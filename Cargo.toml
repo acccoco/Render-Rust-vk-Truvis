@@ -1,0 +1,72 @@
+[package]
+name = "rust-vk"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# vulkan SDK
+# 默认 features：
+# - debug 表示 vulkan 结构体实现了 Debut Trait
+# - loader 表示在运行时动态搜索 vulkan，体现在 Entry 对象的创建上
+ash = "0.37"
+ash-window = "0.12.0"
+
+# window creation lib
+winit = "0.27.5"
+
+# 让 winit 可以和图形库通信
+raw-window-handle = "0.5.0"
+
+# image parser
+image = "0.24.5"
+
+# print 颜色
+colored = "2"
+
+# 各种自动的 macro
+derive-getters = "0.2.0"
+derive-new = "0.5.9"
+derive_setters = "0.1.5"
+derive_builder = "0.12.0"
+
+# 结构体 offset
+memoffset = "0.8.0"
+
+# load gltf
+gltf = "1.0.0"
+
+# graphics math
+# bytemuck：可以转换为 bytes slices
+glam = { version = "0.22.0", features = ["bytemuck", "rand", "serde"] }
+
+# 允许超过 2 个 iter 进行 zip
+itertools = "0.10.5"
+
+# 允许更灵活的 static 变量
+static_init = "1.0.3"
+
+# 方便的初始化 array 的方法
+array-init = "2.1.0"
+
+# 根据字面量创建 CStr
+cstr = "0.2.11"
+
+# 序列化和反序列化
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.91"
+
+# 读取 .obj
+tobj = "3.2.3"
+
+# vulkan memory allocate
+# 只有 git 上最新的才能够和 ash 兼容
+vk-mem = { git = "https://github.com/gwihlidal/vk-mem-rs" }
+
+# 随机数
+rand = "0.8.5"
+rand_derive = "0.5.0"
+
+include_dir = "0.7.3"
+
+# 延迟初始化 static
+lazy_static = "1.4.0"
