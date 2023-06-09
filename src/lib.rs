@@ -1,2 +1,2 @@
-pub mod rhi;
+mod rhi;
 mod window_system;
