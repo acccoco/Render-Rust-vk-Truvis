@@ -1,24 +1,26 @@
 use std::{collections::HashSet, ffi::CStr};
 
-use ash::{vk, Instance};
+use ash::vk;
 use itertools::Itertools;
+use serde::de::Unexpected::Unsigned;
 
 use crate::rhi::queue::{RhiQueueFamilyPresentProps, RhiQueueFamilyProps, RhiQueueType};
 
 
 pub struct RhiPhysicalDevice
 {
-    pub vk_physical_device: vk::PhysicalDevice,
-    pub pd_props: vk::PhysicalDeviceProperties,
-    pub pd_mem_props: vk::PhysicalDeviceMemoryProperties,
-    pub pd_features: vk::PhysicalDeviceFeatures,
-    pub pd_rt_pipeline_props: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR,
-    pub queue_family_props: Vec<RhiQueueFamilyProps>,
+    instance: ash::Instance,
+    pub(crate) vk_physical_device: vk::PhysicalDevice,
+    pub(crate) pd_props: vk::PhysicalDeviceProperties,
+    pub(crate) pd_mem_props: vk::PhysicalDeviceMemoryProperties,
+    pub(crate) pd_features: vk::PhysicalDeviceFeatures,
+    pub(crate) pd_rt_pipeline_props: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR,
+    pub(crate) queue_family_props: Vec<RhiQueueFamilyProps>,
 }
 
 impl RhiPhysicalDevice
 {
-    pub fn new(pdevice: vk::PhysicalDevice, instance: &Instance) -> Self
+    pub fn new(pdevice: vk::PhysicalDevice, instance: ash::Instance) -> Self
     {
         unsafe {
             let mut pd_rt_props = vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
@@ -26,10 +28,11 @@ impl RhiPhysicalDevice
             instance.get_physical_device_properties2(pdevice, &mut pd_props2);
 
             Self {
-                vk_physical_device: pdevice,
-                pd_props: pd_props2.properties,
                 pd_mem_props: instance.get_physical_device_memory_properties(pdevice),
                 pd_features: instance.get_physical_device_features(pdevice),
+                instance,
+                vk_physical_device: pdevice,
+                pd_props: pd_props2.properties,
                 pd_rt_pipeline_props: pd_rt_props,
                 queue_family_props: Vec::new(),
             }
@@ -38,7 +41,6 @@ impl RhiPhysicalDevice
 
     pub fn init_queue_family_props(
         &mut self,
-        instance: &Instance,
         surface: Option<vk::SurfaceKHR>,
         surface_loader: &ash::extensions::khr::Surface,
     )
@@ -46,9 +48,7 @@ impl RhiPhysicalDevice
         unsafe {
             let queue_family_present_prop = |i: u32| {
                 if let Some(surface) = surface {
-                    if surface_loader
-                        .get_physical_device_surface_support(self.vk_physical_device, i, surface)
-                        .unwrap()
+                    if surface_loader.get_physical_device_surface_support(self.vk_physical_device, i, surface).unwrap()
                     {
                         RhiQueueFamilyPresentProps::Supported
                     } else {
@@ -59,7 +59,8 @@ impl RhiPhysicalDevice
                 }
             };
 
-            self.queue_family_props = instance
+            self.queue_family_props = self
+                .instance
                 .get_physical_device_queue_family_properties(self.vk_physical_device)
                 .iter()
                 .enumerate()
@@ -91,10 +92,11 @@ impl RhiPhysicalDevice
 
 
     /// physical device 是否支持指定的所有扩展
-    pub fn check_device_extension_support(&self, instance: &Instance, exts: &[&'static CStr]) -> bool
+    pub fn check_device_extension_support(&self, exts: &[&'static CStr]) -> bool
     {
         unsafe {
-            let supported_exts = instance
+            let supported_exts = self
+                .instance
                 .enumerate_device_extension_properties(self.vk_physical_device)
                 .unwrap()
                 .iter()
@@ -107,5 +109,27 @@ impl RhiPhysicalDevice
             }
             required_exts.is_empty()
         }
+    }
+
+    pub fn find_supported_format(
+        &self,
+        candidates: &[vk::Format],
+        tiling: vk::ImageTiling,
+        features: vk::FormatFeatureFlags,
+    ) -> Vec<vk::Format>
+    {
+        candidates
+            .iter()
+            .filter(|f| {
+                let props =
+                    unsafe { self.instance.get_physical_device_format_properties(self.vk_physical_device, **f) };
+                match tiling {
+                    vk::ImageTiling::LINEAR => props.linear_tiling_features.contains(features),
+                    vk::ImageTiling::OPTIMAL => props.optimal_tiling_features.contains(features),
+                    _ => panic!("not supported tiling."),
+                }
+            })
+            .copied()
+            .collect()
     }
 }
