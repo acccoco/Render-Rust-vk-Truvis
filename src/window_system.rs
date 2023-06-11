@@ -64,7 +64,7 @@ struct WindowSystemEvents
 
 impl WindowSystem
 {
-    pub fn initialize(create_info: WindowCreateInfo) -> Self
+    pub fn init(create_info: WindowCreateInfo) -> Self
     {
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new()

@@ -7,8 +7,8 @@ use crate::window_system::WindowSystem;
 
 pub struct RhiInitInfo<'a>
 {
-    pub app_name: Option<&'static CStr>,
-    pub engine_name: Option<&'static CStr>,
+    pub app_name: Option<String>,
+    pub engine_name: Option<String>,
 
     pub vk_version: u32,
 
@@ -75,14 +75,11 @@ impl<'a> RhiInitInfo<'a>
         }
     }
 
-    pub fn is_complete(&self) -> bool
+    pub fn is_complete(&self) -> Option<()>
     {
-        (|| {
-            self.app_name?;
-            self.engine_name?;
-            Some(())
-        })()
-        .is_some()
+        self.app_name.as_ref()?;
+        self.engine_name.as_ref()?;
+        Some(())
     }
 
 

@@ -228,10 +228,12 @@ impl RhiCore
 
     fn init_instance(&mut self, init_info: &RhiInitInfo)
     {
+        let app_name = CString::new(init_info.app_name.as_ref().unwrap().as_str()).unwrap();
+        let engine_name = CString::new(init_info.engine_name.as_ref().unwrap().as_str()).unwrap();
         let app_info = vk::ApplicationInfo::builder()
-            .application_name(init_info.app_name.as_ref().unwrap())
+            .application_name(app_name.as_ref())
             .application_version(vk::make_api_version(0, 1, 0, 0))
-            .engine_name(init_info.engine_name.as_ref().unwrap())
+            .engine_name(engine_name.as_ref())
             .engine_version(vk::make_api_version(0, 1, 0, 0))
             .api_version(init_info.vk_version);
 
@@ -405,6 +407,8 @@ impl RhiCore
             let compute_queue = device.get_device_queue(self.compute_queue_family_index.unwrap(), 0);
             let present_queue = device.get_device_queue(self.present_queue_family_index.unwrap(), 0);
 
+            self.device = Some(device);
+
             // 为 queue 设置 debug name。考虑 queue 相等的情形
             {
                 let all_queue: HashSet<_> = [graphics_queue, compute_queue, present_queue].into();
@@ -423,7 +427,6 @@ impl RhiCore
                 }
             }
 
-            self.device = Some(device);
             self.graphics_queue = Some(graphics_queue);
             self.present_queue = Some(present_queue);
             self.compute_queue = Some(compute_queue);
