@@ -8,13 +8,11 @@ use crate::{
     window_system::{WindowCreateInfo, WindowSystem},
 };
 
-pub struct Engine
-{
-    window_system: WindowSystem,
-    rhi: Rhi,
-}
+pub struct Engine;
+
 
 static mut G_ENGINE: Option<Engine> = None;
+static mut G_WINDOW_SYSTEM: Option<WindowSystem> = None;
 
 
 pub struct EngineInitInfo
@@ -26,7 +24,10 @@ pub struct EngineInitInfo
 
 impl Engine
 {
-    const EngineName: &'static str = "Hiss";
+    const ENGINE_NAME: &'static str = "Hiss";
+
+    #[inline]
+    pub fn instance() -> &'static Self { unsafe { G_ENGINE.as_ref().unwrap() } }
 
     pub fn init(init_info: &EngineInitInfo)
     {
@@ -49,7 +50,7 @@ impl Engine
         let rhi = {
             let mut rhi_init_info = RhiInitInfo::init_basic(Some(&window_system), Some(vk_debug_callback));
             rhi_init_info.app_name = Some(init_info.app_name.clone());
-            rhi_init_info.engine_name = Some(Self::EngineName.to_string());
+            rhi_init_info.engine_name = Some(Self::ENGINE_NAME.to_string());
             rhi_init_info.is_complete().unwrap();
 
             Rhi::init(&rhi_init_info)
@@ -74,17 +75,19 @@ unsafe extern "system" fn vk_debug_callback(
         CStr::from_ptr(callback_data.p_message).to_string_lossy()
     };
 
+    let format_msg = format!("[{:?}] {}", message_type, msg);
+
     match message_severity {
         vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
-            log::error!("[{:?}][{:?}] {}\n", message_severity, message_type, msg)
+            log::error!("{}", format_msg);
         }
         vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {
-            log::warn!("[{:?}][{:?}] {}\n", message_severity, message_type, msg)
+            log::warn!("{}", format_msg);
         }
         vk::DebugUtilsMessageSeverityFlagsEXT::INFO => {
-            log::info!("[{:?}][{:?}] {}\n", message_severity, message_type, msg)
+            log::info!("{}", format_msg);
         }
-        _ => log::info!("[{:?}][{:?}] {}\n", message_severity, message_type, msg),
+        _ => log::info!("{}", format_msg),
     };
 
     // 只有 layer developer 才需要返回 True

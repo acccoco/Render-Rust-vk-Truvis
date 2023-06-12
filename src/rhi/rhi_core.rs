@@ -186,6 +186,40 @@ impl RhiCore
         self.try_set_debug_name(fence, debug_name);
         fence
     }
+
+    /// @param min_align 对 memory 的 offset align 限制
+    pub fn create_buffer(
+        &self,
+        size: vk::DeviceSize,
+        buffer_usage: vk::BufferUsageFlags,
+        mem_usage: vk_mem::MemoryUsage,
+        alloc_flags: vk_mem::AllocationCreateFlags,
+        min_align: Option<vk::DeviceSize>,
+        debug_name: Option<&str>,
+    ) -> (vk::Buffer, vk_mem::Allocation)
+    {
+        let buffer_info = vk::BufferCreateInfo {
+            size,
+            usage: buffer_usage,
+            ..Default::default()
+        };
+        let alloc_info = vk_mem::AllocationCreateInfo {
+            usage: mem_usage,
+            flags: alloc_flags,
+            ..Default::default()
+        };
+
+        unsafe {
+            let (buffer, allocation) = if let Some(offset_align) = min_align {
+                self.vma().create_buffer_with_alignment(&buffer_info, &alloc_info, offset_align).unwrap()
+            } else {
+                self.vma().create_buffer(&buffer_info, &alloc_info).unwrap()
+            };
+            
+            self.try_set_debug_name(buffer, debug_name);
+            (buffer, allocation)
+        }
+    }
 }
 
 
