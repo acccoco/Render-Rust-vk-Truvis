@@ -6,6 +6,7 @@ use crate::{
     rhi_init_info::RhiInitInfo,
     window_system::WindowSystem,
 };
+use crate::rhi::rhi_struct::RhiCommandPool;
 
 pub struct RenderCtx
 {
@@ -14,7 +15,7 @@ pub struct RenderCtx
     frames_cnt: usize,
 
     // 为每个 frame 分配一个 command pool
-    graphics_command_pools: Vec<vk::CommandPool>,
+    graphics_command_pools: Vec<RhiCommandPool>,
 
     depth_format: Option<vk::Format>,
     depth_image: Option<vk::Image>,

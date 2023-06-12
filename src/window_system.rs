@@ -28,6 +28,10 @@ type OnDropFunc = fn(i32, String) -> ();
 type OnWindowSizeFunc = fn(i32, i32) -> ();
 type OnWindowCloseFunc = fn() -> ();
 
+
+static mut G_WINDOW_SYSTEM: Option<WindowSystem> = None;
+
+
 #[derive(Getters)]
 pub struct WindowSystem
 {
@@ -64,27 +68,31 @@ struct WindowSystemEvents
 
 impl WindowSystem
 {
-    pub fn init(create_info: WindowCreateInfo) -> Self
+    pub fn init(create_info: WindowCreateInfo)
     {
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new()
             .with_title(create_info.title)
-            .with_inner_size(winit::dpi::LogicalSize::new(
-                f64::from(create_info.width),
-                f64::from(create_info.height),
-            ))
+            .with_inner_size(winit::dpi::LogicalSize::new(f64::from(create_info.width), f64::from(create_info.height)))
             .build(&event_loop)
             .unwrap();
 
-        Self {
+        let window_system = Self {
             window,
             event_loop: RefCell::new(event_loop),
             width: create_info.width,
             height: create_info.height,
             is_focus_mode: false,
             events: Default::default(),
+        };
+
+        unsafe {
+            G_WINDOW_SYSTEM = Some(window_system);
         }
     }
+
+    #[inline]
+    pub fn instance() -> &'static Self { unsafe { G_WINDOW_SYSTEM.as_ref().unwrap() } }
 
     pub fn render_loop(&self, f: impl Fn())
     {

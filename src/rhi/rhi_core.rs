@@ -13,6 +13,7 @@ use crate::{
     rhi::{
         physical_device::RhiPhysicalDevice,
         queue::{RhiQueueFamilyPresentProps, RhiQueueType},
+        rhi_struct::{RhiCommandPool, RhiQueue},
     },
     rhi_init_info::RhiInitInfo,
 };
@@ -40,9 +41,9 @@ pub struct RhiCore
     pub(crate) graphics_queue_family_index: Option<u32>,
     pub(crate) present_queue_family_index: Option<u32>,
 
-    compute_queue: Option<vk::Queue>,
-    graphics_queue: Option<vk::Queue>,
-    present_queue: Option<vk::Queue>,
+    compute_queue: Option<RhiQueue>,
+    graphics_queue: Option<RhiQueue>,
+    present_queue: Option<RhiQueue>,
 
     vma: Option<vk_mem::Allocator>,
 }
@@ -68,11 +69,11 @@ impl RhiCore
         unsafe { self.physical_device.as_ref().unwrap_unchecked() }
     }
     #[inline]
-    pub(crate) fn compute_queue(&self) -> vk::Queue { unsafe { self.compute_queue.unwrap_unchecked() } }
+    pub(crate) fn compute_queue(&self) -> &RhiQueue { self.compute_queue.as_ref().unwrap() }
     #[inline]
-    pub(crate) fn graphics_queue(&self) -> vk::Queue { unsafe { self.graphics_queue.unwrap_unchecked() } }
+    pub(crate) fn graphics_queue(&self) -> &RhiQueue { self.graphics_queue.as_ref().unwrap() }
     #[inline]
-    pub(crate) fn present_queue(&self) -> vk::Queue { self.present_queue.unwrap() }
+    pub(crate) fn present_queue(&self) -> &RhiQueue { self.present_queue.as_ref().unwrap() }
     #[inline]
     pub(crate) fn vma(&self) -> &vk_mem::Allocator { unsafe { self.vma.as_ref().unwrap_unchecked() } }
 }
@@ -117,7 +118,7 @@ impl RhiCore
         queue_family_type: RhiQueueType,
         flags: vk::CommandPoolCreateFlags,
         debug_name: Option<&str>,
-    ) -> vk::CommandPool
+    ) -> RhiCommandPool
     {
         let queue_family_index = match queue_family_type {
             RhiQueueType::Compute => self.compute_queue_family_index.unwrap(),
@@ -135,7 +136,10 @@ impl RhiCore
         };
 
         self.try_set_debug_name(pool, debug_name);
-        pool
+        RhiCommandPool {
+            command_pool: pool,
+            queue_family_index,
+        }
     }
 
     pub fn create_image(
@@ -185,40 +189,6 @@ impl RhiCore
 
         self.try_set_debug_name(fence, debug_name);
         fence
-    }
-
-    /// @param min_align 对 memory 的 offset align 限制
-    pub fn create_buffer(
-        &self,
-        size: vk::DeviceSize,
-        buffer_usage: vk::BufferUsageFlags,
-        mem_usage: vk_mem::MemoryUsage,
-        alloc_flags: vk_mem::AllocationCreateFlags,
-        min_align: Option<vk::DeviceSize>,
-        debug_name: Option<&str>,
-    ) -> (vk::Buffer, vk_mem::Allocation)
-    {
-        let buffer_info = vk::BufferCreateInfo {
-            size,
-            usage: buffer_usage,
-            ..Default::default()
-        };
-        let alloc_info = vk_mem::AllocationCreateInfo {
-            usage: mem_usage,
-            flags: alloc_flags,
-            ..Default::default()
-        };
-
-        unsafe {
-            let (buffer, allocation) = if let Some(offset_align) = min_align {
-                self.vma().create_buffer_with_alignment(&buffer_info, &alloc_info, offset_align).unwrap()
-            } else {
-                self.vma().create_buffer(&buffer_info, &alloc_info).unwrap()
-            };
-            
-            self.try_set_debug_name(buffer, debug_name);
-            (buffer, allocation)
-        }
     }
 }
 
@@ -461,9 +431,18 @@ impl RhiCore
                 }
             }
 
-            self.graphics_queue = Some(graphics_queue);
-            self.present_queue = Some(present_queue);
-            self.compute_queue = Some(compute_queue);
+            self.graphics_queue = Some(RhiQueue {
+                queue: graphics_queue,
+                queue_family_index: self.graphics_queue_family_index.unwrap(),
+            });
+            self.present_queue = Some(RhiQueue {
+                queue: present_queue,
+                queue_family_index: self.present_queue_family_index.unwrap(),
+            });
+            self.compute_queue = Some(RhiQueue {
+                queue: compute_queue,
+                queue_family_index: self.compute_queue_family_index.unwrap(),
+            });
         }
     }
 

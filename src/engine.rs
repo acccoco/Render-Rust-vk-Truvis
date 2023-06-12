@@ -12,7 +12,6 @@ pub struct Engine;
 
 
 static mut G_ENGINE: Option<Engine> = None;
-static mut G_WINDOW_SYSTEM: Option<WindowSystem> = None;
 
 
 pub struct EngineInitInfo
@@ -31,32 +30,22 @@ impl Engine
 
     pub fn init(init_info: &EngineInitInfo)
     {
-        let engine = Self::new(init_info);
-        unsafe {
-            G_ENGINE = Some(engine);
-        }
-    }
-
-    fn new(init_info: &EngineInitInfo) -> Self
-    {
         simple_logger::SimpleLogger::new().init().unwrap();
 
-        let window_system = WindowSystem::init(WindowCreateInfo {
+        WindowSystem::init(WindowCreateInfo {
             height: init_info.window_height as i32,
             width: init_info.window_width as i32,
             title: init_info.app_name.clone(),
         });
 
-        let rhi = {
-            let mut rhi_init_info = RhiInitInfo::init_basic(Some(&window_system), Some(vk_debug_callback));
+        {
+            let mut rhi_init_info = RhiInitInfo::init_basic(Some(WindowSystem::instance()), Some(vk_debug_callback));
             rhi_init_info.app_name = Some(init_info.app_name.clone());
             rhi_init_info.engine_name = Some(Self::ENGINE_NAME.to_string());
             rhi_init_info.is_complete().unwrap();
 
-            Rhi::init(&rhi_init_info)
-        };
-
-        Self { rhi, window_system }
+            Rhi::init(&rhi_init_info);
+        }
     }
 }
 

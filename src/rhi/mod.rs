@@ -1,11 +1,8 @@
-use std::ffi::CStr;
-
-use ash::{extensions::khr::Swapchain, vk};
-use raw_window_handle::HasRawDisplayHandle;
+use ash::vk;
 use rhi_core::RhiCore;
 
 use crate::{
-    rhi::{queue::RhiQueueType, render_ctx::RenderCtx, swapchain::RHISwapchain},
+    rhi::{queue::RhiQueueType, render_ctx::RenderCtx, rhi_struct::RhiCommandPool, swapchain::RHISwapchain},
     rhi_init_info::RhiInitInfo,
     window_system::WindowSystem,
 };
@@ -15,7 +12,11 @@ mod physical_device;
 mod queue;
 mod render_ctx;
 mod rhi_core;
+pub(crate) mod rhi_struct;
 mod swapchain;
+
+static mut G_RHI: Option<Rhi> = None;
+
 
 pub struct Rhi
 {
@@ -24,7 +25,7 @@ pub struct Rhi
 
     // TODO 移动到 context 里面去
     descriptor_pool: Option<vk::DescriptorPool>,
-    graphics_command_pool: Option<vk::CommandPool>,
+    graphics_command_pool: Option<RhiCommandPool>,
 
     context: Option<RenderCtx>,
 }
@@ -34,9 +35,20 @@ impl Rhi
     const MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
     const MAX_MATERIAL_CNT: u32 = 256;
 
+    #[inline]
     pub fn core(&self) -> &RhiCore { unsafe { self.core.as_ref().unwrap_unchecked() } }
 
-    pub fn init(init_info: &RhiInitInfo) -> Self
+    #[inline]
+    pub fn device(&self) -> &ash::Device { self.core().device() }
+
+    #[inline]
+    pub fn vma(&self) -> &vk_mem::Allocator { self.core().vma() }
+
+    #[inline]
+    pub(crate) fn graphics_command_pool(&self) -> &RhiCommandPool { self.graphics_command_pool.as_ref().unwrap() }
+
+
+    pub fn init(init_info: &RhiInitInfo)
     {
         let core = RhiCore::init(init_info);
         let mut rhi = Self {
@@ -51,9 +63,13 @@ impl Rhi
         rhi.init_descriptor_pool();
         rhi.init_command_pool();
 
-
-        rhi
+        unsafe {
+            G_RHI = Some(rhi);
+        }
     }
+
+    #[inline]
+    pub fn instance() -> &'static Self { unsafe { G_RHI.as_ref().unwrap_unchecked() } }
 
     fn init_descriptor_pool(&mut self)
     {
@@ -99,10 +115,12 @@ impl Rhi
 
     fn init_command_pool(&mut self)
     {
-        self.graphics_command_pool = Some(self.core().create_command_pool(
+        let command_pool = self.core().create_command_pool(
             RhiQueueType::Graphics,
             vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
             Some("rhi-core-graphics-command-pool"),
-        ));
+        );
+
+        self.graphics_command_pool = Some(command_pool)
     }
 }
