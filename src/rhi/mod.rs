@@ -21,6 +21,8 @@ pub struct Rhi
 {
     core: Option<RhiCore>,
     swapchain: Option<RHISwapchain>,
+
+    // TODO 移动到 context 里面去
     descriptor_pool: Option<vk::DescriptorPool>,
     graphics_command_pool: Option<vk::CommandPool>,
 
