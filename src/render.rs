@@ -3,15 +3,16 @@ use std::ffi::CStr;
 use ash::vk;
 
 use crate::{
-    rhi::Rhi,
-    rhi_init_info::RhiInitInfo,
+    render_context::{RenderContext, RenderContextInitInfo},
+    rhi::{init_info::RhiInitInfo, Rhi},
+    swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
     window_system::{WindowCreateInfo, WindowSystem},
 };
 
-pub struct Engine;
+pub struct Render;
 
 
-static mut G_ENGINE: Option<Engine> = None;
+static mut G_ENGINE: Option<Render> = None;
 
 
 pub struct EngineInitInfo
@@ -21,7 +22,7 @@ pub struct EngineInitInfo
     pub app_name: String,
 }
 
-impl Engine
+impl Render
 {
     const ENGINE_NAME: &'static str = "Hiss";
 
@@ -39,13 +40,17 @@ impl Engine
         });
 
         {
-            let mut rhi_init_info = RhiInitInfo::init_basic(Some(WindowSystem::instance()), Some(vk_debug_callback));
+            let mut rhi_init_info = RhiInitInfo::init_basic(Some(vk_debug_callback));
             rhi_init_info.app_name = Some(init_info.app_name.clone());
             rhi_init_info.engine_name = Some(Self::ENGINE_NAME.to_string());
             rhi_init_info.is_complete().unwrap();
 
             Rhi::init(&rhi_init_info);
         }
+
+        RenderSwapchain::init(&RenderSwapchainInitInfo::default());
+
+        RenderContext::init(&RenderContextInitInfo::default());
     }
 }
 

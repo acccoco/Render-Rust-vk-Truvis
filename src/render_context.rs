@@ -2,13 +2,34 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::{
-    rhi::{create_utils::RhiCreateInfoUtil, queue::RhiQueueType, rhi_core::RhiCore, swapchain::RHISwapchain},
-    rhi_init_info::RhiInitInfo,
-    window_system::WindowSystem,
+    rhi::{command_pool::RhiCommandPool, create_utils::RhiCreateInfoUtil, Rhi},
+    swapchain::RenderSwapchain,
 };
-use crate::rhi::rhi_struct::RhiCommandPool;
 
-pub struct RenderCtx
+pub(crate) struct RenderContextInitInfo
+{
+    frames_in_flight: usize,
+    depth_format_dedicate: Vec<vk::Format>,
+}
+
+impl Default for RenderContextInitInfo
+{
+    fn default() -> Self
+    {
+        Self {
+            depth_format_dedicate: vec![
+                vk::Format::D32_SFLOAT,
+                vk::Format::D32_SFLOAT_S8_UINT,
+                vk::Format::D24_UNORM_S8_UINT,
+            ],
+            frames_in_flight: 3,
+        }
+    }
+}
+
+static mut RENDER_CONTEXT: Option<RenderContext> = None;
+
+pub struct RenderContext
 {
     swapchain_image_index: usize,
     frame_index: usize,
@@ -27,14 +48,14 @@ pub struct RenderCtx
     fence_frame_in_flight: Vec<vk::Fence>,
 }
 
-impl RenderCtx
+impl RenderContext
 {
-    pub(crate) fn init(rhi_core: &RhiCore, swapchain: &RHISwapchain, init_info: &RhiInitInfo) -> Self
+    pub(crate) fn init(init_info: &RenderContextInitInfo)
     {
-        let mut ctx = RenderCtx {
+        let mut ctx = RenderContext {
             swapchain_image_index: 0,
             frame_index: 0,
-            frames_cnt: init_info.frames_in_flight as usize,
+            frames_cnt: init_info.frames_in_flight,
 
             graphics_command_pools: vec![],
 
@@ -48,19 +69,20 @@ impl RenderCtx
             fence_frame_in_flight: vec![],
         };
 
-        ctx.init_depth_image_and_view(rhi_core, swapchain, init_info);
-        ctx.init_synchronous_primitives(rhi_core);
-        ctx.init_command_pool(rhi_core);
+        ctx.init_depth_image_and_view(&init_info.depth_format_dedicate);
+        ctx.init_synchronous_primitives();
+        ctx.init_command_pool();
 
-        ctx
+        unsafe { RENDER_CONTEXT = Some(ctx) }
     }
 
-    fn init_depth_image_and_view(&mut self, rhi_core: &RhiCore, swapchain: &RHISwapchain, init_info: &RhiInitInfo)
+    fn init_depth_image_and_view(&mut self, depth_format_dedicate: &[vk::Format])
     {
-        let depth_format = rhi_core
-            .physical_device()
+        let rhi = Rhi::instance();
+
+        let depth_format = rhi
             .find_supported_format(
-                &init_info.depth_format_dedicate,
+                depth_format_dedicate,
                 vk::ImageTiling::OPTIMAL,
                 vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
             )
@@ -70,11 +92,11 @@ impl RenderCtx
 
         let (depth_image, depth_image_allocation) = {
             let create_info = RhiCreateInfoUtil::make_image2d_create_info(
-                swapchain.extent.unwrap(),
+                RenderSwapchain::instance().extent.unwrap(),
                 depth_format,
                 vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
             );
-            rhi_core.create_image(&create_info, Some("depth-image"))
+            rhi.create_image(&create_info, Some("depth-image"))
         };
 
         let depth_image_view = {
@@ -83,7 +105,7 @@ impl RenderCtx
                 depth_format,
                 vk::ImageAspectFlags::DEPTH,
             );
-            rhi_core.create_image_view(&create_info, Some("depth-image-view"))
+            rhi.create_image_view(&create_info, Some("depth-image-view"))
         };
 
         self.depth_format = Some(depth_format);
@@ -92,28 +114,31 @@ impl RenderCtx
         self.depth_image_view = Some(depth_image_view);
     }
 
-    fn init_synchronous_primitives(&mut self, rhi_core: &RhiCore)
+    fn init_synchronous_primitives(&mut self)
     {
-        let create_semaphore = |name: &str| {
-            (0..self.frames_cnt).map(|i| rhi_core.create_semaphore(Some(&format!("{name}-{i}")))).collect_vec()
-        };
+        let rhi = Rhi::instance();
+
+        let create_semaphore =
+            |name: &str| (0..self.frames_cnt).map(|i| rhi.create_semaphore(Some(&format!("{name}-{i}")))).collect_vec();
         self.semaphore_image_available_for_render = create_semaphore("image-available-for-render");
         self.semaphore_image_finished_for_present = create_semaphore("image-finished-for-present");
 
         self.fence_frame_in_flight = (0..self.frames_cnt)
-            .map(|i| rhi_core.create_fence(true, Some(&format!("frame-in-flight-{i}"))))
+            .map(|i| rhi.create_fence(true, Some(&format!("frame-in-flight-{i}"))))
             .collect();
     }
 
-    fn init_command_pool(&mut self, rhi_core: &RhiCore)
+    fn init_command_pool(&mut self)
     {
+        let rhi = Rhi::instance();
         self.graphics_command_pools = (0..self.frames_cnt)
             .map(|i| {
-                rhi_core.create_command_pool(
-                    RhiQueueType::Graphics,
+                rhi.create_command_pool(
+                    vk::QueueFlags::GRAPHICS,
                     vk::CommandPoolCreateFlags::TRANSIENT,
-                    Some("context-graphics-pool"),
+                    Some(&format!("context-graphics-{}", i)),
                 )
+                .unwrap()
             })
             .collect();
     }

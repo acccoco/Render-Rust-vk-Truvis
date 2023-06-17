@@ -37,12 +37,12 @@ fn compile_all_shader()
         .filter_map(|entry| {
             let entry = entry.unwrap();
             let file_name = entry.file_name().into_string().unwrap();
-            if file_name.contains(".vert")
-                || file_name.contains(".frag")
-                || file_name.contains(".comp")
-                || file_name.contains(".rchit")
-                || file_name.contains(".rgen")
-                || file_name.contains(".rmiss")
+            if file_name.contains(".vert") ||
+                file_name.contains(".frag") ||
+                file_name.contains(".comp") ||
+                file_name.contains(".rchit") ||
+                file_name.contains(".rgen") ||
+                file_name.contains(".rmiss")
             {
                 Some(file_name)
             } else {

@@ -9,6 +9,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
+
 pub struct WindowCreateInfo
 {
     pub width: i32,
@@ -29,7 +30,7 @@ type OnWindowSizeFunc = fn(i32, i32) -> ();
 type OnWindowCloseFunc = fn() -> ();
 
 
-static mut G_WINDOW_SYSTEM: Option<WindowSystem> = None;
+static mut WINDOW_SYSTEM: Option<WindowSystem> = None;
 
 
 #[derive(Getters)]
@@ -87,12 +88,12 @@ impl WindowSystem
         };
 
         unsafe {
-            G_WINDOW_SYSTEM = Some(window_system);
+            WINDOW_SYSTEM = Some(window_system);
         }
     }
 
     #[inline]
-    pub fn instance() -> &'static Self { unsafe { G_WINDOW_SYSTEM.as_ref().unwrap() } }
+    pub fn instance() -> &'static Self { unsafe { WINDOW_SYSTEM.as_ref().unwrap() } }
 
     pub fn render_loop(&self, f: impl Fn())
     {

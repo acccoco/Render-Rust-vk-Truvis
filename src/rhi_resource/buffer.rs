@@ -43,7 +43,7 @@ impl RhiBuffer
                 rhi.vma().create_buffer(&buffer_info, &alloc_info).unwrap()
             };
 
-            rhi.core().try_set_debug_name(buffer, debug_name);
+            rhi.try_set_debug_name(buffer, debug_name);
             Self {
                 buffer,
                 allocation,
