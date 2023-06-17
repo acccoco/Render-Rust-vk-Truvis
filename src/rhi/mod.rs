@@ -2,15 +2,15 @@ use ash::vk;
 use rhi_core::RhiCore;
 
 use crate::{
-    rhi::{queue::RhiQueueType, render_ctx::RenderCtx, rhi_struct::RhiCommandPool, swapchain::RHISwapchain},
+    rhi::{queue::RhiQueueType, rhi_context::RenderCtx, rhi_struct::RhiCommandPool, swapchain::RHISwapchain},
     rhi_init_info::RhiInitInfo,
     window_system::WindowSystem,
 };
 
-mod create_info_uitls;
+mod create_utils;
 mod physical_device;
 mod queue;
-mod render_ctx;
+mod rhi_context;
 mod rhi_core;
 pub(crate) mod rhi_struct;
 mod swapchain;
@@ -23,7 +23,6 @@ pub struct Rhi
     core: Option<RhiCore>,
     swapchain: Option<RHISwapchain>,
 
-    // TODO 移动到 context 里面去
     descriptor_pool: Option<vk::DescriptorPool>,
     graphics_command_pool: Option<RhiCommandPool>,
 
@@ -36,7 +35,7 @@ impl Rhi
     const MAX_MATERIAL_CNT: u32 = 256;
 
     #[inline]
-    pub fn core(&self) -> &RhiCore { unsafe { self.core.as_ref().unwrap_unchecked() } }
+    pub(crate) fn core(&self) -> &RhiCore { unsafe { self.core.as_ref().unwrap_unchecked() } }
 
     #[inline]
     pub fn device(&self) -> &ash::Device { self.core().device() }

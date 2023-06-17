@@ -2,7 +2,7 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::{
-    rhi::{create_info_uitls::RhiCreateInfoUtil, queue::RhiQueueType, rhi_core::RhiCore, swapchain::RHISwapchain},
+    rhi::{create_utils::RhiCreateInfoUtil, queue::RhiQueueType, rhi_core::RhiCore, swapchain::RHISwapchain},
     rhi_init_info::RhiInitInfo,
     window_system::WindowSystem,
 };
@@ -29,7 +29,7 @@ pub struct RenderCtx
 
 impl RenderCtx
 {
-    pub fn init(rhi_core: &RhiCore, swapchain: &RHISwapchain, init_info: &RhiInitInfo) -> Self
+    pub(crate) fn init(rhi_core: &RhiCore, swapchain: &RHISwapchain, init_info: &RhiInitInfo) -> Self
     {
         let mut ctx = RenderCtx {
             swapchain_image_index: 0,

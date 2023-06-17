@@ -20,7 +20,7 @@ use crate::{
 
 
 /// Rhi 只需要做到能够创建各种资源的程度就行了
-pub struct RhiCore
+pub(crate) struct RhiCore
 {
     entry: Option<Entry>,
     instance: Option<Instance>,
@@ -31,8 +31,7 @@ pub struct RhiCore
 
     debug_util_messenger: Option<vk::DebugUtilsMessengerEXT>,
 
-    /// 这个字段是可空的
-    surface: Option<vk::SurfaceKHR>,
+    surface: Option<vk::SurfaceKHR>, // 这个字段是可空的
 
     physical_device: Option<RhiPhysicalDevice>,
     device: Option<Device>,
@@ -120,26 +119,27 @@ impl RhiCore
         debug_name: Option<&str>,
     ) -> RhiCommandPool
     {
-        let queue_family_index = match queue_family_type {
-            RhiQueueType::Compute => self.compute_queue_family_index.unwrap(),
-            RhiQueueType::Graphics => self.graphics_queue_family_index.unwrap(),
-            RhiQueueType::Present => self.present_queue_family_index.unwrap(),
-        };
-
-        let pool = unsafe {
-            self.device()
-                .create_command_pool(
-                    &vk::CommandPoolCreateInfo::builder().queue_family_index(queue_family_index).flags(flags),
-                    None,
-                )
-                .unwrap()
-        };
-
-        self.try_set_debug_name(pool, debug_name);
-        RhiCommandPool {
-            command_pool: pool,
-            queue_family_index,
-        }
+    todo!()
+        // let queue_family_index = match queue_family_type {
+        //     RhiQueueType::Compute => self.compute_queue_family_index.unwrap(),
+        //     RhiQueueType::Graphics => self.graphics_queue_family_index.unwrap(),
+        //     RhiQueueType::Present => self.present_queue_family_index.unwrap(),
+        // };
+        //
+        // let pool = unsafe {
+        //     self.device()
+        //         .create_command_pool(
+        //             &vk::CommandPoolCreateInfo::builder().queue_family_index(queue_family_index).flags(flags),
+        //             None,
+        //         )
+        //         .unwrap()
+        // };
+        //
+        // self.try_set_debug_name(pool, debug_name);
+        // RhiCommandPool {
+        //     command_pool: pool,
+        //     queue_family_index,
+        // }
     }
 
     pub fn create_image(
@@ -306,7 +306,7 @@ impl RhiCore
     fn init_pdevice(&mut self, init_info: &RhiInitInfo)
     {
         /// 检查 physical device 是否满足要求
-        pub fn check_suitable(pdevice: &RhiPhysicalDevice, instance: &Instance, exts: &[&'static CStr]) -> bool
+        pub(crate) fn check_suitable(pdevice: &RhiPhysicalDevice, instance: &Instance, exts: &[&'static CStr]) -> bool
         {
             // check queue family
             {

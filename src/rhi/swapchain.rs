@@ -25,7 +25,7 @@ pub struct RHISwapchain
 
 impl RHISwapchain
 {
-    pub fn new(rhi_core: &RhiCore, init_info: &RhiInitInfo) -> Self
+    pub(crate) fn new(rhi_core: &RhiCore, init_info: &RhiInitInfo) -> Self
     {
         let mut swapchain = unsafe {
             let pdevice = rhi_core.physical_device().vk_physical_device;

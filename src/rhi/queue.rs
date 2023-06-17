@@ -1,3 +1,5 @@
+use bitflags::bitflags;
+
 /// 某个 queue family 对 present 的支持情况
 #[derive(PartialEq)]
 pub enum RhiQueueFamilyPresentProps
@@ -15,12 +17,16 @@ pub struct RhiQueueFamilyProps
     pub compute: bool,
     pub graphics: bool,
     pub present: RhiQueueFamilyPresentProps,
+    pub transfer: bool,
 }
 
 
-pub enum RhiQueueType
-{
-    Graphics,
-    Compute,
-    Present,
+bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    pub struct RhiQueueType : u32{
+        const Graphics = 1;
+        const Compute = 2;
+        const Present = 3;
+        const Transfer = 4;
+    }
 }

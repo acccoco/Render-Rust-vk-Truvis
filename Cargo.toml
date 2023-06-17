@@ -74,3 +74,5 @@ lazy_static = "1.4.0"
 # 日志
 log = "0.4.0"
 simple_logger = { version = "4.1.0", default-features = false, features = ["colors"] }
+
+bitflags = "2.3.2"

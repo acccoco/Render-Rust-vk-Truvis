@@ -1,8 +1,6 @@
 use std::{collections::HashSet, ffi::CStr};
 
 use ash::vk;
-use itertools::Itertools;
-use serde::de::Unexpected::Unsigned;
 
 use crate::rhi::queue::{RhiQueueFamilyPresentProps, RhiQueueFamilyProps, RhiQueueType};
 
@@ -20,7 +18,7 @@ pub struct RhiPhysicalDevice
 
 impl RhiPhysicalDevice
 {
-    pub fn new(pdevice: vk::PhysicalDevice, instance: ash::Instance) -> Self
+    pub(crate) fn new(pdevice: vk::PhysicalDevice, instance: ash::Instance) -> Self
     {
         unsafe {
             let mut pd_rt_props = vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
@@ -39,7 +37,7 @@ impl RhiPhysicalDevice
         }
     }
 
-    pub fn init_queue_family_props(
+    pub(crate) fn init_queue_family_props(
         &mut self,
         surface: Option<vk::SurfaceKHR>,
         surface_loader: &ash::extensions::khr::Surface,
@@ -68,8 +66,9 @@ impl RhiPhysicalDevice
                     compute: prop.queue_flags.contains(vk::QueueFlags::COMPUTE),
                     graphics: prop.queue_flags.contains(vk::QueueFlags::GRAPHICS),
                     present: queue_family_present_prop(i as u32),
+                    transfer: prop.queue_flags.contains(vk::QueueFlags::TRANSFER),
                 })
-                .collect_vec();
+                .collect();
         }
     }
 
@@ -77,15 +76,17 @@ impl RhiPhysicalDevice
     pub fn is_descrete_gpu(&self) -> bool { self.pd_props.device_type == vk::PhysicalDeviceType::DISCRETE_GPU }
 
 
+    /// 返回 index
     pub fn find_queue_family_index(&self, queue_type: RhiQueueType) -> Option<u32>
     {
         self.queue_family_props
             .iter()
             .enumerate()
-            .find(|(_, prop)| match queue_type {
-                RhiQueueType::Compute => prop.compute,
-                RhiQueueType::Graphics => prop.graphics,
-                RhiQueueType::Present => prop.present == RhiQueueFamilyPresentProps::Supported,
+            .find(|(_, prop)| {
+                if queue_type.contains(RhiQueueType::Compute) && !prop.compute {
+                    return false;
+                }
+                return true;
             })
             .map(|(index, _)| index as u32)
     }
@@ -95,13 +96,13 @@ impl RhiPhysicalDevice
     pub fn check_device_extension_support(&self, exts: &[&'static CStr]) -> bool
     {
         unsafe {
-            let supported_exts = self
+            let supported_exts: Vec<_> = self
                 .instance
                 .enumerate_device_extension_properties(self.vk_physical_device)
                 .unwrap()
                 .iter()
                 .map(|ext| CStr::from_ptr(ext.extension_name.as_ptr()))
-                .collect_vec();
+                .collect();
 
             let mut required_exts: HashSet<_> = exts.iter().collect();
             for ext in supported_exts {
