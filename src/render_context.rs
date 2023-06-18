@@ -1,8 +1,12 @@
-use ash::vk;
+use ash::{extensions::khr::Swapchain, vk};
 use itertools::Itertools;
 
 use crate::{
-    rhi::{command_pool::RhiCommandPool, create_utils::RhiCreateInfoUtil, Rhi},
+    resource_type::{
+        command_pool::RhiCommandPool,
+        sync_primitives::{RhiFence, RhiSemaphore},
+    },
+    rhi::{create_utils::RhiCreateInfoUtil, Rhi},
     swapchain::RenderSwapchain,
 };
 
@@ -32,6 +36,7 @@ static mut RENDER_CONTEXT: Option<RenderContext> = None;
 pub struct RenderContext
 {
     swapchain_image_index: usize,
+
     frame_index: usize,
     frames_cnt: usize,
 
@@ -42,10 +47,11 @@ pub struct RenderContext
     depth_image: Option<vk::Image>,
     depth_image_allcation: Option<vk_mem::Allocation>,
     depth_image_view: Option<vk::ImageView>,
+    depth_attach_info: vk::RenderingAttachmentInfo,
 
-    semaphore_image_available_for_render: Vec<vk::Semaphore>,
-    semaphore_image_finished_for_present: Vec<vk::Semaphore>,
-    fence_frame_in_flight: Vec<vk::Fence>,
+    semaphores_swapchain_available: Vec<RhiSemaphore>,
+    semaphores_image_render_finish: Vec<RhiSemaphore>,
+    fence_frame_in_flight: Vec<RhiFence>,
 }
 
 impl RenderContext
@@ -64,17 +70,99 @@ impl RenderContext
             depth_image_allcation: None,
             depth_image_view: None,
 
-            semaphore_image_available_for_render: vec![],
-            semaphore_image_finished_for_present: vec![],
+            depth_attach_info: Default::default(),
+            semaphores_swapchain_available: vec![],
+            semaphores_image_render_finish: vec![],
             fence_frame_in_flight: vec![],
         };
 
         ctx.init_depth_image_and_view(&init_info.depth_format_dedicate);
         ctx.init_synchronous_primitives();
         ctx.init_command_pool();
+        ctx.init_depth_attach();
 
         unsafe { RENDER_CONTEXT = Some(ctx) }
     }
+
+    #[inline]
+    pub fn acquire_frame()
+    {
+        unsafe {
+            let mut ctx = RENDER_CONTEXT.as_mut().unwrap_unchecked();
+
+            let current_fence = &mut ctx.fence_frame_in_flight[ctx.frame_index];
+            ctx.swapchain_image_index = RenderSwapchain::instance()
+                .acquire_next_frame(&ctx.semaphores_swapchain_available[ctx.frame_index], Some(current_fence))
+                as usize;
+
+            current_fence.wait();
+            current_fence.reset();
+        }
+    }
+
+    #[inline]
+    pub fn submit_frame()
+    {
+        unsafe {
+            let mut ctx = RENDER_CONTEXT.as_mut().unwrap_unchecked();
+
+            RenderSwapchain::instance().submit_frame(
+                ctx.swapchain_image_index as u32,
+                &[RenderContext::current_image_render_finish_semaphore().semaphore],
+            );
+
+            ctx.frame_index = (ctx.frame_index + 1) % ctx.frames_cnt;
+        }
+    }
+
+    #[inline]
+    pub fn extent() -> vk::Extent2D { RenderSwapchain::instance().extent() }
+
+    #[inline]
+    pub fn current_image_render_finish_semaphore() -> RhiSemaphore
+    {
+        let ctx = Self::instance();
+        ctx.semaphores_image_render_finish[ctx.frame_index]
+    }
+
+    #[inline]
+    pub fn current_swapchain_available_semaphore() -> RhiSemaphore
+    {
+        let ctx = Self::instance();
+        ctx.semaphores_swapchain_available[ctx.frame_index]
+    }
+
+    #[inline]
+    pub fn color_attach_info() -> &'static vk::RenderingAttachmentInfo
+    {
+        &RenderSwapchain::instance().color_attach_infos[Self::instance().swapchain_image_index]
+    }
+
+    #[inline]
+    pub fn depth_attach_info() -> &'static vk::RenderingAttachmentInfo { &Self::instance().depth_attach_info }
+
+    #[inline]
+    pub fn current_image() -> vk::Image { RenderSwapchain::instance().images[Self::instance().swapchain_image_index] }
+
+    #[inline]
+    pub fn render_info() -> vk::RenderingInfo
+    {
+        vk::RenderingInfo::builder()
+            .layer_count(1)
+            .render_area(Self::extent().into())
+            .color_attachments(std::slice::from_ref(Self::color_attach_info()))
+            .depth_attachment(Self::depth_attach_info())
+            .build()
+    }
+
+    #[inline]
+    pub fn instance() -> &'static Self { unsafe { RENDER_CONTEXT.as_ref().unwrap_unchecked() } }
+
+    #[inline]
+    pub fn color_format(&self) -> vk::Format { RenderSwapchain::instance().color_format() }
+
+    #[inline]
+    pub fn depth_format() -> vk::Format { unsafe { Self::instance().depth_format.unwrap_unchecked() } }
 
     fn init_depth_image_and_view(&mut self, depth_format_dedicate: &[vk::Format])
     {
@@ -116,16 +204,13 @@ impl RenderContext
 
     fn init_synchronous_primitives(&mut self)
     {
-        let rhi = Rhi::instance();
-
         let create_semaphore =
-            |name: &str| (0..self.frames_cnt).map(|i| rhi.create_semaphore(Some(&format!("{name}-{i}")))).collect_vec();
-        self.semaphore_image_available_for_render = create_semaphore("image-available-for-render");
-        self.semaphore_image_finished_for_present = create_semaphore("image-finished-for-present");
+            |name: &str| (0..self.frames_cnt).map(|i| RhiSemaphore::new(Some(&format!("{name}-{i}")))).collect_vec();
+        self.semaphores_swapchain_available = create_semaphore("image-available-for-render");
+        self.semaphores_image_render_finish = create_semaphore("image-finished-for-present");
 
-        self.fence_frame_in_flight = (0..self.frames_cnt)
-            .map(|i| rhi.create_fence(true, Some(&format!("frame-in-flight-{i}"))))
-            .collect();
+        self.fence_frame_in_flight =
+            (0..self.frames_cnt).map(|i| RhiFence::new(false, Some(&format!("frame-in-flight-{i}")))).collect();
     }
 
     fn init_command_pool(&mut self)
@@ -141,5 +226,16 @@ impl RenderContext
                 .unwrap()
             })
             .collect();
+    }
+
+    fn init_depth_attach(&mut self)
+    {
+        self.depth_attach_info = vk::RenderingAttachmentInfo::builder()
+            .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+            .image_view(self.depth_image_view.unwrap())
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .clear_value(vk::ClearValue { depth_stencil: vk::ClearDepthStencilValue { depth: 1_f32, stencil: 0 } })
+            .build();
     }
 }

@@ -1,6 +1,7 @@
+pub mod config;
 pub mod render;
-mod render_context;
+pub mod render_context;
+pub mod resource_type;
 pub mod rhi;
-pub mod rhi_resource;
-mod swapchain;
+pub mod swapchain;
 pub mod window_system;

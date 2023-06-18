@@ -1,12 +1,9 @@
 use ash::{vk, Instance};
-use command_pool::RhiCommandPool;
 
 
-pub(crate) mod command_pool;
 pub(crate) mod create_utils;
 pub(crate) mod init_info;
 pub(crate) mod physical_device;
-pub(crate) mod queue;
 
 use std::{collections::HashMap, ffi::CString, rc::Rc};
 
@@ -14,7 +11,10 @@ use ash::{Device, Entry};
 use itertools::Itertools;
 use vk_mem::Alloc;
 
-use crate::rhi::{init_info::RhiInitInfo, physical_device::RhiPhysicalDevice, queue::RhiQueue};
+use crate::{
+    resource_type::{command_pool::RhiCommandPool, queue::RhiQueue},
+    rhi::{init_info::RhiInitInfo, physical_device::RhiPhysicalDevice},
+};
 
 
 static mut G_RHI: Option<Rhi> = None;
@@ -52,9 +52,13 @@ pub struct Rhi
 impl Rhi
 {
     #[inline]
-    pub(crate) fn graphics_command_pool(&self) -> &RhiCommandPool { self.graphics_command_pool.as_ref().unwrap() }
+    pub fn graphics_command_pool(&self) -> &RhiCommandPool { self.graphics_command_pool.as_ref().unwrap() }
     #[inline]
-    pub(crate) fn instance() -> &'static Self { unsafe { G_RHI.as_ref().unwrap_unchecked() } }
+    pub fn compute_command_pool(&self) -> &RhiCommandPool { self.compute_command_pool.as_ref().unwrap() }
+    #[inline]
+    pub fn transfer_command_pool(&self) -> &RhiCommandPool { self.transfer_command_pool.as_ref().unwrap() }
+    #[inline]
+    pub fn instance() -> &'static Self { unsafe { G_RHI.as_ref().unwrap_unchecked() } }
     #[inline]
     pub(crate) fn vk_instance(&self) -> &Instance { unsafe { self.instance.as_ref().unwrap_unchecked() } }
     #[inline]
@@ -65,15 +69,20 @@ impl Rhi
         unsafe { self.physical_device.as_ref().unwrap_unchecked() }
     }
     #[inline]
-    pub(crate) fn compute_queue(&self) -> &RhiQueue { unsafe { self.compute_queue.as_ref().unwrap_unchecked() } }
+    pub fn compute_queue(&self) -> &RhiQueue { unsafe { self.compute_queue.as_ref().unwrap_unchecked() } }
     #[inline]
-    pub(crate) fn graphics_queue(&self) -> &RhiQueue { unsafe { self.graphics_queue.as_ref().unwrap_unchecked() } }
+    pub fn graphics_queue(&self) -> &RhiQueue { unsafe { self.graphics_queue.as_ref().unwrap_unchecked() } }
     #[inline]
-    pub(crate) fn transfer_queue(&self) -> &RhiQueue { unsafe { self.transfer_queue.as_ref().unwrap_unchecked() } }
+    pub fn transfer_queue(&self) -> &RhiQueue { unsafe { self.transfer_queue.as_ref().unwrap_unchecked() } }
     #[inline]
     pub(crate) fn vma(&self) -> &vk_mem::Allocator { unsafe { self.vma.as_ref().unwrap_unchecked() } }
     #[inline]
     pub(crate) fn vk_pf(&self) -> &Entry { unsafe { self.vk_pf.as_ref().unwrap_unchecked() } }
+    #[inline]
+    pub(crate) fn dynamic_render_pf(&self) -> &ash::extensions::khr::DynamicRendering
+    {
+        unsafe { self.dynamic_render_pf.as_ref().unwrap_unchecked() }
+    }
 }
 
 // 工具方法
@@ -129,10 +138,7 @@ impl Rhi
         };
 
         self.try_set_debug_name(pool, debug_name);
-        Some(RhiCommandPool {
-            command_pool: pool,
-            queue_family_index,
-        })
+        Some(RhiCommandPool { command_pool: pool, queue_family_index })
     }
 
     pub fn create_image(
@@ -141,10 +147,8 @@ impl Rhi
         debug_name: Option<&str>,
     ) -> (vk::Image, vk_mem::Allocation)
     {
-        let alloc_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::AutoPreferDevice,
-            ..Default::default()
-        };
+        let alloc_info =
+            vk_mem::AllocationCreateInfo { usage: vk_mem::MemoryUsage::AutoPreferDevice, ..Default::default() };
         let (image, allocation) = unsafe { self.vma().create_image(create_info, &alloc_info).unwrap() };
 
         self.try_set_debug_name(image, debug_name);
@@ -160,29 +164,6 @@ impl Rhi
         view
     }
 
-    #[inline]
-    pub fn create_semaphore(&self, debug_name: Option<&str>) -> vk::Semaphore
-    {
-        let semaphore = unsafe { self.device().create_semaphore(&vk::SemaphoreCreateInfo::default(), None).unwrap() };
-
-        self.try_set_debug_name(semaphore, debug_name);
-        semaphore
-    }
-
-    #[inline]
-    pub fn create_fence(&self, signaled: bool, debug_name: Option<&str>) -> vk::Fence
-    {
-        let fence_flags = if signaled {
-            vk::FenceCreateFlags::SIGNALED
-        } else {
-            vk::FenceCreateFlags::empty()
-        };
-        let fence =
-            unsafe { self.device().create_fence(&vk::FenceCreateInfo::builder().flags(fence_flags), None).unwrap() };
-
-        self.try_set_debug_name(fence, debug_name);
-        fence
-    }
 
     pub(crate) fn find_supported_format(
         &self,
@@ -252,10 +233,7 @@ impl Rhi
     fn init_descriptor_pool(&mut self)
     {
         let pool_size = [
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
-                descriptor_count: 128,
-            },
+            vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC, descriptor_count: 128 },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER,
                 descriptor_count: Self::MAX_VERTEX_BLENDING_MESH_CNT + 32,
@@ -268,18 +246,9 @@ impl Rhi
                 ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                 descriptor_count: Self::MAX_MATERIAL_CNT + 32,
             },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::INPUT_ATTACHMENT,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_IMAGE,
-                descriptor_count: 32,
-            },
+            vk::DescriptorPoolSize { ty: vk::DescriptorType::INPUT_ATTACHMENT, descriptor_count: 32 },
+            vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC, descriptor_count: 32 },
+            vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_IMAGE, descriptor_count: 32 },
         ];
 
         let pool_create_info = vk::DescriptorPoolCreateInfo::builder()
@@ -465,18 +434,12 @@ impl Rhi
             self.set_debug_name(compute_queue, "compute");
             self.set_debug_name(transfer_queue, "transfer");
 
-            self.graphics_queue = Some(RhiQueue {
-                queue: graphics_queue,
-                queue_family_index: graphics_queue_family_index,
-            });
-            self.transfer_queue = Some(RhiQueue {
-                queue: transfer_queue,
-                queue_family_index: transfer_queue_family_index,
-            });
-            self.compute_queue = Some(RhiQueue {
-                queue: compute_queue,
-                queue_family_index: compute_queue_family_index,
-            });
+            self.graphics_queue =
+                Some(RhiQueue { queue: graphics_queue, queue_family_index: graphics_queue_family_index });
+            self.transfer_queue =
+                Some(RhiQueue { queue: transfer_queue, queue_family_index: transfer_queue_family_index });
+            self.compute_queue =
+                Some(RhiQueue { queue: compute_queue, queue_family_index: compute_queue_family_index });
         }
     }
 

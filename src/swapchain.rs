@@ -2,7 +2,11 @@ use ash::vk;
 use itertools::Itertools;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
-use crate::{rhi::Rhi, window_system::WindowSystem};
+use crate::{
+    resource_type::sync_primitives::{RhiFence, RhiSemaphore},
+    rhi::Rhi,
+    window_system::WindowSystem,
+};
 
 
 pub(crate) struct RenderSwapchainInitInfo
@@ -48,6 +52,8 @@ pub struct RenderSwapchain
     surface_capabilities: vk::SurfaceCapabilitiesKHR,
     surface_formats: Vec<vk::SurfaceFormatKHR>,
     surface_present_modes: Vec<vk::PresentModeKHR>,
+
+    pub(crate) color_attach_infos: Vec<vk::RenderingAttachmentInfo>,
 }
 
 
@@ -56,12 +62,15 @@ impl RenderSwapchain
     #[inline]
     pub(crate) fn instance() -> &'static Self { unsafe { SWAPCHAIN.as_ref().unwrap_unchecked() } }
 
+    #[inline]
+    pub fn color_format(&self) -> vk::Format { unsafe { self.format.unwrap_unchecked() } }
+
     pub(crate) fn init(init_info: &RenderSwapchainInitInfo)
     {
         let mut swapchain = unsafe {
             let rhi = Rhi::instance();
             let pdevice = rhi.physical_device().vk_pdevice;
-            let (surface, surface_pf) = Self::init_surface();
+            let (surface, surface_pf) = Self::create_surface();
 
             Self {
                 swapchain_pf: ash::extensions::khr::Swapchain::new(rhi.vk_instance(), rhi.device()),
@@ -77,6 +86,7 @@ impl RenderSwapchain
                 surface_present_modes: surface_pf.get_physical_device_surface_present_modes(pdevice, surface).unwrap(),
                 surface: Some(surface),
                 surface_pf: Some(surface_pf),
+                color_attach_infos: vec![],
             }
         };
         swapchain.init_format(init_info.format);
@@ -84,6 +94,7 @@ impl RenderSwapchain
         swapchain.init_extent();
         swapchain.init_handle();
         swapchain.init_images_and_views();
+        swapchain.init_color_attachs();
 
         unsafe { SWAPCHAIN = Some(swapchain) }
     }
@@ -94,6 +105,40 @@ impl RenderSwapchain
 
         self.format = Some(surface_format.format);
         self.color_space = Some(surface_format.color_space);
+    }
+
+    #[inline]
+    pub fn acquire_next_frame(&self, semaphore: &RhiSemaphore, fence: Option<&RhiFence>) -> u32
+    {
+        unsafe {
+            let (image_index, is_optimal) = self
+                .swapchain_pf
+                .acquire_next_image(
+                    self.handle.unwrap_unchecked(),
+                    u64::MAX,
+                    semaphore.semaphore,
+                    fence.map_or(vk::Fence::null(), |f| f.fence),
+                )
+                .unwrap();
+            // TODO 处理 optimal
+            image_index
+        }
+    }
+
+    #[inline]
+    pub fn extent(&self) -> vk::Extent2D { unsafe { *self.extent.as_ref().unwrap_unchecked() } }
+
+    #[inline]
+    pub fn submit_frame(&self, image_index: u32, wait_semaphores: &[vk::Semaphore])
+    {
+        unsafe {
+            let present_info = vk::PresentInfoKHR::builder()
+                .wait_semaphores(wait_semaphores)
+                .image_indices(std::slice::from_ref(&image_index))
+                .swapchains(std::slice::from_ref(self.handle.as_ref().unwrap_unchecked()));
+
+            self.swapchain_pf.queue_present(Rhi::instance().graphics_queue().queue, &present_info).unwrap();
+        }
     }
 
     fn init_present_mode(&mut self, present_mode: vk::PresentModeKHR)
@@ -160,7 +205,7 @@ impl RenderSwapchain
         self.image_views = image_views;
     }
 
-    fn init_surface() -> (vk::SurfaceKHR, ash::extensions::khr::Surface)
+    fn create_surface() -> (vk::SurfaceKHR, ash::extensions::khr::Surface)
     {
         let rhi = Rhi::instance();
         let window_system = WindowSystem::instance();
@@ -178,5 +223,25 @@ impl RenderSwapchain
         };
 
         (surface, surface_pf)
+    }
+
+    fn init_color_attachs(&mut self)
+    {
+        self.color_attach_infos = self
+            .image_views
+            .iter()
+            .map(|v| {
+                vk::RenderingAttachmentInfo::builder()
+                    .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .image_view(*v)
+                    .load_op(vk::AttachmentLoadOp::CLEAR)
+                    .store_op(vk::AttachmentStoreOp::STORE)
+                    .clear_value(vk::ClearValue {
+                        color: vk::ClearColorValue { float32: [0_f32, 0_f32, 0_f32, 1_f32] },
+                    })
+                    .build()
+            })
+            .collect();
+        //
     }
 }
