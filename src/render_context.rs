@@ -91,12 +91,12 @@ impl RenderContext
             let mut ctx = RENDER_CONTEXT.as_mut().unwrap_unchecked();
 
             let current_fence = &mut ctx.fence_frame_in_flight[ctx.frame_index];
-            ctx.swapchain_image_index = RenderSwapchain::instance()
-                .acquire_next_frame(&ctx.semaphores_swapchain_available[ctx.frame_index], Some(current_fence))
-                as usize;
-
             current_fence.wait();
             current_fence.reset();
+
+            ctx.swapchain_image_index = RenderSwapchain::instance()
+                .acquire_next_frame(&ctx.semaphores_swapchain_available[ctx.frame_index], None)
+                as usize;
         }
     }
 
@@ -117,6 +117,13 @@ impl RenderContext
 
     #[inline]
     pub fn extent() -> vk::Extent2D { RenderSwapchain::instance().extent() }
+
+    #[inline]
+    pub fn current_fence() -> &'static RhiFence
+    {
+        let ctx = Self::instance();
+        &ctx.fence_frame_in_flight[ctx.frame_index]
+    }
 
     #[inline]
     pub fn current_image_render_finish_semaphore() -> RhiSemaphore
@@ -210,7 +217,7 @@ impl RenderContext
         self.semaphores_image_render_finish = create_semaphore("image-finished-for-present");
 
         self.fence_frame_in_flight =
-            (0..self.frames_cnt).map(|i| RhiFence::new(false, Some(&format!("frame-in-flight-{i}")))).collect();
+            (0..self.frames_cnt).map(|i| RhiFence::new(true, Some(&format!("frame-in-flight-{i}")))).collect();
     }
 
     fn init_command_pool(&mut self)

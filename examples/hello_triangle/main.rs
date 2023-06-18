@@ -122,9 +122,8 @@ fn main()
                     RenderContext::current_swapchain_available_semaphore(),
                 )],
                 signal_info: vec![RenderContext::current_image_render_finish_semaphore()],
-                ..Default::default()
             }],
-            None,
+            Some(RenderContext::current_fence().clone()),
         );
 
         RenderContext::submit_frame();
