@@ -110,6 +110,12 @@ impl Rhi
         }
     }
 
+    pub fn set_debug_label(&self)
+    {
+        todo!()
+        // self.debug_util_pf.unwrap().cmd_begin_debug_utils_label()
+    }
+
     pub fn create_command_pool<S: AsRef<str> + Clone>(
         &self,
         queue_flags: vk::QueueFlags,
