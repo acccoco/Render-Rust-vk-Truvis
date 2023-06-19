@@ -1,9 +1,19 @@
+# build
 /target
+*.spv
 
+# operating system
 .DS_Store
 
+# IDE
 .idea
 .vs_code
 
-*.spv
+
+# Nsignt
 *.ngfx-proj
+*.ngfx-gputrace
+*.ngfx-gputrace.layout
+
+# temp configuration
+imgui.ini

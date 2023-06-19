@@ -19,7 +19,9 @@ pub struct RhiCommandBuffer
 
 impl RhiCommandBuffer
 {
-    pub fn new(pool: &RhiCommandPool) -> Self
+    pub fn new<S>(pool: &RhiCommandPool, debug_name: S) -> Self
+    where
+        S: AsRef<str>,
     {
         let info = vk::CommandBufferAllocateInfo::builder()
             .command_pool(pool.command_pool)
@@ -27,7 +29,11 @@ impl RhiCommandBuffer
             .command_buffer_count(1);
 
         let command_buffer = unsafe { Rhi::instance().device().allocate_command_buffers(&info).unwrap()[0] };
-        Self { command_buffer, command_pool: pool.command_pool }
+        Rhi::instance().set_debug_name(command_buffer, debug_name);
+        Self {
+            command_buffer,
+            command_pool: pool.command_pool,
+        }
     }
 
     /// 专用于 transfer 的仅一次使用的 command buffer
@@ -37,7 +43,7 @@ impl RhiCommandBuffer
     {
         unsafe {
             let rhi = Rhi::instance();
-            let mut command_buffer = Self::new(rhi.transfer_command_pool());
+            let mut command_buffer = Self::new(rhi.transfer_command_pool(), "one-time-transfer-command-buffer");
 
             rhi.device()
                 .begin_command_buffer(
@@ -48,9 +54,12 @@ impl RhiCommandBuffer
             f(&mut command_buffer);
             rhi.device().end_command_buffer(command_buffer.command_buffer).unwrap();
 
-            let fence = RhiFence::new(false, Some("one-time-command-fence"));
+            let fence = RhiFence::new(false, "one-time-command-fence");
             rhi.transfer_queue().submit(
-                vec![RhiSubmitBatch { command_buffers: vec![command_buffer.clone()], ..Default::default() }],
+                vec![RhiSubmitBatch {
+                    command_buffers: vec![command_buffer.clone()],
+                    ..Default::default()
+                }],
                 Some(fence.clone()),
             );
             fence.wait();
@@ -59,7 +68,7 @@ impl RhiCommandBuffer
         }
     }
 
-    fn drop(self)
+    pub fn drop(self)
     {
         unsafe {
             Rhi::instance()

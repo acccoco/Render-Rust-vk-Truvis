@@ -73,7 +73,7 @@ impl Default for RhiPipelineTemplate
                 .line_width(1.0)
                 .cull_mode(vk::CullModeFlags::BACK)
                 // FIXME 背面剔除，会涉及到 vulkan 的投影矩阵
-                .front_face(vk::FrontFace::CLOCKWISE)
+                .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
                 .depth_bias_enable(false)
                 .build(),
 
@@ -98,7 +98,7 @@ impl Default for RhiPipelineTemplate
 
 impl RhiPipelineTemplate
 {
-    pub fn create_pipeline(&self) -> RhiPipeline
+    pub fn create_pipeline<S: AsRef<str> + Clone>(&self, debug_name: S) -> RhiPipeline
     {
         let rhi = Rhi::instance();
 
@@ -113,6 +113,7 @@ impl RhiPipelineTemplate
                 vk::PipelineLayoutCreateInfo::builder().set_layouts(&self.descriptor_set_layouts);
             unsafe { rhi.device().create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() }
         };
+        rhi.set_debug_name(pipeline_layout, debug_name.clone());
 
         // vertex shader 和 fragment shader 是必须的，入口都是 main
         let vertex_shader_module = RhiShaderModule::new(self.vertex_shader_path.as_ref().unwrap());
@@ -178,10 +179,14 @@ impl RhiPipelineTemplate
                 .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
                 .unwrap()[0]
         };
+        rhi.set_debug_name(pipeline, debug_name.clone());
 
         vertex_shader_module.drop();
         fragment_shader_module.drop();
 
-        RhiPipeline { pipeline, pipeline_layout }
+        RhiPipeline {
+            pipeline,
+            pipeline_layout,
+        }
     }
 }

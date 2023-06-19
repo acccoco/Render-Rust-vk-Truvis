@@ -19,14 +19,16 @@ pub struct RhiBuffer
 impl RhiBuffer
 {
     /// @param min_align 对 memory 的 offset align 限制
-    pub fn new(
+    pub fn new<S>(
         size: vk::DeviceSize,
         buffer_usage: vk::BufferUsageFlags,
         mem_usage: vk_mem::MemoryUsage,
         alloc_flags: vk_mem::AllocationCreateFlags,
         min_align: Option<vk::DeviceSize>,
-        debug_name: Option<&str>,
+        debug_name: S,
     ) -> Self
+    where
+        S: AsRef<str> + Clone,
     {
         let buffer_info = vk::BufferCreateInfo {
             size,
@@ -47,19 +49,21 @@ impl RhiBuffer
                 rhi.vma().create_buffer(&buffer_info, &alloc_info).unwrap()
             };
 
-            rhi.try_set_debug_name(buffer, debug_name);
+            rhi.set_debug_name(buffer, debug_name.clone());
             Self {
                 buffer,
                 allocation,
                 map_ptr: None,
                 size,
-                debug_name: debug_name.unwrap_or("").into(),
+                debug_name: debug_name.as_ref().to_string(),
             }
         }
     }
 
     #[inline]
-    pub fn new_stage_buffer(size: vk::DeviceSize, debug_name: Option<&str>) -> Self
+    pub fn new_stage_buffer<S>(size: vk::DeviceSize, debug_name: S) -> Self
+    where
+        S: AsRef<str>,
     {
         Self::new(
             size,
@@ -67,12 +71,14 @@ impl RhiBuffer
             vk_mem::MemoryUsage::Auto,
             vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM,
             None,
-            debug_name,
+            debug_name.as_ref().to_string(),
         )
     }
 
     #[inline]
-    pub fn new_index_buffer(size: usize, debug_name: Option<&str>) -> Self
+    pub fn new_index_buffer<S>(size: usize, debug_name: S) -> Self
+    where
+        S: AsRef<str>,
     {
         Self::new(
             size as vk::DeviceSize,
@@ -80,12 +86,14 @@ impl RhiBuffer
             vk_mem::MemoryUsage::AutoPreferDevice,
             vk_mem::AllocationCreateFlags::empty(),
             None,
-            debug_name,
+            debug_name.as_ref().to_string(),
         )
     }
 
     #[inline]
-    pub fn new_vertex_buffer(size: usize, debug_name: Option<&str>) -> Self
+    pub fn new_vertex_buffer<S>(size: usize, debug_name: S) -> Self
+    where
+        S: AsRef<str>,
     {
         Self::new(
             size as vk::DeviceSize,
@@ -93,7 +101,7 @@ impl RhiBuffer
             vk_mem::MemoryUsage::AutoPreferDevice,
             vk_mem::AllocationCreateFlags::empty(),
             None,
-            debug_name,
+            debug_name.as_ref().to_string(),
         )
     }
 
@@ -133,7 +141,7 @@ impl RhiBuffer
     {
         let mut stage_buffer = Self::new_stage_buffer(
             std::mem::size_of_val(data) as vk::DeviceSize,
-            Some(&format!("{}-stage-buffer", self.debug_name)),
+            format!("{}-stage-buffer", self.debug_name),
         );
         stage_buffer.map();
 

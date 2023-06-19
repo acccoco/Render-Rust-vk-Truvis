@@ -1,9 +1,11 @@
-use ash::{extensions::khr::Swapchain, vk};
+use ash::vk;
 use itertools::Itertools;
 
 use crate::{
     resource_type::{
+        command_buffer::RhiCommandBuffer,
         command_pool::RhiCommandPool,
+        queue::RhiSubmitBatch,
         sync_primitives::{RhiFence, RhiSemaphore},
     },
     rhi::{create_utils::RhiCreateInfoUtil, Rhi},
@@ -42,6 +44,8 @@ pub struct RenderContext
 
     // 为每个 frame 分配一个 command pool
     graphics_command_pools: Vec<RhiCommandPool>,
+    // 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
+    allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
 
     depth_format: Option<vk::Format>,
     depth_image: Option<vk::Image>,
@@ -56,6 +60,9 @@ pub struct RenderContext
 
 impl RenderContext
 {
+    #[inline]
+    pub fn current_frame_index() -> usize { Self::instance().frame_index }
+
     pub(crate) fn init(init_info: &RenderContextInitInfo)
     {
         let mut ctx = RenderContext {
@@ -64,6 +71,7 @@ impl RenderContext
             frames_cnt: init_info.frames_in_flight,
 
             graphics_command_pools: vec![],
+            allocated_command_buffers: vec![Vec::new(); init_info.frames_in_flight],
 
             depth_format: None,
             depth_image: None,
@@ -87,31 +95,98 @@ impl RenderContext
     #[inline]
     pub fn acquire_frame()
     {
-        unsafe {
-            let mut ctx = RENDER_CONTEXT.as_mut().unwrap_unchecked();
+        let mut ctx = unsafe { RENDER_CONTEXT.as_mut().unwrap_unchecked() };
 
-            let current_fence = &mut ctx.fence_frame_in_flight[ctx.frame_index];
-            current_fence.wait();
-            current_fence.reset();
+        let current_fence = &mut ctx.fence_frame_in_flight[ctx.frame_index];
+        current_fence.wait();
+        ctx.graphics_command_pools[ctx.frame_index].reset();
+        std::mem::take(&mut ctx.allocated_command_buffers[ctx.frame_index])
+            .into_iter()
+            .for_each(|c| c.drop());
+        current_fence.reset();
 
-            ctx.swapchain_image_index = RenderSwapchain::instance()
-                .acquire_next_frame(&ctx.semaphores_swapchain_available[ctx.frame_index], None)
-                as usize;
+        ctx.swapchain_image_index = RenderSwapchain::instance()
+            .acquire_next_frame(&ctx.semaphores_swapchain_available[ctx.frame_index], None)
+            as usize;
+
+        {
+            let mut cmd = Self::get_command_buffer(format!("ctx-1st-color-layout-trans-frame-{}", ctx.frame_index));
+            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+            // 只需要建立起执行依赖即可，确保 present 完成后，再进行 layout trans
+            // COLOR_ATTACHMENT_READ 对应 blend 等操作
+            cmd.image_barrier(
+                (vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty()),
+                (
+                    vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                    vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::COLOR_ATTACHMENT_READ,
+                ),
+                RenderContext::current_image(),
+                vk::ImageAspectFlags::COLOR,
+                vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            );
+            cmd.end();
+            Rhi::instance().graphics_queue().submit(
+                vec![RhiSubmitBatch {
+                    command_buffers: vec![cmd],
+                    wait_info: vec![(
+                        vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                        RenderContext::current_swapchain_available_semaphore(),
+                    )],
+                    signal_info: vec![],
+                }],
+                None,
+            );
         }
     }
+
 
     #[inline]
     pub fn submit_frame()
     {
-        unsafe {
-            let mut ctx = RENDER_CONTEXT.as_mut().unwrap_unchecked();
+        let mut ctx = unsafe { RENDER_CONTEXT.as_mut().unwrap_unchecked() };
 
-            RenderSwapchain::instance().submit_frame(
-                ctx.swapchain_image_index as u32,
-                &[RenderContext::current_image_render_finish_semaphore().semaphore],
+        {
+            let mut cmd = Self::get_command_buffer(format!("ctx-2nd-color-layout-trans-frame-{}", ctx.frame_index));
+            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+            cmd.image_barrier(
+                (vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT, vk::AccessFlags::COLOR_ATTACHMENT_WRITE),
+                (vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty()),
+                RenderContext::current_image(),
+                vk::ImageAspectFlags::COLOR,
+                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                vk::ImageLayout::PRESENT_SRC_KHR,
             );
+            cmd.end();
+            Rhi::instance().graphics_queue().submit(
+                vec![RhiSubmitBatch {
+                    command_buffers: vec![cmd],
+                    wait_info: vec![],
+                    signal_info: vec![Self::current_image_render_finish_semaphore()],
+                }],
+                Some(Self::current_fence().clone()),
+            );
+        }
 
-            ctx.frame_index = (ctx.frame_index + 1) % ctx.frames_cnt;
+        RenderSwapchain::instance().submit_frame(
+            ctx.swapchain_image_index as u32,
+            &[RenderContext::current_image_render_finish_semaphore().semaphore],
+        );
+
+        ctx.frame_index = (ctx.frame_index + 1) % ctx.frames_cnt;
+    }
+
+    #[inline]
+    pub fn get_command_buffer<S: AsRef<str>>(debug_name: S) -> RhiCommandBuffer
+    {
+        unsafe {
+            let ctx = RENDER_CONTEXT.as_mut().unwrap_unchecked();
+            let name = format!("frame-{}-command-buffer-{}", ctx.frame_index, debug_name.as_ref());
+            let cmd = RhiCommandBuffer::new(&ctx.graphics_command_pools[ctx.frame_index], name);
+
+            ctx.allocated_command_buffers[ctx.frame_index].push(cmd.clone());
+
+            cmd
         }
     }
 
@@ -191,7 +266,7 @@ impl RenderContext
                 depth_format,
                 vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
             );
-            rhi.create_image(&create_info, Some("depth-image"))
+            rhi.create_image(&create_info, "depth-image")
         };
 
         let depth_image_view = {
@@ -200,7 +275,7 @@ impl RenderContext
                 depth_format,
                 vk::ImageAspectFlags::DEPTH,
             );
-            rhi.create_image_view(&create_info, Some("depth-image-view"))
+            rhi.create_image_view(&create_info, "depth-image-view")
         };
 
         self.depth_format = Some(depth_format);
@@ -212,12 +287,12 @@ impl RenderContext
     fn init_synchronous_primitives(&mut self)
     {
         let create_semaphore =
-            |name: &str| (0..self.frames_cnt).map(|i| RhiSemaphore::new(Some(&format!("{name}-{i}")))).collect_vec();
-        self.semaphores_swapchain_available = create_semaphore("image-available-for-render");
-        self.semaphores_image_render_finish = create_semaphore("image-finished-for-present");
+            |name: &str| (0..self.frames_cnt).map(|i| RhiSemaphore::new(format!("{name}-{i}"))).collect_vec();
+        self.semaphores_swapchain_available = create_semaphore("image-available-for-render-semaphore");
+        self.semaphores_image_render_finish = create_semaphore("image-finished-for-present-semaphore");
 
         self.fence_frame_in_flight =
-            (0..self.frames_cnt).map(|i| RhiFence::new(true, Some(&format!("frame-in-flight-{i}")))).collect();
+            (0..self.frames_cnt).map(|i| RhiFence::new(true, format!("frame-in-flight-fence-{i}"))).collect();
     }
 
     fn init_command_pool(&mut self)
@@ -228,7 +303,7 @@ impl RenderContext
                 rhi.create_command_pool(
                     vk::QueueFlags::GRAPHICS,
                     vk::CommandPoolCreateFlags::TRANSIENT,
-                    Some(&format!("context-graphics-{}", i)),
+                    format!("context-graphics-command-pool-{}", i),
                 )
                 .unwrap()
             })
@@ -242,7 +317,12 @@ impl RenderContext
             .image_view(self.depth_image_view.unwrap())
             .load_op(vk::AttachmentLoadOp::CLEAR)
             .store_op(vk::AttachmentStoreOp::DONT_CARE)
-            .clear_value(vk::ClearValue { depth_stencil: vk::ClearDepthStencilValue { depth: 1_f32, stencil: 0 } })
+            .clear_value(vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1_f32,
+                    stencil: 0,
+                },
+            })
             .build();
     }
 }

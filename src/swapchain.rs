@@ -166,7 +166,8 @@ impl RenderSwapchain
             .image_color_space(self.color_space.unwrap())
             .image_extent(self.extent.unwrap())
             .image_array_layers(1)
-            .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
+            // TRANSFER_DST 用于 Nsight 分析
+            .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST)
             .pre_transform(self.surface_capabilities.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .present_mode(self.present_mode.unwrap())
@@ -174,7 +175,9 @@ impl RenderSwapchain
             .clipped(true);
 
         unsafe {
-            self.handle = Some(self.swapchain_pf.create_swapchain(&create_info, None).unwrap());
+            let swapchain = self.swapchain_pf.create_swapchain(&create_info, None).unwrap();
+            Rhi::instance().set_debug_name(swapchain, "main-swapchain");
+            self.handle = Some(swapchain);
         }
     }
 
@@ -203,6 +206,11 @@ impl RenderSwapchain
 
         self.images = swapchain_images;
         self.image_views = image_views;
+
+        for i in 0..self.images.len() {
+            Rhi::instance().set_debug_name(self.images[i], &format!("swapchain-image-{}", i));
+            Rhi::instance().set_debug_name(self.image_views[i], &format!("swapchain-image-view-{}", i));
+        }
     }
 
     fn create_surface() -> (vk::SurfaceKHR, ash::extensions::khr::Surface)
@@ -221,6 +229,7 @@ impl RenderSwapchain
             )
             .unwrap()
         };
+        rhi.set_debug_name(surface, "main-surface");
 
         (surface, surface_pf)
     }

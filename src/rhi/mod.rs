@@ -88,10 +88,12 @@ impl Rhi
 // 工具方法
 impl Rhi
 {
-    pub(crate) fn set_debug_name<T>(&self, handle: T, name: &str)
+    pub(crate) fn set_debug_name<T, S>(&self, handle: T, name: S)
     where
         T: vk::Handle + Copy,
+        S: AsRef<str>,
     {
+        let name = if name.as_ref().is_empty() { "nameless" } else { name.as_ref() };
         let name = CString::new(name).unwrap();
         unsafe {
             self.debug_util_pf
@@ -108,22 +110,11 @@ impl Rhi
         }
     }
 
-    #[inline]
-    pub(crate) fn try_set_debug_name<T>(&self, handle: T, name: Option<&str>)
-    where
-        T: vk::Handle + Copy,
-    {
-        if let Some(name) = name {
-            self.set_debug_name(handle, name);
-        }
-    }
-
-
-    pub fn create_command_pool(
+    pub fn create_command_pool<S: AsRef<str> + Clone>(
         &self,
         queue_flags: vk::QueueFlags,
         flags: vk::CommandPoolCreateFlags,
-        debug_name: Option<&str>,
+        debug_name: S,
     ) -> Option<RhiCommandPool>
     {
         let queue_family_index = self.physical_device().find_queue_family_index(queue_flags)?;
@@ -137,30 +128,35 @@ impl Rhi
                 .unwrap()
         };
 
-        self.try_set_debug_name(pool, debug_name);
-        Some(RhiCommandPool { command_pool: pool, queue_family_index })
+        self.set_debug_name(pool, debug_name);
+        Some(RhiCommandPool {
+            command_pool: pool,
+            queue_family_index,
+        })
     }
 
-    pub fn create_image(
-        &self,
-        create_info: &vk::ImageCreateInfo,
-        debug_name: Option<&str>,
-    ) -> (vk::Image, vk_mem::Allocation)
+    pub fn create_image<S>(&self, create_info: &vk::ImageCreateInfo, debug_name: S) -> (vk::Image, vk_mem::Allocation)
+    where
+        S: AsRef<str>,
     {
-        let alloc_info =
-            vk_mem::AllocationCreateInfo { usage: vk_mem::MemoryUsage::AutoPreferDevice, ..Default::default() };
+        let alloc_info = vk_mem::AllocationCreateInfo {
+            usage: vk_mem::MemoryUsage::AutoPreferDevice,
+            ..Default::default()
+        };
         let (image, allocation) = unsafe { self.vma().create_image(create_info, &alloc_info).unwrap() };
 
-        self.try_set_debug_name(image, debug_name);
+        self.set_debug_name(image, debug_name);
         (image, allocation)
     }
 
     #[inline]
-    pub fn create_image_view(&self, create_info: &vk::ImageViewCreateInfo, debug_name: Option<&str>) -> vk::ImageView
+    pub fn create_image_view<S>(&self, create_info: &vk::ImageViewCreateInfo, debug_name: S) -> vk::ImageView
+    where
+        S: AsRef<str>,
     {
         let view = unsafe { self.device().create_image_view(create_info, None).unwrap() };
 
-        self.try_set_debug_name(view, debug_name);
+        self.set_debug_name(view, debug_name);
         view
     }
 
@@ -225,6 +221,10 @@ impl Rhi
         rhi.init_descriptor_pool();
         rhi.init_default_command_pool();
 
+        rhi.set_debug_name(rhi.physical_device().vk_pdevice, "main-physical-device");
+        rhi.set_debug_name(rhi.device().handle(), "main-device");
+        rhi.set_debug_name(rhi.descriptor_pool.unwrap(), "main-descriptor-pool");
+
         unsafe {
             G_RHI = Some(rhi);
         }
@@ -233,7 +233,10 @@ impl Rhi
     fn init_descriptor_pool(&mut self)
     {
         let pool_size = [
-            vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC, descriptor_count: 128 },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
+                descriptor_count: 128,
+            },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER,
                 descriptor_count: Self::MAX_VERTEX_BLENDING_MESH_CNT + 32,
@@ -246,9 +249,18 @@ impl Rhi
                 ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                 descriptor_count: Self::MAX_MATERIAL_CNT + 32,
             },
-            vk::DescriptorPoolSize { ty: vk::DescriptorType::INPUT_ATTACHMENT, descriptor_count: 32 },
-            vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC, descriptor_count: 32 },
-            vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_IMAGE, descriptor_count: 32 },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::INPUT_ATTACHMENT,
+                descriptor_count: 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
+                descriptor_count: 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_IMAGE,
+                descriptor_count: 32,
+            },
         ];
 
         let pool_create_info = vk::DescriptorPoolCreateInfo::builder()
@@ -265,17 +277,17 @@ impl Rhi
         self.graphics_command_pool = self.create_command_pool(
             vk::QueueFlags::GRAPHICS,
             vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-            Some("rhi-graphics"),
+            "rhi-graphics-command-pool",
         );
         self.compute_command_pool = self.create_command_pool(
             vk::QueueFlags::COMPUTE,
             vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-            Some("rhi-compute"),
+            "rhi-compute-command-pool",
         );
         self.transfer_command_pool = self.create_command_pool(
             vk::QueueFlags::TRANSFER,
             vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-            Some("rhi-transfer"),
+            "rhi-transfer-command-pool",
         );
 
         // 非空检测
@@ -430,16 +442,22 @@ impl Rhi
 
             self.device = Some(device);
 
-            self.set_debug_name(graphics_queue, "graphics");
-            self.set_debug_name(compute_queue, "compute");
-            self.set_debug_name(transfer_queue, "transfer");
+            self.set_debug_name(graphics_queue, "graphics-queue");
+            self.set_debug_name(compute_queue, "compute-queue");
+            self.set_debug_name(transfer_queue, "transfer-queue");
 
-            self.graphics_queue =
-                Some(RhiQueue { queue: graphics_queue, queue_family_index: graphics_queue_family_index });
-            self.transfer_queue =
-                Some(RhiQueue { queue: transfer_queue, queue_family_index: transfer_queue_family_index });
-            self.compute_queue =
-                Some(RhiQueue { queue: compute_queue, queue_family_index: compute_queue_family_index });
+            self.graphics_queue = Some(RhiQueue {
+                queue: graphics_queue,
+                queue_family_index: graphics_queue_family_index,
+            });
+            self.transfer_queue = Some(RhiQueue {
+                queue: transfer_queue,
+                queue_family_index: transfer_queue_family_index,
+            });
+            self.compute_queue = Some(RhiQueue {
+                queue: compute_queue,
+                queue_family_index: compute_queue_family_index,
+            });
         }
     }
 

@@ -12,7 +12,9 @@ pub struct RhiFence
 
 impl RhiFence
 {
-    pub fn new(signaled: bool, debug_name: Option<&str>) -> Self
+    pub fn new<S>(signaled: bool, debug_name: S) -> Self
+    where
+        S: AsRef<str>,
     {
         let rhi = Rhi::instance();
 
@@ -20,7 +22,7 @@ impl RhiFence
         let fence =
             unsafe { rhi.device().create_fence(&vk::FenceCreateInfo::builder().flags(fence_flags), None).unwrap() };
 
-        rhi.try_set_debug_name(fence, debug_name);
+        rhi.set_debug_name(fence, debug_name);
         Self { fence }
     }
 
@@ -56,12 +58,14 @@ pub struct RhiSemaphore
 
 impl RhiSemaphore
 {
-    pub fn new(debug_name: Option<&str>) -> Self
+    pub fn new<S>(debug_name: S) -> Self
+    where
+        S: AsRef<str>,
     {
         let rhi = Rhi::instance();
         let semaphore = unsafe { rhi.device().create_semaphore(&vk::SemaphoreCreateInfo::default(), None).unwrap() };
 
-        rhi.try_set_debug_name(semaphore, debug_name);
+        rhi.set_debug_name(semaphore, debug_name);
         Self { semaphore }
     }
 
