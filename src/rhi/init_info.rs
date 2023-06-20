@@ -16,6 +16,9 @@ pub struct RhiInitInfo
     pub instance_extensions: Vec<&'static CStr>,
     pub device_extensions: Vec<&'static CStr>,
 
+    pub core_features: vk::PhysicalDeviceFeatures,
+    pub ext_features: Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>>,
+
     pub debug_msg_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
     pub debug_msg_type: vk::DebugUtilsMessageTypeFlagsEXT,
     pub debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT,
@@ -30,7 +33,7 @@ impl RhiInitInfo
 
     pub fn init_basic(debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT) -> Self
     {
-        Self {
+        let mut info = Self {
             app_name: None,
             engine_name: None,
 
@@ -40,6 +43,8 @@ impl RhiInitInfo
             instance_extensions: Self::basic_instance_extensions(),
             device_extensions: Self::basic_device_extensions(),
 
+            core_features: Default::default(),
+            ext_features: vec![],
             debug_msg_severity: vk::DebugUtilsMessageSeverityFlagsEXT::WARNING |
                 vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
             debug_msg_type: vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION |
@@ -47,7 +52,10 @@ impl RhiInitInfo
             debug_callback,
 
             frames_in_flight: 3,
-        }
+        };
+        info.set_device_features();
+
+        info
     }
 
     pub fn is_complete(&self) -> Option<()>
@@ -60,17 +68,35 @@ impl RhiInitInfo
 
     fn basic_device_extensions() -> Vec<&'static CStr>
     {
-        vec![
-            Swapchain::name(),
-            #[cfg(target_os = "macos")]
-            vk::KhrPortabilitySubsetFn::name(), // 这个扩展可以在 metal 上模拟出 vulkan
-            // dynamic rendering 所需的 extensions
+        let mut exts = vec![Swapchain::name()];
+
+        if cfg!(target_os = "macos") {
+            // 在 metal 上模拟出 vulkan
+            exts.push(vk::KhrPortabilitySubsetFn::name());
+        }
+
+        // dynamic rendering
+        exts.append(&mut vec![
             cstr::cstr!("VK_KHR_depth_stencil_resolve"),
             // cstr::cstr!("VK_KHR_multiview"),     // 于 vk-1.1 加入到 core
             // cstr::cstr!("VK_KHR_maintenance2"),  // 于 vk-1.1 加入到 core
             ash::extensions::khr::CreateRenderPass2::name(),
             ash::extensions::khr::DynamicRendering::name(),
-        ]
+        ]);
+
+        // RayTracing 相关的
+        exts.append(&mut vec![
+            ash::extensions::khr::AccelerationStructure::name(), // 主要的 ext
+            cstr::cstr!("VK_EXT_descriptor_indexing"),
+            cstr::cstr!("VK_KHR_buffer_device_address"),
+            ash::extensions::khr::RayTracingPipeline::name(), // 主要的 ext
+            ash::extensions::khr::DeferredHostOperations::name(),
+            cstr::cstr!("VK_KHR_spirv_1_4"),
+            cstr::cstr!("VK_KHR_shader_float_controls"),
+        ]);
+
+
+        exts
     }
 
     fn basic_instance_layers() -> Vec<&'static CStr> { vec![Self::VALIDATION_LAYER_NAME] }
@@ -95,8 +121,7 @@ impl RhiInitInfo
             }
         }
 
-        #[cfg(target_os = "macos")]
-        {
+        if cfg!(target_os = "macos") {
             // 这个扩展能够在枚举 pdevice 时，将不受支持的 pdevice 也列举出来
             // 不受支持的 pdevice 可以通过模拟层运行 vulkan
             exts.push(vk::KhrPortabilityEnumerationFn::name());
@@ -105,5 +130,20 @@ impl RhiInitInfo
             exts.push(vk::KhrGetPhysicalDeviceProperties2Fn::name());
         }
         exts
+    }
+
+    fn set_device_features(&mut self)
+    {
+        self.core_features = vk::PhysicalDeviceFeatures::builder()
+            .sampler_anisotropy(true)
+            .fragment_stores_and_atomics(true)
+            .independent_blend(true)
+            .build();
+
+        self.ext_features = vec![
+            Box::new(vk::PhysicalDeviceDynamicRenderingFeatures::builder().dynamic_rendering(true).build()),
+            Box::<vk::PhysicalDeviceAccelerationStructureFeaturesKHR>::default(),
+            Box::<vk::PhysicalDeviceRayTracingPipelineFeaturesKHR>::default(),
+        ];
     }
 }

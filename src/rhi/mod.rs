@@ -17,7 +17,7 @@ use crate::{
 };
 
 
-static mut G_RHI: Option<Rhi> = None;
+static mut RHI: Option<Rhi> = None;
 
 
 /// Rhi 只需要做到能够创建各种资源的程度就行了
@@ -58,7 +58,7 @@ impl Rhi
     #[inline]
     pub fn transfer_command_pool(&self) -> &RhiCommandPool { self.transfer_command_pool.as_ref().unwrap() }
     #[inline]
-    pub fn instance() -> &'static Self { unsafe { G_RHI.as_ref().unwrap_unchecked() } }
+    pub fn instance() -> &'static Self { unsafe { RHI.as_ref().unwrap_unchecked() } }
     #[inline]
     pub(crate) fn vk_instance(&self) -> &Instance { unsafe { self.instance.as_ref().unwrap_unchecked() } }
     #[inline]
@@ -198,7 +198,7 @@ impl Rhi
     const MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
     const MAX_MATERIAL_CNT: u32 = 256;
 
-    pub fn init(init_info: &RhiInitInfo)
+    pub fn init(mut init_info: RhiInitInfo)
     {
         let mut rhi = Self {
             vk_pf: unsafe { Some(Entry::load().unwrap()) },
@@ -218,12 +218,12 @@ impl Rhi
             compute_command_pool: None,
         };
 
-        rhi.init_instance(init_info);
-        rhi.init_debug_messenger(init_info);
+        rhi.init_instance(&init_info);
+        rhi.init_debug_messenger(&init_info);
         rhi.init_pdevice();
-        rhi.init_device_and_queue(init_info);
+        rhi.init_device_and_queue(&mut init_info);
         rhi.init_dynamic_render_loader();
-        rhi.init_vma(init_info);
+        rhi.init_vma(&init_info);
         rhi.init_descriptor_pool();
         rhi.init_default_command_pool();
 
@@ -232,7 +232,7 @@ impl Rhi
         rhi.set_debug_name(rhi.descriptor_pool.unwrap(), "main-descriptor-pool");
 
         unsafe {
-            G_RHI = Some(rhi);
+            RHI = Some(rhi);
         }
     }
 
@@ -374,7 +374,7 @@ impl Rhi
     }
 
 
-    fn init_device_and_queue(&mut self, init_info: &RhiInitInfo)
+    fn init_device_and_queue(&mut self, init_info: &mut RhiInitInfo)
     {
         let graphics_queue_family_index =
             self.physical_device().find_queue_family_index(vk::QueueFlags::GRAPHICS).unwrap();
@@ -418,21 +418,21 @@ impl Rhi
             })
             .collect_vec();
 
-        let physical_device_features = vk::PhysicalDeviceFeatures::builder()
-            .sampler_anisotropy(true)
-            .fragment_stores_and_atomics(true)
-            .independent_blend(true);
-
         let device_exts = init_info.device_extensions.iter().map(|e| e.as_ptr()).collect_vec();
 
-        // dynamic rendering 所需的 feature
-        let mut dynamic_render_feature = vk::PhysicalDeviceDynamicRenderingFeatures::builder().dynamic_rendering(true);
+        let mut features = vk::PhysicalDeviceFeatures2::builder().features(init_info.core_features).build();
+        unsafe {
+            init_info.ext_features.iter_mut().for_each(|f| {
+                let ptr = <*mut dyn vk::ExtendsPhysicalDeviceFeatures2>::cast::<vk::BaseOutStructure>(f.as_mut());
+                (*ptr).p_next = features.p_next as _;
+                features.p_next = ptr as _;
+            });
+        }
 
         let device_create_info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(&queue_create_infos)
-            .enabled_features(&physical_device_features)
             .enabled_extension_names(&device_exts)
-            .push_next(&mut dynamic_render_feature);
+            .push_next(&mut features);
 
         unsafe {
             let device = self

@@ -12,7 +12,7 @@ use crate::{
 pub struct Render;
 
 
-static mut G_ENGINE: Option<Render> = None;
+static mut ENGINE: Option<Render> = None;
 
 
 pub struct EngineInitInfo
@@ -27,7 +27,7 @@ impl Render
     const ENGINE_NAME: &'static str = "Hiss";
 
     #[inline]
-    pub fn instance() -> &'static Self { unsafe { G_ENGINE.as_ref().unwrap() } }
+    pub fn instance() -> &'static Self { unsafe { ENGINE.as_ref().unwrap() } }
 
     pub fn init(init_info: &EngineInitInfo)
     {
@@ -45,7 +45,7 @@ impl Render
             rhi_init_info.engine_name = Some(Self::ENGINE_NAME.to_string());
             rhi_init_info.is_complete().unwrap();
 
-            Rhi::init(&rhi_init_info);
+            Rhi::init(rhi_init_info);
         }
 
         RenderSwapchain::init(&RenderSwapchainInitInfo::default());
