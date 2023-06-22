@@ -15,7 +15,7 @@ pub struct Render;
 static mut ENGINE: Option<Render> = None;
 
 
-pub struct EngineInitInfo
+pub struct RenderInitInfo
 {
     pub window_width: u32,
     pub window_height: u32,
@@ -29,7 +29,7 @@ impl Render
     #[inline]
     pub fn instance() -> &'static Self { unsafe { ENGINE.as_ref().unwrap() } }
 
-    pub fn init(init_info: &EngineInitInfo)
+    pub fn init(init_info: &RenderInitInfo)
     {
         simple_logger::SimpleLogger::new().init().unwrap();
 

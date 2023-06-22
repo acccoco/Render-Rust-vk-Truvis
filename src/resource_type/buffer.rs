@@ -171,4 +171,13 @@ impl RhiBuffer
 
         stage_buffer.drop();
     }
+
+    pub fn get_device_address(&self) -> vk::DeviceAddress
+    {
+        unsafe {
+            Rhi::instance()
+                .device()
+                .get_buffer_device_address(&vk::BufferDeviceAddressInfo::builder().buffer(self.buffer))
+        }
+    }
 }

@@ -1,7 +1,7 @@
 use ash::{extensions::khr::Swapchain, vk};
 use memoffset::offset_of;
 use rust_vk::{
-    render::{EngineInitInfo, Render},
+    render::{RenderInitInfo, Render},
     render_context::RenderContext,
     resource_type::{
         buffer::RhiBuffer, command_buffer::RhiCommandBuffer, pipeline::RhiPipelineTemplate, queue::RhiSubmitBatch,
@@ -37,7 +37,7 @@ const VERTEX_DATA: [Vertex; 3] = [
 
 fn main()
 {
-    Render::init(&EngineInitInfo {
+    Render::init(&RenderInitInfo {
         window_width: 800,
         window_height: 800,
         app_name: "hello-triangle".to_string(),
@@ -53,8 +53,8 @@ fn main()
 
     let extent = RenderContext::extent();
     let pipeline = RhiPipelineTemplate {
-        fragment_shader_path: Some("examples/hello_triangle/frag.spv".into()),
-        vertex_shader_path: Some("examples/hello_triangle/vert.spv".into()),
+        fragment_shader_path: Some("examples/hello_triangle/shader/frag.spv".into()),
+        vertex_shader_path: Some("examples/hello_triangle/shader/vert.spv".into()),
         color_formats: vec![RenderContext::instance().color_format()],
         depth_format: RenderContext::depth_format(),
         viewport: Some(vk::Viewport {

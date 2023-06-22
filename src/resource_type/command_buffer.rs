@@ -210,3 +210,30 @@ impl RhiCommandBuffer
         }
     }
 }
+
+
+// RayTracing 相关的命令
+impl RhiCommandBuffer
+{
+    pub fn build_blas(
+        &mut self,
+        flags: vk::BuildAccelerationStructureFlagsKHR,
+        geometry: Vec<(vk::AccelerationStructureGeometryKHR, vk::AccelerationStructureBuildRangeInfoKHR)>,
+        scratch_data: vk::DeviceOrHostAddressKHR,
+    ) -> vk::AccelerationStructureKHR
+    {
+        let dst_accleration_structure = vk::AccelerationStructureKHR::null();
+        let p_geometry = geometry.iter().map(|(g, _)| g as *const vk::AccelerationStructureGeometryKHR).collect_vec();
+        let build_info = vk::AccelerationStructureBuildGeometryInfoKHR {
+            //
+            ty: vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
+            flags,
+            mode: vk::BuildAccelerationStructureModeKHR::BUILD,
+            dst_acceleration_structure: dst_accleration_structure,
+
+            ..Default::default()
+        };
+
+        todo!()
+    }
+}
