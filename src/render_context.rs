@@ -102,7 +102,7 @@ impl RenderContext
         ctx.graphics_command_pools[ctx.frame_index].reset();
         std::mem::take(&mut ctx.allocated_command_buffers[ctx.frame_index])
             .into_iter()
-            .for_each(|c| c.drop());
+            .for_each(|c| c.free());
         current_fence.reset();
 
         ctx.swapchain_image_index = RenderSwapchain::instance()

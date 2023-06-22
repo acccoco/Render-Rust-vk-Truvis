@@ -28,6 +28,7 @@ pub struct Rhi
 
     debug_util_pf: Option<ash::extensions::ext::DebugUtils>,
     dynamic_render_pf: Option<ash::extensions::khr::DynamicRendering>,
+    acc_pf: Option<ash::extensions::khr::AccelerationStructure>,
 
     debug_util_messenger: Option<vk::DebugUtilsMessengerEXT>,
 
@@ -82,6 +83,11 @@ impl Rhi
     pub(crate) fn dynamic_render_pf(&self) -> &ash::extensions::khr::DynamicRendering
     {
         unsafe { self.dynamic_render_pf.as_ref().unwrap_unchecked() }
+    }
+    #[inline]
+    pub(crate) fn acc_struct_pf(&self) -> &ash::extensions::khr::AccelerationStructure
+    {
+        unsafe { self.acc_pf.as_ref().unwrap_unchecked() }
     }
 }
 
@@ -216,13 +222,14 @@ impl Rhi
             graphics_command_pool: None,
             transfer_command_pool: None,
             compute_command_pool: None,
+            acc_pf: None,
         };
 
         rhi.init_instance(&init_info);
         rhi.init_debug_messenger(&init_info);
         rhi.init_pdevice();
         rhi.init_device_and_queue(&mut init_info);
-        rhi.init_dynamic_render_loader();
+        rhi.init_pf();
         rhi.init_vma(&init_info);
         rhi.init_descriptor_pool();
         rhi.init_default_command_pool();
@@ -467,11 +474,13 @@ impl Rhi
         }
     }
 
-    fn init_dynamic_render_loader(&mut self)
+    fn init_pf(&mut self)
     {
         let instance = self.instance.as_ref().unwrap();
         let device = self.device.as_ref().unwrap();
+
         self.dynamic_render_pf = Some(ash::extensions::khr::DynamicRendering::new(instance, device));
+        self.acc_pf = Some(ash::extensions::khr::AccelerationStructure::new(instance, device));
     }
 
     fn init_vma(&mut self, init_info: &RhiInitInfo)
@@ -481,7 +490,8 @@ impl Rhi
             Rc::new(self.device.as_ref().unwrap()),
             self.physical_device.as_ref().unwrap().vk_pdevice,
         )
-        .vulkan_api_version(init_info.vk_version);
+        .vulkan_api_version(init_info.vk_version)
+        .flags(vk_mem::AllocatorCreateFlags::BUFFER_DEVICE_ADDRESS);
 
         self.vma = Some(vk_mem::Allocator::new(vma_create_info).unwrap());
     }

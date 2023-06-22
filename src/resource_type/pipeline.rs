@@ -181,8 +181,8 @@ impl RhiPipelineTemplate
         };
         rhi.set_debug_name(pipeline, debug_name.clone());
 
-        vertex_shader_module.drop();
-        fragment_shader_module.drop();
+        vertex_shader_module.destroy();
+        fragment_shader_module.destroy();
 
         RhiPipeline {
             pipeline,

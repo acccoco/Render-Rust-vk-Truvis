@@ -37,7 +37,8 @@ impl RhiInitInfo
             app_name: None,
             engine_name: None,
 
-            vk_version: vk::API_VERSION_1_1,
+            // 版本过低时，有些函数无法正确加载
+            vk_version: vk::API_VERSION_1_3,
 
             instance_layers: Self::basic_instance_layers(),
             instance_extensions: Self::basic_instance_extensions(),
@@ -95,7 +96,6 @@ impl RhiInitInfo
             cstr::cstr!("VK_KHR_shader_float_controls"),
         ]);
 
-
         exts
     }
 
@@ -142,8 +142,12 @@ impl RhiInitInfo
 
         self.ext_features = vec![
             Box::new(vk::PhysicalDeviceDynamicRenderingFeatures::builder().dynamic_rendering(true).build()),
-            Box::<vk::PhysicalDeviceAccelerationStructureFeaturesKHR>::default(),
-            Box::<vk::PhysicalDeviceRayTracingPipelineFeaturesKHR>::default(),
+            Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::builder().buffer_device_address(true).build()),
+            Box::new(vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder().ray_tracing_pipeline(true).build()),
+            Box::new(
+                vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder().acceleration_structure(true).build(),
+            ),
+            Box::new(vk::PhysicalDeviceHostQueryResetFeatures::builder().host_query_reset(true).build()),
         ];
     }
 }

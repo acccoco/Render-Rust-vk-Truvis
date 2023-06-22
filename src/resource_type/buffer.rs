@@ -19,16 +19,14 @@ pub struct RhiBuffer
 impl RhiBuffer
 {
     /// @param min_align 对 memory 的 offset align 限制
-    pub fn new<S>(
+    pub fn new(
         size: vk::DeviceSize,
         buffer_usage: vk::BufferUsageFlags,
         mem_usage: vk_mem::MemoryUsage,
         alloc_flags: vk_mem::AllocationCreateFlags,
         min_align: Option<vk::DeviceSize>,
-        debug_name: S,
+        debug_name: String,
     ) -> Self
-    where
-        S: AsRef<str> + Clone,
     {
         let buffer_info = vk::BufferCreateInfo {
             size,
@@ -49,15 +47,28 @@ impl RhiBuffer
                 rhi.vma().create_buffer(&buffer_info, &alloc_info).unwrap()
             };
 
-            rhi.set_debug_name(buffer, debug_name.clone());
+            rhi.set_debug_name(buffer, debug_name.as_str());
             Self {
                 buffer,
                 allocation,
                 map_ptr: None,
                 size,
-                debug_name: debug_name.as_ref().to_string(),
+                debug_name,
             }
         }
+    }
+
+    #[inline]
+    pub fn new_device_buffer(size: vk::DeviceSize, flags: vk::BufferUsageFlags, debug_name: &str) -> Self
+    {
+        Self::new(
+            size as vk::DeviceSize,
+            flags,
+            vk_mem::MemoryUsage::AutoPreferDevice,
+            vk_mem::AllocationCreateFlags::empty(),
+            None,
+            debug_name.to_string(),
+        )
     }
 
     #[inline]
@@ -80,13 +91,13 @@ impl RhiBuffer
     where
         S: AsRef<str>,
     {
-        Self::new(
+        Self::new_device_buffer(
             size as vk::DeviceSize,
-            vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
-            vk_mem::MemoryUsage::AutoPreferDevice,
-            vk_mem::AllocationCreateFlags::empty(),
-            None,
-            debug_name.as_ref().to_string(),
+            vk::BufferUsageFlags::INDEX_BUFFER |
+                vk::BufferUsageFlags::TRANSFER_DST |
+                vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS |
+                vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+            debug_name.as_ref(),
         )
     }
 
@@ -95,16 +106,35 @@ impl RhiBuffer
     where
         S: AsRef<str>,
     {
-        Self::new(
+        Self::new_device_buffer(
             size as vk::DeviceSize,
-            vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
-            vk_mem::MemoryUsage::AutoPreferDevice,
-            vk_mem::AllocationCreateFlags::empty(),
-            None,
-            debug_name.as_ref().to_string(),
+            vk::BufferUsageFlags::VERTEX_BUFFER |
+                vk::BufferUsageFlags::TRANSFER_DST |
+                vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS |
+                vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+            debug_name.as_ref(),
         )
     }
 
+    #[inline]
+    pub fn new_accleration_buffer<S: AsRef<str>>(size: usize, debug_name: S) -> Self
+    {
+        Self::new_device_buffer(
+            size as vk::DeviceSize,
+            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+            debug_name.as_ref(),
+        )
+    }
+
+    #[inline]
+    pub fn new_accleration_scratch_buffer<S: AsRef<str>>(size: usize, debug_name: S) -> Self
+    {
+        Self::new_device_buffer(
+            size as vk::DeviceSize,
+            vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+            debug_name.as_ref(),
+        )
+    }
 
     pub fn map(&mut self)
     {
@@ -127,7 +157,7 @@ impl RhiBuffer
         }
     }
 
-    pub fn drop(self)
+    pub fn destroy(self)
     {
         unsafe {
             Rhi::instance().vma().destroy_buffer(self.buffer, self.allocation);
@@ -158,7 +188,7 @@ impl RhiBuffer
 
         stage_buffer.unmap();
 
-        RhiCommandBuffer::one_time_transfer(|cmd| {
+        RhiCommandBuffer::one_time_exec(vk::QueueFlags::TRANSFER, |cmd| {
             cmd.copy_buffer(
                 &stage_buffer,
                 self,
@@ -169,7 +199,7 @@ impl RhiBuffer
             );
         });
 
-        stage_buffer.drop();
+        stage_buffer.destroy();
     }
 
     pub fn get_device_address(&self) -> vk::DeviceAddress

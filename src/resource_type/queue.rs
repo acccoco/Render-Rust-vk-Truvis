@@ -31,6 +31,14 @@ impl RhiQueue
                 .unwrap();
         }
     }
+    
+    /// 根据 specification，vkQueueWaitIdle 应该和 Fence 效率相同
+    #[inline]   
+    pub fn wait_idle(&self) {
+        unsafe {
+            Rhi::instance().device().queue_wait_idle(self.queue) .unwrap()
+        } 
+    }
 }
 
 

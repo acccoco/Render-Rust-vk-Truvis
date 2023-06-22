@@ -25,7 +25,7 @@ impl RhiShaderModule
         }
     }
 
-    pub fn drop(self)
+    pub fn destroy(self)
     {
         unsafe {
             Rhi::instance().device().destroy_shader_module(self.handle, None);

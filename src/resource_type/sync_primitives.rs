@@ -42,7 +42,7 @@ impl RhiFence
         }
     }
 
-    pub fn drop(self)
+    pub fn destroy(self)
     {
         unsafe {
             Rhi::instance().device().destroy_fence(self.fence, None);
@@ -69,7 +69,7 @@ impl RhiSemaphore
         Self { semaphore }
     }
 
-    pub fn drop(self)
+    pub fn destroy(self)
     {
         unsafe {
             Rhi::instance().device().destroy_semaphore(self.semaphore, None);

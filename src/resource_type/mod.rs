@@ -7,3 +7,4 @@ pub mod queue;
 pub mod sync_primitives;
 pub mod shader;
 pub mod acc_struct;
+pub mod query_pool;

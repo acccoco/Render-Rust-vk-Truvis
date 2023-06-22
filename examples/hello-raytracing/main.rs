@@ -1,7 +1,7 @@
 use ash::vk;
 use rust_vk::{
     render::{Render, RenderInitInfo},
-    resource_type::buffer::RhiBuffer,
+    resource_type::{acc_struct::RhiAcceleration, buffer::RhiBuffer},
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -11,8 +11,14 @@ struct Vertex
     pos: [f32; 4],
     color: [f32; 4],
 }
-const INDEX_DATA: [u32; 3] = [0u32, 1, 2];
-const VERTEX_DATA: [Vertex; 3] = [
+const INDEX_DATA: [u32; 21] = [
+    0u32, 1, 2, //
+    0, 2, 3, //
+    0, 1, 3, //
+    1, 2, 3, //
+    0, 3, 2, 0, 3, 1, 1, 3, 2,
+];
+const VERTEX_DATA: [Vertex; 4] = [
     Vertex {
         pos: [-1.0, 1.0, 0.0, 1.0],
         color: [0.0, 1.0, 0.0, 1.0],
@@ -25,18 +31,49 @@ const VERTEX_DATA: [Vertex; 3] = [
         pos: [0.0, -1.0, 0.0, 1.0],
         color: [1.0, 0.0, 0.0, 1.0],
     },
+    Vertex {
+        pos: [0.0, 0.0, 1.0, 1.0],
+        color: [1.0, 0.0, 0.0, 1.0],
+    },
 ];
 
 struct HelloRT
 {
     vertex_buffer: Option<RhiBuffer>,
     index_buffer: Option<RhiBuffer>,
+    acceleration: Option<RhiAcceleration>,
 }
 
 
 impl HelloRT
 {
-    fn to_vk_geo(&mut self)
+    fn init() -> Self
+    {
+        let mut hello = Self {
+            vertex_buffer: None,
+            index_buffer: None,
+            acceleration: None,
+        };
+
+        hello.create_buffer();
+        hello.create_acceleration();
+
+        hello
+    }
+
+    fn create_buffer(&mut self)
+    {
+        let mut index_buffer = RhiBuffer::new_index_buffer(std::mem::size_of_val(&INDEX_DATA), "index-buffer");
+        index_buffer.transfer_data(&INDEX_DATA);
+
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
+        vertex_buffer.transfer_data(&VERTEX_DATA);
+
+        self.vertex_buffer = Some(vertex_buffer);
+        self.index_buffer = Some(index_buffer);
+    }
+
+    fn create_acceleration(&mut self)
     {
         let vertex_buffer = self.vertex_buffer.as_ref().unwrap();
         let index_buffer = self.index_buffer.as_ref().unwrap();
@@ -75,9 +112,13 @@ impl HelloRT
         };
 
         // 构建 BLAS
-        vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE;
+        let acc = RhiAcceleration::build_acceleration(
+            vk::BuildAccelerationStructureFlagsKHR::empty(),
+            std::slice::from_ref(&geometry),
+            std::slice::from_ref(&range_info),
+        );
 
-        vk::AccelerationStructureKHR()
+        self.acceleration = Some(acc);
     }
 }
 
@@ -92,9 +133,5 @@ fn main()
 
     log::info!("start.");
 
-    let mut index_buffer = RhiBuffer::new_index_buffer(std::mem::size_of_val(&INDEX_DATA), "index-buffer");
-    index_buffer.transfer_data(&INDEX_DATA);
-
-    let mut vertex_buffer = RhiBuffer::new_vertex_buffer(std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
-    vertex_buffer.transfer_data(&VERTEX_DATA);
+    let hello = HelloRT::init();
 }

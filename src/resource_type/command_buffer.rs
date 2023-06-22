@@ -3,8 +3,8 @@ use itertools::Itertools;
 
 use crate::{
     resource_type::{
-        buffer::RhiBuffer, command_pool::RhiCommandPool, pipeline::RhiPipeline, queue::RhiSubmitBatch,
-        sync_primitives::RhiFence,
+        buffer::RhiBuffer, command_pool::RhiCommandPool, pipeline::RhiPipeline, query_pool::RhiQueryPool,
+        queue::RhiSubmitBatch, sync_primitives::RhiFence,
     },
     rhi::Rhi,
 };
@@ -36,39 +36,48 @@ impl RhiCommandBuffer
         }
     }
 
-    /// 专用于 transfer 的仅一次使用的 command buffer
-    pub fn one_time_transfer<F>(f: F)
+    pub fn one_time_exec<F>(ty: vk::QueueFlags, f: F)
     where
         F: FnOnce(&mut RhiCommandBuffer),
     {
-        unsafe {
-            let rhi = Rhi::instance();
-            let mut command_buffer = Self::new(rhi.transfer_command_pool(), "one-time-transfer-command-buffer");
+        let rhi = Rhi::instance();
 
-            rhi.device()
-                .begin_command_buffer(
-                    command_buffer.command_buffer,
-                    &vk::CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
-                )
-                .unwrap();
-            f(&mut command_buffer);
-            rhi.device().end_command_buffer(command_buffer.command_buffer).unwrap();
-
-            let fence = RhiFence::new(false, "one-time-command-fence");
-            rhi.transfer_queue().submit(
-                vec![RhiSubmitBatch {
-                    command_buffers: vec![command_buffer.clone()],
-                    ..Default::default()
-                }],
-                Some(fence.clone()),
-            );
-            fence.wait();
-            fence.drop();
-            command_buffer.drop();
+        let pool;
+        let queue;
+        match ty {
+            vk::QueueFlags::COMPUTE => {
+                pool = rhi.compute_command_pool();
+                queue = rhi.compute_queue();
+            }
+            vk::QueueFlags::TRANSFER => {
+                pool = rhi.transfer_command_pool();
+                queue = rhi.transfer_queue();
+            }
+            vk::QueueFlags::GRAPHICS => {
+                pool = rhi.graphics_command_pool();
+                queue = rhi.graphics_queue();
+            }
+            other => panic!("not supported queue type: SPARSE_BINDING, {:?}", other),
         }
+
+        let mut command_buffer = Self::new(pool, "one-time-command-buffer");
+
+        command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        f(&mut command_buffer);
+        command_buffer.end();
+
+        queue.submit(
+            vec![RhiSubmitBatch {
+                command_buffers: vec![command_buffer.clone()],
+                ..Default::default()
+            }],
+            None,
+        );
+        queue.wait_idle();
+        command_buffer.free();
     }
 
-    pub fn drop(self)
+    pub fn free(self)
     {
         unsafe {
             Rhi::instance()
@@ -99,6 +108,15 @@ impl RhiCommandBuffer
     {
         unsafe {
             Rhi::instance().device().cmd_copy_buffer(self.command_buffer, src.buffer, dst.buffer, regions);
+        }
+    }
+
+    /// 注：仅支持 compute queue
+    #[inline]
+    pub fn copy_acceleration_structure(&mut self, copy_info: &vk::CopyAccelerationStructureInfoKHR)
+    {
+        unsafe {
+            Rhi::instance().acc_struct_pf().cmd_copy_acceleration_structure(self.command_buffer, copy_info);
         }
     }
 }
@@ -215,25 +233,44 @@ impl RhiCommandBuffer
 // RayTracing 相关的命令
 impl RhiCommandBuffer
 {
+    /// 注：仅支持 compute queue
+    #[inline]
     pub fn build_blas(
         &mut self,
-        flags: vk::BuildAccelerationStructureFlagsKHR,
-        geometry: Vec<(vk::AccelerationStructureGeometryKHR, vk::AccelerationStructureBuildRangeInfoKHR)>,
-        scratch_data: vk::DeviceOrHostAddressKHR,
-    ) -> vk::AccelerationStructureKHR
+        geometry: &vk::AccelerationStructureBuildGeometryInfoKHR,
+        ranges: &[vk::AccelerationStructureBuildRangeInfoKHR],
+    )
     {
-        let dst_accleration_structure = vk::AccelerationStructureKHR::null();
-        let p_geometry = geometry.iter().map(|(g, _)| g as *const vk::AccelerationStructureGeometryKHR).collect_vec();
-        let build_info = vk::AccelerationStructureBuildGeometryInfoKHR {
-            //
-            ty: vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
-            flags,
-            mode: vk::BuildAccelerationStructureModeKHR::BUILD,
-            dst_acceleration_structure: dst_accleration_structure,
+        unsafe {
+            Rhi::instance().acc_struct_pf().cmd_build_acceleration_structures(
+                self.command_buffer,
+                std::slice::from_ref(geometry),
+                &[ranges],
+            )
+        }
+    }
 
-            ..Default::default()
-        };
-
-        todo!()
+    /// 注：仅支持 compute queue
+    #[inline]
+    pub fn write_acceleration_structure_properties(
+        &mut self,
+        query_pool: &mut RhiQueryPool,
+        first_query: u32,
+        acceleration_structures: &[vk::AccelerationStructureKHR],
+    )
+    {
+        unsafe {
+            Rhi::instance().acc_struct_pf().cmd_write_acceleration_structures_properties(
+                self.command_buffer,
+                acceleration_structures,
+                query_pool.query_type,
+                query_pool.handle,
+                first_query,
+            )
+        }
     }
 }
+
+
+// 其他命令
+impl RhiCommandBuffer {}
