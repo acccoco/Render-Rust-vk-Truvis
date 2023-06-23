@@ -6,5 +6,5 @@ pub mod pipeline;
 pub mod queue;
 pub mod sync_primitives;
 pub mod shader;
-pub mod acc_struct;
+pub mod acceleration;
 pub mod query_pool;

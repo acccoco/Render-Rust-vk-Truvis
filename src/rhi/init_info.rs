@@ -148,6 +148,7 @@ impl RhiInitInfo
                 vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder().acceleration_structure(true).build(),
             ),
             Box::new(vk::PhysicalDeviceHostQueryResetFeatures::builder().host_query_reset(true).build()),
+            Box::new(vk::PhysicalDeviceSynchronization2Features::builder().synchronization2(true).build()),
         ];
     }
 }

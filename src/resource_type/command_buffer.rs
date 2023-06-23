@@ -116,7 +116,9 @@ impl RhiCommandBuffer
     pub fn copy_acceleration_structure(&mut self, copy_info: &vk::CopyAccelerationStructureInfoKHR)
     {
         unsafe {
-            Rhi::instance().acc_struct_pf().cmd_copy_acceleration_structure(self.command_buffer, copy_info);
+            Rhi::instance()
+                .acceleration_structure_pf()
+                .cmd_copy_acceleration_structure(self.command_buffer, copy_info);
         }
     }
 }
@@ -227,6 +229,15 @@ impl RhiCommandBuffer
             );
         }
     }
+
+    #[inline]
+    pub fn memory_barrier(&mut self, barriers: &[vk::MemoryBarrier2])
+    {
+        let dependency_info = vk::DependencyInfo::builder().memory_barriers(barriers);
+        unsafe {
+            Rhi::instance().device().cmd_pipeline_barrier2(self.command_buffer, &dependency_info);
+        }
+    }
 }
 
 
@@ -235,14 +246,15 @@ impl RhiCommandBuffer
 {
     /// 注：仅支持 compute queue
     #[inline]
-    pub fn build_blas(
+    pub fn build_acceleration_structure(
         &mut self,
         geometry: &vk::AccelerationStructureBuildGeometryInfoKHR,
         ranges: &[vk::AccelerationStructureBuildRangeInfoKHR],
     )
     {
         unsafe {
-            Rhi::instance().acc_struct_pf().cmd_build_acceleration_structures(
+            // 该函数可以一次构建多个 AccelerationStructure，这里只构建了 1 个
+            Rhi::instance().acceleration_structure_pf().cmd_build_acceleration_structures(
                 self.command_buffer,
                 std::slice::from_ref(geometry),
                 &[ranges],
@@ -260,7 +272,7 @@ impl RhiCommandBuffer
     )
     {
         unsafe {
-            Rhi::instance().acc_struct_pf().cmd_write_acceleration_structures_properties(
+            Rhi::instance().acceleration_structure_pf().cmd_write_acceleration_structures_properties(
                 self.command_buffer,
                 acceleration_structures,
                 query_pool.query_type,

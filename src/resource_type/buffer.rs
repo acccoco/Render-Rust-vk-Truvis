@@ -72,6 +72,20 @@ impl RhiBuffer
     }
 
     #[inline]
+    pub fn new_acceleration_instance_buffer<S>(size: vk::DeviceSize, debug_name: S) -> Self
+    where
+        S: AsRef<str>,
+    {
+        Self::new_device_buffer(
+            size,
+            vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS |
+                vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR |
+                vk::BufferUsageFlags::TRANSFER_DST,
+            debug_name.as_ref(),
+        )
+    }
+
+    #[inline]
     pub fn new_stage_buffer<S>(size: vk::DeviceSize, debug_name: S) -> Self
     where
         S: AsRef<str>,
@@ -127,10 +141,10 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_accleration_scratch_buffer<S: AsRef<str>>(size: usize, debug_name: S) -> Self
+    pub fn new_accleration_scratch_buffer<S: AsRef<str>>(size: vk::DeviceSize, debug_name: S) -> Self
     {
         Self::new_device_buffer(
-            size as vk::DeviceSize,
+            size,
             vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
             debug_name.as_ref(),
         )

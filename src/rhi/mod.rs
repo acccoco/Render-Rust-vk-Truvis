@@ -85,7 +85,7 @@ impl Rhi
         unsafe { self.dynamic_render_pf.as_ref().unwrap_unchecked() }
     }
     #[inline]
-    pub(crate) fn acc_struct_pf(&self) -> &ash::extensions::khr::AccelerationStructure
+    pub(crate) fn acceleration_structure_pf(&self) -> &ash::extensions::khr::AccelerationStructure
     {
         unsafe { self.acc_pf.as_ref().unwrap_unchecked() }
     }
