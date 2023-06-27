@@ -1,3 +1,5 @@
+mod lib;
+
 use ash::vk;
 use memoffset::offset_of;
 use rust_vk::{
@@ -42,7 +44,7 @@ const VERTEX_DATA: [Vertex; 4] = [
     },
     Vertex {
         pos: [0.0, 0.0, 1.0, 1.0],
-        color: [1.0, 0.0, 0.0, 1.0],
+        color: [1.0, 1.0, 1.0, 1.0],
     },
 ];
 
@@ -54,6 +56,8 @@ struct HelloRT
     blas: Option<RhiAcceleration>, // 可以有多个
     tlas: Option<RhiAcceleration>, // 只能由一个
 }
+
+
 
 
 impl HelloRT
@@ -224,6 +228,10 @@ impl HelloRT
         hello.init_pipeline();
 
         hello
+    }
+    
+    fn create_descriptor_set() {
+        vk::DescriptorSetLayoutBinding{}
     }
 }
 
