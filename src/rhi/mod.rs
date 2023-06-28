@@ -76,6 +76,8 @@ impl Rhi
     #[inline]
     pub fn transfer_queue(&self) -> &RhiQueue { unsafe { self.transfer_queue.as_ref().unwrap_unchecked() } }
     #[inline]
+    pub(crate) fn descriptor_pool(&self) -> vk::DescriptorPool { unsafe { self.descriptor_pool.unwrap_unchecked() } }
+    #[inline]
     pub(crate) fn vma(&self) -> &vk_mem::Allocator { unsafe { self.vma.as_ref().unwrap_unchecked() } }
     #[inline]
     pub(crate) fn vk_pf(&self) -> &Entry { unsafe { self.vk_pf.as_ref().unwrap_unchecked() } }

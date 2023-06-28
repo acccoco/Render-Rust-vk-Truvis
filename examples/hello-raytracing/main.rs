@@ -231,7 +231,7 @@ impl HelloRT
     }
     
     fn create_descriptor_set() {
-        vk::DescriptorSetLayoutBinding{}
+        // vk::DescriptorSetLayoutBinding{}
     }
 }
 
