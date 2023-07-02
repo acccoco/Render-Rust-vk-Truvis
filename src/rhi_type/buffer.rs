@@ -3,7 +3,7 @@ use std::ffi::c_void;
 use ash::vk;
 use vk_mem::Alloc;
 
-use crate::{resource_type::command_buffer::RhiCommandBuffer, rhi::Rhi};
+use crate::{rhi_type::command_buffer::RhiCommandBuffer, rhi::Rhi};
 
 pub struct RhiBuffer
 {

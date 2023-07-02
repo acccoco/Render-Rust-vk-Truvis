@@ -4,9 +4,9 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::{
-    resource_type::{
+    rhi_type::{
         buffer::RhiBuffer, command_buffer::RhiCommandBuffer, query_pool::RhiQueryPool, queue::RhiSubmitBatch,
-        sync_primitives::RhiFence,
+        synchronize::RhiFence,
     },
     rhi::Rhi,
 };

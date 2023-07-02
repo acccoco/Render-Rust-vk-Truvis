@@ -2,11 +2,11 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::{
-    resource_type::{
+    rhi_type::{
         command_buffer::RhiCommandBuffer,
         command_pool::RhiCommandPool,
         queue::RhiSubmitBatch,
-        sync_primitives::{RhiFence, RhiSemaphore},
+        synchronize::{RhiFence, RhiSemaphore},
     },
     rhi::{create_utils::RhiCreateInfoUtil, Rhi},
     swapchain::RenderSwapchain,

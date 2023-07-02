@@ -12,7 +12,7 @@ use itertools::Itertools;
 use vk_mem::Alloc;
 
 use crate::{
-    resource_type::{command_pool::RhiCommandPool, queue::RhiQueue},
+    rhi_type::{command_pool::RhiCommandPool, queue::RhiQueue},
     rhi::{init_info::RhiInitInfo, physical_device::RhiPhysicalDevice},
 };
 

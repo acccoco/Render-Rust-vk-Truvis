@@ -3,7 +3,7 @@ use itertools::Itertools;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
 use crate::{
-    resource_type::sync_primitives::{RhiFence, RhiSemaphore},
+    rhi_type::synchronize::{RhiFence, RhiSemaphore},
     rhi::Rhi,
     window_system::WindowSystem,
 };

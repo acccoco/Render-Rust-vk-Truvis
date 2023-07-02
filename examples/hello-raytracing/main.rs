@@ -5,13 +5,13 @@ use memoffset::offset_of;
 use rust_vk::{
     render::{Render, RenderInitInfo},
     render_context::RenderContext,
-    resource_type::{
+    rhi::Rhi,
+    rhi_type::{
         acceleration::RhiAcceleration,
         buffer::RhiBuffer,
         pipeline::{RhiPipeline, RhiPipelineTemplate},
         queue::RhiSubmitBatch,
     },
-    rhi::Rhi,
     window_system::WindowSystem,
 };
 
@@ -56,8 +56,6 @@ struct HelloRT
     blas: Option<RhiAcceleration>, // 可以有多个
     tlas: Option<RhiAcceleration>, // 只能由一个
 }
-
-
 
 
 impl HelloRT
@@ -229,8 +227,9 @@ impl HelloRT
 
         hello
     }
-    
-    fn create_descriptor_set() {
+
+    fn create_descriptor_set()
+    {
         // vk::DescriptorSetLayoutBinding{}
     }
 }

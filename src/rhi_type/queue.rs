@@ -2,9 +2,9 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::{
-    resource_type::{
+    rhi_type::{
         command_buffer::RhiCommandBuffer,
-        sync_primitives::{RhiFence, RhiSemaphore},
+        synchronize::{RhiFence, RhiSemaphore},
     },
     rhi::Rhi,
 };

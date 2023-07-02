@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::{resource_type::shader::RhiShaderModule, rhi::Rhi};
+use crate::{rhi_type::shader::RhiShaderModule, rhi::Rhi};
 
 pub struct RhiPipeline
 {

@@ -18,7 +18,7 @@ fn main()
     // 设置编译时的环境变量
     let current_dir = std::env::current_dir().unwrap();
     let shader_spv_dir_abs = format!("{}/shader/generate", current_dir.to_str().unwrap());
-    println!("cargo:rustc-env=HISS_SHADER_SPV_DIR={shader_spv_dir_abs}");
+    println!("cargo:rustc-env=HISS_SHADER_SPV_DIR={}", shader_spv_dir_abs);
 
     // 如果 generate 文件夹不存在，则创建文件夹
     let dst_dir = std::path::Path::new("shader/generate");

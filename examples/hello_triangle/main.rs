@@ -3,7 +3,7 @@ use memoffset::offset_of;
 use rust_vk::{
     render::{Render, RenderInitInfo},
     render_context::RenderContext,
-    resource_type::{
+    rhi_type::{
         buffer::RhiBuffer,
         pipeline::{RhiPipeline, RhiPipelineTemplate},
         queue::RhiSubmitBatch,
