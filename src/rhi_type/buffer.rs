@@ -3,7 +3,7 @@ use std::ffi::c_void;
 use ash::vk;
 use vk_mem::Alloc;
 
-use crate::{rhi_type::command_buffer::RhiCommandBuffer, rhi::Rhi};
+use crate::{rhi::Rhi, rhi_type::command_buffer::RhiCommandBuffer};
 
 pub struct RhiBuffer
 {
@@ -191,10 +191,10 @@ impl RhiBuffer
 
         unsafe {
             // 这里的 size 是目标内存的最大 size
-            // align 表示目标内存位置额外的内存对齐要求，这里使用 size_of，表示和 rust 中 [T; n] 的保持一致
+            // align 表示目标内存位置额外的内存对齐要求，这里使用 align_of 表示和 rust 中 [T; n] 的保持一致
             let mut slice = ash::util::Align::new(
                 stage_buffer.map_ptr.unwrap() as *mut c_void,
-                std::mem::size_of::<T>() as u64,
+                std::mem::align_of::<T>() as u64,
                 self.size,
             );
             slice.copy_from_slice(data);

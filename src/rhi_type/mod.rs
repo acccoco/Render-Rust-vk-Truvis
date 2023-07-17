@@ -9,3 +9,5 @@ pub mod shader;
 pub mod acceleration;
 pub mod query_pool;
 pub mod mesh;
+pub mod sampler;
+pub mod image;
