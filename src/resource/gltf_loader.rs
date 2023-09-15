@@ -9,7 +9,10 @@ use glam::f32::Mat4;
 use itertools::{izip, Itertools};
 use static_init::raw_static::Static;
 
-use crate::{resource::model::StaticMeshData, rhi::Rhi};
+use crate::{
+    resource::model::StaticMeshData,
+    rhi_type::{image::RhiImage2D, sampler::RhiSampler},
+};
 
 
 /// 导入 gltf 格式的模型
@@ -238,21 +241,29 @@ impl GltfLoader
         HissTexture::new(self.core.clone(), Rc::new(image), sampler)
     }
 
-    fn create_image(&self, image: &gltf::image::Data, s_rgb: bool) -> HissImage
+    fn create_image(&self, image: &gltf::image::Data, s_rgb: bool) -> RhiImage2D
     {
-        HissImage::builder()
-            .core(self.core.clone())
+        let image_info = vk::ImageCreateInfo::builder()
+            .image_type(vk::ImageType::TYPE_2D)
             .format(Self::gltf_format_to_vk(image.format, s_rgb))
-            .extent(vk::Extent2D {
-                width: image.width,
-                height: image.height,
-            })
-            .usage(vk::ImageUsageFlags::SAMPLED)
-            .aspect(vk::ImageAspectFlags::COLOR)
-            .build()
+            .extent(
+                vk::Extent2D {
+                    width: image.width,
+                    height: image.height,
+                }
+                .into(),
+            )
+            .usage(vk::ImageUsageFlags::SAMPLED);
+
+        let alloc_info = vk_mem::AllocationCreateInfo {
+            usage: vk_mem::MemoryUsage::AutoPreferDevice,
+            ..Default::default()
+        };
+
+        RhiImage2D::new(&image_info, &alloc_info)
     }
 
-    fn create_sampler(&self, sampler: &gltf::texture::Sampler) -> vk::Sampler
+    fn create_sampler(&self, sampler: &gltf::texture::Sampler) -> RhiSampler
     {
         let (min_filter, mipmap_mode) = Self::gltf_min_filter_to_vk(sampler.min_filter());
         let mag_filter = Self::gltf_mag_filter_to_vk(sampler.mag_filter());
@@ -271,7 +282,12 @@ impl GltfLoader
                 .expect("failed to create sampler for gltf")
         }
     }
+}
 
+
+// 一些工具函数
+impl GltfLoader
+{
     /// 将 gltf 内定义的 format 转换为 vulkan 的 format
     ///
     /// 注 只支持有限的几种格式
@@ -318,7 +334,7 @@ impl GltfLoader
         })
     }
 
-    /// 将 gltf 文件中的 texture mag 参数（OpenGL 风格）转换为 vulkan 格式
+    /// 将 gltf 中纹理的 mag 参数（OpenGL 风格）转换为 vulkan 格式
     fn gltf_mag_filter_to_vk(filter: Option<gltf::texture::MagFilter>) -> vk::Filter
     {
         use ash::vk::Filter;
@@ -330,6 +346,7 @@ impl GltfLoader
         })
     }
 
+    /// 将 gltf 中纹理的 sampler wrap mode 转换成 vk 的 wrap mode
     fn gltf_wrap_mode_to_vk(wrap_mode: gltf::texture::WrappingMode) -> vk::SamplerAddressMode
     {
         use ash::vk::SamplerAddressMode;
