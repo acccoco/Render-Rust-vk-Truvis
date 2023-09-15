@@ -20,14 +20,15 @@ static mut RHI: Option<Rhi> = None;
 /// Rhi 只需要做到能够创建各种资源的程度就行了
 pub struct Rhi
 {
+    /// vk 基础函数的接口
     vk_pf: Option<Entry>,
-    instance: Option<Instance>,
+    vk_instance: Option<Instance>,
 
-    debug_util_pf: Option<ash::extensions::ext::DebugUtils>,
-    dynamic_render_pf: Option<ash::extensions::khr::DynamicRendering>,
-    acc_pf: Option<ash::extensions::khr::AccelerationStructure>,
+    vk_debug_util_pf: Option<ash::extensions::ext::DebugUtils>,
+    vk_dynamic_render_pf: Option<ash::extensions::khr::DynamicRendering>,
+    vk_acceleration_pf: Option<ash::extensions::khr::AccelerationStructure>,
 
-    debug_util_messenger: Option<vk::DebugUtilsMessengerEXT>,
+    vk_debug_util_messenger: Option<vk::DebugUtilsMessengerEXT>,
 
     physical_device: Option<RhiPhysicalDevice>,
     device: Option<Device>,

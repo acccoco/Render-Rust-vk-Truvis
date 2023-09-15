@@ -4,7 +4,7 @@ use ash::{vk, Entry};
 use itertools::Itertools;
 
 use crate::{
-    rhi::{rhi_init_info::RhiInitInfo, physical_device::RhiPhysicalDevice, Rhi, RHI},
+    rhi::{physical_device::RhiPhysicalDevice, rhi_init_info::RhiInitInfo, Rhi, RHI},
     rhi_type::queue::RhiQueue,
 };
 
@@ -18,21 +18,21 @@ impl Rhi
     {
         let mut rhi = Self {
             vk_pf: unsafe { Some(Entry::load().unwrap()) },
-            instance: None,
-            debug_util_pf: None,
-            debug_util_messenger: None,
+            vk_instance: None,
+            vk_debug_util_pf: None,
+            vk_debug_util_messenger: None,
             physical_device: None,
             device: None,
             compute_queue: None,
             graphics_queue: None,
             transfer_queue: None,
-            dynamic_render_pf: None,
+            vk_dynamic_render_pf: None,
             vma: None,
             descriptor_pool: None,
             graphics_command_pool: None,
             transfer_command_pool: None,
             compute_command_pool: None,
-            acc_pf: None,
+            vk_acceleration_pf: None,
         };
 
         rhi.init_instance(&init_info);
@@ -153,13 +153,13 @@ impl Rhi
             .push_next(&mut debug_info);
 
         let instance = unsafe { self.vk_pf.as_ref().unwrap().create_instance(&instance_info, None).unwrap() };
-        self.instance = Some(instance);
+        self.vk_instance = Some(instance);
     }
 
     fn init_debug_messenger(&mut self, init_info: &RhiInitInfo)
     {
         let loader =
-            ash::extensions::ext::DebugUtils::new(self.vk_pf.as_ref().unwrap(), self.instance.as_ref().unwrap());
+            ash::extensions::ext::DebugUtils::new(self.vk_pf.as_ref().unwrap(), self.vk_instance.as_ref().unwrap());
 
         let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
             .message_severity(init_info.debug_msg_severity)
@@ -168,20 +168,20 @@ impl Rhi
             .build();
         let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None).unwrap() };
 
-        self.debug_util_pf = Some(loader);
-        self.debug_util_messenger = Some(debug_messenger);
+        self.vk_debug_util_pf = Some(loader);
+        self.vk_debug_util_messenger = Some(debug_messenger);
     }
 
 
     fn init_pdevice(&mut self)
     {
-        let instance = self.instance.as_ref().unwrap();
+        let instance = self.vk_instance.as_ref().unwrap();
         unsafe {
             let pd = instance
                 .enumerate_physical_devices()
                 .unwrap()
                 .iter()
-                .map(|pdevice| RhiPhysicalDevice::new(*pdevice, self.instance.as_ref().unwrap()))
+                .map(|pdevice| RhiPhysicalDevice::new(*pdevice, self.vk_instance.as_ref().unwrap()))
                 // 优先使用独立显卡
                 .find_or_first(RhiPhysicalDevice::is_descrete_gpu)
                 .unwrap();
@@ -253,7 +253,7 @@ impl Rhi
 
         unsafe {
             let device = self
-                .instance
+                .vk_instance
                 .as_ref()
                 .unwrap()
                 .create_device(self.physical_device.as_ref().unwrap().vk_pdevice, &device_create_info, None)
@@ -286,17 +286,17 @@ impl Rhi
 
     fn init_pf(&mut self)
     {
-        let instance = self.instance.as_ref().unwrap();
+        let instance = self.vk_instance.as_ref().unwrap();
         let device = self.device.as_ref().unwrap();
 
-        self.dynamic_render_pf = Some(ash::extensions::khr::DynamicRendering::new(instance, device));
-        self.acc_pf = Some(ash::extensions::khr::AccelerationStructure::new(instance, device));
+        self.vk_dynamic_render_pf = Some(ash::extensions::khr::DynamicRendering::new(instance, device));
+        self.vk_acceleration_pf = Some(ash::extensions::khr::AccelerationStructure::new(instance, device));
     }
 
     fn init_vma(&mut self, init_info: &RhiInitInfo)
     {
         let vma_create_info = vk_mem::AllocatorCreateInfo::new(
-            Rc::new(self.instance.as_ref().unwrap()),
+            Rc::new(self.vk_instance.as_ref().unwrap()),
             Rc::new(self.device.as_ref().unwrap()),
             self.physical_device.as_ref().unwrap().vk_pdevice,
         )

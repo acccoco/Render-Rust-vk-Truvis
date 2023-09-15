@@ -181,7 +181,7 @@ impl HelloRT
 
             let rhi = Rhi::instance();
 
-            let mut cmd = RenderContext::get_command_buffer("render");
+            let mut cmd = RenderContext::alloc_command_buffer("render");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
             {
                 cmd.begin_rendering(&RenderContext::render_info());

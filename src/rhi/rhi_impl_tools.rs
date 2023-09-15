@@ -17,7 +17,7 @@ impl Rhi
         let name = if name.as_ref().is_empty() { "nameless" } else { name.as_ref() };
         let name = CString::new(name).unwrap();
         unsafe {
-            self.debug_util_pf
+            self.vk_debug_util_pf
                 .as_ref()
                 .unwrap()
                 .set_debug_utils_object_name(

@@ -18,7 +18,7 @@ impl Rhi
     #[inline]
     pub fn instance() -> &'static Self { unsafe { RHI.as_ref().unwrap_unchecked() } }
     #[inline]
-    pub(crate) fn vk_instance(&self) -> &Instance { unsafe { self.instance.as_ref().unwrap_unchecked() } }
+    pub(crate) fn vk_instance(&self) -> &Instance { unsafe { self.vk_instance.as_ref().unwrap_unchecked() } }
     #[inline]
     pub(crate) fn device(&self) -> &Device { unsafe { self.device.as_ref().unwrap_unchecked() } }
     #[inline]
@@ -41,11 +41,11 @@ impl Rhi
     #[inline]
     pub(crate) fn dynamic_render_pf(&self) -> &ash::extensions::khr::DynamicRendering
     {
-        unsafe { self.dynamic_render_pf.as_ref().unwrap_unchecked() }
+        unsafe { self.vk_dynamic_render_pf.as_ref().unwrap_unchecked() }
     }
     #[inline]
     pub(crate) fn acceleration_structure_pf(&self) -> &ash::extensions::khr::AccelerationStructure
     {
-        unsafe { self.acc_pf.as_ref().unwrap_unchecked() }
+        unsafe { self.vk_acceleration_pf.as_ref().unwrap_unchecked() }
     }
 }
