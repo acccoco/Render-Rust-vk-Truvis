@@ -12,6 +12,7 @@
 
 fn main()
 {
+    // 文件夹发生变化时，才重新运行该构建脚本
     println!("cargo:rerun-if-changed=shader/glsl/");
     println!("cargo:rerun-if-changed=shader/include/");
 

@@ -1,11 +1,14 @@
+//! 在 vk 的基础类型之上进行简单的封装
+
+
+pub mod acceleration;
 pub mod buffer;
 pub mod command_buffer;
 pub mod command_pool;
 pub mod descriptor;
-pub mod pipeline;
-pub mod queue;
-pub mod synchronize;
-pub mod shader;
-pub mod acceleration;
-pub mod query_pool;
 pub mod mesh;
+pub mod pipeline;
+pub mod query_pool;
+pub mod queue;
+pub mod shader;
+pub mod synchronize;

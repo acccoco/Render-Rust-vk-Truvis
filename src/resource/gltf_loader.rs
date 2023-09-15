@@ -9,7 +9,7 @@ use glam::f32::Mat4;
 use itertools::{izip, Itertools};
 use static_init::raw_static::Static;
 
-use crate::resource::model::StaticMeshData;
+use crate::{resource::model::StaticMeshData, rhi::Rhi};
 
 
 /// 导入 gltf 格式的模型
@@ -264,7 +264,12 @@ impl GltfLoader
             .address_mode_u(Self::gltf_wrap_mode_to_vk(sampler.wrap_s()))
             .address_mode_v(Self::gltf_wrap_mode_to_vk(sampler.wrap_t()));
 
-        unsafe { self.core.device().create_sampler(&sampler_info, None).expect("failed to create sampler for gltf") }
+        unsafe {
+            Rhi::instance()
+                .device()
+                .create_sampler(&sampler_info, None)
+                .expect("failed to create sampler for gltf")
+        }
     }
 
     /// 将 gltf 内定义的 format 转换为 vulkan 的 format

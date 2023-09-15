@@ -4,7 +4,7 @@ use ash::vk;
 
 use crate::{
     render_context::{RenderContext, RenderContextInitInfo},
-    rhi::{init_info::RhiInitInfo, Rhi},
+    rhi::{rhi_init_info::RhiInitInfo, Rhi},
     swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
     window_system::{WindowCreateInfo, WindowSystem},
 };
