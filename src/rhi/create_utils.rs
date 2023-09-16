@@ -1,5 +1,6 @@
 use ash::vk;
 
+/// 可以快速创建出 vuklan 所需的各种 CreateInfo
 pub struct RhiCreateInfoUtil;
 
 impl RhiCreateInfoUtil

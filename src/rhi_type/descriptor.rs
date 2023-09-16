@@ -42,6 +42,7 @@ where
         unsafe { Rhi::instance().device().create_descriptor_set_layout(&create_info, None).unwrap() }
     }
 
+    /// 可以确保每种类型的 layout 在内存中只有 1 份
     fn get_layout() -> vk::DescriptorSetLayout
     {
         unsafe {

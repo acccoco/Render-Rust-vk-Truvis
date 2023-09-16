@@ -6,3 +6,4 @@ pub mod rhi;
 pub mod swapchain;
 pub mod window_system;
 pub mod resource;
+pub mod mat_system;

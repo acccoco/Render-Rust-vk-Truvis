@@ -21,9 +21,10 @@ pub struct RenderContext
     frame_index: usize,
     frames_cnt: usize,
 
-    // 为每个 frame 分配一个 command pool
+    /// 为每个 frame 分配一个 command pool
     graphics_command_pools: Vec<RhiCommandPool>,
-    // 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
+
+    /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
     allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
 
     depth_format: Option<vk::Format>,
