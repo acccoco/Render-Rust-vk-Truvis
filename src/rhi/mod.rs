@@ -7,11 +7,11 @@ use crate::{
 
 
 pub(crate) mod create_utils;
+mod init;
 pub(crate) mod physical_device;
-mod rhi_impl_init;
-mod rhi_impl_property;
-mod rhi_impl_tools;
+mod props;
 pub(crate) mod rhi_init_info;
+mod tools;
 
 
 static mut RHI: Option<Rhi> = None;

@@ -1,9 +1,51 @@
 use std::ffi::CStr;
 
+use anyhow::Context;
 use ash::{extensions::khr::Swapchain, vk};
 use raw_window_handle::HasRawDisplayHandle;
 
 use crate::window_system::WindowSystem;
+
+
+/// # Safety
+/// very safe
+pub unsafe extern "system" fn vk_debug_callback(
+    message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
+    message_type: vk::DebugUtilsMessageTypeFlagsEXT,
+    p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
+    _user_data: *mut std::os::raw::c_void,
+) -> vk::Bool32
+{
+    let callback_data = *p_callback_data;
+
+    let msg = if callback_data.p_message.is_null() {
+        std::borrow::Cow::from("")
+    } else {
+        CStr::from_ptr(callback_data.p_message).to_string_lossy()
+    };
+
+
+    // 按照 | 切分 msg 字符串，并在中间插入换行符
+    let msg = msg.split('|').collect::<Vec<&str>>().join("\n");
+    let msg = msg.split(" ] ").collect::<Vec<&str>>().join(" ]\n ");
+    let format_msg = format!("[{:?}]\n {}\n", message_type, msg);
+
+    match message_severity {
+        vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
+            log::error!("{}", format_msg);
+        }
+        vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {
+            log::warn!("{}", format_msg);
+        }
+        vk::DebugUtilsMessageSeverityFlagsEXT::INFO => {
+            log::info!("{}", format_msg);
+        }
+        _ => log::info!("{}", format_msg),
+    };
+
+    // 只有 layer developer 才需要返回 True
+    vk::FALSE
+}
 
 pub struct RhiInitInfo
 {
@@ -14,6 +56,7 @@ pub struct RhiInitInfo
 
     pub instance_layers: Vec<&'static CStr>,
     pub instance_extensions: Vec<&'static CStr>,
+    pub instance_create_flags: vk::InstanceCreateFlags,
     pub device_extensions: Vec<&'static CStr>,
 
     pub core_features: vk::PhysicalDeviceFeatures,
@@ -33,6 +76,12 @@ impl RhiInitInfo
 
     pub fn init_basic(debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT) -> Self
     {
+        let instance_create_flags = if cfg!(target_os = "macos") {
+            vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR
+        } else {
+            vk::InstanceCreateFlags::empty()
+        };
+
         let mut info = Self {
             app_name: None,
             engine_name: None,
@@ -42,6 +91,7 @@ impl RhiInitInfo
 
             instance_layers: Self::basic_instance_layers(),
             instance_extensions: Self::basic_instance_extensions(),
+            instance_create_flags,
             device_extensions: Self::basic_device_extensions(),
 
             core_features: Default::default(),
@@ -59,11 +109,11 @@ impl RhiInitInfo
         info
     }
 
-    pub fn is_complete(&self) -> Option<()>
+    pub fn is_complete(&self) -> anyhow::Result<()>
     {
-        self.app_name.as_ref()?;
-        self.engine_name.as_ref()?;
-        Some(())
+        self.app_name.as_ref().context("")?;
+        self.engine_name.as_ref().context("")?;
+        Ok(())
     }
 
 
@@ -99,7 +149,10 @@ impl RhiInitInfo
         exts
     }
 
-    fn basic_instance_layers() -> Vec<&'static CStr> { vec![Self::VALIDATION_LAYER_NAME] }
+    fn basic_instance_layers() -> Vec<&'static CStr>
+    {
+        vec![Self::VALIDATION_LAYER_NAME]
+    }
 
     fn basic_instance_extensions() -> Vec<&'static CStr>
     {

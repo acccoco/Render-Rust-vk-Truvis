@@ -1,7 +1,7 @@
 use ash::vk;
 use memoffset::offset_of;
 use rust_vk::{
-    render::{Render, RenderInitInfo},
+    render::{Renderer, RenderInitInfo},
     render_context::RenderContext,
     rhi_type::{
         buffer::RhiBuffer,
@@ -136,7 +136,7 @@ impl HelloTriangle
 
     fn init() -> Self
     {
-        Render::init(&RenderInitInfo {
+        Renderer::init(&RenderInitInfo {
             window_width: 800,
             window_height: 800,
             app_name: "hello-triangle".to_string(),

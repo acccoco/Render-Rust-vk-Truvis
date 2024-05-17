@@ -26,6 +26,7 @@ impl RhiFence
         Self { fence }
     }
 
+    /// 阻塞等待 fence 
     #[inline]
     pub fn wait(&self)
     {

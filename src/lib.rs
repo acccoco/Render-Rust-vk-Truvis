@@ -1,4 +1,3 @@
-pub mod config;
 pub mod render;
 pub mod render_context;
 pub mod rhi_type;

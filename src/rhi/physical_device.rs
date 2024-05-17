@@ -1,6 +1,7 @@
 use ash::vk;
 
 
+/// 表示一张物理显卡
 pub struct RhiPhysicalDevice
 {
     pub(crate) vk_pdevice: vk::PhysicalDevice,
@@ -32,7 +33,10 @@ impl RhiPhysicalDevice
     }
 
     #[inline]
-    pub(crate) fn is_descrete_gpu(&self) -> bool { self.pd_props.device_type == vk::PhysicalDeviceType::DISCRETE_GPU }
+    pub(crate) fn is_descrete_gpu(&self) -> bool
+    {
+        self.pd_props.device_type == vk::PhysicalDeviceType::DISCRETE_GPU
+    }
 
 
     pub(crate) fn find_queue_family_index(&self, queue_flags: vk::QueueFlags) -> Option<u32>

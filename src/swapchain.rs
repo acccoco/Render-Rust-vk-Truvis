@@ -65,7 +65,8 @@ impl RenderSwapchain
     pub fn acquire_next_frame(&self, semaphore: &RhiSemaphore, fence: Option<&RhiFence>) -> u32
     {
         unsafe {
-            let (image_index, is_optimal) = self
+            // TODO 处理 optimal 的情况
+            let (image_index, _is_optimal) = self
                 .swapchain_pf
                 .acquire_next_image(
                     self.handle.unwrap_unchecked(),

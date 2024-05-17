@@ -21,6 +21,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.84"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18b8795de6d09abb2b178fa5a9e3bb10da935750f33449a132b328b9391b2c6a"
+
+[[package]]
 name = "array-init"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -95,9 +101,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.3.2"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dbe3c979c178231552ecba20214a8272df4e09f232a87aef4320cf06539aded"
+checksum = "cf4b9d6a944f767f8e5e0db018570623c85f3d925ac718db4e06d0187adb21c1"
 
 [[package]]
 name = "block"
@@ -1493,10 +1499,11 @@ dependencies = [
 name = "rust-vk"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "array-init",
  "ash",
  "ash-window",
- "bitflags 2.3.2",
+ "bitflags 2.5.0",
  "colored",
  "cstr",
  "derive-getters",
@@ -1865,7 +1872,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vk-mem"
 version = "0.2.3"
-source = "git+https://github.com/gwihlidal/vk-mem-rs#0b18c5dac60214e3556308cc3a6127f363d6866f"
+source = "git+https://github.com/gwihlidal/vk-mem-rs?rev=0b18c5d#0b18c5dac60214e3556308cc3a6127f363d6866f"
 dependencies = [
  "ash",
  "bitflags 1.3.2",

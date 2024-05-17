@@ -5,10 +5,7 @@ use itertools::Itertools;
 
 use crate::{
     rhi::Rhi,
-    rhi_type::{
-        buffer::RhiBuffer, command_buffer::RhiCommandBuffer, query_pool::RhiQueryPool, queue::RhiSubmitBatch,
-        synchronize::RhiFence,
-    },
+    rhi_type::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, query_pool::RhiQueryPool},
 };
 
 pub struct RhiAcceleration

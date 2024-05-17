@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::{rhi_type::shader::RhiShaderModule, rhi::Rhi};
+use crate::{rhi::Rhi, rhi_type::shader::RhiShaderModule};
 
 pub struct RhiPipeline
 {
@@ -108,7 +108,7 @@ impl RhiPipelineTemplate
             .depth_attachment_format(self.depth_format)
             .stencil_attachment_format(self.stencil_format);
 
-        let pipeline_layout = unsafe {
+        let pipeline_layout = {
             let pipeline_layout_create_info =
                 vk::PipelineLayoutCreateInfo::builder().set_layouts(&self.descriptor_set_layouts);
             unsafe { rhi.device().create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() }

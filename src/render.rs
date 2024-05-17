@@ -1,18 +1,25 @@
-use std::ffi::CStr;
-
-use ash::vk;
-
 use crate::{
     render_context::{RenderContext, RenderContextInitInfo},
-    rhi::{rhi_init_info::RhiInitInfo, Rhi},
+    rhi::{
+        rhi_init_info::{vk_debug_callback, RhiInitInfo},
+        Rhi,
+    },
     swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
     window_system::{WindowCreateInfo, WindowSystem},
 };
 
-pub struct Render;
+pub struct Renderer;
+
+use anyhow::Context;
+
+static mut RENDERER: Option<Renderer> = None;
 
 
-static mut ENGINE: Option<Render> = None;
+pub fn panic_handler(info: &std::panic::PanicInfo)
+{
+    log::error!("{}", info);
+    std::thread::sleep(std::time::Duration::from_secs(3));
+}
 
 
 pub struct RenderInitInfo
@@ -22,16 +29,21 @@ pub struct RenderInitInfo
     pub app_name: String,
 }
 
-impl Render
+impl Renderer
 {
     const ENGINE_NAME: &'static str = "Hiss";
 
     #[inline]
-    pub fn instance() -> &'static Self { unsafe { ENGINE.as_ref().unwrap() } }
-
-    pub fn init(init_info: &RenderInitInfo)
+    pub fn instance() -> &'static Self
     {
-        simple_logger::SimpleLogger::new().init().unwrap();
+        unsafe { RENDERER.as_ref().unwrap() }
+    }
+
+    pub fn init(init_info: &RenderInitInfo) -> anyhow::Result<()>
+    {
+        simple_logger::SimpleLogger::new().init()?;
+
+        std::panic::set_hook(Box::new(panic_handler));
 
         WindowSystem::init(WindowCreateInfo {
             height: init_info.window_height as i32,
@@ -43,47 +55,15 @@ impl Render
             let mut rhi_init_info = RhiInitInfo::init_basic(Some(vk_debug_callback));
             rhi_init_info.app_name = Some(init_info.app_name.clone());
             rhi_init_info.engine_name = Some(Self::ENGINE_NAME.to_string());
-            rhi_init_info.is_complete().unwrap();
+            rhi_init_info.is_complete()?;
 
-            Rhi::init(rhi_init_info);
+            Rhi::init(rhi_init_info)?;
         }
 
         RenderSwapchain::init(&RenderSwapchainInitInfo::default());
 
         RenderContext::init(&RenderContextInitInfo::default());
+
+        Ok(())
     }
-}
-
-unsafe extern "system" fn vk_debug_callback(
-    message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
-    message_type: vk::DebugUtilsMessageTypeFlagsEXT,
-    p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
-    _user_data: *mut std::os::raw::c_void,
-) -> vk::Bool32
-{
-    let callback_data = *p_callback_data;
-
-    let msg = if callback_data.p_message.is_null() {
-        std::borrow::Cow::from("")
-    } else {
-        CStr::from_ptr(callback_data.p_message).to_string_lossy()
-    };
-
-    let format_msg = format!("[{:?}] {}", message_type, msg);
-
-    match message_severity {
-        vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
-            log::error!("{}", format_msg);
-        }
-        vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {
-            log::warn!("{}", format_msg);
-        }
-        vk::DebugUtilsMessageSeverityFlagsEXT::INFO => {
-            log::info!("{}", format_msg);
-        }
-        _ => log::info!("{}", format_msg),
-    };
-
-    // 只有 layer developer 才需要返回 True
-    vk::FALSE
 }
