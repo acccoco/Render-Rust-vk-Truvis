@@ -316,10 +316,16 @@ mod _ctx_property
     impl RenderContext
     {
         #[inline]
-        pub fn instance() -> &'static Self { unsafe { RENDER_CONTEXT.as_ref().unwrap_unchecked() } }
+        pub fn instance() -> &'static Self
+        {
+            unsafe { RENDER_CONTEXT.as_ref().unwrap_unchecked() }
+        }
 
         #[inline]
-        pub fn extent() -> vk::Extent2D { RenderSwapchain::instance().extent() }
+        pub fn extent() -> vk::Extent2D
+        {
+            RenderSwapchain::instance().extent()
+        }
 
         #[inline]
         pub fn current_fence() -> &'static RhiFence
@@ -329,14 +335,23 @@ mod _ctx_property
         }
 
         #[inline]
-        pub fn color_format(&self) -> vk::Format { RenderSwapchain::instance().color_format() }
+        pub fn color_format(&self) -> vk::Format
+        {
+            RenderSwapchain::instance().color_format()
+        }
 
         #[inline]
-        pub fn current_frame_index() -> usize { Self::instance().frame_index }
+        pub fn current_frame_index() -> usize
+        {
+            Self::instance().frame_index
+        }
 
 
         #[inline]
-        pub fn depth_format() -> vk::Format { unsafe { Self::instance().depth_format.unwrap_unchecked() } }
+        pub fn depth_format() -> vk::Format
+        {
+            unsafe { Self::instance().depth_format.unwrap_unchecked() }
+        }
 
 
         #[inline]
@@ -360,7 +375,10 @@ mod _ctx_property
         }
 
         #[inline]
-        pub fn depth_attach_info() -> &'static vk::RenderingAttachmentInfo { &Self::instance().depth_attach_info }
+        pub fn depth_attach_info() -> &'static vk::RenderingAttachmentInfo
+        {
+            &Self::instance().depth_attach_info
+        }
 
         #[inline]
         pub fn current_image() -> vk::Image

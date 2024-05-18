@@ -3,9 +3,6 @@ name = "rust-vk"
 version = "0.1.0"
 edition = "2021"
 
-[profile.release]
-panic = "unwind"
-
 
 [dependencies]
 # vulkan SDK
@@ -43,6 +40,8 @@ gltf = "1.0.0"
 # graphics math
 # bytemuck：可以转换为 bytes slices
 glam = { version = "0.22.0", features = ["bytemuck", "rand", "serde"] }
+
+bytemuck = { version = "1.16.0", features = ["derive"] }
 
 # 允许超过 2 个 iter 进行 zip
 itertools = "0.10.5"

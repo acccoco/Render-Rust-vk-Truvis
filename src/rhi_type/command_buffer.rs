@@ -94,7 +94,10 @@ impl RhiCommandBuffer
     }
 
     #[inline]
-    pub fn end(&mut self) { unsafe { Rhi::instance().device().end_command_buffer(self.command_buffer).unwrap() } }
+    pub fn end(&mut self)
+    {
+        unsafe { Rhi::instance().device().end_command_buffer(self.command_buffer).unwrap() }
+    }
 }
 
 mod _transfer_cmd
@@ -331,7 +334,27 @@ mod _ray_tracing_cmd
 
 mod _other_cmd
 {
-    use crate::rhi_type::command_buffer::RhiCommandBuffer;
+    use ash::vk;
+
+    use crate::{
+        rhi::Rhi,
+        rhi_type::{command_buffer::RhiCommandBuffer, pipeline::RhiPipeline},
+    };
+
     // 其他命令
-    impl RhiCommandBuffer {}
+    impl RhiCommandBuffer
+    {
+        pub fn push_constants(&mut self, pipeline: &RhiPipeline, stage: vk::ShaderStageFlags, offset: u32, data: &[u8])
+        {
+            unsafe {
+                Rhi::instance().device().cmd_push_constants(
+                    self.command_buffer,
+                    pipeline.pipeline_layout,
+                    stage,
+                    offset,
+                    data,
+                );
+            }
+        }
+    }
 }

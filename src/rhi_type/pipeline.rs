@@ -1,4 +1,5 @@
 use ash::vk;
+use bytemuck::{Pod, Zeroable};
 
 use crate::{rhi::Rhi, rhi_type::shader::RhiShaderModule};
 
@@ -22,6 +23,8 @@ pub struct RhiPipelineTemplate
 
     pub vertex_shader_path: Option<std::path::PathBuf>,
     pub fragment_shader_path: Option<std::path::PathBuf>,
+
+    pub push_constant_ranges: Vec<vk::PushConstantRange>,
 
     pub vertex_binding_desc: Vec<vk::VertexInputBindingDescription>,
     pub vertex_attribute_desec: Vec<vk::VertexInputAttributeDescription>,
@@ -58,6 +61,8 @@ impl Default for RhiPipelineTemplate
 
             vertex_shader_path: None,
             fragment_shader_path: None,
+
+            push_constant_ranges: vec![],
 
             vertex_binding_desc: vec![],
             vertex_attribute_desec: vec![],
@@ -109,8 +114,9 @@ impl RhiPipelineTemplate
             .stencil_attachment_format(self.stencil_format);
 
         let pipeline_layout = {
-            let pipeline_layout_create_info =
-                vk::PipelineLayoutCreateInfo::builder().set_layouts(&self.descriptor_set_layouts);
+            let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::builder()
+                .set_layouts(&self.descriptor_set_layouts)
+                .push_constant_ranges(&self.push_constant_ranges);
             unsafe { rhi.device().create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() }
         };
         rhi.set_debug_name(pipeline_layout, debug_name.clone());

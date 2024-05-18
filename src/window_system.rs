@@ -93,9 +93,12 @@ impl WindowSystem
     }
 
     #[inline]
-    pub fn instance() -> &'static Self { unsafe { WINDOW_SYSTEM.as_ref().unwrap() } }
+    pub fn instance() -> &'static Self
+    {
+        unsafe { WINDOW_SYSTEM.as_ref().unwrap() }
+    }
 
-    pub fn render_loop(&self, f: impl Fn())
+    pub fn render_loop(&self, mut f: impl FnMut())
     {
         self.event_loop.borrow_mut().run_return(|event, _, control_flow| {
             *control_flow = ControlFlow::Poll;
