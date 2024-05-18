@@ -1,14 +1,14 @@
 use ash::vk;
 use memoffset::offset_of;
 use rust_vk::{
-    render::{Renderer, RenderInitInfo},
+    render::{RenderInitInfo, Renderer},
     render_context::RenderContext,
+    rhi::Rhi,
     rhi_type::{
         buffer::RhiBuffer,
         pipeline::{RhiPipeline, RhiPipelineTemplate},
         queue::RhiSubmitBatch,
     },
-    rhi::Rhi,
     window_system::WindowSystem,
 };
 
@@ -61,8 +61,8 @@ impl HelloTriangle
     {
         let extent = RenderContext::extent();
         let pipeline = RhiPipelineTemplate {
-            fragment_shader_path: Some("examples/hello_triangle/shader/frag.spv".into()),
-            vertex_shader_path: Some("examples/hello_triangle/shader/vert.spv".into()),
+            fragment_shader_path: Some("shader/hello_triangle/triangle.frag.spv".into()),
+            vertex_shader_path: Some("shader/hello_triangle/triangle.vert.spv".into()),
             color_formats: vec![RenderContext::instance().color_format()],
             depth_format: RenderContext::depth_format(),
             viewport: Some(vk::Viewport {
