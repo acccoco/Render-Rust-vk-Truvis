@@ -17,3 +17,6 @@
 
 # temp configuration
 imgui.ini
+
+# drawio
+*.drawio.bkp

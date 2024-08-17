@@ -1510,42 +1510,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-vk"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "array-init",
- "ash",
- "ash-window",
- "bitflags 2.5.0",
- "bytemuck",
- "colored",
- "cstr",
- "derive-getters",
- "derive-new",
- "derive_builder",
- "derive_setters",
- "glam",
- "gltf",
- "image",
- "include_dir",
- "itertools",
- "lazy_static",
- "log",
- "memoffset 0.8.0",
- "rand",
- "rand_derive",
- "raw-window-handle 0.5.2",
- "serde",
- "serde_json",
- "simple_logger",
- "static_init",
- "tobj",
- "vk-mem",
- "winit",
-]
-
-[[package]]
 name = "ryu"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1853,6 +1817,46 @@ dependencies = [
  "toml_datetime",
  "winnow",
 ]
+
+[[package]]
+name = "truvis-render"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "array-init",
+ "ash",
+ "ash-window",
+ "bitflags 2.5.0",
+ "bytemuck",
+ "colored",
+ "cstr",
+ "derive-getters",
+ "derive-new",
+ "derive_builder",
+ "derive_setters",
+ "glam",
+ "gltf",
+ "image",
+ "include_dir",
+ "itertools",
+ "lazy_static",
+ "log",
+ "memoffset 0.8.0",
+ "rand",
+ "rand_derive",
+ "raw-window-handle 0.5.2",
+ "serde",
+ "serde_json",
+ "simple_logger",
+ "static_init",
+ "tobj",
+ "vk-mem",
+ "winit",
+]
+
+[[package]]
+name = "truvis-xtask"
+version = "0.1.0"
 
 [[package]]
 name = "unicode-ident"

@@ -1,14 +1,11 @@
-[package]
-name = "rust-vk"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+    "truvis-render",
+    "xtask"
+]
 
 
-[dependencies]
-# vulkan SDK
-# 默认 features：
-# - debug 表示 vulkan 结构体实现了 Debut Trait
-# - loader 表示在运行时动态搜索 vulkan，体现在 Entry 对象的创建上
+[workspace.dependencies]
 ash = "0.37"
 # ash = "0.38.0+1.3.281"
 ash-window = "0.12.0"
@@ -37,11 +34,9 @@ memoffset = "0.8.0"
 # load gltf
 gltf = "1.0.0"
 
-# graphics math
-# bytemuck：可以转换为 bytes slices
-glam = { version = "0.22.0", features = ["bytemuck", "rand", "serde"] }
+glam = { version = "0.22.0" }
 
-bytemuck = { version = "1.16.0", features = ["derive"] }
+bytemuck = { version = "1.16.0" }
 
 # 允许超过 2 个 iter 进行 zip
 itertools = "0.10.5"
