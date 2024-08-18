@@ -1,6 +1,6 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.5 Chrome/126.0.6478.183 Electron/31.3.0 Safari/537.36" version="24.7.5">
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.5 Chrome/126.0.6478.183 Electron/31.3.0 Safari/537.36" version="24.7.5" pages="2">
   <diagram id="23iRSUPoRavnBvh4doch" name="Page-1">
-    <mxGraphModel dx="2123" dy="611" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+    <mxGraphModel dx="2229" dy="679" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -46,40 +46,40 @@
         <mxCell id="7" value="Swapchain" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fontFamily=Consolas;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
           <mxGeometry x="-30" y="56" width="340" height="338" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-22" value="handle: vk::Swapchain" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-22" value="handle: vk::Swapchain" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="26" width="340" height="26" as="geometry" />
         </mxCell>
         <mxCell id="9" value="surface: vk::Surface" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="52" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-28" value="images: vk::Image[]" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-28" value="images: vk::Image[]" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="78" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-31" value="image_views: vk::ImageView[]" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-31" value="image_views: vk::ImageView[]" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="104" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-34" value="extent: vk::Extent2D" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-34" value="extent: vk::Extent2D" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="130" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-35" value="format: vk::Format" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-35" value="format: vk::Format" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="156" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-36" value="color_space: vk::ColorSpace" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-36" value="color_space: vk::ColorSpace" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="182" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-37" value="present_mode: vk::PresentMode" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-37" value="present_mode: vk::PresentMode" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="208" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-38" value="surface_capabilities: vk::SurfaceCapabilities" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-38" value="surface_capabilities: vk::SurfaceCapabilities" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="234" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-39" value="surface_formats: vk::SurfaceFormat[]" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-39" value="surface_formats: vk::SurfaceFormat[]" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="260" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-40" value="surface_present_modes: vk::PresentMode[]" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-40" value="surface_present_modes: vk::PresentMode[]" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="286" width="340" height="26" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-42" value="color_attach_infos: vk::RenderingAttachmentInfo[]" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" vertex="1" parent="7">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-42" value="color_attach_infos: vk::RenderingAttachmentInfo[]" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontFamily=Consolas;" parent="7" vertex="1">
           <mxGeometry y="312" width="340" height="26" as="geometry" />
         </mxCell>
         <mxCell id="15" value="WindowSystem" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fontFamily=Consolas;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
@@ -103,9 +103,11 @@
         <mxCell id="820sSQmcWdXDixxTHN7m-22" value="Render" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Consolas;" parent="1" vertex="1">
           <mxGeometry x="425" y="454" width="215" height="138" as="geometry" />
         </mxCell>
-        <mxCell id="820sSQmcWdXDixxTHN7m-23" value="rhi" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontFamily=Consolas;" parent="820sSQmcWdXDixxTHN7m-22" vertex="1">
-          <mxGeometry y="26" width="215" height="26" as="geometry" />
-        </mxCell>
+        <UserObject label="rhi" link="data:page/id,MykvRJxzRp0D9HRaywjL" id="820sSQmcWdXDixxTHN7m-23">
+          <mxCell style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontFamily=Consolas;" parent="820sSQmcWdXDixxTHN7m-22" vertex="1">
+            <mxGeometry y="26" width="215" height="26" as="geometry" />
+          </mxCell>
+        </UserObject>
         <mxCell id="820sSQmcWdXDixxTHN7m-26" value="swapchain" style="text;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;fontFamily=Consolas;" parent="820sSQmcWdXDixxTHN7m-22" vertex="1">
           <mxGeometry y="52" width="215" height="26" as="geometry" />
         </mxCell>
@@ -130,34 +132,42 @@
         <mxCell id="820sSQmcWdXDixxTHN7m-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=Consolas;" parent="1" source="820sSQmcWdXDixxTHN7m-26" target="7" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-23" value="vk::Swapchain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Consolas;" vertex="1" parent="1">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-23" value="vk::Swapchain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Consolas;" parent="1" vertex="1">
           <mxGeometry x="-240" y="80" width="120" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-24" value="vk::Surface" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Consolas;" vertex="1" parent="1">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-24" value="vk::Surface" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Consolas;" parent="1" vertex="1">
           <mxGeometry x="370" y="106" width="120" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-25" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="3CVFnSyyfeXJSbs3mgzF-22" target="3CVFnSyyfeXJSbs3mgzF-23">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-25" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="3CVFnSyyfeXJSbs3mgzF-22" target="3CVFnSyyfeXJSbs3mgzF-23" edge="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="90" y="309" as="sourcePoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="9" target="3CVFnSyyfeXJSbs3mgzF-24">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="9" target="3CVFnSyyfeXJSbs3mgzF-24" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-29" value="vk::Image" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Consolas;" vertex="1" parent="1">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-29" value="vk::Image" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Consolas;" parent="1" vertex="1">
           <mxGeometry x="-240" y="132" width="120" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="3CVFnSyyfeXJSbs3mgzF-28" target="3CVFnSyyfeXJSbs3mgzF-29">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="3CVFnSyyfeXJSbs3mgzF-28" target="3CVFnSyyfeXJSbs3mgzF-29" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-33" value="vk::ImageView" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Consolas;" vertex="1" parent="1">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-33" value="vk::ImageView" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Consolas;" parent="1" vertex="1">
           <mxGeometry x="370" y="158" width="120" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="3CVFnSyyfeXJSbs3mgzF-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="3CVFnSyyfeXJSbs3mgzF-31" target="3CVFnSyyfeXJSbs3mgzF-33">
+        <mxCell id="3CVFnSyyfeXJSbs3mgzF-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="3CVFnSyyfeXJSbs3mgzF-31" target="3CVFnSyyfeXJSbs3mgzF-33" edge="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="-50" y="400" as="targetPoint" />
           </mxGeometry>
         </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="MykvRJxzRp0D9HRaywjL" name="第 2 页">
+    <mxGraphModel dx="954" dy="611" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
       </root>
     </mxGraphModel>
   </diagram>

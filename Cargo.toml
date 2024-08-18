@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "truvis-render",
-    "xtask"
+    "xtask",
+    "shader-toy"
 ]
 
 
