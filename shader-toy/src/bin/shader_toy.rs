@@ -1,7 +1,7 @@
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use memoffset::offset_of;
-use rust_vk::{
+use truvis_render::{
     render::{RenderInitInfo, Renderer},
     render_context::RenderContext,
     rhi::Rhi,
@@ -69,14 +69,14 @@ pub struct PushConstants
 
 struct ShaderToy
 {
-    vertex_buffer: Option<RhiBuffer>,
-    index_buffer: Option<RhiBuffer>,
-    pipeline: Option<RhiPipeline>,
+    vertex_buffer: RhiBuffer,
+    index_buffer: RhiBuffer,
+    pipeline: RhiPipeline,
 }
 
 impl ShaderToy
 {
-    fn init_buffer(&mut self)
+    fn init_buffer() -> (RhiBuffer, RhiBuffer)
     {
         let mut index_buffer = RhiBuffer::new_index_buffer(std::mem::size_of_val(&INDEX_DATA), "index-buffer");
         index_buffer.transfer_data(&INDEX_DATA);
@@ -84,11 +84,10 @@ impl ShaderToy
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
         vertex_buffer.transfer_data(&VERTEX_DATA);
 
-        self.vertex_buffer = Some(vertex_buffer);
-        self.index_buffer = Some(index_buffer);
+        (vertex_buffer, index_buffer)
     }
 
-    fn init_pipeline(&mut self)
+    fn init_pipeline() -> RhiPipeline
     {
         let extent = RenderContext::extent();
         let push_constant_ranges = vec![vk::PushConstantRange {
@@ -138,7 +137,7 @@ impl ShaderToy
         }
         .create_pipeline("");
 
-        self.pipeline = Some(pipeline);
+        pipeline
     }
 
     fn run(&self)
@@ -178,17 +177,12 @@ impl ShaderToy
             let mut cmd = RenderContext::alloc_command_buffer("render");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
             {
-                cmd.push_constants(
-                    self.pipeline.as_ref().unwrap(),
-                    vk::ShaderStageFlags::ALL,
-                    0,
-                    bytemuck::bytes_of(&push_constants),
-                );
+                cmd.push_constants(&self.pipeline, vk::ShaderStageFlags::ALL, 0, bytemuck::bytes_of(&push_constants));
 
                 cmd.begin_rendering(&RenderContext::render_info());
-                cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.as_ref().unwrap());
-                cmd.bind_index_buffer(self.index_buffer.as_ref().unwrap(), 0, vk::IndexType::UINT32);
-                cmd.bind_vertex_buffer(0, std::slice::from_ref(self.vertex_buffer.as_ref().unwrap()), &[0]);
+                cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
+                cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
+                cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
                 cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
                 cmd.end_rendering();
             }
@@ -215,13 +209,14 @@ impl ShaderToy
 
         log::info!("start.");
 
+        let (vertex_buffer, index_buffer) = Self::init_buffer();
+        let pipeline = Self::init_pipeline();
+
         let mut hello = Self {
-            vertex_buffer: None,
-            index_buffer: None,
-            pipeline: None,
+            vertex_buffer,
+            index_buffer,
+            pipeline,
         };
-        hello.init_buffer();
-        hello.init_pipeline();
 
         hello
     }

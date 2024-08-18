@@ -1604,6 +1604,11 @@ dependencies = [
 name = "shader-toy"
 version = "0.1.0"
 dependencies = [
+ "ash",
+ "bytemuck",
+ "glam",
+ "log",
+ "memoffset 0.8.0",
  "truvis-render",
 ]
 
