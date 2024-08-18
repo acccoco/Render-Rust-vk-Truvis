@@ -128,8 +128,8 @@ impl HelloRT
     {
         let extent = RenderContext::extent();
         let pipeline = RhiPipelineTemplate {
-            fragment_shader_path: Some("examples/hello_triangle/shader/frag.spv".into()),
-            vertex_shader_path: Some("examples/hello_triangle/shader/vert.spv".into()),
+            fragment_shader_path: Some("shader/hello_triangle/triangle.frag.spv".into()),
+            vertex_shader_path: Some("shader/hello_triangle/triangle.vert.spv".into()),
             color_formats: vec![RenderContext::instance().color_format()],
             depth_format: RenderContext::depth_format(),
             viewport: Some(vk::Viewport {

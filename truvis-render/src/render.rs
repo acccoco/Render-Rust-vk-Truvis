@@ -12,6 +12,8 @@ pub struct Renderer;
 
 use anyhow::Context;
 
+use crate::render_init::ENGINE_NAME;
+
 static mut RENDERER: Option<Renderer> = None;
 
 
@@ -52,7 +54,7 @@ impl Renderer
         {
             let mut rhi_init_info = RhiInitInfo::init_basic(Some(vk_debug_callback));
             rhi_init_info.app_name = Some(init_info.app_name.clone());
-            rhi_init_info.engine_name = Some(Self::ENGINE_NAME.to_string());
+            rhi_init_info.engine_name = Some(ENGINE_NAME.to_string());
             rhi_init_info.is_complete()?;
 
             Rhi::init(rhi_init_info)?;
