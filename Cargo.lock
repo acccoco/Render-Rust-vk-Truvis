@@ -1904,6 +1904,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
+name = "vk-examples"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "bytemuck",
+ "glam",
+ "log",
+ "memoffset 0.8.0",
+ "truvis-render",
+]
+
+[[package]]
 name = "vk-mem"
 version = "0.2.3"
 source = "git+https://github.com/gwihlidal/vk-mem-rs?rev=0b18c5d#0b18c5dac60214e3556308cc3a6127f363d6866f"

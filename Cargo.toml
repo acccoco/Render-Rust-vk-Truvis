@@ -2,7 +2,8 @@
 members = [
     "truvis-render",
     "xtask",
-    "shader-toy"
+    "shader-toy",
+    "vk-examlpes",
 ]
 
 
