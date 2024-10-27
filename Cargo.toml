@@ -3,8 +3,11 @@ members = [
     "truvis-render",
     "xtask",
     "shader-toy",
-    "vk-examlpes",
+    "vulkan-samples",
+    "framework",
 ]
+
+resolver = "2"
 
 
 [workspace.dependencies]
@@ -81,3 +84,6 @@ bitflags = "2.3.2"
 
 # 简化错误处理
 anyhow = "1.0.84"
+
+# 计时器
+chrono = "0.4.38"

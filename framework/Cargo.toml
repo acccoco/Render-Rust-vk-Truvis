@@ -1,0 +1,44 @@
+[package]
+name = "framework"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+# 默认 features：
+# - debug 表示 vulkan 结构体实现了 Debut Trait
+# - loader 表示在运行时动态搜索 vulkan，体现在 Entry 对象的创建上
+ash = { workspace = true }
+ash-window = { workspace = true }
+winit = { workspace = true }
+raw-window-handle = { workspace = true }
+image = { workspace = true }
+colored = { workspace = true }
+derive-getters = { workspace = true }
+derive-new = { workspace = true }
+derive_setters = { workspace = true }
+derive_builder = { workspace = true }
+memoffset = { workspace = true }
+gltf = { workspace = true }
+# graphics math
+# bytemuck：可以转换为 bytes slices
+glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
+bytemuck = { workspace = true, features = ["derive"] }
+itertools = { workspace = true }
+static_init = { workspace = true }
+array-init = { workspace = true }
+cstr = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tobj = { workspace = true }
+vk-mem = { workspace = true }
+rand = { workspace = true }
+rand_derive = { workspace = true }
+include_dir = { workspace = true }
+lazy_static = { workspace = true }
+log = { workspace = true }
+simple_logger = { workspace = true, default-features = false, features = ["colors"] }
+bitflags = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+
