@@ -3,7 +3,7 @@
 
 use ash::vk;
 
-use crate::rhi_type::descriptor::RHiDescriptorBindings;
+use crate::framework::core::descriptor::RHiDescriptorBindings;
 
 struct UnlitMatBindings;
 
@@ -34,6 +34,4 @@ impl RHiDescriptorBindings for UnlitMatBindings
 
 
 #[repr(C)]
-struct UnlitMat {
-
-}
+struct UnlitMat {}

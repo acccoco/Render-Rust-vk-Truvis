@@ -39,3 +39,4 @@ log = { workspace = true }
 simple_logger = { workspace = true, default-features = false, features = ["colors"] }
 bitflags = { workspace = true }
 anyhow = { workspace = true }
+chrono = { workspace = true }

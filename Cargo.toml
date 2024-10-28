@@ -1,10 +1,8 @@
 [workspace]
 members = [
     "truvis-render",
-    "xtask",
-    "shader-toy",
-    "vulkan-samples",
-    "framework",
+    "truvis-xtask",
+    "truvis-shader-toy",
 ]
 
 resolver = "2"

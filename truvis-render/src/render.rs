@@ -1,18 +1,16 @@
-use crate::{
-    render_context::{RenderContext, RenderContextInitInfo},
-    rhi::{
-        rhi_init_info::{vk_debug_callback, RhiInitInfo},
-        Rhi,
-    },
-    swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
-    window_system::{WindowCreateInfo, WindowSystem},
-};
-
 pub struct Renderer;
 
 use anyhow::Context;
 
-use crate::render_init::ENGINE_NAME;
+use crate::{
+    framework::{
+        core::swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
+        platform::window_system::{WindowCreateInfo, WindowSystem},
+        rendering::render_context::{RenderContext, RenderContextInitInfo},
+        rhi::{vk_debug_callback, Rhi, RhiInitInfo},
+    },
+    render_init::ENGINE_NAME,
+};
 
 static mut RENDERER: Option<Renderer> = None;
 
