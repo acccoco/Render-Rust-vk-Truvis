@@ -158,7 +158,7 @@ mod _render_swapchain_init
         {
             let mut swapchain = unsafe {
                 let rhi = Rhi::instance();
-                let pdevice = rhi.physical_device().vk_pdevice;
+                let pdevice = rhi.physical_device().handle;
                 let (surface, surface_pf) = Self::create_surface();
 
                 Self {

@@ -9,6 +9,7 @@ pub mod descriptor;
 pub mod device;
 pub mod fence_pool;
 pub mod image;
+pub mod instance;
 pub mod physical_device;
 pub mod pipeline;
 pub mod query_pool;

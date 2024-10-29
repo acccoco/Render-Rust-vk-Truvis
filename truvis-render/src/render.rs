@@ -1,5 +1,3 @@
-pub struct Renderer;
-
 use anyhow::Context;
 
 use crate::{
@@ -11,6 +9,10 @@ use crate::{
     },
     render_init::ENGINE_NAME,
 };
+
+
+/// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
+pub struct Renderer;
 
 static mut RENDERER: Option<Renderer> = None;
 

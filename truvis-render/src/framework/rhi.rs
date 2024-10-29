@@ -240,6 +240,8 @@ impl RhiInitInfo
 
 
 /// Rhi 只需要做到能够创建各种资源的程度就行了
+///
+/// 与 VulkanSamples 的 VulkanSamle 及 ApiVulkanSample 作用类似
 pub struct Rhi
 {
     /// vk 基础函数的接口
@@ -305,7 +307,7 @@ impl Rhi
         rhi.init_descriptor_pool();
         rhi.init_default_command_pool();
 
-        rhi.set_debug_name(rhi.physical_device().vk_pdevice, "main-physical-device");
+        rhi.set_debug_name(rhi.physical_device().handle, "main-physical-device");
         rhi.set_debug_name(rhi.device().handle(), "main-device");
         rhi.set_debug_name(rhi.descriptor_pool.unwrap(), "main-descriptor-pool");
 
@@ -533,7 +535,7 @@ impl Rhi
                 .as_ref()
                 .unwrap()
                 .create_device(
-                    self.physical_device.as_ref().unwrap().vk_pdevice,
+                    self.physical_device.as_ref().unwrap().handle,
                     &device_create_info,
                     None,
                 )
@@ -583,7 +585,7 @@ impl Rhi
         let vma_create_info = vk_mem::AllocatorCreateInfo::new(
             Rc::new(self.vk_instance.as_ref().unwrap()),
             Rc::new(self.device.as_ref().unwrap()),
-            self.physical_device.as_ref().unwrap().vk_pdevice,
+            self.physical_device.as_ref().unwrap().handle,
         )
         .vulkan_api_version(init_info.vk_version)
         .flags(vk_mem::AllocatorCreateFlags::BUFFER_DEVICE_ADDRESS);
@@ -780,7 +782,7 @@ impl Rhi
             .filter(|f| {
                 let props = unsafe {
                     self.vk_instance().get_physical_device_format_properties(
-                        self.physical_device().vk_pdevice,
+                        self.physical_device().handle,
                         **f,
                     )
                 };
