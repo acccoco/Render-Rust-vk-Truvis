@@ -30,16 +30,13 @@ type OnWindowSizeFunc = fn(i32, i32) -> ();
 type OnWindowCloseFunc = fn() -> ();
 
 
-static mut WINDOW_SYSTEM: Option<WindowSystem> = None;
-
-
 #[derive(Getters)]
 pub struct WindowSystem
 {
     window: Window,
 
     #[getter(skip)]
-    event_loop: RefCell<EventLoop<()>>,
+    pub event_loop: RefCell<EventLoop<()>>,
 
     width: i32,
     height: i32,
@@ -69,36 +66,23 @@ struct WindowSystemEvents
 
 impl WindowSystem
 {
-    pub fn init(create_info: WindowCreateInfo)
+    pub fn new(create_info: WindowCreateInfo) -> Self
     {
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new()
             .with_title(create_info.title)
-            .with_inner_size(winit::dpi::LogicalSize::new(
-                f64::from(create_info.width),
-                f64::from(create_info.height),
-            ))
+            .with_inner_size(winit::dpi::LogicalSize::new(f64::from(create_info.width), f64::from(create_info.height)))
             .build(&event_loop)
             .unwrap();
 
-        let window_system = Self {
+        Self {
             window,
             event_loop: RefCell::new(event_loop),
             width: create_info.width,
             height: create_info.height,
             is_focus_mode: false,
             events: Default::default(),
-        };
-
-        unsafe {
-            WINDOW_SYSTEM = Some(window_system);
         }
-    }
-
-    #[inline]
-    pub fn instance() -> &'static Self
-    {
-        unsafe { WINDOW_SYSTEM.as_ref().unwrap() }
     }
 
     pub fn render_loop(&self, mut f: impl FnMut())

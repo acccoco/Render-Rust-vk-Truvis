@@ -12,6 +12,7 @@ use truvis_render::{
         rhi::Rhi,
     },
     render::{RenderInitInfo, Renderer},
+    run::{run, App},
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -47,28 +48,26 @@ struct HelloTriangle
 
 impl HelloTriangle
 {
-    fn init_buffer(&mut self)
+    fn init_buffer(&mut self, rhi: &Rhi)
     {
-        let mut index_buffer =
-            RhiBuffer::new_index_buffer(std::mem::size_of_val(&INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data(&INDEX_DATA);
+        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
+        index_buffer.transfer_data(rhi, &INDEX_DATA);
 
-        let mut vertex_buffer =
-            RhiBuffer::new_vertex_buffer(std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data(&VERTEX_DATA);
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
+        vertex_buffer.transfer_data(rhi, &VERTEX_DATA);
 
         self.vertex_buffer = Some(vertex_buffer);
         self.index_buffer = Some(index_buffer);
     }
 
-    fn init_pipeline(&mut self)
+    fn init_pipeline(&mut self, rhi: &Rhi, render_context: &mut RenderContext)
     {
-        let extent = RenderContext::extent();
+        let extent = render_context.extent();
         let pipeline = RhiPipelineTemplate {
             fragment_shader_path: Some("shader/hello_triangle/triangle.frag.spv".into()),
             vertex_shader_path: Some("shader/hello_triangle/triangle.vert.spv".into()),
-            color_formats: vec![RenderContext::instance().color_format()],
-            depth_format: RenderContext::depth_format(),
+            color_formats: vec![render_context.color_format()],
+            depth_format: render_context.depth_format(),
             viewport: Some(vk::Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -103,74 +102,77 @@ impl HelloTriangle
                 .build()],
             ..Default::default()
         }
-        .create_pipeline("");
+        .create_pipeline(rhi, "");
 
         self.pipeline = Some(pipeline);
     }
 
-    fn run(&self)
+    fn my_update(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
-        WindowSystem::instance().render_loop(|| {
-            RenderContext::acquire_frame();
+        render_context.acquire_frame(rhi);
 
-            let rhi = Rhi::instance();
+        let mut cmd = RenderContext::alloc_command_buffer(render_context, rhi, "render");
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        {
+            cmd.begin_rendering(&render_context.render_info());
+            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.as_ref().unwrap());
+            cmd.bind_index_buffer(self.index_buffer.as_ref().unwrap(), 0, vk::IndexType::UINT32);
+            cmd.bind_vertex_buffer(0, std::slice::from_ref(self.vertex_buffer.as_ref().unwrap()), &[0]);
+            cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
+            cmd.end_rendering();
+        }
+        cmd.end();
+        rhi.graphics_queue().submit(
+            rhi,
+            vec![RhiSubmitBatch {
+                command_buffers: vec![cmd],
+                ..Default::default()
+            }],
+            None,
+        );
 
-            let mut cmd = RenderContext::alloc_command_buffer("render");
-            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-            {
-                cmd.begin_rendering(&RenderContext::render_info());
-                cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.as_ref().unwrap());
-                cmd.bind_index_buffer(
-                    self.index_buffer.as_ref().unwrap(),
-                    0,
-                    vk::IndexType::UINT32,
-                );
-                cmd.bind_vertex_buffer(
-                    0,
-                    std::slice::from_ref(self.vertex_buffer.as_ref().unwrap()),
-                    &[0],
-                );
-                cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
-                cmd.end_rendering();
-            }
-            cmd.end();
-            rhi.graphics_queue().submit(
-                vec![RhiSubmitBatch {
-                    command_buffers: vec![cmd],
-                    ..Default::default()
-                }],
-                None,
-            );
-
-            RenderContext::submit_frame();
-        });
+        render_context.submit_frame(rhi);
     }
 
-    fn init() -> Self
+    fn new() -> Self
     {
-        Renderer::init(&RenderInitInfo {
-            window_width: 800,
-            window_height: 800,
-            app_name: "hello-triangle".to_string(),
-        })
-        .unwrap();
-
-        log::info!("start.");
-
-        let mut hello = Self {
+        Self {
             vertex_buffer: None,
             index_buffer: None,
             pipeline: None,
-        };
-        hello.init_buffer();
-        hello.init_pipeline();
+        }
+    }
+}
 
-        hello
+impl App for HelloTriangle
+{
+    fn get_init_info(&self) -> RenderInitInfo
+    {
+        RenderInitInfo {
+            window_width: 800,
+            window_height: 800,
+            app_name: "hello-triangle".to_string(),
+        }
+    }
+
+
+    fn init(&mut self, rhi: &Rhi, render_context: &mut RenderContext)
+    {
+        log::info!("start.");
+
+        self.init_buffer(rhi);
+        self.init_pipeline(rhi, render_context);
+    }
+
+    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
+    {
+        self.my_update(rhi, render_context);
     }
 }
 
 fn main()
 {
-    let hello = HelloTriangle::init();
-    hello.run();
+    let hello = HelloTriangle::new();
+
+    run(hello);
 }

@@ -14,7 +14,7 @@ pub struct RhiQueryPool
 impl RhiQueryPool
 {
     #[inline]
-    pub fn new(ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self
+    pub fn new(rhi: &Rhi, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self
     {
         let create_info = vk::QueryPoolCreateInfo {
             query_type: ty,
@@ -22,7 +22,6 @@ impl RhiQueryPool
             ..Default::default()
         };
 
-        let rhi = Rhi::instance();
 
         unsafe {
             let handle = rhi.device().create_query_pool(&create_info, None).unwrap();
@@ -37,39 +36,32 @@ impl RhiQueryPool
     }
 
     // #[inline]
-    pub fn get_query_result<T>(&mut self, first_index: u32, query_cnt: u32) -> Vec<T>
+    pub fn get_query_result<T>(&mut self, rhi: &Rhi, first_index: u32, query_cnt: u32) -> Vec<T>
     where
         T: Default + Sized + Clone,
     {
         unsafe {
             let mut res = vec![Default::default(); query_cnt as usize];
-            Rhi::instance()
-                .device()
-                .get_query_pool_results(
-                    self.handle,
-                    first_index,
-                    query_cnt,
-                    &mut res,
-                    vk::QueryResultFlags::WAIT,
-                )
+            rhi.device()
+                .get_query_pool_results(self.handle, first_index, query_cnt, &mut res, vk::QueryResultFlags::WAIT)
                 .unwrap();
             res
         }
     }
 
     #[inline]
-    pub fn reset(&mut self, first_query: u32, query_cnt: u32)
+    pub fn reset(&mut self, rhi: &Rhi, first_query: u32, query_cnt: u32)
     {
         unsafe {
-            Rhi::instance().device().reset_query_pool(self.handle, first_query, query_cnt);
+            rhi.device().reset_query_pool(self.handle, first_query, query_cnt);
         }
     }
 
     #[inline]
-    pub fn destroy(self)
+    pub fn destroy(self, rhi: &Rhi)
     {
         unsafe {
-            Rhi::instance().device().destroy_query_pool(self.handle, None);
+            rhi.device().destroy_query_pool(self.handle, None);
         }
     }
 }

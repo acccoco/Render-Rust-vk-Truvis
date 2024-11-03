@@ -34,23 +34,20 @@ where
         }
     }
 
-    fn create_layout() -> vk::DescriptorSetLayout
+    fn create_layout(rhi: &Rhi) -> vk::DescriptorSetLayout
     {
-        let create_info =
-            vk::DescriptorSetLayoutCreateInfo::builder().bindings(Self::get_bindings());
+        let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(Self::get_bindings());
 
-        unsafe {
-            Rhi::instance().device().create_descriptor_set_layout(&create_info, None).unwrap()
-        }
+        unsafe { rhi.device().create_descriptor_set_layout(&create_info, None).unwrap() }
     }
 
     /// 可以确保每种类型的 layout 在内存中只有 1 份
-    fn get_layout() -> vk::DescriptorSetLayout
+    fn get_layout(rhi: &Rhi) -> vk::DescriptorSetLayout
     {
         unsafe {
             static mut LAYOUT: Option<vk::DescriptorSetLayout> = None;
             if LAYOUT.is_none() {
-                LAYOUT = Some(Self::create_layout());
+                LAYOUT = Some(Self::create_layout(rhi));
             }
             LAYOUT.unwrap()
         }
@@ -70,16 +67,14 @@ enum RhiDescriptorUpdateInfo
 }
 impl RhiDescriptorSet
 {
-    pub fn new<T>() -> Self
+    pub fn new<T>(rhi: &Rhi) -> Self
     where
         T: RHiDescriptorBindings,
     {
-        let rhi = Rhi::instance();
-        let layout = [RhiDescriptorLayout::<T>::get_layout()];
+        let layout = [RhiDescriptorLayout::<T>::get_layout(rhi)];
         unsafe {
-            let alloc_info = vk::DescriptorSetAllocateInfo::builder()
-                .descriptor_pool(rhi.descriptor_pool())
-                .set_layouts(&layout);
+            let alloc_info =
+                vk::DescriptorSetAllocateInfo::builder().descriptor_pool(rhi.descriptor_pool()).set_layouts(&layout);
             let descriptor_set = rhi.device().allocate_descriptor_sets(&alloc_info).unwrap()[0];
             Self {
                 descriptor_set,
@@ -93,10 +88,8 @@ impl RhiDescriptorSet
         self.bindings.get(binding_index as usize).unwrap().descriptor_type
     }
 
-    pub fn write(&mut self, write_datas: Vec<(u32, RhiDescriptorUpdateInfo)>)
+    pub fn write(&mut self, rhi: &Rhi, write_datas: Vec<(u32, RhiDescriptorUpdateInfo)>)
     {
-        let rhi = Rhi::instance();
-
         let writes = write_datas
             .iter()
             .map(|(binding_index, info)| {
@@ -104,9 +97,7 @@ impl RhiDescriptorSet
                     .dst_set(self.descriptor_set)
                     .dst_binding(*binding_index)
                     .dst_array_element(1)
-                    .descriptor_type(
-                        self.bindings.get(*binding_index as usize).unwrap().descriptor_type,
-                    );
+                    .descriptor_type(self.bindings.get(*binding_index as usize).unwrap().descriptor_type);
 
                 match info {
                     RhiDescriptorUpdateInfo::Buffer(info) => {

@@ -102,10 +102,8 @@ impl Default for RhiPipelineTemplate
 
 impl RhiPipelineTemplate
 {
-    pub fn create_pipeline<S: AsRef<str> + Clone>(&self, debug_name: S) -> RhiPipeline
+    pub fn create_pipeline<S: AsRef<str> + Clone>(&self, rhi: &Rhi, debug_name: S) -> RhiPipeline
     {
-        let rhi = Rhi::instance();
-
         // dynamic rendering 需要的 framebuffer 信息
         let mut attach_info = vk::PipelineRenderingCreateInfo::builder()
             .color_attachment_formats(&self.color_formats)
@@ -116,16 +114,13 @@ impl RhiPipelineTemplate
             let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::builder()
                 .set_layouts(&self.descriptor_set_layouts)
                 .push_constant_ranges(&self.push_constant_ranges);
-            unsafe {
-                rhi.device().create_pipeline_layout(&pipeline_layout_create_info, None).unwrap()
-            }
+            unsafe { rhi.device().create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() }
         };
         rhi.set_debug_name(pipeline_layout, debug_name.clone());
 
         // vertex shader 和 fragment shader 是必须的，入口都是 main
-        let vertex_shader_module = RhiShaderModule::new(self.vertex_shader_path.as_ref().unwrap());
-        let fragment_shader_module =
-            RhiShaderModule::new(self.fragment_shader_path.as_ref().unwrap());
+        let vertex_shader_module = RhiShaderModule::new(rhi, self.vertex_shader_path.as_ref().unwrap());
+        let fragment_shader_module = RhiShaderModule::new(rhi, self.fragment_shader_path.as_ref().unwrap());
         let shader_stages_info = [
             vk::PipelineShaderStageCreateInfo::builder()
                 .stage(vk::ShaderStageFlags::VERTEX)
@@ -164,8 +159,7 @@ impl RhiPipelineTemplate
             .logic_op_enable(self.enable_logical_op)
             .attachments(&self.color_attach_blend_states);
 
-        let dynamic_state_info =
-            vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&self.dynamic_states);
+        let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&self.dynamic_states);
 
         // =======================================
         // === 创建 pipeline
@@ -185,11 +179,7 @@ impl RhiPipelineTemplate
 
         let pipeline = unsafe {
             rhi.device()
-                .create_graphics_pipelines(
-                    vk::PipelineCache::null(),
-                    std::slice::from_ref(&pipeline_info),
-                    None,
-                )
+                .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
                 .unwrap()[0]
         };
         rhi.set_debug_name(pipeline, debug_name.clone());

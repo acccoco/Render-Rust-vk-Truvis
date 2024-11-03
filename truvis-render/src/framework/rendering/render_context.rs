@@ -1,10 +1,12 @@
+use std::rc::Rc;
+
 use ash::vk;
 
 
-static mut RENDER_CONTEXT: Option<RenderContext> = None;
-
-pub struct RenderContext
+pub struct RenderContext<'a>
 {
+    render_swapchain: Rc<RenderSwapchain>,
+
     swapchain_image_index: usize,
 
     frame_index: usize,
@@ -14,7 +16,7 @@ pub struct RenderContext
     graphics_command_pools: Vec<RhiCommandPool>,
 
     /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
-    allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
+    allocated_command_buffers: Vec<Vec<RhiCommandBuffer<'a>>>,
 
     depth_format: Option<vk::Format>,
     depth_image: Option<vk::Image>,
@@ -22,35 +24,29 @@ pub struct RenderContext
     depth_image_view: Option<vk::ImageView>,
     depth_attach_info: vk::RenderingAttachmentInfo,
 
-    semaphores_swapchain_available: Vec<RhiSemaphore>,
-    semaphores_image_render_finish: Vec<RhiSemaphore>,
-    fence_frame_in_flight: Vec<RhiFence>,
+    semaphores_swapchain_available: Vec<RhiSemaphore<'a>>,
+    semaphores_image_render_finish: Vec<RhiSemaphore<'a>>,
+    fence_frame_in_flight: Vec<RhiFence<'a>>,
 }
 
-impl RenderContext
+impl<'a> RenderContext<'a>
 {
     #[inline]
-    pub fn acquire_frame()
+    pub fn acquire_frame(&mut self, rhi: &'a Rhi)
     {
-        let ctx = unsafe { RENDER_CONTEXT.as_mut().unwrap_unchecked() };
-
-        let current_fence = &mut ctx.fence_frame_in_flight[ctx.frame_index];
+        let current_fence = &mut self.fence_frame_in_flight[self.frame_index];
         current_fence.wait();
-        ctx.graphics_command_pools[ctx.frame_index].reset();
-        std::mem::take(&mut ctx.allocated_command_buffers[ctx.frame_index])
-            .into_iter()
-            .for_each(|c| c.free());
+        self.graphics_command_pools[self.frame_index].reset(rhi);
+        std::mem::take(&mut self.allocated_command_buffers[self.frame_index]).into_iter().for_each(|c| c.free());
         current_fence.reset();
 
-        ctx.swapchain_image_index = RenderSwapchain::instance()
-            .acquire_next_frame(&ctx.semaphores_swapchain_available[ctx.frame_index], None)
-            as usize;
+        self.swapchain_image_index =
+            self.render_swapchain.acquire_next_frame(&self.semaphores_swapchain_available[self.frame_index], None)
+                as usize;
 
         {
-            let mut cmd = Self::alloc_command_buffer(format!(
-                "ctx-1st-color-layout-trans-frame-{}",
-                ctx.frame_index
-            ));
+            let mut cmd =
+                self.alloc_command_buffer(rhi, format!("ctx-1st-color-layout-trans-frame-{}", self.frame_index));
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
             // 只需要建立起执行依赖即可，确保 present 完成后，再进行 layout trans
             // COLOR_ATTACHMENT_READ 对应 blend 等操作
@@ -58,21 +54,21 @@ impl RenderContext
                 (vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty()),
                 (
                     vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                    vk::AccessFlags::COLOR_ATTACHMENT_WRITE |
-                        vk::AccessFlags::COLOR_ATTACHMENT_READ,
+                    vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::COLOR_ATTACHMENT_READ,
                 ),
-                RenderContext::current_image(),
+                self.current_image(),
                 vk::ImageAspectFlags::COLOR,
                 vk::ImageLayout::UNDEFINED,
                 vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             );
             cmd.end();
-            Rhi::instance().graphics_queue().submit(
+            rhi.graphics_queue().submit(
+                rhi,
                 vec![RhiSubmitBatch {
                     command_buffers: vec![cmd],
                     wait_info: vec![(
                         vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                        RenderContext::current_swapchain_available_semaphore(),
+                        self.current_swapchain_available_semaphore(),
                     )],
                     signal_info: vec![],
                 }],
@@ -83,69 +79,63 @@ impl RenderContext
 
 
     #[inline]
-    pub fn submit_frame()
+    pub fn submit_frame(&mut self, rhi: &'a Rhi)
     {
-        let ctx = unsafe { RENDER_CONTEXT.as_mut().unwrap_unchecked() };
-
         {
-            let mut cmd = Self::alloc_command_buffer(format!(
-                "ctx-2nd-color-layout-trans-frame-{}",
-                ctx.frame_index
-            ));
+            let mut cmd =
+                self.alloc_command_buffer(rhi, format!("ctx-2nd-color-layout-trans-frame-{}", self.frame_index));
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
             cmd.image_barrier(
-                (
-                    vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                    vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
-                ),
+                (vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT, vk::AccessFlags::COLOR_ATTACHMENT_WRITE),
                 (vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty()),
-                RenderContext::current_image(),
+                self.current_image(),
                 vk::ImageAspectFlags::COLOR,
                 vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                 vk::ImageLayout::PRESENT_SRC_KHR,
             );
             cmd.end();
-            Rhi::instance().graphics_queue().submit(
+            rhi.graphics_queue().submit(
+                rhi,
                 vec![RhiSubmitBatch {
                     command_buffers: vec![cmd],
                     wait_info: vec![],
-                    signal_info: vec![Self::current_image_render_finish_semaphore()],
+                    signal_info: vec![self.current_image_render_finish_semaphore()],
                 }],
-                Some(Self::current_fence().clone()),
+                Some(self.current_fence().clone()),
             );
         }
 
-        RenderSwapchain::instance().submit_frame(
-            ctx.swapchain_image_index as u32,
-            &[RenderContext::current_image_render_finish_semaphore().semaphore],
+        self.render_swapchain.submit_frame(
+            rhi,
+            self.swapchain_image_index as u32,
+            &[self.current_image_render_finish_semaphore().semaphore],
         );
 
-        ctx.frame_index = (ctx.frame_index + 1) % ctx.frames_cnt;
+        self.frame_index = (self.frame_index + 1) % self.frames_cnt;
     }
 
 
     #[inline]
-    pub fn render_info() -> vk::RenderingInfo
+    pub fn render_info(&self) -> vk::RenderingInfo
     {
         vk::RenderingInfo::builder()
             .layer_count(1)
-            .render_area(Self::extent().into())
-            .color_attachments(std::slice::from_ref(Self::color_attach_info()))
-            .depth_attachment(Self::depth_attach_info())
+            .render_area(self.extent().into())
+            .color_attachments(std::slice::from_ref(self.color_attach_info()))
+            .depth_attachment(self.depth_attach_info())
             .build()
     }
 
 
     /// 分配 command buffer，在当前 frame 使用
     #[inline]
-    pub fn alloc_command_buffer<S: AsRef<str>>(debug_name: S) -> RhiCommandBuffer
+    pub fn alloc_command_buffer<S: AsRef<str>>(&mut self, rhi: &'a Rhi, debug_name: S) -> RhiCommandBuffer<'a>
     {
         unsafe {
-            let ctx = RENDER_CONTEXT.as_mut().unwrap_unchecked();
-            let name = format!("frame-{}-command-buffer-{}", ctx.frame_index, debug_name.as_ref());
-            let cmd = RhiCommandBuffer::new(&ctx.graphics_command_pools[ctx.frame_index], name);
+            let name = format!("frame-{}-command-buffer-{}", self.frame_index, debug_name.as_ref());
+            let cmd = RhiCommandBuffer::new(rhi, &self.graphics_command_pools[self.frame_index], name);
 
-            ctx.allocated_command_buffers[ctx.frame_index].push(cmd.clone());
+            self.allocated_command_buffers[self.frame_index].push(cmd.clone());
 
             cmd
         }
@@ -168,6 +158,8 @@ use crate::framework::{
 
 mod _ctx_init
 {
+    use std::rc::Rc;
+
     use ash::vk;
     use itertools::Itertools;
 
@@ -177,7 +169,7 @@ mod _ctx_init
             swapchain::RenderSwapchain,
             synchronize::{RhiFence, RhiSemaphore},
         },
-        rendering::render_context::{RenderContext, RENDER_CONTEXT},
+        rendering::render_context::RenderContext,
         rhi::Rhi,
     };
 
@@ -202,11 +194,13 @@ mod _ctx_init
         }
     }
 
-    impl RenderContext
+    impl<'a> RenderContext<'a>
     {
-        pub(crate) fn init(init_info: &RenderContextInitInfo)
+        pub fn new(rhi: &'a Rhi, init_info: &RenderContextInitInfo, render_swapchain: Rc<RenderSwapchain>) -> Self
         {
             let mut ctx = RenderContext {
+                render_swapchain,
+
                 swapchain_image_index: 0,
                 frame_index: 0,
                 frames_cnt: init_info.frames_in_flight,
@@ -225,19 +219,17 @@ mod _ctx_init
                 fence_frame_in_flight: vec![],
             };
 
-            ctx.init_depth_image_and_view(&init_info.depth_format_dedicate);
-            ctx.init_synchronous_primitives();
-            ctx.init_command_pool();
+            ctx.init_depth_image_and_view(rhi, &init_info.depth_format_dedicate);
+            ctx.init_synchronous_primitives(rhi);
+            ctx.init_command_pool(rhi);
             ctx.init_depth_attach();
 
-            unsafe { RENDER_CONTEXT = Some(ctx) }
+            ctx
         }
 
 
-        fn init_depth_image_and_view(&mut self, depth_format_dedicate: &[vk::Format])
+        fn init_depth_image_and_view(&mut self, rhi: &Rhi, depth_format_dedicate: &[vk::Format])
         {
-            let rhi = Rhi::instance();
-
             let depth_format = rhi
                 .find_supported_format(
                     depth_format_dedicate,
@@ -250,7 +242,7 @@ mod _ctx_init
 
             let (depth_image, depth_image_allocation) = {
                 let create_info = RhiCreateInfoUtil::make_image2d_create_info(
-                    RenderSwapchain::instance().extent.unwrap(),
+                    self.render_swapchain.extent.unwrap(),
                     depth_format,
                     vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
                 );
@@ -272,24 +264,19 @@ mod _ctx_init
             self.depth_image_view = Some(depth_image_view);
         }
 
-        fn init_synchronous_primitives(&mut self)
+        fn init_synchronous_primitives(&mut self, rhi: &'a Rhi)
         {
-            let create_semaphore = |name: &str| {
-                (0..self.frames_cnt).map(|i| RhiSemaphore::new(format!("{name}-{i}"))).collect_vec()
-            };
-            self.semaphores_swapchain_available =
-                create_semaphore("image-available-for-render-semaphore");
-            self.semaphores_image_render_finish =
-                create_semaphore("image-finished-for-present-semaphore");
+            let create_semaphore =
+                |name: &str| (0..self.frames_cnt).map(|i| RhiSemaphore::new(rhi, format!("{name}-{i}"))).collect_vec();
+            self.semaphores_swapchain_available = create_semaphore("image-available-for-render-semaphore");
+            self.semaphores_image_render_finish = create_semaphore("image-finished-for-present-semaphore");
 
-            self.fence_frame_in_flight = (0..self.frames_cnt)
-                .map(|i| RhiFence::new(true, format!("frame-in-flight-fence-{i}")))
-                .collect();
+            self.fence_frame_in_flight =
+                (0..self.frames_cnt).map(|i| RhiFence::new(rhi, true, format!("frame-in-flight-fence-{i}"))).collect();
         }
 
-        fn init_command_pool(&mut self)
+        fn init_command_pool(&mut self, rhi: &Rhi)
         {
-            let rhi = Rhi::instance();
             self.graphics_command_pools = (0..self.frames_cnt)
                 .map(|i| {
                     rhi.create_command_pool(
@@ -325,84 +312,72 @@ mod _ctx_property
     use ash::vk;
 
     use crate::framework::{
-        core::{
-            swapchain::RenderSwapchain,
-            synchronize::{RhiFence, RhiSemaphore},
-        },
-        rendering::render_context::{RenderContext, RENDER_CONTEXT},
+        core::synchronize::{RhiFence, RhiSemaphore},
+        rendering::render_context::RenderContext,
     };
 
-    impl RenderContext
+    impl RenderContext<'_>
     {
         #[inline]
-        pub fn instance() -> &'static Self
+        pub fn extent(&self) -> vk::Extent2D
         {
-            unsafe { RENDER_CONTEXT.as_ref().unwrap_unchecked() }
+            self.render_swapchain.extent()
         }
 
         #[inline]
-        pub fn extent() -> vk::Extent2D
+        pub fn current_fence(&self) -> &RhiFence
         {
-            RenderSwapchain::instance().extent()
-        }
-
-        #[inline]
-        pub fn current_fence() -> &'static RhiFence
-        {
-            let ctx = Self::instance();
-            &ctx.fence_frame_in_flight[ctx.frame_index]
+            &self.fence_frame_in_flight[self.frame_index]
         }
 
         #[inline]
         pub fn color_format(&self) -> vk::Format
         {
-            RenderSwapchain::instance().color_format()
+            self.render_swapchain.color_format()
         }
 
         #[inline]
-        pub fn current_frame_index() -> usize
+        pub fn current_frame_index(&self) -> usize
         {
-            Self::instance().frame_index
-        }
-
-
-        #[inline]
-        pub fn depth_format() -> vk::Format
-        {
-            unsafe { Self::instance().depth_format.unwrap_unchecked() }
+            self.frame_index
         }
 
 
         #[inline]
-        pub fn current_image_render_finish_semaphore() -> RhiSemaphore
+        pub fn depth_format(&self) -> vk::Format
         {
-            let ctx = Self::instance();
-            ctx.semaphores_image_render_finish[ctx.frame_index]
+            unsafe { self.depth_format.unwrap_unchecked() }
+        }
+
+
+        #[inline]
+        pub fn current_image_render_finish_semaphore(&self) -> RhiSemaphore
+        {
+            self.semaphores_image_render_finish[self.frame_index]
         }
 
         #[inline]
-        pub fn current_swapchain_available_semaphore() -> RhiSemaphore
+        pub fn current_swapchain_available_semaphore(&self) -> RhiSemaphore
         {
-            let ctx = Self::instance();
-            ctx.semaphores_swapchain_available[ctx.frame_index]
+            self.semaphores_swapchain_available[self.frame_index]
         }
 
         #[inline]
-        pub fn color_attach_info() -> &'static vk::RenderingAttachmentInfo
+        pub fn color_attach_info(&self) -> &vk::RenderingAttachmentInfo
         {
-            &RenderSwapchain::instance().color_attach_infos[Self::instance().swapchain_image_index]
+            &self.render_swapchain.color_attach_infos[self.swapchain_image_index]
         }
 
         #[inline]
-        pub fn depth_attach_info() -> &'static vk::RenderingAttachmentInfo
+        pub fn depth_attach_info(&self) -> &vk::RenderingAttachmentInfo
         {
-            &Self::instance().depth_attach_info
+            &self.depth_attach_info
         }
 
         #[inline]
-        pub fn current_image() -> vk::Image
+        pub fn current_image(&self) -> vk::Image
         {
-            RenderSwapchain::instance().images[Self::instance().swapchain_image_index]
+            self.render_swapchain.images[self.swapchain_image_index]
         }
     }
 }

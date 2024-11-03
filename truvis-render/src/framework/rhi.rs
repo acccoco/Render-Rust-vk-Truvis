@@ -1,4 +1,5 @@
 use std::{
+    cell::UnsafeCell,
     collections::HashMap,
     ffi::{CStr, CString},
     rc::Rc,
@@ -11,7 +12,7 @@ use raw_window_handle::HasRawDisplayHandle;
 use vk_mem::Alloc;
 
 use crate::framework::{
-    core::{command_pool::RhiCommandPool, physical_device::RhiPhysicalDevice, queue::RhiQueue},
+    core::{command_pool::RhiCommandPool, instance::RhiInstance, physical_device::RhiPhysicalDevice, queue::RhiQueue},
     platform::window_system::WindowSystem,
 };
 
@@ -57,10 +58,12 @@ pub unsafe extern "system" fn vk_debug_callback(
     vk::FALSE
 }
 
-pub struct RhiInitInfo
+pub struct RhiInitInfo<'a>
 {
     pub app_name: Option<String>,
     pub engine_name: Option<String>,
+
+    pub window: Option<&'a WindowSystem>,
 
     pub vk_version: u32,
 
@@ -80,11 +83,14 @@ pub struct RhiInitInfo
 }
 
 
-impl RhiInitInfo
+impl<'a> RhiInitInfo<'a>
 {
     const VALIDATION_LAYER_NAME: &'static CStr = cstr::cstr!("VK_LAYER_KHRONOS_validation");
 
-    pub fn init_basic(debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT) -> Self
+    pub fn init_basic<'b: 'a>(
+        debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT,
+        window: &'b WindowSystem,
+    ) -> Self
     {
         let instance_create_flags = if cfg!(target_os = "macos") {
             vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR
@@ -96,11 +102,13 @@ impl RhiInitInfo
             app_name: None,
             engine_name: None,
 
+            window: Some(window),
+
             // 版本过低时，有些函数无法正确加载
             vk_version: vk::API_VERSION_1_3,
 
             instance_layers: Self::basic_instance_layers(),
-            instance_extensions: Self::basic_instance_extensions(),
+            instance_extensions: Self::basic_instance_extensions(window),
             instance_create_flags,
             device_extensions: Self::basic_device_extensions(),
 
@@ -164,7 +172,7 @@ impl RhiInitInfo
         vec![Self::VALIDATION_LAYER_NAME]
     }
 
-    fn basic_instance_extensions() -> Vec<&'static CStr>
+    fn basic_instance_extensions(window: &WindowSystem) -> Vec<&'static CStr>
     {
         let mut exts = Vec::new();
 
@@ -176,11 +184,7 @@ impl RhiInitInfo
         exts.push(ash::extensions::ext::DebugUtils::name());
 
         // 追加 window system 需要的 extension
-        for ext in ash_window::enumerate_required_extensions(
-            WindowSystem::instance().window().raw_display_handle(),
-        )
-        .unwrap()
-        {
+        for ext in ash_window::enumerate_required_extensions(window.window().raw_display_handle()).unwrap() {
             unsafe {
                 exts.push(CStr::from_ptr(*ext));
             }
@@ -206,34 +210,14 @@ impl RhiInitInfo
             .build();
 
         self.ext_features = vec![
+            Box::new(vk::PhysicalDeviceDynamicRenderingFeatures::builder().dynamic_rendering(true).build()),
+            Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::builder().buffer_device_address(true).build()),
+            Box::new(vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder().ray_tracing_pipeline(true).build()),
             Box::new(
-                vk::PhysicalDeviceDynamicRenderingFeatures::builder()
-                    .dynamic_rendering(true)
-                    .build(),
+                vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder().acceleration_structure(true).build(),
             ),
-            Box::new(
-                vk::PhysicalDeviceBufferDeviceAddressFeatures::builder()
-                    .buffer_device_address(true)
-                    .build(),
-            ),
-            Box::new(
-                vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
-                    .ray_tracing_pipeline(true)
-                    .build(),
-            ),
-            Box::new(
-                vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
-                    .acceleration_structure(true)
-                    .build(),
-            ),
-            Box::new(
-                vk::PhysicalDeviceHostQueryResetFeatures::builder().host_query_reset(true).build(),
-            ),
-            Box::new(
-                vk::PhysicalDeviceSynchronization2Features::builder()
-                    .synchronization2(true)
-                    .build(),
-            ),
+            Box::new(vk::PhysicalDeviceHostQueryResetFeatures::builder().host_query_reset(true).build()),
+            Box::new(vk::PhysicalDeviceSynchronization2Features::builder().synchronization2(true).build()),
         ];
     }
 }
@@ -277,8 +261,9 @@ impl Rhi
     const MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
     const MAX_MATERIAL_CNT: u32 = 256;
 
-    pub fn init(mut init_info: RhiInitInfo) -> anyhow::Result<()>
+    pub fn new(mut init_info: RhiInitInfo) -> anyhow::Result<Self>
     {
+        let vk_pf = unsafe { Entry::load() }.expect("Failed to load vulkan entry");
         let mut rhi = Self {
             vk_pf: unsafe { Some(Entry::load().unwrap()) },
             vk_instance: None,
@@ -311,11 +296,7 @@ impl Rhi
         rhi.set_debug_name(rhi.device().handle(), "main-device");
         rhi.set_debug_name(rhi.descriptor_pool.unwrap(), "main-descriptor-pool");
 
-        unsafe {
-            RHI = Some(rhi);
-        }
-
-        Ok(())
+        Ok(rhi)
     }
 
     fn init_descriptor_pool(&mut self)
@@ -356,8 +337,7 @@ impl Rhi
             .max_sets(Self::MAX_MATERIAL_CNT + Self::MAX_VERTEX_BLENDING_MESH_CNT + 32);
 
         unsafe {
-            self.descriptor_pool =
-                Some(self.device().create_descriptor_pool(&pool_create_info, None).unwrap());
+            self.descriptor_pool = Some(self.device().create_descriptor_pool(&pool_create_info, None).unwrap());
         }
     }
 
@@ -387,10 +367,8 @@ impl Rhi
 
     fn init_instance(&mut self, init_info: &RhiInitInfo) -> anyhow::Result<()>
     {
-        let app_name =
-            CString::new(init_info.app_name.as_ref().context("")?.as_str()).context("")?;
-        let engine_name =
-            CString::new(init_info.engine_name.as_ref().context("")?.as_str()).context("")?;
+        let app_name = CString::new(init_info.app_name.as_ref().context("")?.as_str()).context("")?;
+        let engine_name = CString::new(init_info.engine_name.as_ref().context("")?.as_str()).context("")?;
         let app_info = vk::ApplicationInfo::builder()
             .application_name(app_name.as_ref())
             .application_version(vk::make_api_version(0, 1, 0, 0))
@@ -398,8 +376,7 @@ impl Rhi
             .engine_version(vk::make_api_version(0, 1, 0, 0))
             .api_version(init_info.vk_version);
 
-        let instance_extensions =
-            init_info.instance_extensions.iter().map(|x| x.as_ptr()).collect_vec();
+        let instance_extensions = init_info.instance_extensions.iter().map(|x| x.as_ptr()).collect_vec();
         let instance_layers = init_info.instance_layers.iter().map(|l| l.as_ptr()).collect_vec();
 
         let mut debug_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
@@ -421,8 +398,7 @@ impl Rhi
             .flags(create_flags)
             .push_next(&mut debug_info);
 
-        let instance =
-            unsafe { self.vk_pf.as_ref().unwrap().create_instance(&instance_info, None)? };
+        let instance = unsafe { self.vk_pf.as_ref().unwrap().create_instance(&instance_info, None)? };
         self.vk_instance = Some(instance);
 
         Ok(())
@@ -430,10 +406,8 @@ impl Rhi
 
     fn init_debug_messenger(&mut self, init_info: &RhiInitInfo) -> anyhow::Result<()>
     {
-        let loader = ash::extensions::ext::DebugUtils::new(
-            self.vk_pf.as_ref().unwrap(),
-            self.vk_instance.as_ref().context("")?,
-        );
+        let loader =
+            ash::extensions::ext::DebugUtils::new(self.vk_pf.as_ref().unwrap(), self.vk_instance.as_ref().context("")?);
 
         let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
             .message_severity(init_info.debug_msg_severity)
@@ -500,8 +474,7 @@ impl Rhi
         });
 
         // 每个 queue family 的 queue 数量通过 priority 数组的长度指定
-        let queue_priorities =
-            queues.values().map(|count| vec![1.0; *count as usize]).collect_vec();
+        let queue_priorities = queues.values().map(|count| vec![1.0; *count as usize]).collect_vec();
         let queue_create_infos = queues
             .keys()
             .map(|index| {
@@ -514,8 +487,7 @@ impl Rhi
 
         let device_exts = init_info.device_extensions.iter().map(|e| e.as_ptr()).collect_vec();
 
-        let mut features =
-            vk::PhysicalDeviceFeatures2::builder().features(init_info.core_features).build();
+        let mut features = vk::PhysicalDeviceFeatures2::builder().features(init_info.core_features).build();
         unsafe {
             init_info.ext_features.iter_mut().for_each(|f| {
                 let ptr = <*mut dyn vk::ExtendsPhysicalDeviceFeatures2>::cast::<vk::BaseOutStructure>(f.as_mut());
@@ -534,19 +506,12 @@ impl Rhi
                 .vk_instance
                 .as_ref()
                 .unwrap()
-                .create_device(
-                    self.physical_device.as_ref().unwrap().handle,
-                    &device_create_info,
-                    None,
-                )
+                .create_device(self.physical_device.as_ref().unwrap().handle, &device_create_info, None)
                 .unwrap();
 
-            let graphics_queue =
-                device.get_device_queue(graphics_queue_family_index, graphics_queue_num);
-            let compute_queue =
-                device.get_device_queue(compute_queue_family_index, compute_queue_num);
-            let transfer_queue =
-                device.get_device_queue(transfer_queue_family_index, transfer_queue_num);
+            let graphics_queue = device.get_device_queue(graphics_queue_family_index, graphics_queue_num);
+            let compute_queue = device.get_device_queue(compute_queue_family_index, compute_queue_num);
+            let transfer_queue = device.get_device_queue(transfer_queue_family_index, transfer_queue_num);
 
             self.device = Some(device);
 
@@ -574,10 +539,8 @@ impl Rhi
         let instance = self.vk_instance.as_ref().unwrap();
         let device = self.device.as_ref().unwrap();
 
-        self.vk_dynamic_render_pf =
-            Some(ash::extensions::khr::DynamicRendering::new(instance, device));
-        self.vk_acceleration_pf =
-            Some(ash::extensions::khr::AccelerationStructure::new(instance, device));
+        self.vk_dynamic_render_pf = Some(ash::extensions::khr::DynamicRendering::new(instance, device));
+        self.vk_acceleration_pf = Some(ash::extensions::khr::AccelerationStructure::new(instance, device));
     }
 
     fn init_vma(&mut self, init_info: &RhiInitInfo)
@@ -612,11 +575,6 @@ impl Rhi
     pub fn transfer_command_pool(&self) -> &RhiCommandPool
     {
         self.transfer_command_pool.as_ref().unwrap()
-    }
-    #[inline]
-    pub fn instance() -> &'static Self
-    {
-        unsafe { RHI.as_ref().unwrap_unchecked() }
     }
     #[inline]
     pub(crate) fn vk_instance(&self) -> &Instance
@@ -720,9 +678,7 @@ impl Rhi
         let pool = unsafe {
             self.device()
                 .create_command_pool(
-                    &vk::CommandPoolCreateInfo::builder()
-                        .queue_family_index(queue_family_index)
-                        .flags(flags),
+                    &vk::CommandPoolCreateInfo::builder().queue_family_index(queue_family_index).flags(flags),
                     None,
                 )
                 .unwrap()
@@ -735,11 +691,7 @@ impl Rhi
         })
     }
 
-    pub fn create_image<S>(
-        &self,
-        create_info: &vk::ImageCreateInfo,
-        debug_name: S,
-    ) -> (vk::Image, vk_mem::Allocation)
+    pub fn create_image<S>(&self, create_info: &vk::ImageCreateInfo, debug_name: S) -> (vk::Image, vk_mem::Allocation)
     where
         S: AsRef<str>,
     {
@@ -747,19 +699,14 @@ impl Rhi
             usage: vk_mem::MemoryUsage::AutoPreferDevice,
             ..Default::default()
         };
-        let (image, allocation) =
-            unsafe { self.vma().create_image(create_info, &alloc_info).unwrap() };
+        let (image, allocation) = unsafe { self.vma().create_image(create_info, &alloc_info).unwrap() };
 
         self.set_debug_name(image, debug_name);
         (image, allocation)
     }
 
     #[inline]
-    pub fn create_image_view<S>(
-        &self,
-        create_info: &vk::ImageViewCreateInfo,
-        debug_name: S,
-    ) -> vk::ImageView
+    pub fn create_image_view<S>(&self, create_info: &vk::ImageViewCreateInfo, debug_name: S) -> vk::ImageView
     where
         S: AsRef<str>,
     {
@@ -781,10 +728,7 @@ impl Rhi
             .iter()
             .filter(|f| {
                 let props = unsafe {
-                    self.vk_instance().get_physical_device_format_properties(
-                        self.physical_device().handle,
-                        **f,
-                    )
+                    self.vk_instance().get_physical_device_format_properties(self.physical_device().handle, **f)
                 };
                 match tiling {
                     vk::ImageTiling::LINEAR => props.linear_tiling_features.contains(features),

@@ -1,4 +1,6 @@
-use anyhow::Context;
+use std::rc::Rc;
+
+use winit::platform::run_return::EventLoopExtRunReturn;
 
 use crate::{
     framework::{
@@ -12,15 +14,11 @@ use crate::{
 
 
 /// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
-pub struct Renderer;
-
-static mut RENDERER: Option<Renderer> = None;
-
-
-pub fn panic_handler(info: &std::panic::PanicInfo)
+pub struct Renderer
 {
-    log::error!("{}", info);
-    std::thread::sleep(std::time::Duration::from_secs(3));
+    pub window: WindowSystem,
+    render_swapchain: Rc<RenderSwapchain>,
+    pub render_context: RenderContext<'static>,
 }
 
 
@@ -31,39 +29,47 @@ pub struct RenderInitInfo
     pub app_name: String,
 }
 
+static mut RHI: Option<Rhi> = None;
+
 impl Renderer
 {
-    #[inline]
-    pub fn instance() -> &'static Self
+    pub fn new(init_info: &RenderInitInfo) -> Self
     {
-        unsafe { RENDERER.as_ref().unwrap() }
-    }
+        simple_logger::SimpleLogger::new().init().unwrap();
 
-    pub fn init(init_info: &RenderInitInfo) -> anyhow::Result<()>
-    {
-        simple_logger::SimpleLogger::new().init()?;
 
-        std::panic::set_hook(Box::new(panic_handler));
-
-        WindowSystem::init(WindowCreateInfo {
+        let window = WindowSystem::new(WindowCreateInfo {
             height: init_info.window_height as i32,
             width: init_info.window_width as i32,
             title: init_info.app_name.clone(),
         });
 
-        {
-            let mut rhi_init_info = RhiInitInfo::init_basic(Some(vk_debug_callback));
-            rhi_init_info.app_name = Some(init_info.app_name.clone());
-            rhi_init_info.engine_name = Some(ENGINE_NAME.to_string());
-            rhi_init_info.is_complete()?;
-
-            Rhi::init(rhi_init_info)?;
+        let mut rhi_init_info = RhiInitInfo::init_basic(Some(vk_debug_callback), &window);
+        rhi_init_info.app_name = Some(init_info.app_name.clone());
+        rhi_init_info.engine_name = Some(ENGINE_NAME.to_string());
+        rhi_init_info.is_complete().unwrap();
+        unsafe {
+            RHI = Some(Rhi::new(rhi_init_info).unwrap());
         }
+        let rhi = unsafe { RHI.as_ref().unwrap() };
 
-        RenderSwapchain::init(&RenderSwapchainInitInfo::default());
+        let mut render_swapchain_init_info = RenderSwapchainInitInfo::default();
+        render_swapchain_init_info.window = Some(&window);
+        let render_swapchain = Rc::new(RenderSwapchain::new(&rhi, &render_swapchain_init_info));
 
-        RenderContext::init(&RenderContextInitInfo::default());
+        let render_context_init_info = RenderContextInitInfo::default();
+        let render_context = RenderContext::new(&rhi, &render_context_init_info, render_swapchain.clone());
 
-        Ok(())
+
+        Self {
+            window,
+            render_swapchain,
+            render_context,
+        }
+    }
+
+    pub fn get_rhi() -> &'static Rhi
+    {
+        unsafe { RHI.as_ref().unwrap() }
     }
 }

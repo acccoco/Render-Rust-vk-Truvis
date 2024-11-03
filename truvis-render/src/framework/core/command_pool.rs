@@ -11,13 +11,10 @@ pub struct RhiCommandPool
 impl RhiCommandPool
 {
     #[inline]
-    pub(crate) fn reset(&mut self)
+    pub(crate) fn reset(&mut self, rhi: &Rhi)
     {
         unsafe {
-            Rhi::instance()
-                .device()
-                .reset_command_pool(self.command_pool, vk::CommandPoolResetFlags::RELEASE_RESOURCES)
-                .unwrap();
+            rhi.device().reset_command_pool(self.command_pool, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();
         }
     }
 }

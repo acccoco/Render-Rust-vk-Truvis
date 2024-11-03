@@ -43,12 +43,12 @@ pub struct RhiImage2D
 impl RhiImage2D
 {
     pub fn new(
+        rhi: &Rhi,
         image_info: &vk::ImageCreateInfo,
         alloc_info: &vk_mem::AllocationCreateInfo,
         debug_name: &str,
     ) -> Self
     {
-        let rhi = Rhi::instance();
         let (image, alloc) = unsafe { rhi.vma().create_image(image_info, alloc_info).unwrap() };
 
         rhi.set_debug_name(image, debug_name);
@@ -63,19 +63,14 @@ impl RhiImage2D
         }
     }
 
-    pub fn transfer_data(&mut self, data: &[u8])
+    pub fn transfer_data(&mut self, rhi: &Rhi, data: &[u8])
     {
         let pixels_cnt = self.image_info.extent.width * self.image_info.extent.height;
-        assert_eq!(
-            data.len(),
-            Self::format_byte_count(self.image_info.format) * pixels_cnt as usize
-        );
+        assert_eq!(data.len(), Self::format_byte_count(self.image_info.format) * pixels_cnt as usize);
 
-        let mut stage_buffer = RhiBuffer::new_stage_buffer(
-            std::mem::size_of_val(data) as vk::DeviceSize,
-            "image-stage-buffer",
-        );
-        stage_buffer.map();
+        let mut stage_buffer =
+            RhiBuffer::new_stage_buffer(rhi, std::mem::size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
+        stage_buffer.map(rhi);
 
         // TODO
     }
@@ -84,10 +79,8 @@ impl RhiImage2D
     fn format_byte_count(format: vk::Format) -> usize
     {
         // 根据 vulkan specification 得到的 format 顺序
-        const BYTE_3_FORMAT: [(vk::Format, vk::Format); 1] =
-            [(vk::Format::R8G8B8_UNORM, vk::Format::B8G8R8_SRGB)];
-        const BYTE_4_FORMAT: [(vk::Format, vk::Format); 1] =
-            [(vk::Format::R8G8B8A8_UNORM, vk::Format::B8G8R8A8_SRGB)];
+        const BYTE_3_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8_UNORM, vk::Format::B8G8R8_SRGB)];
+        const BYTE_4_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8A8_UNORM, vk::Format::B8G8R8A8_SRGB)];
         const BYTE_6_FORMAT: [(vk::Format, vk::Format); 1] =
             [(vk::Format::R16G16B16_UNORM, vk::Format::R16G16B16_SFLOAT)];
         const BYTE_8_FORMAT: [(vk::Format, vk::Format); 1] =

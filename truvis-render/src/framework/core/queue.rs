@@ -17,41 +17,33 @@ pub struct RhiQueue
 
 impl RhiQueue
 {
-    pub fn submit(&self, batches: Vec<RhiSubmitBatch>, fence: Option<RhiFence>)
+    pub fn submit(&self, rhi: &Rhi, batches: Vec<RhiSubmitBatch>, fence: Option<RhiFence>)
     {
         unsafe {
-            let rhi = Rhi::instance();
-
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = batches.iter().map(|b| b.to_vk_batch()).collect_vec();
             let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();
 
-            rhi.device()
-                .queue_submit(
-                    self.queue,
-                    &submit_infos,
-                    fence.map_or(vk::Fence::null(), |f| f.fence),
-                )
-                .unwrap();
+            rhi.device().queue_submit(self.queue, &submit_infos, fence.map_or(vk::Fence::null(), |f| f.fence)).unwrap();
         }
     }
 
     /// 根据 specification，vkQueueWaitIdle 应该和 Fence 效率相同
     #[inline]
-    pub fn wait_idle(&self)
+    pub fn wait_idle(&self, rhi: &Rhi)
     {
-        unsafe { Rhi::instance().device().queue_wait_idle(self.queue).unwrap() }
+        unsafe { rhi.device().queue_wait_idle(self.queue).unwrap() }
     }
 }
 
 
 /// RHi 关于 submitInfo 的封装，更易用
 #[derive(Default)]
-pub struct RhiSubmitBatch
+pub struct RhiSubmitBatch<'a>
 {
-    pub command_buffers: Vec<RhiCommandBuffer>,
-    pub wait_info: Vec<(vk::PipelineStageFlags, RhiSemaphore)>,
-    pub signal_info: Vec<RhiSemaphore>,
+    pub command_buffers: Vec<RhiCommandBuffer<'a>>,
+    pub wait_info: Vec<(vk::PipelineStageFlags, RhiSemaphore<'a>)>,
+    pub signal_info: Vec<RhiSemaphore<'a>>,
 }
 
 
@@ -91,7 +83,7 @@ impl RhiSubmitBatchVk
     }
 }
 
-impl RhiSubmitBatch
+impl RhiSubmitBatch<'_>
 {
     #[inline]
     fn to_vk_batch(&self) -> RhiSubmitBatchVk

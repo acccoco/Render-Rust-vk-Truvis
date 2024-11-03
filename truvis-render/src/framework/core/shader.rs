@@ -1,17 +1,17 @@
 use ash::vk;
+
 use crate::framework::rhi::Rhi;
 
-pub struct RhiShaderModule
+pub struct RhiShaderModule<'a>
 {
     pub(crate) handle: vk::ShaderModule,
+    rhi: &'a Rhi,
 }
 
-impl RhiShaderModule
+impl<'a> RhiShaderModule<'a>
 {
-    pub fn new(path: &std::path::Path) -> Self
+    pub fn new(rhi: &'a Rhi, path: &std::path::Path) -> Self
     {
-        let rhi = Rhi::instance();
-
         let mut file = std::fs::File::open(path).unwrap();
         let shader_code = ash::util::read_spv(&mut file).unwrap();
 
@@ -19,14 +19,17 @@ impl RhiShaderModule
 
         unsafe {
             let shader_module = rhi.device().create_shader_module(&shader_module_info, None).unwrap();
-            Self { handle: shader_module }
+            Self {
+                handle: shader_module,
+                rhi,
+            }
         }
     }
 
     pub fn destroy(self)
     {
         unsafe {
-            Rhi::instance().device().destroy_shader_module(self.handle, None);
+            self.rhi.device().destroy_shader_module(self.handle, None);
         }
     }
 }
