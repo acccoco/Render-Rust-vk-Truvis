@@ -14,13 +14,15 @@ pub struct RhiBuffer
     size: vk::DeviceSize,
 
     debug_name: String,
+
+    rhi: &'static Rhi,
 }
 
 impl RhiBuffer
 {
     /// @param min_align 对 memory 的 offset align 限制
     pub fn new(
-        rhi: &Rhi,
+        rhi: &'static Rhi,
         size: vk::DeviceSize,
         buffer_usage: vk::BufferUsageFlags,
         mem_usage: vk_mem::MemoryUsage,
@@ -49,6 +51,7 @@ impl RhiBuffer
 
             rhi.set_debug_name(buffer, debug_name.as_str());
             Self {
+                rhi,
                 buffer,
                 allocation,
                 map_ptr: None,
@@ -59,7 +62,12 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_device_buffer(rhi: &Rhi, size: vk::DeviceSize, flags: vk::BufferUsageFlags, debug_name: &str) -> Self
+    pub fn new_device_buffer(
+        rhi: &'static Rhi,
+        size: vk::DeviceSize,
+        flags: vk::BufferUsageFlags,
+        debug_name: &str,
+    ) -> Self
     {
         Self::new(
             rhi,
@@ -73,7 +81,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_acceleration_instance_buffer<S>(rhi: &Rhi, size: vk::DeviceSize, debug_name: S) -> Self
+    pub fn new_acceleration_instance_buffer<S>(rhi: &'static Rhi, size: vk::DeviceSize, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {
@@ -88,7 +96,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_stage_buffer<S>(rhi: &Rhi, size: vk::DeviceSize, debug_name: S) -> Self
+    pub fn new_stage_buffer<S>(rhi: &'static Rhi, size: vk::DeviceSize, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {
@@ -104,7 +112,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_index_buffer<S>(rhi: &Rhi, size: usize, debug_name: S) -> Self
+    pub fn new_index_buffer<S>(rhi: &'static Rhi, size: usize, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {
@@ -120,7 +128,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_vertex_buffer<S>(rhi: &Rhi, size: usize, debug_name: S) -> Self
+    pub fn new_vertex_buffer<S>(rhi: &'static Rhi, size: usize, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {
@@ -136,7 +144,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_accleration_buffer<S: AsRef<str>>(rhi: &Rhi, size: usize, debug_name: S) -> Self
+    pub fn new_accleration_buffer<S: AsRef<str>>(rhi: &'static Rhi, size: usize, debug_name: S) -> Self
     {
         Self::new_device_buffer(
             rhi,
@@ -147,7 +155,8 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_accleration_scratch_buffer<S: AsRef<str>>(rhi: &Rhi, size: vk::DeviceSize, debug_name: S) -> Self
+    pub fn new_accleration_scratch_buffer<S: AsRef<str>>(rhi: &'static Rhi, size: vk::DeviceSize, debug_name: S)
+        -> Self
     {
         Self::new_device_buffer(
             rhi,
@@ -157,45 +166,45 @@ impl RhiBuffer
         )
     }
 
-    pub fn map(&mut self, rhi: &Rhi)
+    pub fn map(&mut self)
     {
         if self.map_ptr.is_some() {
             return;
         }
         unsafe {
-            self.map_ptr = Some(rhi.vma().map_memory(&mut self.allocation).unwrap());
+            self.map_ptr = Some(self.rhi.vma().map_memory(&mut self.allocation).unwrap());
         }
     }
 
-    pub fn unmap(&mut self, rhi: &Rhi)
+    pub fn unmap(&mut self)
     {
         if self.map_ptr.is_none() {
             return;
         }
         unsafe {
-            rhi.vma().unmap_memory(&mut self.allocation);
+            self.rhi.vma().unmap_memory(&mut self.allocation);
             self.map_ptr = None;
         }
     }
 
-    pub fn destroy(self, rhi: &Rhi)
+    pub fn destroy(self)
     {
         unsafe {
-            rhi.vma().destroy_buffer(self.buffer, self.allocation);
+            self.rhi.vma().destroy_buffer(self.buffer, self.allocation);
         }
     }
 
     /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到 self
-    pub fn transfer_data<T>(&mut self, rhi: &Rhi, data: &[T])
+    pub fn transfer_data<T>(&mut self, data: &[T])
     where
         T: Sized + Copy,
     {
         let mut stage_buffer = Self::new_stage_buffer(
-            rhi,
+            self.rhi,
             std::mem::size_of_val(data) as vk::DeviceSize,
             format!("{}-stage-buffer", self.debug_name),
         );
-        stage_buffer.map(rhi);
+        stage_buffer.map();
 
         unsafe {
             // 这里的 size 是目标内存的最大 size
@@ -208,9 +217,9 @@ impl RhiBuffer
             slice.copy_from_slice(data);
         }
 
-        stage_buffer.unmap(rhi);
+        stage_buffer.unmap();
 
-        RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::TRANSFER, |cmd| {
+        RhiCommandBuffer::one_time_exec(self.rhi, vk::QueueFlags::TRANSFER, |cmd| {
             cmd.copy_buffer(
                 &stage_buffer,
                 self,
@@ -221,11 +230,13 @@ impl RhiBuffer
             );
         });
 
-        stage_buffer.destroy(rhi);
+        stage_buffer.destroy();
     }
 
-    pub fn get_device_address(&self, rhi: &Rhi) -> vk::DeviceAddress
+    pub fn get_device_address(&self) -> vk::DeviceAddress
     {
-        unsafe { rhi.device().get_buffer_device_address(&vk::BufferDeviceAddressInfo::builder().buffer(self.buffer)) }
+        unsafe {
+            self.rhi.device().get_buffer_device_address(&vk::BufferDeviceAddressInfo::builder().buffer(self.buffer))
+        }
     }
 }

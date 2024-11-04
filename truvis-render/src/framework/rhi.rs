@@ -1,5 +1,4 @@
 use std::{
-    cell::UnsafeCell,
     collections::HashMap,
     ffi::{CStr, CString},
     rc::Rc,
@@ -12,7 +11,7 @@ use raw_window_handle::HasRawDisplayHandle;
 use vk_mem::Alloc;
 
 use crate::framework::{
-    core::{command_pool::RhiCommandPool, instance::RhiInstance, physical_device::RhiPhysicalDevice, queue::RhiQueue},
+    core::{command_pool::RhiCommandPool, physical_device::RhiPhysicalDevice, queue::RhiQueue},
     platform::window_system::WindowSystem,
 };
 

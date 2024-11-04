@@ -1,10 +1,6 @@
-use std::{
-    ffi::CStr,
-    rc::{Rc, Weak},
-};
+use std::ffi::CStr;
 
-use ash::{vk, vk::make_api_version};
-use derive_getters::Getters;
+use ash::vk;
 
 use crate::framework::core::instance::RhiInstance;
 
@@ -36,15 +32,13 @@ impl RhiPhysicalDevice
     {
         unsafe {
             let mut pd_rt_props = vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
-            let mut pd_props2 =
-                vk::PhysicalDeviceProperties2::builder().push_next(&mut pd_rt_props);
+            let mut pd_props2 = vk::PhysicalDeviceProperties2::builder().push_next(&mut pd_rt_props);
             instance.get_physical_device_properties2(pdevice, &mut pd_props2);
 
             let gpu_name = CStr::from_ptr(pd_props2.properties.device_name.as_ptr());
             log::info!("found gpus: {:?}", gpu_name);
 
-            let device_extensions =
-                instance.enumerate_device_extension_properties(pdevice).unwrap();
+            let device_extensions = instance.enumerate_device_extension_properties(pdevice).unwrap();
             for ext in &device_extensions {
                 let ext_name = CStr::from_ptr(ext.extension_name.as_ptr());
                 log::info!("device supports extensions: {:?}", ext_name.to_str().unwrap());
@@ -56,8 +50,7 @@ impl RhiPhysicalDevice
                 handle: pdevice,
                 properties: pd_props2.properties,
                 pd_rt_pipeline_props: pd_rt_props,
-                queue_family_properties: instance
-                    .get_physical_device_queue_family_properties(pdevice),
+                queue_family_properties: instance.get_physical_device_queue_family_properties(pdevice),
                 device_extensions,
                 requested_features: vk::PhysicalDeviceFeatures::default(),
             }

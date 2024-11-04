@@ -13,6 +13,8 @@ pub struct RhiAcceleration
 {
     acceleration_structure: vk::AccelerationStructureKHR,
     buffer: RhiBuffer,
+
+    rhi: &'static Rhi,
 }
 
 
@@ -21,7 +23,7 @@ impl RhiAcceleration
     /// 需要指定每个 geometry 的信息，以及每个 geometry 拥有的 max primitives 数量
     /// 会自动添加 compact 和 trace 的 flag
     pub fn build_blas(
-        rhi: &Rhi,
+        rhi: &'static Rhi,
         data: Vec<(vk::AccelerationStructureGeometryTrianglesDataKHR, u32)>,
         flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: &str,
@@ -85,12 +87,12 @@ impl RhiAcceleration
         // 填充 build geometry info 的剩余部分以 build AccelerationStructure
         build_geometry_info.dst_acceleration_structure = uncompact_acceleration.acceleration_structure;
         build_geometry_info.scratch_data = vk::DeviceOrHostAddressKHR {
-            device_address: scratch_buffer.get_device_address(rhi),
+            device_address: scratch_buffer.get_device_address(),
         };
 
         // 创建一个 QueryPool，用于查询 compact size
         let mut query_pool = RhiQueryPool::new(rhi, vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, 1, "");
-        query_pool.reset(rhi, 0, 1);
+        query_pool.reset(0, 1);
 
         // 等待初步 build 完成
         RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::COMPUTE, |cmd| {
@@ -110,7 +112,7 @@ impl RhiAcceleration
         });
 
         // 提供更紧凑的 acceleration
-        let compact_size: Vec<vk::DeviceSize> = query_pool.get_query_result(rhi, 0, 1);
+        let compact_size: Vec<vk::DeviceSize> = query_pool.get_query_result(0, 1);
         let compact_acceleration = Self::new(
             rhi,
             compact_size[0],
@@ -130,16 +132,16 @@ impl RhiAcceleration
 
         // 回收临时资源
         {
-            uncompact_acceleration.destroy(rhi);
-            scratch_buffer.destroy(rhi);
-            query_pool.destroy(rhi);
+            uncompact_acceleration.destroy();
+            scratch_buffer.destroy();
+            query_pool.destroy();
         }
 
         compact_acceleration
     }
 
     pub fn build_tlas(
-        rhi: &Rhi,
+        rhi: &'static Rhi,
         instances: &[vk::AccelerationStructureInstanceKHR],
         flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: &str,
@@ -150,7 +152,7 @@ impl RhiAcceleration
             std::mem::size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name),
         );
-        acceleration_instance_buffer.transfer_data(rhi, instances);
+        acceleration_instance_buffer.transfer_data(instances);
 
         let geometry = vk::AccelerationStructureGeometryKHR {
             geometry_type: vk::GeometryTypeKHR::INSTANCES,
@@ -160,7 +162,7 @@ impl RhiAcceleration
                     // false: data 是 &[&vk::AccelerationStructureInstanceKHR]
                     array_of_pointers: vk::FALSE,
                     data: vk::DeviceOrHostAddressConstKHR {
-                        device_address: acceleration_instance_buffer.get_device_address(rhi),
+                        device_address: acceleration_instance_buffer.get_device_address(),
                     },
                     ..Default::default()
                 },
@@ -201,7 +203,7 @@ impl RhiAcceleration
 
         // 补全剩下的 build info
         geometry_info.dst_acceleration_structure = acceleration.acceleration_structure;
-        geometry_info.scratch_data.device_address = scratch_buffer.get_device_address(rhi);
+        geometry_info.scratch_data.device_address = scratch_buffer.get_device_address();
 
         // range info
         let range_info = vk::AccelerationStructureBuildRangeInfoKHR {
@@ -216,15 +218,15 @@ impl RhiAcceleration
 
         // 回收资源
         {
-            acceleration_instance_buffer.destroy(rhi);
-            scratch_buffer.destroy(rhi);
+            acceleration_instance_buffer.destroy();
+            scratch_buffer.destroy();
         }
 
         acceleration
     }
 
     /// 创建 AccelerationStructure 以及 buffer    
-    fn new(rhi: &Rhi, size: vk::DeviceSize, ty: vk::AccelerationStructureTypeKHR, debug_name: &str) -> Self
+    fn new(rhi: &'static Rhi, size: vk::DeviceSize, ty: vk::AccelerationStructureTypeKHR, debug_name: &str) -> Self
     {
         let buffer = RhiBuffer::new_accleration_buffer(rhi, size as usize, debug_name);
 
@@ -242,15 +244,16 @@ impl RhiAcceleration
         Self {
             acceleration_structure,
             buffer,
+            rhi,
         }
     }
 
 
     #[inline]
-    pub fn get_device_address(&self, rhi: &Rhi) -> vk::DeviceAddress
+    pub fn get_device_address(&self) -> vk::DeviceAddress
     {
         unsafe {
-            rhi.acceleration_structure_pf().get_acceleration_structure_device_address(
+            self.rhi.acceleration_structure_pf().get_acceleration_structure_device_address(
                 &vk::AccelerationStructureDeviceAddressInfoKHR::builder()
                     .acceleration_structure(self.acceleration_structure),
             )
@@ -259,11 +262,11 @@ impl RhiAcceleration
 
 
     #[inline]
-    pub fn destroy(self, rhi: &Rhi)
+    pub fn destroy(self)
     {
         unsafe {
-            rhi.acceleration_structure_pf().destroy_acceleration_structure(self.acceleration_structure, None);
-            self.buffer.destroy(rhi);
+            self.rhi.acceleration_structure_pf().destroy_acceleration_structure(self.acceleration_structure, None);
+            self.buffer.destroy();
         }
     }
 }

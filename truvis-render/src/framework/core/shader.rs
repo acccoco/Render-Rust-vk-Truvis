@@ -2,15 +2,15 @@ use ash::vk;
 
 use crate::framework::rhi::Rhi;
 
-pub struct RhiShaderModule<'a>
+pub struct RhiShaderModule
 {
     pub(crate) handle: vk::ShaderModule,
-    rhi: &'a Rhi,
+    rhi: &'static Rhi,
 }
 
-impl<'a> RhiShaderModule<'a>
+impl RhiShaderModule
 {
-    pub fn new(rhi: &'a Rhi, path: &std::path::Path) -> Self
+    pub fn new(rhi: &'static Rhi, path: &std::path::Path) -> Self
     {
         let mut file = std::fs::File::open(path).unwrap();
         let shader_code = ash::util::read_spv(&mut file).unwrap();

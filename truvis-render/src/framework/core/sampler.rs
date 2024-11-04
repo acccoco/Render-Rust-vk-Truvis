@@ -2,7 +2,7 @@ use ash::vk;
 
 use crate::framework::rhi::Rhi;
 
-pub struct RhiSampler<'a>
+pub struct RhiSampler
 {
     min_filter: vk::Filter,
     mag_filter: vk::Filter,
@@ -11,12 +11,12 @@ pub struct RhiSampler<'a>
     wrap_v: vk::SamplerAddressMode,
 
     handle: vk::Sampler,
-    rhi: &'a Rhi,
+    rhi: &'static Rhi,
 }
 
-impl<'a> RhiSampler<'a>
+impl RhiSampler
 {
-    pub fn new(rhi: &'a Rhi, info: &vk::SamplerCreateInfo, debug_name: &str) -> Self
+    pub fn new(rhi: &'static Rhi, info: &vk::SamplerCreateInfo, debug_name: &str) -> Self
     {
         let handle = unsafe { rhi.device().create_sampler(info, None).unwrap() };
         rhi.set_debug_name(handle, debug_name);

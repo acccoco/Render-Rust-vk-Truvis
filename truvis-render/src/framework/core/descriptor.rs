@@ -59,6 +59,7 @@ struct RhiDescriptorSet
 {
     descriptor_set: vk::DescriptorSet,
     bindings: &'static [vk::DescriptorSetLayoutBinding],
+    rhi: &'static Rhi,
 }
 enum RhiDescriptorUpdateInfo
 {
@@ -67,7 +68,7 @@ enum RhiDescriptorUpdateInfo
 }
 impl RhiDescriptorSet
 {
-    pub fn new<T>(rhi: &Rhi) -> Self
+    pub fn new<T>(rhi: &'static Rhi) -> Self
     where
         T: RHiDescriptorBindings,
     {
@@ -79,6 +80,7 @@ impl RhiDescriptorSet
             Self {
                 descriptor_set,
                 bindings: RhiDescriptorLayout::<T>::get_bindings(),
+                rhi,
             }
         }
     }
@@ -88,7 +90,7 @@ impl RhiDescriptorSet
         self.bindings.get(binding_index as usize).unwrap().descriptor_type
     }
 
-    pub fn write(&mut self, rhi: &Rhi, write_datas: Vec<(u32, RhiDescriptorUpdateInfo)>)
+    pub fn write(&mut self, write_datas: Vec<(u32, RhiDescriptorUpdateInfo)>)
     {
         let writes = write_datas
             .iter()
@@ -113,7 +115,7 @@ impl RhiDescriptorSet
             .collect_vec();
 
         unsafe {
-            rhi.device().update_descriptor_sets(&writes, &[]);
+            self.rhi.device().update_descriptor_sets(&writes, &[]);
         }
         //
     }

@@ -37,13 +37,15 @@ pub struct RhiImage2D
     alloc: vk_mem::Allocation,
 
     image_info: RhiImage2DInfo,
+
+    rhi: &'static Rhi,
 }
 
 
 impl RhiImage2D
 {
     pub fn new(
-        rhi: &Rhi,
+        rhi: &'static Rhi,
         image_info: &vk::ImageCreateInfo,
         alloc_info: &vk_mem::AllocationCreateInfo,
         debug_name: &str,
@@ -60,17 +62,18 @@ impl RhiImage2D
             alloc,
 
             image_info: (*image_info).into(),
+            rhi,
         }
     }
 
-    pub fn transfer_data(&mut self, rhi: &Rhi, data: &[u8])
+    pub fn transfer_data(&mut self, data: &[u8])
     {
         let pixels_cnt = self.image_info.extent.width * self.image_info.extent.height;
         assert_eq!(data.len(), Self::format_byte_count(self.image_info.format) * pixels_cnt as usize);
 
         let mut stage_buffer =
-            RhiBuffer::new_stage_buffer(rhi, std::mem::size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
-        stage_buffer.map(rhi);
+            RhiBuffer::new_stage_buffer(self.rhi, std::mem::size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
+        stage_buffer.map();
 
         // TODO
     }

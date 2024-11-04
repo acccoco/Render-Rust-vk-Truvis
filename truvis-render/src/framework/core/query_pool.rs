@@ -9,12 +9,14 @@ pub struct RhiQueryPool
 
     /// pool 的容量
     pub(crate) cnt: u32,
+
+    rhi: &'static Rhi,
 }
 
 impl RhiQueryPool
 {
     #[inline]
-    pub fn new(rhi: &Rhi, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self
+    pub fn new(rhi: &'static Rhi, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self
     {
         let create_info = vk::QueryPoolCreateInfo {
             query_type: ty,
@@ -31,18 +33,20 @@ impl RhiQueryPool
                 handle,
                 query_type: ty,
                 cnt,
+                rhi,
             }
         }
     }
 
     // #[inline]
-    pub fn get_query_result<T>(&mut self, rhi: &Rhi, first_index: u32, query_cnt: u32) -> Vec<T>
+    pub fn get_query_result<T>(&mut self, first_index: u32, query_cnt: u32) -> Vec<T>
     where
         T: Default + Sized + Clone,
     {
         unsafe {
             let mut res = vec![Default::default(); query_cnt as usize];
-            rhi.device()
+            self.rhi
+                .device()
                 .get_query_pool_results(self.handle, first_index, query_cnt, &mut res, vk::QueryResultFlags::WAIT)
                 .unwrap();
             res
@@ -50,18 +54,18 @@ impl RhiQueryPool
     }
 
     #[inline]
-    pub fn reset(&mut self, rhi: &Rhi, first_query: u32, query_cnt: u32)
+    pub fn reset(&mut self, first_query: u32, query_cnt: u32)
     {
         unsafe {
-            rhi.device().reset_query_pool(self.handle, first_query, query_cnt);
+            self.rhi.device().reset_query_pool(self.handle, first_query, query_cnt);
         }
     }
 
     #[inline]
-    pub fn destroy(self, rhi: &Rhi)
+    pub fn destroy(self)
     {
         unsafe {
-            rhi.device().destroy_query_pool(self.handle, None);
+            self.rhi.device().destroy_query_pool(self.handle, None);
         }
     }
 }

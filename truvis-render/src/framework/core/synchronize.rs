@@ -5,15 +5,15 @@ use ash::vk;
 use crate::framework::rhi::Rhi;
 
 #[derive(Clone)]
-pub struct RhiFence<'a>
+pub struct RhiFence
 {
     pub(crate) fence: vk::Fence,
-    rhi: &'a Rhi,
+    rhi: &'static Rhi,
 }
 
-impl<'a> RhiFence<'a>
+impl RhiFence
 {
-    pub fn new<S>(rhi: &'a Rhi, signaled: bool, debug_name: S) -> Self
+    pub fn new<S>(rhi: &'static Rhi, signaled: bool, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {
@@ -51,15 +51,15 @@ impl<'a> RhiFence<'a>
 }
 
 #[derive(Copy, Clone)]
-pub struct RhiSemaphore<'a>
+pub struct RhiSemaphore
 {
     pub(crate) semaphore: vk::Semaphore,
-    rhi: &'a Rhi,
+    rhi: &'static Rhi,
 }
 
-impl<'a> RhiSemaphore<'a>
+impl RhiSemaphore
 {
-    pub fn new<S>(rhi: &'a Rhi, debug_name: S) -> Self
+    pub fn new<S>(rhi: &'static Rhi, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {

@@ -6,6 +6,8 @@ pub struct RhiPipeline
 {
     pub(crate) pipeline: vk::Pipeline,
     pub(crate) pipeline_layout: vk::PipelineLayout,
+
+    rhi: &'static Rhi,
 }
 
 impl RhiPipeline {}
@@ -102,7 +104,7 @@ impl Default for RhiPipelineTemplate
 
 impl RhiPipelineTemplate
 {
-    pub fn create_pipeline<S: AsRef<str> + Clone>(&self, rhi: &Rhi, debug_name: S) -> RhiPipeline
+    pub fn create_pipeline<S: AsRef<str> + Clone>(&self, rhi: &'static Rhi, debug_name: S) -> RhiPipeline
     {
         // dynamic rendering 需要的 framebuffer 信息
         let mut attach_info = vk::PipelineRenderingCreateInfo::builder()
@@ -190,6 +192,7 @@ impl RhiPipelineTemplate
         RhiPipeline {
             pipeline,
             pipeline_layout,
+            rhi,
         }
     }
 }

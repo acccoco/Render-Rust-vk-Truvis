@@ -8,11 +8,11 @@ use truvis_render::{
             pipeline::{RhiPipeline, RhiPipelineTemplate},
             queue::RhiSubmitBatch,
         },
-        platform::window_system::WindowSystem,
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{RenderInitInfo, Renderer},
+    render::{RenderInitInfo, Timer},
+    run::{run, App},
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -71,29 +71,27 @@ pub struct PushConstants
 
 struct ShaderToy
 {
-    vertex_buffer: RhiBuffer,
-    index_buffer: RhiBuffer,
-    pipeline: RhiPipeline,
+    vertex_buffer: Option<RhiBuffer>,
+    index_buffer: Option<RhiBuffer>,
+    pipeline: Option<RhiPipeline>,
 }
 
 impl ShaderToy
 {
-    fn init_buffer() -> (RhiBuffer, RhiBuffer)
+    fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
     {
-        let mut index_buffer =
-            RhiBuffer::new_index_buffer(std::mem::size_of_val(&INDEX_DATA), "index-buffer");
+        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
         index_buffer.transfer_data(&INDEX_DATA);
 
-        let mut vertex_buffer =
-            RhiBuffer::new_vertex_buffer(std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
         vertex_buffer.transfer_data(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }
 
-    fn init_pipeline() -> RhiPipeline
+    fn init_pipeline(rhi: &'static Rhi, render_context: &RenderContext) -> RhiPipeline
     {
-        let extent = RenderContext::extent();
+        let extent = render_context.extent();
         let push_constant_ranges = vec![vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::ALL,
             offset: 0,
@@ -102,8 +100,8 @@ impl ShaderToy
         let pipeline = RhiPipelineTemplate {
             vertex_shader_path: Some("shader/shadertoy-glsl/shadertoy.vert.spv".into()),
             fragment_shader_path: Some("shader/shadertoy-glsl/shadertoy.frag.spv".into()),
-            color_formats: vec![RenderContext::instance().color_format()],
-            depth_format: RenderContext::depth_format(),
+            color_formats: vec![render_context.color_format()],
+            depth_format: render_context.depth_format(),
             viewport: Some(vk::Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -139,100 +137,101 @@ impl ShaderToy
                 .build()],
             ..Default::default()
         }
-        .create_pipeline("");
+        .create_pipeline(rhi, "");
 
         pipeline
     }
 
-    fn run(&self)
+    fn run(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
     {
-        let time_start = std::time::SystemTime::now();
-        let mut last_time = std::time::SystemTime::now();
-        let mut total_frame = 0;
+        render_context.acquire_frame();
 
-        WindowSystem::instance().render_loop(|| {
-            RenderContext::acquire_frame();
+        let push_constants = PushConstants {
+            time: timer.total_time,
+            delta_time: timer.delta_time,
+            frame: timer.total_frame,
+            frame_rate: 1.0 / timer.delta_time,
+            resolution: glam::Vec2::new(render_context.extent().width as f32, render_context.extent().height as f32),
+            mouse: glam::Vec4::new(
+                0.2 * (render_context.extent().width as f32),
+                0.2 * (render_context.extent().height as f32),
+                0.0,
+                0.0,
+            ),
+            __padding__: [0.0, 0.0],
+        };
 
-            let now = std::time::SystemTime::now();
-            let total_time = now.duration_since(time_start).unwrap().as_secs_f32();
-            let delta_time = now.duration_since(last_time).unwrap().as_secs_f32();
-            last_time = now;
-            total_frame += 1;
-
-            let push_constants = PushConstants {
-                time: total_time,
-                delta_time,
-                frame: total_frame,
-                frame_rate: 1.0 / delta_time,
-                resolution: glam::Vec2::new(
-                    RenderContext::extent().width as f32,
-                    RenderContext::extent().height as f32,
-                ),
-                mouse: glam::Vec4::new(
-                    0.2 * (RenderContext::extent().width as f32),
-                    0.2 * (RenderContext::extent().height as f32),
-                    0.0,
-                    0.0,
-                ),
-                __padding__: [0.0, 0.0],
-            };
-            let rhi = Rhi::instance();
-
-            let mut cmd = RenderContext::alloc_command_buffer("render");
-            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-            {
-                cmd.push_constants(
-                    &self.pipeline,
-                    vk::ShaderStageFlags::ALL,
-                    0,
-                    bytemuck::bytes_of(&push_constants),
-                );
-
-                cmd.begin_rendering(&RenderContext::render_info());
-                cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
-                cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
-                cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
-                cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
-                cmd.end_rendering();
-            }
-            cmd.end();
-            rhi.graphics_queue().submit(
-                vec![RhiSubmitBatch {
-                    command_buffers: vec![cmd],
-                    ..Default::default()
-                }],
-                None,
+        let mut cmd = render_context.alloc_command_buffer("render");
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        {
+            cmd.push_constants(
+                self.pipeline.as_ref().unwrap(),
+                vk::ShaderStageFlags::ALL,
+                0,
+                bytemuck::bytes_of(&push_constants),
             );
 
-            RenderContext::submit_frame();
-        });
+            cmd.begin_rendering(&render_context.render_info());
+            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.as_ref().unwrap());
+            cmd.bind_index_buffer(self.index_buffer.as_ref().unwrap(), 0, vk::IndexType::UINT32);
+            cmd.bind_vertex_buffer(0, std::slice::from_ref(self.vertex_buffer.as_ref().unwrap()), &[0]);
+            cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
+            cmd.end_rendering();
+        }
+        cmd.end();
+        rhi.graphics_queue().submit(
+            rhi,
+            vec![RhiSubmitBatch {
+                command_buffers: vec![cmd],
+                ..Default::default()
+            }],
+            None,
+        );
+
+        render_context.submit_frame();
     }
 
-    fn init() -> Self
+    fn new() -> Self
     {
-        let _ = Renderer::init(&RenderInitInfo {
+        Self {
+            vertex_buffer: None,
+            index_buffer: None,
+            pipeline: None,
+        }
+    }
+}
+
+impl App for ShaderToy
+{
+    fn get_init_info(&self) -> RenderInitInfo
+    {
+        RenderInitInfo {
             window_width: 1600,
             window_height: 900,
             app_name: "hello-triangle".to_string(),
-        });
+        }
+    }
 
+    fn init(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
+    {
         log::info!("start.");
 
-        let (vertex_buffer, index_buffer) = Self::init_buffer();
-        let pipeline = Self::init_pipeline();
+        let (vertex_buffer, index_buffer) = Self::init_buffer(rhi);
+        let pipeline = Self::init_pipeline(rhi, render_context);
 
-        let mut hello = Self {
-            vertex_buffer,
-            index_buffer,
-            pipeline,
-        };
+        self.vertex_buffer = Some(vertex_buffer);
+        self.index_buffer = Some(index_buffer);
+        self.pipeline = Some(pipeline);
+    }
 
-        hello
+    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    {
+        self.run(rhi, render_context, timer)
     }
 }
 
 fn main()
 {
-    let hello = ShaderToy::init();
-    hello.run();
+    let hello = ShaderToy::new();
+    run(hello);
 }

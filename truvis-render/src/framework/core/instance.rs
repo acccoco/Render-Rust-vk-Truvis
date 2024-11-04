@@ -1,6 +1,5 @@
 use std::{
     ffi::{CStr, CString},
-    rc::Rc,
 };
 
 use ash::vk;

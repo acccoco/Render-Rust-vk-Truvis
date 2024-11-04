@@ -14,6 +14,7 @@ use truvis_render::{
     },
     render::{RenderInitInfo, Renderer},
 };
+use truvis_render::run::App;
 
 #[derive(Clone, Debug, Copy)]
 #[repr(C)]
@@ -212,6 +213,11 @@ impl HelloRT
         });
     }
 
+    
+    fn new() -> Self {
+
+    }
+    
     fn init() -> Self
     {
         Renderer::init(&RenderInitInfo {
@@ -239,6 +245,20 @@ impl HelloRT
     fn create_descriptor_set()
     {
         // vk::DescriptorSetLayoutBinding{}
+    }
+}
+
+impl App for HelloRT {
+    fn get_init_info(&self) -> RenderInitInfo {
+        todo!()
+    }
+
+    fn init(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext) {
+        todo!()
+    }
+
+    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext) {
+        todo!()
     }
 }
 

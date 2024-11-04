@@ -1,4 +1,4 @@
-use ash::{vk, vk::Window};
+use ash::vk;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
 use crate::framework::{
@@ -135,13 +135,11 @@ mod _render_swapchain_property
 
 mod _render_swapchain_init
 {
-    use std::mem::swap;
-
     use ash::vk;
     use itertools::Itertools;
 
     use crate::framework::{
-        core::swapchain::{RenderSwapchain, RenderSwapchainInitInfo, SWAPCHAIN},
+        core::swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
         rhi::Rhi,
     };
 

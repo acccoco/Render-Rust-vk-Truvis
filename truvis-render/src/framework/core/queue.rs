@@ -39,11 +39,11 @@ impl RhiQueue
 
 /// RHi 关于 submitInfo 的封装，更易用
 #[derive(Default)]
-pub struct RhiSubmitBatch<'a>
+pub struct RhiSubmitBatch
 {
-    pub command_buffers: Vec<RhiCommandBuffer<'a>>,
-    pub wait_info: Vec<(vk::PipelineStageFlags, RhiSemaphore<'a>)>,
-    pub signal_info: Vec<RhiSemaphore<'a>>,
+    pub command_buffers: Vec<RhiCommandBuffer>,
+    pub wait_info: Vec<(vk::PipelineStageFlags, RhiSemaphore)>,
+    pub signal_info: Vec<RhiSemaphore>,
 }
 
 
@@ -83,7 +83,7 @@ impl RhiSubmitBatchVk
     }
 }
 
-impl RhiSubmitBatch<'_>
+impl RhiSubmitBatch
 {
     #[inline]
     fn to_vk_batch(&self) -> RhiSubmitBatchVk

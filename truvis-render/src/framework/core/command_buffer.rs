@@ -6,20 +6,19 @@ use crate::framework::{
 };
 
 #[derive(Clone)]
-pub struct RhiCommandBuffer<'a>
+pub struct RhiCommandBuffer
 {
     pub(crate) command_buffer: vk::CommandBuffer,
     pub(crate) command_pool: vk::CommandPool,
 
-    rhi: &'a Rhi,
+    rhi: &'static Rhi,
 }
 
-impl<'a> RhiCommandBuffer<'a>
+impl RhiCommandBuffer
 {
-    pub fn new<'b, S>(rhi: &'b Rhi, pool: &'_ RhiCommandPool, debug_name: S) -> Self
+    pub fn new<S>(rhi: &'static Rhi, pool: &RhiCommandPool, debug_name: S) -> Self
     where
         S: AsRef<str>,
-        'b: 'a,
     {
         let info = vk::CommandBufferAllocateInfo::builder()
             .command_pool(pool.command_pool)
@@ -36,7 +35,7 @@ impl<'a> RhiCommandBuffer<'a>
     }
 
     /// 从 Rhi 中的 command pool 分配 command buffer 进行执行
-    pub fn one_time_exec<F>(rhi: &'a Rhi, ty: vk::QueueFlags, f: F)
+    pub fn one_time_exec<F>(rhi: &'static Rhi, ty: vk::QueueFlags, f: F)
     where
         F: FnOnce(&mut RhiCommandBuffer),
     {
@@ -107,7 +106,7 @@ mod _transfer_cmd
     use crate::framework::core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer};
 
     // transfer 类型的命令
-    impl RhiCommandBuffer<'_>
+    impl RhiCommandBuffer
     {
         #[inline]
         pub fn copy_buffer(&mut self, src: &RhiBuffer, dst: &mut RhiBuffer, regions: &[vk::BufferCopy])
@@ -132,10 +131,10 @@ mod _draw_cmd
 {
     use ash::vk;
 
-    use crate::framework::{core::command_buffer::RhiCommandBuffer, rhi::Rhi};
+    use crate::framework::core::command_buffer::RhiCommandBuffer;
 
     // 绘制类型命令
-    impl RhiCommandBuffer<'_>
+    impl RhiCommandBuffer
     {
         #[inline]
         pub fn begin_rendering(&mut self, render_info: &vk::RenderingInfo)
@@ -178,13 +177,10 @@ mod _status_cmd
     use ash::vk;
     use itertools::Itertools;
 
-    use crate::framework::{
-        core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, pipeline::RhiPipeline},
-        rhi::Rhi,
-    };
+    use crate::framework::core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, pipeline::RhiPipeline};
 
     // 状态设置命令
-    impl RhiCommandBuffer<'_>
+    impl RhiCommandBuffer
     {
         #[inline]
         pub fn bind_pipeline(&mut self, bind_point: vk::PipelineBindPoint, pipeline: &RhiPipeline)
@@ -218,10 +214,10 @@ mod _sync_cmd
 {
     use ash::vk;
 
-    use crate::framework::{core::command_buffer::RhiCommandBuffer, rhi::Rhi};
+    use crate::framework::core::command_buffer::RhiCommandBuffer;
 
     // 同步命令
-    impl RhiCommandBuffer<'_>
+    impl RhiCommandBuffer
     {
         // TODO 临时的，修改下
         #[inline]
@@ -278,13 +274,10 @@ mod _ray_tracing_cmd
 {
     use ash::vk;
 
-    use crate::framework::{
-        core::{command_buffer::RhiCommandBuffer, query_pool::RhiQueryPool},
-        rhi::Rhi,
-    };
+    use crate::framework::core::{command_buffer::RhiCommandBuffer, query_pool::RhiQueryPool};
 
     // RayTracing 相关的命令
-    impl RhiCommandBuffer<'_>
+    impl RhiCommandBuffer
     {
         /// 注：仅支持 compute queue
         #[inline]
@@ -330,13 +323,10 @@ mod _other_cmd
 {
     use ash::vk;
 
-    use crate::framework::{
-        core::{command_buffer::RhiCommandBuffer, pipeline::RhiPipeline},
-        rhi::Rhi,
-    };
+    use crate::framework::core::{command_buffer::RhiCommandBuffer, pipeline::RhiPipeline};
 
     // 其他命令
-    impl RhiCommandBuffer<'_>
+    impl RhiCommandBuffer
     {
         pub fn push_constants(&mut self, pipeline: &RhiPipeline, stage: vk::ShaderStageFlags, offset: u32, data: &[u8])
         {

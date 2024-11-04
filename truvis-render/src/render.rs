@@ -1,7 +1,5 @@
 use std::rc::Rc;
 
-use winit::platform::run_return::EventLoopExtRunReturn;
-
 use crate::{
     framework::{
         core::swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
@@ -13,12 +11,57 @@ use crate::{
 };
 
 
+pub struct Timer
+{
+    pub start_time: std::time::SystemTime,
+    pub last_time: std::time::SystemTime,
+    pub delta_time: f32,
+    pub total_time: f32,
+    pub total_frame: i32,
+}
+
+impl Timer
+{
+    pub fn new() -> Self
+    {
+        Self {
+            start_time: std::time::SystemTime::now(),
+            last_time: std::time::SystemTime::now(),
+            total_frame: 0,
+            delta_time: 0.0,
+            total_time: 0.0,
+        }
+    }
+
+    pub fn reset(&mut self)
+    {
+        self.start_time = std::time::SystemTime::now();
+        self.last_time = std::time::SystemTime::now();
+        self.total_frame = 0;
+        self.delta_time = 0.0;
+        self.total_time = 0.0;
+    }
+
+    pub fn update(&mut self)
+    {
+        let now = std::time::SystemTime::now();
+        let total_time = now.duration_since(self.start_time).unwrap().as_secs_f32();
+        let delta_time = now.duration_since(self.last_time).unwrap().as_secs_f32();
+        self.last_time = now;
+        self.total_frame += 1;
+        self.total_time = total_time;
+        self.delta_time = delta_time;
+    }
+}
+
+
 /// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
 pub struct Renderer
 {
+    pub timer: Timer,
     pub window: WindowSystem,
     render_swapchain: Rc<RenderSwapchain>,
-    pub render_context: RenderContext<'static>,
+    pub render_context: RenderContext,
 }
 
 
@@ -36,7 +79,6 @@ impl Renderer
     pub fn new(init_info: &RenderInitInfo) -> Self
     {
         simple_logger::SimpleLogger::new().init().unwrap();
-
 
         let window = WindowSystem::new(WindowCreateInfo {
             height: init_info.window_height as i32,
@@ -65,6 +107,7 @@ impl Renderer
             window,
             render_swapchain,
             render_context,
+            timer: Timer::new(),
         }
     }
 

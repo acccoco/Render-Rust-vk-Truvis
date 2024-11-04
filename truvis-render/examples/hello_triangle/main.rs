@@ -11,7 +11,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{RenderInitInfo, Renderer},
+    render::{RenderInitInfo, Renderer, Timer},
     run::{run, App},
 };
 
@@ -48,19 +48,19 @@ struct HelloTriangle
 
 impl HelloTriangle
 {
-    fn init_buffer(&mut self, rhi: &Rhi)
+    fn init_buffer(&mut self, rhi: &'static Rhi)
     {
         let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data(rhi, &INDEX_DATA);
+        index_buffer.transfer_data(&INDEX_DATA);
 
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data(rhi, &VERTEX_DATA);
+        vertex_buffer.transfer_data(&VERTEX_DATA);
 
         self.vertex_buffer = Some(vertex_buffer);
         self.index_buffer = Some(index_buffer);
     }
 
-    fn init_pipeline(&mut self, rhi: &Rhi, render_context: &mut RenderContext)
+    fn init_pipeline(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
         let extent = render_context.extent();
         let pipeline = RhiPipelineTemplate {
@@ -109,9 +109,9 @@ impl HelloTriangle
 
     fn my_update(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
-        render_context.acquire_frame(rhi);
+        render_context.acquire_frame();
 
-        let mut cmd = RenderContext::alloc_command_buffer(render_context, rhi, "render");
+        let mut cmd = RenderContext::alloc_command_buffer(render_context, "render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         {
             cmd.begin_rendering(&render_context.render_info());
@@ -131,7 +131,7 @@ impl HelloTriangle
             None,
         );
 
-        render_context.submit_frame(rhi);
+        render_context.submit_frame();
     }
 
     fn new() -> Self
@@ -156,7 +156,7 @@ impl App for HelloTriangle
     }
 
 
-    fn init(&mut self, rhi: &Rhi, render_context: &mut RenderContext)
+    fn init(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
         log::info!("start.");
 
@@ -164,7 +164,7 @@ impl App for HelloTriangle
         self.init_pipeline(rhi, render_context);
     }
 
-    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
+    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _: &Timer)
     {
         self.my_update(rhi, render_context);
     }
