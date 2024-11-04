@@ -76,9 +76,17 @@ static mut RHI: Option<Rhi> = None;
 
 impl Renderer
 {
+    pub fn init_logger()
+    {
+        use simplelog::*;
+
+        TermLogger::init(LevelFilter::Info, ConfigBuilder::new().build(), TerminalMode::Mixed, ColorChoice::Auto)
+            .unwrap();
+    }
+
     pub fn new(init_info: &RenderInitInfo) -> Self
     {
-        simple_logger::SimpleLogger::new().init().unwrap();
+        Self::init_logger();
 
         let window = WindowSystem::new(WindowCreateInfo {
             height: init_info.window_height as i32,
