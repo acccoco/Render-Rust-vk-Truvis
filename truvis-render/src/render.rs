@@ -1,5 +1,5 @@
-use std::rc::Rc;
-
+use std::{cell::OnceCell, rc::Rc};
+use std::sync::OnceLock;
 use crate::{
     framework::{
         core::swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
@@ -72,7 +72,7 @@ pub struct RenderInitInfo
     pub app_name: String,
 }
 
-static mut RHI: Option<Rhi> = None;
+static RHI: OnceLock<Rhi> = OnceLock::new();
 
 impl Renderer
 {
@@ -98,10 +98,8 @@ impl Renderer
         rhi_init_info.app_name = Some(init_info.app_name.clone());
         rhi_init_info.engine_name = Some(ENGINE_NAME.to_string());
         rhi_init_info.is_complete().unwrap();
-        unsafe {
-            RHI = Some(Rhi::new(rhi_init_info).unwrap());
-        }
-        let rhi = unsafe { RHI.as_ref().unwrap() };
+        RHI.get_or_init(|| Rhi::new(rhi_init_info).unwrap());
+        let rhi = RHI.get().unwrap();
 
         let mut render_swapchain_init_info = RenderSwapchainInitInfo::default();
         render_swapchain_init_info.window = Some(&window);
@@ -121,6 +119,6 @@ impl Renderer
 
     pub fn get_rhi() -> &'static Rhi
     {
-        unsafe { RHI.as_ref().unwrap() }
+        RHI.get().unwrap()
     }
 }

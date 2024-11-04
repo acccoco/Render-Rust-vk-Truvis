@@ -22,8 +22,7 @@ pub struct RhiPhysicalDevice
 
     /// 想要在 logical device 中启用的 features
     requested_features: vk::PhysicalDeviceFeatures,
-
-    pd_rt_pipeline_props: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR,
+    // pd_rt_pipeline_props: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR,
 }
 
 impl RhiPhysicalDevice
@@ -50,7 +49,6 @@ impl RhiPhysicalDevice
                 features: instance.get_physical_device_features(pdevice),
                 handle: pdevice,
                 properties: pd_props2.properties,
-                pd_rt_pipeline_props: pd_rt_props,
                 queue_family_properties: instance.get_physical_device_queue_family_properties(pdevice),
                 device_extensions,
                 requested_features: vk::PhysicalDeviceFeatures::default(),
