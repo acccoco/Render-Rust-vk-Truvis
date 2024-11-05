@@ -1,23 +1,13 @@
-use std::{
-    ffi::{CStr, CString},
-};
+use std::ffi::{CStr, CString};
 
+use anyhow::Context;
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::{core::physical_device::RhiPhysicalDevice, rhi::vk_debug_callback};
-
-pub struct RhiInstance
-{
-    handle: ash::Instance,
-
-    /// 当前机器上找到的所有 physical device
-    gpus: Vec<RhiPhysicalDevice>,
-
-    debug_utils_messenger: vk::DebugUtilsMessengerEXT,
-    debug_report_callback: vk::DebugReportCallbackEXT,
-}
-
+use crate::framework::{
+    core::physical_device::RhiPhysicalDevice,
+    rhi::{vk_debug_callback, RhiInitInfo},
+};
 
 /// 所需的 layers 是否全部支持
 fn validate_layers(required: &[&'static CStr], available: &[vk::LayerProperties]) -> bool
@@ -66,8 +56,87 @@ fn get_optimal_validation_layers(supported_instance_layers: &[vk::LayerPropertie
 }
 
 
+pub struct RhiInstance
+{
+    pub handle: ash::Instance,
+
+    /// 当前机器上找到的所有 physical device
+    gpus: Vec<RhiPhysicalDevice>,
+
+    pub debug_utils_messenger: vk::DebugUtilsMessengerEXT,
+    pub debug_utils_pf: ash::extensions::ext::DebugUtils,
+
+    // TODO uncomment me
+    debug_report_callback: Option<vk::DebugReportCallbackEXT>,
+}
+
+
 impl RhiInstance
 {
+    pub fn old_new(vk_pf: &ash::Entry, init_info: &RhiInitInfo) -> anyhow::Result<Self>
+    {
+        let app_name = CString::new(init_info.app_name.as_ref().context("")?.as_str()).context("")?;
+        let engine_name = CString::new(init_info.engine_name.as_ref().context("")?.as_str()).context("")?;
+        let app_info = vk::ApplicationInfo::builder()
+            .application_name(app_name.as_ref())
+            .application_version(vk::make_api_version(0, 1, 0, 0))
+            .engine_name(engine_name.as_ref())
+            .engine_version(vk::make_api_version(0, 1, 0, 0))
+            .api_version(init_info.vk_version);
+
+        let instance_extensions = init_info.instance_extensions.iter().map(|x| x.as_ptr()).collect_vec();
+        let instance_layers = init_info.instance_layers.iter().map(|l| l.as_ptr()).collect_vec();
+
+        let mut debug_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+            .message_severity(init_info.debug_msg_severity)
+            .message_type(init_info.debug_msg_type)
+            .pfn_user_callback(init_info.debug_callback)
+            .build();
+
+        let create_flags = if cfg!(target_os = "macos") {
+            vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR
+        } else {
+            Default::default()
+        };
+
+        let instance_info = vk::InstanceCreateInfo::builder()
+            .application_info(&app_info)
+            .enabled_extension_names(&instance_extensions)
+            .enabled_layer_names(&instance_layers)
+            .flags(create_flags)
+            .push_next(&mut debug_info);
+
+        let instance = unsafe { vk_pf.create_instance(&instance_info, None)? };
+
+        let (debug_utils_messenger, debug_utils_pf) = Self::new_old_debug_messenger(vk_pf, &instance, init_info)?;
+
+        Ok(Self {
+            handle: instance,
+            gpus: Vec::new(),
+            debug_utils_messenger,
+            debug_report_callback: None,
+            debug_utils_pf,
+        })
+    }
+
+    fn new_old_debug_messenger(
+        vk_pf: &ash::Entry,
+        instance: &ash::Instance,
+        init_info: &RhiInitInfo,
+    ) -> anyhow::Result<(vk::DebugUtilsMessengerEXT, ash::extensions::ext::DebugUtils)>
+    {
+        let loader = ash::extensions::ext::DebugUtils::new(vk_pf, instance);
+
+        let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+            .message_severity(init_info.debug_msg_severity)
+            .message_type(init_info.debug_msg_type)
+            .pfn_user_callback(init_info.debug_callback)
+            .build();
+        let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None)? };
+
+        Ok((debug_messenger, loader))
+    }
+
     /// 设置所需的 layers 和 extensions，创建 vk instance
     ///
     /// # Arguments
@@ -93,9 +162,9 @@ impl RhiInstance
             // 尝试开启 DEBUG_UTILS extension
             #[cfg(feature = "validation")]
             {
-                let has_debug_utils = Self::enable_extension(
+                let has_debug_utils = RhiInstance::enable_extension(
                     ash::extensions::ext::DebugUtils::name(),
-                    &available_instance_extensions,
+                    available_instance_extensions,
                     &mut enabled_extensions,
                 );
 
@@ -113,7 +182,7 @@ impl RhiInstance
             // 这个 extension 时 VK_KHR_performance_query 的前置条件；而后者是用于 stats gathering 的
             RhiInstance::enable_extension(
                 ash::extensions::khr::GetPhysicalDeviceProperties2::name(),
-                &available_instance_extensions,
+                available_instance_extensions,
                 &mut enabled_extensions,
             );
 
@@ -122,8 +191,8 @@ impl RhiInstance
             for extension in required_extensions {
                 let (extension_name, extension_is_optional) = extension;
                 if !RhiInstance::enable_extension(
-                    extension_name.clone(),
-                    &available_instance_extensions,
+                    extension_name,
+                    available_instance_extensions,
                     &mut enabled_extensions,
                 ) {
                     if extension_is_optional {
@@ -152,12 +221,12 @@ impl RhiInstance
         {
             #[cfg(feature = "validation")]
             {
-                let optimal_validation_layers = get_optimal_validation_layers(&supported_validation_layers);
+                let optimal_validation_layers = get_optimal_validation_layers(supported_validation_layers);
                 required_validation_layers.extend(optimal_validation_layers);
             }
 
 
-            if validate_layers(&required_validation_layers, &supported_validation_layers) {
+            if validate_layers(&required_validation_layers, supported_validation_layers) {
                 log::info!("Enabled Validation Layers:");
                 for layer in &required_validation_layers {
                     log::info!("\t{:?}", layer);
@@ -206,9 +275,9 @@ impl RhiInstance
         }
 
         // 为 instance info 添加 debug messenger
+        let mut debug_utils_create_info = get_debug_utils_create_info();
         #[cfg(feature = "validation")]
         {
-            let mut debug_utils_create_info = get_debug_utils_create_info();
             instance_info = instance_info.push_next(&mut debug_utils_create_info);
         }
 
@@ -217,18 +286,21 @@ impl RhiInstance
         let debug_utils_messenger = None;
         #[cfg(feature = "validation")]
         {
-            let debug_utils_pf = ash::extensions::ext::DebugUtils::new(&vk_entry, &handle);
+            let debug_utils_pf = ash::extensions::ext::DebugUtils::new(vk_entry, &handle);
             let debug_utils_create_info = get_debug_utils_create_info();
             let debug_utils_messenger =
                 Some(unsafe { debug_utils_pf.create_debug_utils_messenger(&debug_utils_create_info, None).unwrap() });
         }
+
+        let debug_utils_pf = ash::extensions::ext::DebugUtils::new(vk_entry, &handle);
 
 
         let mut s = Self {
             handle,
             gpus: Vec::new(),
             debug_utils_messenger: debug_utils_messenger.unwrap(),
-            debug_report_callback: vk::DebugReportCallbackEXT::null(),
+            debug_utils_pf,
+            debug_report_callback: None,
         };
 
         s.query_gpus();

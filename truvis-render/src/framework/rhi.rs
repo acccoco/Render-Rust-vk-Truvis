@@ -1,21 +1,22 @@
 use std::{
-    collections::HashMap,
     ffi::{CStr, CString},
     rc::Rc,
+    sync::Arc,
 };
 
 use anyhow::Context;
-use ash::{extensions::khr::Swapchain, vk, Device, Entry, Instance};
+use ash::{extensions::khr::Swapchain, vk};
 use itertools::Itertools;
 use raw_window_handle::HasRawDisplayHandle;
 use vk_mem::Alloc;
 
 use crate::framework::{
-    core::{command_pool::RhiCommandPool, physical_device::RhiPhysicalDevice, queue::RhiQueue},
+    core::{
+        command_pool::RhiCommandPool, device::RhiDevice, instance::RhiInstance, physical_device::RhiPhysicalDevice,
+        queue::RhiQueue,
+    },
     platform::window_system::WindowSystem,
 };
-
-static mut RHI: Option<Rhi> = None;
 
 /// # Safety
 /// very safe
@@ -208,6 +209,7 @@ impl<'a> RhiInitInfo<'a>
             .independent_blend(true)
             .build();
 
+        // TODO 改一下这个构建过程，后面会用到 &mut
         self.ext_features = vec![
             Box::new(vk::PhysicalDeviceDynamicRenderingFeatures::builder().dynamic_rendering(true).build()),
             Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::builder().buffer_device_address(true).build()),
@@ -228,22 +230,17 @@ impl<'a> RhiInitInfo<'a>
 pub struct Rhi
 {
     /// vk 基础函数的接口
-    vk_pf: Option<Entry>,
-    vk_instance: Option<Instance>,
+    vk_pf: Option<ash::Entry>,
+    instance: RhiInstance,
+    // vk_instance: Option<Instance>,
 
-    vk_debug_util_pf: Option<ash::extensions::ext::DebugUtils>,
+    // vk_debug_util_pf: Option<ash::extensions::ext::DebugUtils>,
     vk_dynamic_render_pf: Option<ash::extensions::khr::DynamicRendering>,
     vk_acceleration_pf: Option<ash::extensions::khr::AccelerationStructure>,
 
-    vk_debug_util_messenger: Option<vk::DebugUtilsMessengerEXT>,
-
-    physical_device: Option<RhiPhysicalDevice>,
-    device: Option<Device>,
-
-    /// 可以提交 graphics 命令，也可以进行 present 操作
-    graphics_queue: Option<RhiQueue>,
-    transfer_queue: Option<RhiQueue>,
-    compute_queue: Option<RhiQueue>,
+    // vk_debug_util_messenger: Option<vk::DebugUtilsMessengerEXT>,
+    physical_device: Arc<RhiPhysicalDevice>,
+    device: RhiDevice,
 
     vma: Option<vk_mem::Allocator>,
 
@@ -262,17 +259,17 @@ impl Rhi
 
     pub fn new(mut init_info: RhiInitInfo) -> anyhow::Result<Self>
     {
-        let vk_pf = unsafe { Entry::load() }.expect("Failed to load vulkan entry");
+        let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");
+
+        let instance = RhiInstance::old_new(&vk_pf, &init_info)?;
+        let pdevice = Arc::new(Self::init_pdevice(&instance.handle)?);
+        let device = RhiDevice::old_new(&mut init_info, &instance, pdevice.clone())?;
+
         let mut rhi = Self {
-            vk_pf: unsafe { Some(Entry::load().unwrap()) },
-            vk_instance: None,
-            vk_debug_util_pf: None,
-            vk_debug_util_messenger: None,
-            physical_device: None,
-            device: None,
-            compute_queue: None,
-            graphics_queue: None,
-            transfer_queue: None,
+            vk_pf: unsafe { Some(ash::Entry::load()?) },
+            instance,
+            physical_device: pdevice,
+            device,
             vk_dynamic_render_pf: None,
             vma: None,
             descriptor_pool: None,
@@ -282,10 +279,6 @@ impl Rhi
             vk_acceleration_pf: None,
         };
 
-        rhi.init_instance(&init_info)?;
-        rhi.init_debug_messenger(&init_info)?;
-        rhi.init_pdevice();
-        rhi.init_device_and_queue(&mut init_info);
         rhi.init_pf();
         rhi.init_vma(&init_info);
         rhi.init_descriptor_pool();
@@ -364,190 +357,32 @@ impl Rhi
         self.transfer_command_pool.as_ref().unwrap();
     }
 
-    fn init_instance(&mut self, init_info: &RhiInitInfo) -> anyhow::Result<()>
+
+    fn init_pdevice(instance: &ash::Instance) -> anyhow::Result<RhiPhysicalDevice>
     {
-        let app_name = CString::new(init_info.app_name.as_ref().context("")?.as_str()).context("")?;
-        let engine_name = CString::new(init_info.engine_name.as_ref().context("")?.as_str()).context("")?;
-        let app_info = vk::ApplicationInfo::builder()
-            .application_name(app_name.as_ref())
-            .application_version(vk::make_api_version(0, 1, 0, 0))
-            .engine_name(engine_name.as_ref())
-            .engine_version(vk::make_api_version(0, 1, 0, 0))
-            .api_version(init_info.vk_version);
-
-        let instance_extensions = init_info.instance_extensions.iter().map(|x| x.as_ptr()).collect_vec();
-        let instance_layers = init_info.instance_layers.iter().map(|l| l.as_ptr()).collect_vec();
-
-        let mut debug_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
-            .message_severity(init_info.debug_msg_severity)
-            .message_type(init_info.debug_msg_type)
-            .pfn_user_callback(init_info.debug_callback)
-            .build();
-
-        let create_flags = if cfg!(target_os = "macos") {
-            vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR
-        } else {
-            Default::default()
-        };
-
-        let instance_info = vk::InstanceCreateInfo::builder()
-            .application_info(&app_info)
-            .enabled_extension_names(&instance_extensions)
-            .enabled_layer_names(&instance_layers)
-            .flags(create_flags)
-            .push_next(&mut debug_info);
-
-        let instance = unsafe { self.vk_pf.as_ref().unwrap().create_instance(&instance_info, None)? };
-        self.vk_instance = Some(instance);
-
-        Ok(())
+        Ok(unsafe { instance.enumerate_physical_devices() }?
+            .iter()
+            .map(|pdevice| RhiPhysicalDevice::new(*pdevice, instance))
+            // 优先使用独立显卡
+            .find_or_first(RhiPhysicalDevice::is_descrete_gpu)
+            .unwrap())
     }
 
-    fn init_debug_messenger(&mut self, init_info: &RhiInitInfo) -> anyhow::Result<()>
-    {
-        let loader =
-            ash::extensions::ext::DebugUtils::new(self.vk_pf.as_ref().unwrap(), self.vk_instance.as_ref().context("")?);
-
-        let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
-            .message_severity(init_info.debug_msg_severity)
-            .message_type(init_info.debug_msg_type)
-            .pfn_user_callback(init_info.debug_callback)
-            .build();
-        let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None)? };
-
-        self.vk_debug_util_pf = Some(loader);
-        self.vk_debug_util_messenger = Some(debug_messenger);
-
-        Ok(())
-    }
-
-
-    fn init_pdevice(&mut self)
-    {
-        let instance = self.vk_instance.as_ref().unwrap();
-        unsafe {
-            let pd = instance
-                .enumerate_physical_devices()
-                .unwrap()
-                .iter()
-                .map(|pdevice| RhiPhysicalDevice::new(*pdevice, self.vk_instance.as_ref().unwrap()))
-                // 优先使用独立显卡
-                .find_or_first(RhiPhysicalDevice::is_descrete_gpu)
-                .unwrap();
-
-            self.physical_device = Some(pd);
-        }
-    }
-
-
-    fn init_device_and_queue(&mut self, init_info: &mut RhiInitInfo)
-    {
-        let graphics_queue_family_index =
-            self.physical_device().find_queue_family_index(vk::QueueFlags::GRAPHICS).unwrap();
-        let compute_queue_family_index =
-            self.physical_device().find_queue_family_index(vk::QueueFlags::COMPUTE).unwrap();
-        let transfer_queue_family_index =
-            self.physical_device().find_queue_family_index(vk::QueueFlags::TRANSFER).unwrap();
-
-        let mut queues = HashMap::from([
-            (graphics_queue_family_index, 0),
-            (compute_queue_family_index, 0),
-            (transfer_queue_family_index, 0),
-        ]);
-
-        // num 表示 “号码”
-        let mut graphics_queue_num = 0;
-        let mut compute_queue_num = 0;
-        let mut transfer_queue_num = 0;
-        queues.entry(graphics_queue_family_index).and_modify(|num| {
-            graphics_queue_num = *num;
-            *num += 1;
-        });
-        queues.entry(compute_queue_family_index).and_modify(|num| {
-            compute_queue_num = *num;
-            *num += 1;
-        });
-        queues.entry(transfer_queue_family_index).and_modify(|num| {
-            transfer_queue_num = *num;
-            *num += 1;
-        });
-
-        // 每个 queue family 的 queue 数量通过 priority 数组的长度指定
-        let queue_priorities = queues.values().map(|count| vec![1.0; *count as usize]).collect_vec();
-        let queue_create_infos = queues
-            .keys()
-            .map(|index| {
-                vk::DeviceQueueCreateInfo::builder()
-                    .queue_family_index(*index)
-                    .queue_priorities(&queue_priorities[*index as usize])
-                    .build()
-            })
-            .collect_vec();
-
-        let device_exts = init_info.device_extensions.iter().map(|e| e.as_ptr()).collect_vec();
-
-        let mut features = vk::PhysicalDeviceFeatures2::builder().features(init_info.core_features).build();
-        unsafe {
-            init_info.ext_features.iter_mut().for_each(|f| {
-                let ptr = <*mut dyn vk::ExtendsPhysicalDeviceFeatures2>::cast::<vk::BaseOutStructure>(f.as_mut());
-                (*ptr).p_next = features.p_next as _;
-                features.p_next = ptr as _;
-            });
-        }
-
-        let device_create_info = vk::DeviceCreateInfo::builder()
-            .queue_create_infos(&queue_create_infos)
-            .enabled_extension_names(&device_exts)
-            .push_next(&mut features);
-
-        unsafe {
-            let device = self
-                .vk_instance
-                .as_ref()
-                .unwrap()
-                .create_device(self.physical_device.as_ref().unwrap().handle, &device_create_info, None)
-                .unwrap();
-
-            let graphics_queue = device.get_device_queue(graphics_queue_family_index, graphics_queue_num);
-            let compute_queue = device.get_device_queue(compute_queue_family_index, compute_queue_num);
-            let transfer_queue = device.get_device_queue(transfer_queue_family_index, transfer_queue_num);
-
-            self.device = Some(device);
-
-            self.set_debug_name(graphics_queue, "graphics-queue");
-            self.set_debug_name(compute_queue, "compute-queue");
-            self.set_debug_name(transfer_queue, "transfer-queue");
-
-            self.graphics_queue = Some(RhiQueue {
-                queue: graphics_queue,
-                queue_family_index: graphics_queue_family_index,
-            });
-            self.transfer_queue = Some(RhiQueue {
-                queue: transfer_queue,
-                queue_family_index: transfer_queue_family_index,
-            });
-            self.compute_queue = Some(RhiQueue {
-                queue: compute_queue,
-                queue_family_index: compute_queue_family_index,
-            });
-        }
-    }
 
     fn init_pf(&mut self)
     {
-        let instance = self.vk_instance.as_ref().unwrap();
-        let device = self.device.as_ref().unwrap();
-
-        self.vk_dynamic_render_pf = Some(ash::extensions::khr::DynamicRendering::new(instance, device));
-        self.vk_acceleration_pf = Some(ash::extensions::khr::AccelerationStructure::new(instance, device));
+        self.vk_dynamic_render_pf =
+            Some(ash::extensions::khr::DynamicRendering::new(&self.instance.handle, RhiDevice::device()));
+        self.vk_acceleration_pf =
+            Some(ash::extensions::khr::AccelerationStructure::new(&self.instance.handle, RhiDevice::device()));
     }
 
     fn init_vma(&mut self, init_info: &RhiInitInfo)
     {
         let vma_create_info = vk_mem::AllocatorCreateInfo::new(
-            Rc::new(self.vk_instance.as_ref().unwrap()),
-            Rc::new(self.device.as_ref().unwrap()),
-            self.physical_device.as_ref().unwrap().handle,
+            Rc::new(&self.instance.handle),
+            Rc::new(RhiDevice::device()),
+            self.physical_device.handle,
         )
         .vulkan_api_version(init_info.vk_version)
         .flags(vk_mem::AllocatorCreateFlags::BUFFER_DEVICE_ADDRESS);
@@ -576,34 +411,34 @@ impl Rhi
         self.transfer_command_pool.as_ref().unwrap()
     }
     #[inline]
-    pub(crate) fn vk_instance(&self) -> &Instance
+    pub(crate) fn vk_instance(&self) -> &ash::Instance
     {
-        unsafe { self.vk_instance.as_ref().unwrap_unchecked() }
+        &self.instance.handle
     }
     #[inline]
-    pub(crate) fn device(&self) -> &Device
+    pub(crate) fn device(&self) -> &ash::Device
     {
-        unsafe { self.device.as_ref().unwrap_unchecked() }
+        RhiDevice::device()
     }
     #[inline]
     pub(crate) fn physical_device(&self) -> &RhiPhysicalDevice
     {
-        unsafe { self.physical_device.as_ref().unwrap_unchecked() }
+        &self.physical_device
     }
     #[inline]
     pub fn compute_queue(&self) -> &RhiQueue
     {
-        unsafe { self.compute_queue.as_ref().unwrap_unchecked() }
+        &self.device.compute_queue
     }
     #[inline]
     pub fn graphics_queue(&self) -> &RhiQueue
     {
-        unsafe { self.graphics_queue.as_ref().unwrap_unchecked() }
+        &self.device.graphics_queue
     }
     #[inline]
     pub fn transfer_queue(&self) -> &RhiQueue
     {
-        unsafe { self.transfer_queue.as_ref().unwrap_unchecked() }
+        &self.device.transfer_queue
     }
     #[inline]
     pub fn descriptor_pool(&self) -> vk::DescriptorPool
@@ -616,7 +451,7 @@ impl Rhi
         unsafe { self.vma.as_ref().unwrap_unchecked() }
     }
     #[inline]
-    pub(crate) fn vk_pf(&self) -> &Entry
+    pub(crate) fn vk_pf(&self) -> &ash::Entry
     {
         unsafe { self.vk_pf.as_ref().unwrap_unchecked() }
     }
@@ -645,11 +480,10 @@ impl Rhi
         let name = if name.as_ref().is_empty() { "empty-debug-name" } else { name.as_ref() };
         let name = CString::new(name).unwrap();
         unsafe {
-            self.vk_debug_util_pf
-                .as_ref()
-                .unwrap()
+            self.instance
+                .debug_utils_pf
                 .set_debug_utils_object_name(
-                    self.device.as_ref().unwrap().handle(),
+                    RhiDevice::device().handle(),
                     &vk::DebugUtilsObjectNameInfoEXT::builder()
                         .object_name(name.as_c_str())
                         .object_type(T::TYPE)

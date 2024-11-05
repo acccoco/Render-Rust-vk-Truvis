@@ -11,6 +11,7 @@ use crate::framework::core::device::Device;
 pub struct VulkanResource<Handle: vk::Handle + Copy>
 {
     debug_name: String,
+    // FIXME 直接使用 &'static RhiDevive
     device: Option<Weak<RefCell<Device>>>,
     handle: Handle,
 }
