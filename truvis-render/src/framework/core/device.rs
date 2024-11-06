@@ -9,7 +9,7 @@ use itertools::Itertools;
 use crate::framework::{
     core::{
         command_pool::RhiCommandPool,
-        debug::DebugUtils,
+        debug::RhiDebugUtils,
         fence_pool::FencePool,
         instance::RhiInstance,
         physical_device::RhiPhysicalDevice,
@@ -27,7 +27,7 @@ pub struct Device
 
     surface: vk::SurfaceKHR,
 
-    debug_utils: DebugUtils,
+    debug_utils: RhiDebugUtils,
 
     enabled_extensions: Vec<String>,
 
@@ -40,7 +40,7 @@ pub struct Device
 
 impl Device
 {
-    pub fn get_debug_utils(&self) -> &DebugUtils
+    pub fn get_debug_utils(&self) -> &RhiDebugUtils
     {
         &self.debug_utils
     }
@@ -71,11 +71,14 @@ pub struct RhiDevice
     pub compute_queue: RhiQueue,
 
     pub pdevice: Arc<RhiPhysicalDevice>,
+
+    pub debug_utils: RhiDebugUtils,
 }
 
 impl RhiDevice
 {
     pub fn old_new(
+        vk_pf: &ash::Entry,
         init_info: &mut RhiInitInfo,
         instance: &RhiInstance,
         pdevice: Arc<RhiPhysicalDevice>,
@@ -136,6 +139,8 @@ impl RhiDevice
             .enabled_extension_names(&device_exts)
             .push_next(&mut features);
 
+        let debug_utils = RhiDebugUtils::new(vk_pf, instance.get_handle(), init_info);
+
         unsafe {
             let device = instance.handle.create_device(pdevice.handle, &device_create_info, None).unwrap();
 
@@ -152,6 +157,7 @@ impl RhiDevice
 
             Ok(Self {
                 pdevice,
+                debug_utils,
                 graphics_queue: RhiQueue {
                     queue: graphics_queue,
                     queue_family_index: graphics_queue_family_index,

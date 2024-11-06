@@ -17,6 +17,9 @@ pub struct VulkanResource<Handle: vk::Handle + Copy>
 }
 
 
+impl<Handle: vk::Handle + Copy> VulkanResource<Handle> {}
+
+
 pub trait IVulkanResource
 {
     /// vk 内部的 handle
@@ -27,12 +30,7 @@ pub trait IVulkanResource
 
     fn get_device(&self) -> Rc<RefCell<Device>>
     {
-        self.get_inner_resource()
-            .device
-            .as_ref()
-            .expect("Device handle not set")
-            .upgrade()
-            .expect("Device dropped")
+        self.get_inner_resource().device.as_ref().expect("Device handle not set").upgrade().expect("Device dropped")
     }
 
 
@@ -49,11 +47,7 @@ pub trait IVulkanResource
         if !inner.debug_name.is_empty() && inner.device.is_some() {
             let device = self.get_device();
             let device = device.borrow();
-            device.get_debug_utils().set_debug_name(
-                device.get_handle(),
-                inner.handle,
-                &inner.debug_name,
-            );
+            device.get_debug_utils().set_debug_name(device.get_handle(), inner.handle, &inner.debug_name);
         }
     }
 

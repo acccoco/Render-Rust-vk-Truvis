@@ -12,8 +12,8 @@ use vk_mem::Alloc;
 
 use crate::framework::{
     core::{
-        command_pool::RhiCommandPool, device::RhiDevice, instance::RhiInstance, physical_device::RhiPhysicalDevice,
-        queue::RhiQueue,
+        command_pool::RhiCommandPool, debug::RhiDebugUtils, device::RhiDevice, instance::RhiInstance,
+        physical_device::RhiPhysicalDevice, queue::RhiQueue,
     },
     platform::window_system::WindowSystem,
 };
@@ -262,8 +262,9 @@ impl Rhi
         let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");
 
         let instance = RhiInstance::old_new(&vk_pf, &init_info)?;
+
         let pdevice = Arc::new(Self::init_pdevice(&instance.handle)?);
-        let device = RhiDevice::old_new(&mut init_info, &instance, pdevice.clone())?;
+        let device = RhiDevice::old_new(&vk_pf, &mut init_info, &instance, pdevice.clone())?;
 
         let mut rhi = Self {
             vk_pf: unsafe { Some(ash::Entry::load()?) },
@@ -480,8 +481,9 @@ impl Rhi
         let name = if name.as_ref().is_empty() { "empty-debug-name" } else { name.as_ref() };
         let name = CString::new(name).unwrap();
         unsafe {
-            self.instance
-                .debug_utils_pf
+            self.device
+                .debug_utils
+                .vk_debug_utils
                 .set_debug_utils_object_name(
                     RhiDevice::device().handle(),
                     &vk::DebugUtilsObjectNameInfoEXT::builder()

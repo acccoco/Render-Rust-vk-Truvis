@@ -2,13 +2,33 @@ use std::ffi::CString;
 
 use ash::vk;
 
-pub struct DebugUtils
+use crate::framework::rhi::RhiInitInfo;
+
+pub struct RhiDebugUtils
 {
-    vk_debug_utils: ash::extensions::ext::DebugUtils,
+    pub vk_debug_utils: ash::extensions::ext::DebugUtils,
+    pub vk_debug_messenger: vk::DebugUtilsMessengerEXT,
 }
 
-impl DebugUtils
+impl RhiDebugUtils
 {
+    pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, init_info: &RhiInitInfo) -> Self
+    {
+        let loader = ash::extensions::ext::DebugUtils::new(vk_pf, instance);
+
+        let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+            .message_severity(init_info.debug_msg_severity)
+            .message_type(init_info.debug_msg_type)
+            .pfn_user_callback(init_info.debug_callback)
+            .build();
+        let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None).unwrap() };
+
+        Self {
+            vk_debug_messenger: debug_messenger,
+            vk_debug_utils: loader,
+        }
+    }
+
     pub fn set_debug_name<T, S>(&self, device: vk::Device, handle: T, name: S)
     where
         T: vk::Handle + Copy,

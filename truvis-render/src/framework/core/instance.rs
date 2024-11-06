@@ -63,9 +63,6 @@ pub struct RhiInstance
     /// 当前机器上找到的所有 physical device
     gpus: Vec<RhiPhysicalDevice>,
 
-    pub debug_utils_messenger: vk::DebugUtilsMessengerEXT,
-    pub debug_utils_pf: ash::extensions::ext::DebugUtils,
-
     // TODO uncomment me
     debug_report_callback: Option<vk::DebugReportCallbackEXT>,
 }
@@ -108,33 +105,11 @@ impl RhiInstance
 
         let instance = unsafe { vk_pf.create_instance(&instance_info, None)? };
 
-        let (debug_utils_messenger, debug_utils_pf) = Self::new_old_debug_messenger(vk_pf, &instance, init_info)?;
-
         Ok(Self {
             handle: instance,
             gpus: Vec::new(),
-            debug_utils_messenger,
             debug_report_callback: None,
-            debug_utils_pf,
         })
-    }
-
-    fn new_old_debug_messenger(
-        vk_pf: &ash::Entry,
-        instance: &ash::Instance,
-        init_info: &RhiInitInfo,
-    ) -> anyhow::Result<(vk::DebugUtilsMessengerEXT, ash::extensions::ext::DebugUtils)>
-    {
-        let loader = ash::extensions::ext::DebugUtils::new(vk_pf, instance);
-
-        let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
-            .message_severity(init_info.debug_msg_severity)
-            .message_type(init_info.debug_msg_type)
-            .pfn_user_callback(init_info.debug_callback)
-            .build();
-        let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None)? };
-
-        Ok((debug_messenger, loader))
     }
 
     /// 设置所需的 layers 和 extensions，创建 vk instance
@@ -283,7 +258,6 @@ impl RhiInstance
 
         let handle = unsafe { vk_entry.create_instance(&instance_info, None) }.unwrap();
 
-        let debug_utils_messenger = None;
         #[cfg(feature = "validation")]
         {
             let debug_utils_pf = ash::extensions::ext::DebugUtils::new(vk_entry, &handle);
@@ -298,8 +272,6 @@ impl RhiInstance
         let mut s = Self {
             handle,
             gpus: Vec::new(),
-            debug_utils_messenger: debug_utils_messenger.unwrap(),
-            debug_utils_pf,
             debug_report_callback: None,
         };
 
