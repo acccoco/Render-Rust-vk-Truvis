@@ -1,3 +1,5 @@
+use std::{cell::OnceCell, sync::OnceLock};
+
 use ash::vk;
 use itertools::Itertools;
 
@@ -44,13 +46,8 @@ where
     /// 可以确保每种类型的 layout 在内存中只有 1 份
     fn get_layout(rhi: &Rhi) -> vk::DescriptorSetLayout
     {
-        unsafe {
-            static mut LAYOUT: Option<vk::DescriptorSetLayout> = None;
-            if LAYOUT.is_none() {
-                LAYOUT = Some(Self::create_layout(rhi));
-            }
-            LAYOUT.unwrap()
-        }
+        static LAYOUT: OnceLock<vk::DescriptorSetLayout> = OnceLock::new();
+        *LAYOUT.get_or_init(|| Self::create_layout(rhi))
     }
 }
 

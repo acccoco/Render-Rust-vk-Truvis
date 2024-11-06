@@ -373,16 +373,16 @@ impl Rhi
     fn init_pf(&mut self)
     {
         self.vk_dynamic_render_pf =
-            Some(ash::extensions::khr::DynamicRendering::new(&self.instance.handle, RhiDevice::device()));
+            Some(ash::extensions::khr::DynamicRendering::new(&self.instance.handle, self.device.device()));
         self.vk_acceleration_pf =
-            Some(ash::extensions::khr::AccelerationStructure::new(&self.instance.handle, RhiDevice::device()));
+            Some(ash::extensions::khr::AccelerationStructure::new(&self.instance.handle, self.device.device()));
     }
 
     fn init_vma(&mut self, init_info: &RhiInitInfo)
     {
         let vma_create_info = vk_mem::AllocatorCreateInfo::new(
             Rc::new(&self.instance.handle),
-            Rc::new(RhiDevice::device()),
+            Rc::new(self.device.device()),
             self.physical_device.handle,
         )
         .vulkan_api_version(init_info.vk_version)
@@ -419,7 +419,7 @@ impl Rhi
     #[inline]
     pub(crate) fn device(&self) -> &ash::Device
     {
-        RhiDevice::device()
+        self.device.device()
     }
     #[inline]
     pub(crate) fn physical_device(&self) -> &RhiPhysicalDevice
@@ -485,7 +485,7 @@ impl Rhi
                 .debug_utils
                 .vk_debug_utils
                 .set_debug_utils_object_name(
-                    RhiDevice::device().handle(),
+                    self.device.device().handle(),
                     &vk::DebugUtilsObjectNameInfoEXT::builder()
                         .object_name(name.as_c_str())
                         .object_type(T::TYPE)

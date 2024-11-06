@@ -1,4 +1,5 @@
 use std::{
+    cell::{Cell, OnceCell},
     collections::HashMap,
     sync::{Arc, OnceLock},
 };
@@ -46,26 +47,11 @@ impl Device
     }
 }
 
-impl IVulkanResource for Device
-{
-    type Handle = vk::Device;
-
-    fn get_inner_resource(&self) -> &VulkanResource<Self::Handle>
-    {
-        &self.inner_resource
-    }
-    fn get_inner_resource_mut(&mut self) -> &mut VulkanResource<vk::Device>
-    {
-        &mut self.inner_resource
-    }
-}
-
-
-static DEVICE: OnceLock<ash::Device> = OnceLock::new();
-
 
 pub struct RhiDevice
 {
+    device: ash::Device,
+
     pub graphics_queue: RhiQueue,
     pub transfer_queue: RhiQueue,
     pub compute_queue: RhiQueue,
@@ -148,7 +134,6 @@ impl RhiDevice
             let compute_queue = device.get_device_queue(compute_queue_family_index, compute_queue_num);
             let transfer_queue = device.get_device_queue(transfer_queue_family_index, transfer_queue_num);
 
-            DEVICE.get_or_init(|| device);
 
             // TODO
             // self.set_debug_name(graphics_queue, "graphics-queue");
@@ -156,6 +141,7 @@ impl RhiDevice
             // self.set_debug_name(transfer_queue, "transfer-queue");
 
             Ok(Self {
+                device,
                 pdevice,
                 debug_utils,
                 graphics_queue: RhiQueue {
@@ -174,8 +160,8 @@ impl RhiDevice
         }
     }
 
-    pub fn device() -> &'static ash::Device
+    pub fn device(&self) -> &ash::Device
     {
-        DEVICE.get().unwrap()
+        &self.device
     }
 }

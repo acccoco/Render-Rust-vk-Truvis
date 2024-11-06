@@ -1,7 +1,12 @@
+use std::ops::{Deref, DerefMut};
+
 use ash::vk;
 use vk_mem::Alloc;
 
-use crate::framework::{core::buffer::RhiBuffer, rhi::Rhi};
+use crate::framework::{
+    core::{buffer::RhiBuffer, vulkan_resource::VulkanResource},
+    rhi::Rhi,
+};
 
 pub struct RhiImage2DInfo
 {
@@ -33,12 +38,31 @@ pub struct RhiImage2D
 {
     name: String,
 
-    image: vk::Image,
+    resource: VulkanResource<vk::Image>,
+
     alloc: vk_mem::Allocation,
 
     image_info: RhiImage2DInfo,
 
     rhi: &'static Rhi,
+}
+
+impl Deref for RhiImage2D
+{
+    type Target = VulkanResource<vk::Image>;
+
+    fn deref(&self) -> &Self::Target
+    {
+        &self.resource
+    }
+}
+
+impl DerefMut for RhiImage2D
+{
+    fn deref_mut(&mut self) -> &mut Self::Target
+    {
+        &mut self.resource
+    }
 }
 
 
@@ -58,7 +82,7 @@ impl RhiImage2D
         Self {
             name: debug_name.to_string(),
 
-            image,
+            resource: VulkanResource::new(image),
             alloc,
 
             image_info: (*image_info).into(),
