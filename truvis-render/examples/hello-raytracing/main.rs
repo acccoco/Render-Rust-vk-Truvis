@@ -9,12 +9,12 @@ use truvis_render::{
             queue::RhiSubmitBatch,
         },
         platform::window_system::WindowSystem,
-        rendering::render_context::RenderContext,
+        rendering::{render_context, render_context::RenderContext},
         rhi::Rhi,
     },
-    render::{RenderInitInfo, Renderer},
+    render::{RenderInitInfo, Renderer, Timer},
+    run::{run2, App},
 };
-use truvis_render::run::App;
 
 #[derive(Clone, Debug, Copy)]
 #[repr(C)]
@@ -61,20 +61,19 @@ struct HelloRT
 
 impl HelloRT
 {
-    fn init_buffer() -> (RhiBuffer, RhiBuffer)
+    fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
     {
-        let mut index_buffer =
-            RhiBuffer::new_index_buffer(std::mem::size_of_val(&INDEX_DATA), "index-buffer");
+        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
         index_buffer.transfer_data(&INDEX_DATA);
 
-        let mut vertex_buffer =
-            RhiBuffer::new_vertex_buffer(std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
         vertex_buffer.transfer_data(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }
 
     fn init_acceleration(
+        rhi: &'static Rhi,
         vertex_buffer: &RhiBuffer,
         index_buffer: &RhiBuffer,
     ) -> (RhiAcceleration, RhiAcceleration)
@@ -97,6 +96,7 @@ impl HelloRT
 
         // 构建 BLAS
         let blas = RhiAcceleration::build_blas(
+            rhi,
             vec![(triangles_data, INDEX_DATA.len() as u32 / 3)],
             vk::BuildAccelerationStructureFlagsKHR::empty(),
             "hello",
@@ -126,24 +126,21 @@ impl HelloRT
             },
         }];
 
-        let tlas = RhiAcceleration::build_tlas(
-            &instances,
-            vk::BuildAccelerationStructureFlagsKHR::empty(),
-            "hello",
-        );
+        let tlas =
+            RhiAcceleration::build_tlas(rhi, &instances, vk::BuildAccelerationStructureFlagsKHR::empty(), "hello");
 
 
         (tlas, blas)
     }
 
-    fn init_pipeline() -> RhiPipeline
+    fn init_pipeline(rhi: &'static Rhi, render_context: &RenderContext) -> RhiPipeline
     {
-        let extent = RenderContext::extent();
+        let extent = render_context.extent();
         let pipeline = RhiPipelineTemplate {
             fragment_shader_path: Some("shader/hello_triangle/triangle.frag.spv".into()),
             vertex_shader_path: Some("shader/hello_triangle/triangle.vert.spv".into()),
-            color_formats: vec![RenderContext::instance().color_format()],
-            depth_format: RenderContext::depth_format(),
+            color_formats: vec![render_context.color_format()],
+            depth_format: render_context.depth_format(),
             viewport: Some(vk::Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -178,60 +175,46 @@ impl HelloRT
                 .build()],
             ..Default::default()
         }
-        .create_pipeline("");
+        .create_pipeline(rhi, "");
 
         pipeline
     }
 
-    fn run(&self)
+    fn run(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
-        WindowSystem::instance().render_loop(|| {
-            RenderContext::acquire_frame();
+        render_context.acquire_frame();
 
-            let rhi = Rhi::instance();
 
-            let mut cmd = RenderContext::alloc_command_buffer("render");
-            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-            {
-                cmd.begin_rendering(&RenderContext::render_info());
-                cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
-                cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
-                cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
-                cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
-                cmd.end_rendering();
-            }
-            cmd.end();
-            rhi.graphics_queue().submit(
-                vec![RhiSubmitBatch {
-                    command_buffers: vec![cmd],
-                    ..Default::default()
-                }],
-                None,
-            );
+        let mut cmd = render_context.alloc_command_buffer("render");
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        {
+            cmd.begin_rendering(&render_context.render_info());
+            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
+            cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
+            cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
+            cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
+            cmd.end_rendering();
+        }
+        cmd.end();
+        rhi.graphics_queue().submit(
+            rhi,
+            vec![RhiSubmitBatch {
+                command_buffers: vec![cmd],
+                ..Default::default()
+            }],
+            None,
+        );
 
-            RenderContext::submit_frame();
-        });
+        render_context.submit_frame();
     }
 
-    
-    fn new() -> Self {
 
-    }
-    
-    fn init() -> Self
+    fn new(rhi: &'static Rhi, render_context: &RenderContext) -> Self
     {
-        Renderer::init(&RenderInitInfo {
-            window_width: 800,
-            window_height: 800,
-            app_name: "hello-triangle".to_string(),
-        })
-        .expect("init failed");
-
         log::info!("start.");
-
-        let (vertex_buffer, index_buffer) = Self::init_buffer();
-        let (tlas, blas) = Self::init_acceleration(&vertex_buffer, &index_buffer);
-        let pipeline = Self::init_pipeline();
+        let (vertex_buffer, index_buffer) = Self::init_buffer(rhi);
+        let (tlas, blas) = Self::init_acceleration(rhi, &vertex_buffer, &index_buffer);
+        let pipeline = Self::init_pipeline(rhi, render_context);
 
         Self {
             vertex_buffer,
@@ -241,30 +224,42 @@ impl HelloRT
             tlas,
         }
     }
-
-    fn create_descriptor_set()
-    {
-        // vk::DescriptorSetLayoutBinding{}
-    }
 }
 
-impl App for HelloRT {
-    fn get_init_info(&self) -> RenderInitInfo {
-        todo!()
+impl App for HelloRT
+{
+    fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    {
+        HelloRT::new(rhi, render_context)
     }
 
-    fn init(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext) {
-        todo!()
+    fn init_info() -> RenderInitInfo
+    {
+        RenderInitInfo {
+            window_width: 800,
+            window_height: 800,
+            app_name: "hello-triangle".to_string(),
+        }
     }
 
-    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext) {
-        todo!()
+    fn get_init_info(&self) -> RenderInitInfo
+    {
+        unimplemented!()
+    }
+
+    fn init(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
+    {
+        unimplemented!()
+    }
+
+    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    {
+        self.run(rhi, render_context);
     }
 }
 
 
 fn main()
 {
-    let hello = HelloRT::init();
-    hello.run();
+    run2::<HelloRT>(HelloRT::init_info());
 }

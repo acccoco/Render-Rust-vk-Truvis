@@ -203,6 +203,16 @@ impl ShaderToy
 
 impl App for ShaderToy
 {
+    fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    {
+        unimplemented!()
+    }
+
+    fn init_info() -> RenderInitInfo
+    {
+        unimplemented!()
+    }
+
     fn get_init_info(&self) -> RenderInitInfo
     {
         RenderInitInfo {
