@@ -1,8 +1,8 @@
-use std::{cell::OnceCell, rc::Rc};
 use std::sync::OnceLock;
+
 use crate::{
     framework::{
-        core::swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
+        core::swapchain::RenderSwapchainInitInfo,
         platform::window_system::{WindowCreateInfo, WindowSystem},
         rendering::render_context::{RenderContext, RenderContextInitInfo},
         rhi::{vk_debug_callback, Rhi, RhiInitInfo},
@@ -20,9 +20,9 @@ pub struct Timer
     pub total_frame: i32,
 }
 
-impl Timer
+impl Default for Timer
 {
-    pub fn new() -> Self
+    fn default() -> Self
     {
         Self {
             start_time: std::time::SystemTime::now(),
@@ -32,7 +32,11 @@ impl Timer
             total_time: 0.0,
         }
     }
+}
 
+
+impl Timer
+{
     pub fn reset(&mut self)
     {
         self.start_time = std::time::SystemTime::now();
@@ -60,7 +64,6 @@ pub struct Renderer
 {
     pub timer: Timer,
     pub window: WindowSystem,
-    render_swapchain: Rc<RenderSwapchain>,
     pub render_context: RenderContext,
 }
 
@@ -101,19 +104,19 @@ impl Renderer
         RHI.get_or_init(|| Rhi::new(rhi_init_info).unwrap());
         let rhi = RHI.get().unwrap();
 
-        let mut render_swapchain_init_info = RenderSwapchainInitInfo::default();
-        render_swapchain_init_info.window = Some(&window);
-        let render_swapchain = Rc::new(RenderSwapchain::new(&rhi, &render_swapchain_init_info));
+        let render_swapchain_init_info = RenderSwapchainInitInfo {
+            window: Some(&window),
+            ..Default::default()
+        };
 
         let render_context_init_info = RenderContextInitInfo::default();
-        let render_context = RenderContext::new(&rhi, &render_context_init_info, render_swapchain.clone());
+        let render_context = RenderContext::new(rhi, &render_context_init_info, render_swapchain_init_info);
 
 
         Self {
             window,
-            render_swapchain,
             render_context,
-            timer: Timer::new(),
+            timer: Timer::default(),
         }
     }
 

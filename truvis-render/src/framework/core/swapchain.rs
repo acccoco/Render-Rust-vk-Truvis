@@ -7,8 +7,6 @@ use crate::framework::{
     rhi::Rhi,
 };
 
-static mut SWAPCHAIN: Option<RenderSwapchain> = None;
-
 pub struct RenderSwapchain
 {
     pub(crate) swapchain_pf: ash::extensions::khr::Swapchain,

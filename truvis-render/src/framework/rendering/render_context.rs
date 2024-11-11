@@ -1,11 +1,21 @@
-use std::rc::Rc;
-
+pub(crate) use _ctx_init::RenderContextInitInfo;
 use ash::vk;
+
+use crate::framework::{
+    core::{
+        command_buffer::RhiCommandBuffer,
+        command_pool::RhiCommandPool,
+        queue::RhiSubmitBatch,
+        swapchain::RenderSwapchain,
+        synchronize::{RhiFence, RhiSemaphore},
+    },
+    rhi::Rhi,
+};
 
 
 pub struct RenderContext
 {
-    render_swapchain: Rc<RenderSwapchain>,
+    render_swapchain: RenderSwapchain,
 
     swapchain_image_index: usize,
 
@@ -141,30 +151,15 @@ impl RenderContext
 }
 
 
-pub(crate) use _ctx_init::RenderContextInitInfo;
-
-use crate::framework::{
-    core::{
-        command_buffer::RhiCommandBuffer,
-        command_pool::RhiCommandPool,
-        queue::RhiSubmitBatch,
-        swapchain::RenderSwapchain,
-        synchronize::{RhiFence, RhiSemaphore},
-    },
-    rhi::Rhi,
-};
-
 mod _ctx_init
 {
-    use std::rc::Rc;
-
     use ash::vk;
     use itertools::Itertools;
 
     use crate::framework::{
         core::{
             create_utils::RhiCreateInfoUtil,
-            swapchain::RenderSwapchain,
+            swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
             synchronize::{RhiFence, RhiSemaphore},
         },
         rendering::render_context::RenderContext,
@@ -194,9 +189,14 @@ mod _ctx_init
 
     impl RenderContext
     {
-        pub fn new(rhi: &'static Rhi, init_info: &RenderContextInitInfo, render_swapchain: Rc<RenderSwapchain>)
-            -> Self
+        pub fn new(
+            rhi: &'static Rhi,
+            init_info: &RenderContextInitInfo,
+            render_swapchain_init_info: RenderSwapchainInitInfo,
+        ) -> Self
         {
+            let render_swapchain = RenderSwapchain::new(rhi, &render_swapchain_init_info);
+
             let mut ctx = RenderContext {
                 render_swapchain,
 
