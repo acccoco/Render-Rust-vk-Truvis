@@ -43,7 +43,10 @@ pub struct RenderContext
 
 impl RenderContext
 {
-    #[inline]
+    /// 准备好渲染当前frame 所需的资源
+    ///
+    /// * 通过 fence 等待当前 frame 资源释放
+    /// * 为 image 进行 layout transition 的操作
     pub fn acquire_frame(&mut self)
     {
         let current_fence = &mut self.fence_frame_in_flight[self.frame_index];
@@ -89,7 +92,9 @@ impl RenderContext
     }
 
 
-    #[inline]
+    /// 提交当前 frame
+    /// 
+    /// * 在提交之前，为 image 进行 layout transition
     pub fn submit_frame(&mut self)
     {
         {
