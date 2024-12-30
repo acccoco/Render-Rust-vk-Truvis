@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ash::vk;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
@@ -30,14 +32,14 @@ pub struct RenderSwapchain
     pub(crate) color_attach_infos: Vec<vk::RenderingAttachmentInfo>,
 }
 
-pub struct RenderSwapchainInitInfo<'a>
+pub struct RenderSwapchainInitInfo
 {
     pub format: vk::SurfaceFormatKHR,
     pub swapchain_present_mode: vk::PresentModeKHR,
-    pub window: Option<&'a WindowSystem>,
+    pub window: Option<Arc<WindowSystem>>,
 }
 
-impl Default for RenderSwapchainInitInfo<'_>
+impl Default for RenderSwapchainInitInfo
 {
     fn default() -> Self
     {
@@ -147,7 +149,7 @@ mod _render_swapchain_init
         {
             let mut swapchain = unsafe {
                 let pdevice = rhi.physical_device().handle;
-                let (surface, surface_pf) = Self::create_surface(rhi, init_info.window.unwrap());
+                let (surface, surface_pf) = Self::create_surface(rhi, init_info.window.as_ref().unwrap());
 
                 Self {
                     swapchain_pf: ash::extensions::khr::Swapchain::new(rhi.vk_instance(), rhi.device()),

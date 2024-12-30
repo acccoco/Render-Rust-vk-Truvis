@@ -63,7 +63,6 @@ pub struct RhiInstance
     /// 当前机器上找到的所有 physical device
     gpus: Vec<RhiPhysicalDevice>,
 
-    // TODO uncomment me
     debug_report_callback: Option<vk::DebugReportCallbackEXT>,
 }
 

@@ -58,12 +58,12 @@ pub unsafe extern "system" fn vk_debug_callback(
     vk::FALSE
 }
 
-pub struct RhiInitInfo<'a>
+pub struct RhiInitInfo
 {
     pub app_name: Option<String>,
     pub engine_name: Option<String>,
 
-    pub window: Option<&'a WindowSystem>,
+    pub window: Option<Arc<WindowSystem>>,
 
     pub vk_version: u32,
 
@@ -83,14 +83,11 @@ pub struct RhiInitInfo<'a>
 }
 
 
-impl<'a> RhiInitInfo<'a>
+impl RhiInitInfo
 {
     const VALIDATION_LAYER_NAME: &'static CStr = cstr::cstr!("VK_LAYER_KHRONOS_validation");
 
-    pub fn init_basic<'b: 'a>(
-        debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT,
-        window: &'b WindowSystem,
-    ) -> Self
+    pub fn init_basic(debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT, window: Arc<WindowSystem>) -> Self
     {
         let instance_create_flags = if cfg!(target_os = "macos") {
             vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR
@@ -102,13 +99,13 @@ impl<'a> RhiInitInfo<'a>
             app_name: None,
             engine_name: None,
 
-            window: Some(window),
+            window: Some(window.clone()),
 
             // 版本过低时，有些函数无法正确加载
             vk_version: vk::API_VERSION_1_3,
 
             instance_layers: Self::basic_instance_layers(),
-            instance_extensions: Self::basic_instance_extensions(window),
+            instance_extensions: Self::basic_instance_extensions(window.as_ref()),
             instance_create_flags,
             device_extensions: Self::basic_device_extensions(),
 

@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use crate::{
     framework::{
@@ -63,7 +63,7 @@ impl Timer
 pub struct Renderer
 {
     pub timer: Timer,
-    pub window: WindowSystem,
+    pub window: Arc<WindowSystem>,
     pub render_context: RenderContext,
 }
 
@@ -96,8 +96,9 @@ impl Renderer
             width: init_info.window_width as i32,
             title: init_info.app_name.clone(),
         });
+        let window = Arc::new(window);
 
-        let mut rhi_init_info = RhiInitInfo::init_basic(Some(vk_debug_callback), &window);
+        let mut rhi_init_info = RhiInitInfo::init_basic(Some(vk_debug_callback), window.clone());
         rhi_init_info.app_name = Some(init_info.app_name.clone());
         rhi_init_info.engine_name = Some(ENGINE_NAME.to_string());
         rhi_init_info.is_complete().unwrap();
@@ -105,7 +106,7 @@ impl Renderer
         let rhi = RHI.get().unwrap();
 
         let render_swapchain_init_info = RenderSwapchainInitInfo {
-            window: Some(&window),
+            window: Some(window.clone()),
             ..Default::default()
         };
 
