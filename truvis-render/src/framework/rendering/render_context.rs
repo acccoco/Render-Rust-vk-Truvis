@@ -9,9 +9,8 @@ use crate::framework::{
         swapchain::RenderSwapchain,
         synchronize::{RhiFence, RhiSemaphore},
     },
-    rhi::Rhi,
+    rhi::{Rhi, RHI},
 };
-
 
 pub struct RenderContext
 {
@@ -19,7 +18,7 @@ pub struct RenderContext
 
     swapchain_image_index: usize,
 
-    frame_index: usize,
+    current_frame: usize,
     frames_cnt: usize,
 
     /// 为每个 frame 分配一个 command pool
@@ -34,8 +33,8 @@ pub struct RenderContext
     depth_image_view: Option<vk::ImageView>,
     depth_attach_info: vk::RenderingAttachmentInfo,
 
-    semaphores_swapchain_available: Vec<RhiSemaphore>,
-    semaphores_image_render_finish: Vec<RhiSemaphore>,
+    present_complete_semaphores: Vec<RhiSemaphore>,
+    render_complete_semaphores: Vec<RhiSemaphore>,
     fence_frame_in_flight: Vec<RhiFence>,
 
     rhi: &'static Rhi,
@@ -49,18 +48,19 @@ impl RenderContext
     /// * 为 image 进行 layout transition 的操作
     pub fn acquire_frame(&mut self)
     {
-        let current_fence = &mut self.fence_frame_in_flight[self.frame_index];
-        current_fence.wait();
-        self.graphics_command_pools[self.frame_index].reset(self.rhi);
-        std::mem::take(&mut self.allocated_command_buffers[self.frame_index]).into_iter().for_each(|c| c.free());
-        current_fence.reset();
+        let rhi = RHI.get().unwrap();
+        let current_fence = &mut self.fence_frame_in_flight[self.current_frame];
+        rhi.wait_for_fence(&current_fence);
+        rhi.reset_fence(&current_fence);
+        rhi.reset_command_pool(&mut self.graphics_command_pools[self.current_frame]);
+        std::mem::take(&mut self.allocated_command_buffers[self.current_frame]).into_iter().for_each(|c| c.free());
 
         self.swapchain_image_index =
-            self.render_swapchain.acquire_next_frame(&self.semaphores_swapchain_available[self.frame_index], None)
+            self.render_swapchain.acquire_next_frame(&self.present_complete_semaphores[self.current_frame], None)
                 as usize;
 
         {
-            let mut cmd = self.alloc_command_buffer(format!("ctx-1st-color-layout-trans-frame-{}", self.frame_index));
+            let mut cmd = self.alloc_command_buffer(format!("ctx-1st-color-layout-trans-frame-{}", self.current_frame));
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
             // 只需要建立起执行依赖即可，确保 present 完成后，再进行 layout trans
             // COLOR_ATTACHMENT_READ 对应 blend 等操作
@@ -76,8 +76,8 @@ impl RenderContext
                 vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             );
             cmd.end();
-            self.rhi.graphics_queue().submit(
-                self.rhi,
+            rhi.queue_submit(
+                rhi.graphics_queue(),
                 vec![RhiSubmitBatch {
                     command_buffers: vec![cmd],
                     wait_info: vec![(
@@ -93,12 +93,12 @@ impl RenderContext
 
 
     /// 提交当前 frame
-    /// 
+    ///
     /// * 在提交之前，为 image 进行 layout transition
     pub fn submit_frame(&mut self)
     {
         {
-            let mut cmd = self.alloc_command_buffer(format!("ctx-2nd-color-layout-trans-frame-{}", self.frame_index));
+            let mut cmd = self.alloc_command_buffer(format!("ctx-2nd-color-layout-trans-frame-{}", self.current_frame));
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
             cmd.image_barrier(
                 (vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT, vk::AccessFlags::COLOR_ATTACHMENT_WRITE),
@@ -126,7 +126,7 @@ impl RenderContext
             &[self.current_image_render_finish_semaphore().semaphore],
         );
 
-        self.frame_index = (self.frame_index + 1) % self.frames_cnt;
+        self.current_frame = (self.current_frame + 1) % self.frames_cnt;
     }
 
 
@@ -143,13 +143,12 @@ impl RenderContext
 
 
     /// 分配 command buffer，在当前 frame 使用
-    #[inline]
     pub fn alloc_command_buffer<S: AsRef<str>>(&mut self, debug_name: S) -> RhiCommandBuffer
     {
-        let name = format!("frame-{}-command-buffer-{}", self.frame_index, debug_name.as_ref());
-        let cmd = RhiCommandBuffer::new(self.rhi, &self.graphics_command_pools[self.frame_index], name);
+        let name = format!("frame-{}-command-buffer-{}", self.current_frame, debug_name.as_ref());
+        let cmd = RhiCommandBuffer::new(self.rhi, &self.graphics_command_pools[self.current_frame], name);
 
-        self.allocated_command_buffers[self.frame_index].push(cmd.clone());
+        self.allocated_command_buffers[self.current_frame].push(cmd.clone());
 
         cmd
     }
@@ -206,7 +205,7 @@ mod _ctx_init
                 render_swapchain,
 
                 swapchain_image_index: 0,
-                frame_index: 0,
+                current_frame: 0,
                 frames_cnt: init_info.frames_in_flight,
 
                 graphics_command_pools: vec![],
@@ -218,8 +217,8 @@ mod _ctx_init
                 depth_image_view: None,
 
                 depth_attach_info: Default::default(),
-                semaphores_swapchain_available: vec![],
-                semaphores_image_render_finish: vec![],
+                present_complete_semaphores: vec![],
+                render_complete_semaphores: vec![],
                 fence_frame_in_flight: vec![],
 
                 rhi,
@@ -276,8 +275,8 @@ mod _ctx_init
             let create_semaphore = |name: &str| {
                 (0..self.frames_cnt).map(|i| RhiSemaphore::new(self.rhi, format!("{name}-{i}"))).collect_vec()
             };
-            self.semaphores_swapchain_available = create_semaphore("image-available-for-render-semaphore");
-            self.semaphores_image_render_finish = create_semaphore("image-finished-for-present-semaphore");
+            self.present_complete_semaphores = create_semaphore("image-available-for-render-semaphore");
+            self.render_complete_semaphores = create_semaphore("image-finished-for-present-semaphore");
 
             self.fence_frame_in_flight = (0..self.frames_cnt)
                 .map(|i| RhiFence::new(self.rhi, true, format!("frame-in-flight-fence-{i}")))
@@ -337,7 +336,7 @@ mod _ctx_property
         #[inline]
         pub fn current_fence(&self) -> &RhiFence
         {
-            &self.fence_frame_in_flight[self.frame_index]
+            &self.fence_frame_in_flight[self.current_frame]
         }
 
         #[inline]
@@ -349,7 +348,7 @@ mod _ctx_property
         #[inline]
         pub fn current_frame_index(&self) -> usize
         {
-            self.frame_index
+            self.current_frame
         }
 
 
@@ -363,13 +362,13 @@ mod _ctx_property
         #[inline]
         pub fn current_image_render_finish_semaphore(&self) -> RhiSemaphore
         {
-            self.semaphores_image_render_finish[self.frame_index]
+            self.render_complete_semaphores[self.current_frame]
         }
 
         #[inline]
         pub fn current_swapchain_available_semaphore(&self) -> RhiSemaphore
         {
-            self.semaphores_swapchain_available[self.frame_index]
+            self.present_complete_semaphores[self.current_frame]
         }
 
         #[inline]

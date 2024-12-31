@@ -125,93 +125,6 @@ impl RhiInstance
         api_version: u32,
     ) -> Self
     {
-        /// instance 所需的所有 extension
-        fn get_extensions(
-            required_extensions: Vec<(&'static CStr, bool)>,
-            available_instance_extensions: &[vk::ExtensionProperties],
-        ) -> Vec<&'static CStr>
-        {
-            let mut enabled_extensions = Vec::new();
-
-            // 尝试开启 DEBUG_UTILS extension
-            #[cfg(feature = "validation")]
-            {
-                let has_debug_utils = RhiInstance::enable_extension(
-                    ash::extensions::ext::DebugUtils::name(),
-                    available_instance_extensions,
-                    &mut enabled_extensions,
-                );
-
-                if !has_debug_utils {
-                    log::warn!(
-                        "{:?} are not available; disableing debug reporting",
-                        ash::extensions::ext::DebugUtils::name()
-                    );
-                }
-            }
-
-            // 显示在 surface 上所需的 extension
-            enabled_extensions.push(ash::extensions::khr::Surface::name());
-
-            // 这个 extension 时 VK_KHR_performance_query 的前置条件；而后者是用于 stats gathering 的
-            RhiInstance::enable_extension(
-                ash::extensions::khr::GetPhysicalDeviceProperties2::name(),
-                available_instance_extensions,
-                &mut enabled_extensions,
-            );
-
-            // 检查外部传入的 extension 是否支持
-            let mut extension_error = false;
-            for extension in required_extensions {
-                let (extension_name, extension_is_optional) = extension;
-                if !RhiInstance::enable_extension(
-                    extension_name,
-                    available_instance_extensions,
-                    &mut enabled_extensions,
-                ) {
-                    if extension_is_optional {
-                        log::warn!(
-                            "Optional instance extension {:?} not available, some features may be disabled",
-                            extension_name
-                        );
-                    } else {
-                        log::error!("Required instance extension {:?} not available, cannot run", extension_name);
-                        extension_error = true;
-                    }
-                }
-            }
-            if extension_error {
-                panic!("Required instance extensions are missin");
-            }
-
-            enabled_extensions
-        }
-
-        /// instance 所需的所有 layers
-        fn get_layers(
-            mut required_validation_layers: Vec<&'static CStr>,
-            supported_validation_layers: &[vk::LayerProperties],
-        ) -> Vec<&'static CStr>
-        {
-            #[cfg(feature = "validation")]
-            {
-                let optimal_validation_layers = get_optimal_validation_layers(supported_validation_layers);
-                required_validation_layers.extend(optimal_validation_layers);
-            }
-
-
-            if validate_layers(&required_validation_layers, supported_validation_layers) {
-                log::info!("Enabled Validation Layers:");
-                for layer in &required_validation_layers {
-                    log::info!("\t{:?}", layer);
-                }
-            } else {
-                panic!("Required validation layers are missing.");
-            }
-
-            required_validation_layers
-        }
-
         let application_name = CString::new(application_name.as_str()).unwrap();
         let app_info = vk::ApplicationInfo::builder()
             .api_version(vk::API_VERSION_1_3)
@@ -221,12 +134,12 @@ impl RhiInstance
             .engine_version(vk::make_api_version(0, 1, 0, 0));
 
         let enabled_extensions =
-            get_extensions(required_extensions, &vk_entry.enumerate_instance_extension_properties(None).unwrap())
+            Self::get_extensions(required_extensions, &vk_entry.enumerate_instance_extension_properties(None).unwrap())
                 .iter()
                 .map(|ext| ext.as_ptr())
                 .collect_vec();
         let enabled_layers =
-            get_layers(required_validation_layer, &vk_entry.enumerate_instance_layer_properties().unwrap())
+            Self::get_layers(required_validation_layer, &vk_entry.enumerate_instance_layer_properties().unwrap())
                 .iter()
                 .map(|layer| layer.as_ptr())
                 .collect_vec();
@@ -279,21 +192,96 @@ impl RhiInstance
         s
     }
 
-    /// 尝试得到机器上第一个可用的 discrete gpu
-    fn get_first_gpu(&self) -> RhiPhysicalDevice
+
+    /// instance 所需的所有 extension
+    fn get_extensions(
+        required_extensions: Vec<(&'static CStr, bool)>,
+        available_instance_extensions: &[vk::ExtensionProperties],
+    ) -> Vec<&'static CStr>
     {
-        todo!()
+        let mut enabled_extensions = Vec::new();
+
+        // 尝试开启 DEBUG_UTILS extension
+        #[cfg(feature = "validation")]
+        {
+            let has_debug_utils = RhiInstance::enable_extension(
+                ash::extensions::ext::DebugUtils::name(),
+                available_instance_extensions,
+                &mut enabled_extensions,
+            );
+
+            if !has_debug_utils {
+                log::warn!(
+                    "{:?} are not available; disableing debug reporting",
+                    ash::extensions::ext::DebugUtils::name()
+                );
+            }
+        }
+
+        // 显示在 surface 上所需的 extension
+        enabled_extensions.push(ash::extensions::khr::Surface::name());
+
+        // 这个 extension 时 VK_KHR_performance_query 的前置条件；而后者是用于 stats gathering 的
+        RhiInstance::enable_extension(
+            ash::extensions::khr::GetPhysicalDeviceProperties2::name(),
+            available_instance_extensions,
+            &mut enabled_extensions,
+        );
+
+        // 检查外部传入的 extension 是否支持
+        let mut extension_error = false;
+        for extension in required_extensions {
+            let (extension_name, extension_is_optional) = extension;
+            if !RhiInstance::enable_extension(extension_name, available_instance_extensions, &mut enabled_extensions) {
+                if extension_is_optional {
+                    log::warn!(
+                        "Optional instance extension {:?} not available, some features may be disabled",
+                        extension_name
+                    );
+                } else {
+                    log::error!("Required instance extension {:?} not available, cannot run", extension_name);
+                    extension_error = true;
+                }
+            }
+        }
+        if extension_error {
+            panic!("Required instance extensions are missin");
+        }
+
+        enabled_extensions
     }
+
+    /// instance 所需的所有 layers
+    fn get_layers(
+        mut required_validation_layers: Vec<&'static CStr>,
+        supported_validation_layers: &[vk::LayerProperties],
+    ) -> Vec<&'static CStr>
+    {
+        #[cfg(feature = "validation")]
+        {
+            let optimal_validation_layers = get_optimal_validation_layers(supported_validation_layers);
+            required_validation_layers.extend(optimal_validation_layers);
+        }
+
+
+        if validate_layers(&required_validation_layers, supported_validation_layers) {
+            log::info!("Enabled Validation Layers:");
+            for layer in &required_validation_layers {
+                log::info!("\t{:?}", layer);
+            }
+        } else {
+            panic!("Required validation layers are missing.");
+        }
+
+        required_validation_layers
+    }
+
 
     pub fn get_handle(&self) -> &ash::Instance
     {
         &self.handle
     }
 
-    pub fn get_extensions(&self) -> &Vec<String>
-    {
-        todo!()
-    }
 
     /// 尝试开启某项 extension
     ///
@@ -336,7 +324,7 @@ impl RhiInstance
         todo!()
     }
 
-    /// 找到机器上所有的 GPU，并缓存到 self.gpus 中
+    /// 找到机器上所有的 PhysicalDevice, 并缓存到 self.gpus 中
     fn query_gpus(&mut self)
     {
         unsafe {

@@ -26,7 +26,6 @@ impl RhiFence
     }
 
     /// 阻塞等待 fence
-    #[inline]
     pub fn wait(&self)
     {
         unsafe {
@@ -34,7 +33,6 @@ impl RhiFence
         }
     }
 
-    #[inline]
     pub fn reset(&mut self)
     {
         unsafe {

@@ -48,7 +48,7 @@ pub struct RhiSubmitBatch
 
 
 /// 兼容 VkSubmitInfo 的内存模式
-struct RhiSubmitBatchVk
+pub struct RhiSubmitBatchVk
 {
     command_buffers: Vec<vk::CommandBuffer>,
     wait_stages: Vec<vk::PipelineStageFlags>,
@@ -61,7 +61,7 @@ impl RhiSubmitBatchVk
 {
     /// # unsafe
     /// 返回的 submitInfo 仅仅在 self 存在时有效
-    unsafe fn submit_info(&self) -> vk::SubmitInfo
+    pub unsafe fn submit_info(&self) -> vk::SubmitInfo
     {
         let mut info = vk::SubmitInfo::builder()
             .command_buffers(&self.command_buffers)
@@ -86,7 +86,7 @@ impl RhiSubmitBatchVk
 impl RhiSubmitBatch
 {
     #[inline]
-    fn to_vk_batch(&self) -> RhiSubmitBatchVk
+    pub fn to_vk_batch(&self) -> RhiSubmitBatchVk
     {
         RhiSubmitBatchVk {
             command_buffers: self.commands(),

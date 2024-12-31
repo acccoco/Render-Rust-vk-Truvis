@@ -1,15 +1,14 @@
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use crate::{
     framework::{
         core::swapchain::RenderSwapchainInitInfo,
         platform::window_system::{WindowCreateInfo, WindowSystem},
         rendering::render_context::{RenderContext, RenderContextInitInfo},
-        rhi::{vk_debug_callback, Rhi, RhiInitInfo},
+        rhi::{vk_debug_callback, Rhi, RhiInitInfo, RHI},
     },
     render_init::ENGINE_NAME,
 };
-
 
 pub struct Timer
 {
@@ -75,7 +74,6 @@ pub struct RenderInitInfo
     pub app_name: String,
 }
 
-static RHI: OnceLock<Rhi> = OnceLock::new();
 
 impl Renderer
 {

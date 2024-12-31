@@ -1,7 +1,7 @@
 use std::{
     ffi::{CStr, CString},
     rc::Rc,
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use anyhow::Context;
@@ -12,8 +12,13 @@ use vk_mem::Alloc;
 
 use crate::framework::{
     core::{
-        command_pool::RhiCommandPool, debug::RhiDebugUtils, device::RhiDevice, instance::RhiInstance,
-        physical_device::RhiPhysicalDevice, queue::RhiQueue,
+        command_pool::RhiCommandPool,
+        debug::RhiDebugUtils,
+        device::RhiDevice,
+        instance::RhiInstance,
+        physical_device::RhiPhysicalDevice,
+        queue::{RhiQueue, RhiSubmitBatch},
+        synchronize::RhiFence,
     },
     platform::window_system::WindowSystem,
 };
@@ -219,6 +224,9 @@ impl RhiInitInfo
         ];
     }
 }
+
+
+pub static RHI: OnceLock<Rhi> = OnceLock::new();
 
 
 /// Rhi 只需要做到能够创建各种资源的程度就行了
@@ -570,5 +578,41 @@ impl Rhi
             })
             .copied()
             .collect()
+    }
+
+    pub fn reset_command_pool(&self, command_pool: &mut RhiCommandPool)
+    {
+        unsafe {
+            self.device()
+                .reset_command_pool(command_pool.command_pool, vk::CommandPoolResetFlags::RELEASE_RESOURCES)
+                .unwrap();
+        }
+    }
+
+    pub fn wait_for_fence(&self, fence: &RhiFence)
+    {
+        unsafe {
+            self.device().wait_for_fences(std::slice::from_ref(&fence.fence), true, u64::MAX).unwrap();
+        }
+    }
+
+    pub fn reset_fence(&self, fence: &RhiFence)
+    {
+        unsafe {
+            self.device().reset_fences(std::slice::from_ref(&fence.fence)).unwrap();
+        }
+    }
+
+    pub fn queue_submit(&self, queue: &RhiQueue, batches: Vec<RhiSubmitBatch>, fence: Option<RhiFence>)
+    {
+        unsafe {
+            // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
+            let batches = batches.iter().map(|b| b.to_vk_batch()).collect_vec();
+            let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();
+
+            self.device()
+                .queue_submit(queue.queue, &submit_infos, fence.map_or(vk::Fence::null(), |f| f.fence))
+                .unwrap();
+        }
     }
 }
