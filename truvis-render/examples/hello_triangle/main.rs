@@ -166,7 +166,7 @@ impl App for HelloTriangle
     }
 
 
-    fn init(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
+    fn prepare(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
         log::info!("start.");
 

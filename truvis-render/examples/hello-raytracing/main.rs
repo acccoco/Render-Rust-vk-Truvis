@@ -247,7 +247,7 @@ impl App for HelloRT
         unimplemented!()
     }
 
-    fn init(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
+    fn prepare(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
         unimplemented!()
     }

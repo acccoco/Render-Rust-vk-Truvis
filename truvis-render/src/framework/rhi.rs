@@ -615,4 +615,41 @@ impl Rhi
                 .unwrap();
         }
     }
+
+    pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str) -> vk::RenderPass
+    {
+        let render_pass = unsafe { self.device().create_render_pass(render_pass_ci, None).unwrap() };
+        self.set_debug_name(render_pass, debug_name);
+        render_pass
+    }
+
+    pub fn create_pipeline_cache(
+        &self,
+        pipeline_cache_ci: &vk::PipelineCacheCreateInfo,
+        debug_name: &str,
+    ) -> vk::PipelineCache
+    {
+        let pipeline_cache = unsafe { self.device().create_pipeline_cache(pipeline_cache_ci, None).unwrap() };
+        self.set_debug_name(pipeline_cache, debug_name);
+        pipeline_cache
+    }
+
+    pub fn get_depth_format(&self) -> vk::Format
+    {
+        let depth_formats = vec![
+            vk::Format::D32_SFLOAT_S8_UINT,
+            vk::Format::D32_SFLOAT,
+            vk::Format::D32_SFLOAT_S8_UINT,
+            vk::Format::D16_UNORM_S8_UINT,
+            vk::Format::D16_UNORM,
+        ];
+
+        let depth_format = self.find_supported_format(
+            &depth_formats,
+            vk::ImageTiling::OPTIMAL,
+            vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+        );
+
+        depth_format.first().copied().unwrap()
+    }
 }
