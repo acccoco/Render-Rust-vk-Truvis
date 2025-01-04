@@ -1,14 +1,23 @@
 use ash::vk;
 use truvis_render::{
-    framework::{rendering::render_context::RenderContext, rhi::Rhi},
+    framework::{
+        core::{create_utils::RhiCreateInfoUtil, image::RhiImage2D},
+        rendering::render_context::RenderContext,
+        rhi::Rhi,
+    },
     render::{RenderInitInfo, Timer},
     run::App,
 };
+use vk_mem::MemoryUsage;
 
 fn main() {}
 
 
-struct VkApp {}
+struct VkApp
+{
+    width: i32,
+    height: i32,
+}
 
 impl VkApp
 {
@@ -79,15 +88,20 @@ impl VkApp
         render_pass
     }
 
-    fn setup_frame_buffer(rhi: &Rhi)
+    fn setup_frame_buffer(rhi: &Rhi, width: u32, height: u32)
     {
+        // TODO 使用 vkmem
+
+        // TODO 可以把这个 format 存下来
+        let depth_format = rhi.get_depth_format();
+
         // depth image
-        let image = vk::ImageCreateInfo::builder()
+        let image_ci = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
-            .format(rhi.get_depth_format()) // TODO 可以把这个 format 存下来
+            .format(depth_format)
             .extent(vk::Extent3D {
-                width: 800,
-                height: 800,
+                width,
+                height,
                 depth: 1,
             })
             .mip_levels(1)
@@ -95,29 +109,25 @@ impl VkApp
             .samples(vk::SampleCountFlags::TYPE_1)
             .tiling(vk::ImageTiling::OPTIMAL)
             .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC)
-            .flags(vk::ImageCreateFlags::empty());
-    }
-}
+            .flags(vk::ImageCreateFlags::empty())
+            .build();
 
-impl App for VkApp
-{
-    fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
-    {
-        unimplemented!()
-    }
+        let (depth_image, depth_alloc) = rhi.create_image(&image_ci, "depth_buffer");
 
-    fn init_info() -> RenderInitInfo
-    {
-        unimplemented!()
-    }
+        let depth_stencil_view_ci = vk::ImageViewCreateInfo::builder()
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(depth_format)
+            .flags(vk::ImageViewCreateFlags::empty())
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            })
+            .image(depth_image);
 
-    fn get_init_info(&self) -> RenderInitInfo
-    {
-        RenderInitInfo {
-            window_width: 800,
-            window_height: 800,
-            app_name: "Vk-glTF-PBR".to_string(),
-        }
+        let depth_image_view = rhi.create_image_view(&depth_stencil_view_ci, "depth view");
     }
 
     fn prepare(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
@@ -129,6 +139,34 @@ impl App for VkApp
         let pipeline_cache = rhi.create_pipeline_cache(&pipeline_cache_create_info, "pipeline cache");
 
         todo!()
+    }
+
+    fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    {
+        let mut app = VkApp {
+            width: 800,
+            height: 800,
+        };
+        app.prepare(rhi, render_context);
+
+        app
+    }
+}
+
+impl App for VkApp
+{
+    fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    {
+        VkApp::new(rhi, render_context)
+    }
+
+    fn get_render_init_info() -> RenderInitInfo
+    {
+        RenderInitInfo {
+            window_width: 800,
+            window_height: 800,
+            app_name: "Vk-glTF-PBR".to_string(),
+        }
     }
 
     fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)

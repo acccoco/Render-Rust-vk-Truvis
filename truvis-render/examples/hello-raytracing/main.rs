@@ -13,7 +13,7 @@ use truvis_render::{
         rhi::Rhi,
     },
     render::{RenderInitInfo, Renderer, Timer},
-    run::{run2, App},
+    run::{run, App},
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -228,28 +228,18 @@ impl HelloRT
 
 impl App for HelloRT
 {
-    fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
     {
         HelloRT::new(rhi, render_context)
     }
 
-    fn init_info() -> RenderInitInfo
+    fn get_render_init_info() -> RenderInitInfo
     {
         RenderInitInfo {
             window_width: 800,
             window_height: 800,
             app_name: "hello-triangle".to_string(),
         }
-    }
-
-    fn get_init_info(&self) -> RenderInitInfo
-    {
-        unimplemented!()
-    }
-
-    fn prepare(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
-    {
-        unimplemented!()
     }
 
     fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
@@ -261,5 +251,5 @@ impl App for HelloRT
 
 fn main()
 {
-    run2::<HelloRT>(HelloRT::init_info());
+    run::<HelloRT>();
 }

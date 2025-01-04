@@ -71,9 +71,9 @@ pub struct PushConstants
 
 struct ShaderToy
 {
-    vertex_buffer: Option<RhiBuffer>,
-    index_buffer: Option<RhiBuffer>,
-    pipeline: Option<RhiPipeline>,
+    vertex_buffer: RhiBuffer,
+    index_buffer: RhiBuffer,
+    pipeline: RhiPipeline,
 }
 
 impl ShaderToy
@@ -164,17 +164,12 @@ impl ShaderToy
         let mut cmd = render_context.alloc_command_buffer("render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         {
-            cmd.push_constants(
-                self.pipeline.as_ref().unwrap(),
-                vk::ShaderStageFlags::ALL,
-                0,
-                bytemuck::bytes_of(&push_constants),
-            );
+            cmd.push_constants(&self.pipeline, vk::ShaderStageFlags::ALL, 0, bytemuck::bytes_of(&push_constants));
 
             cmd.begin_rendering(&render_context.render_info());
-            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.as_ref().unwrap());
-            cmd.bind_index_buffer(self.index_buffer.as_ref().unwrap(), 0, vk::IndexType::UINT32);
-            cmd.bind_vertex_buffer(0, std::slice::from_ref(self.vertex_buffer.as_ref().unwrap()), &[0]);
+            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
+            cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
+            cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
             cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
             cmd.end_rendering();
         }
@@ -191,47 +186,35 @@ impl ShaderToy
         render_context.submit_frame();
     }
 
-    fn new() -> Self
-    {
-        Self {
-            vertex_buffer: None,
-            index_buffer: None,
-            pipeline: None,
-        }
-    }
-}
-
-impl App for ShaderToy
-{
     fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
-    {
-        unimplemented!()
-    }
-
-    fn init_info() -> RenderInitInfo
-    {
-        unimplemented!()
-    }
-
-    fn get_init_info(&self) -> RenderInitInfo
-    {
-        RenderInitInfo {
-            window_width: 1600,
-            window_height: 900,
-            app_name: "hello-triangle".to_string(),
-        }
-    }
-
-    fn prepare(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
         log::info!("start.");
 
         let (vertex_buffer, index_buffer) = Self::init_buffer(rhi);
         let pipeline = Self::init_pipeline(rhi, render_context);
 
-        self.vertex_buffer = Some(vertex_buffer);
-        self.index_buffer = Some(index_buffer);
-        self.pipeline = Some(pipeline);
+        Self {
+            vertex_buffer,
+            index_buffer,
+            pipeline,
+        }
+    }
+}
+
+impl App for ShaderToy
+{
+    fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    {
+        ShaderToy::new(rhi, render_context)
+    }
+
+    fn get_render_init_info() -> RenderInitInfo
+    {
+        RenderInitInfo {
+            window_width: 1600,
+            window_height: 900,
+            app_name: "hello-triangle".to_string(),
+        }
     }
 
     fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
@@ -242,6 +225,5 @@ impl App for ShaderToy
 
 fn main()
 {
-    let hello = ShaderToy::new();
-    run(hello);
+    run::<ShaderToy>();
 }
