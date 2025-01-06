@@ -1,5 +1,5 @@
-pub(crate) use _ctx_init::RenderContextInitInfo;
 use ash::vk;
+pub(crate) use impl_init::RenderContextInitInfo;
 
 use crate::framework::{
     core::{
@@ -155,7 +155,7 @@ impl RenderContext
 }
 
 
-mod _ctx_init
+mod impl_init
 {
     use ash::vk;
     use itertools::Itertools;
@@ -316,17 +316,26 @@ mod _ctx_init
     }
 }
 
-mod _ctx_property
+mod impl_property
 {
     use ash::vk;
 
     use crate::framework::{
-        core::synchronize::{RhiFence, RhiSemaphore},
+        core::{
+            swapchain::RenderSwapchain,
+            synchronize::{RhiFence, RhiSemaphore},
+        },
         rendering::render_context::RenderContext,
     };
 
     impl RenderContext
     {
+        #[inline]
+        pub fn swapchain(&self) -> &RenderSwapchain
+        {
+            &self.render_swapchain
+        }
+
         #[inline]
         pub fn extent(&self) -> vk::Extent2D
         {
@@ -351,13 +360,11 @@ mod _ctx_property
             self.current_frame
         }
 
-
         #[inline]
         pub fn depth_format(&self) -> vk::Format
         {
             unsafe { self.depth_format.unwrap_unchecked() }
         }
-
 
         #[inline]
         pub fn current_image_render_finish_semaphore(&self) -> RhiSemaphore

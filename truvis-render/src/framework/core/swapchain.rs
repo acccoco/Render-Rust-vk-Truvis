@@ -11,17 +11,17 @@ use crate::framework::{
 
 pub struct RenderSwapchain
 {
-    pub(crate) swapchain_pf: ash::extensions::khr::Swapchain,
-    pub(crate) handle: Option<vk::SwapchainKHR>,
+    swapchain_pf: ash::extensions::khr::Swapchain,
+    handle: Option<vk::SwapchainKHR>,
 
-    pub(crate) surface: Option<vk::SurfaceKHR>,
+    surface: Option<vk::SurfaceKHR>,
     surface_pf: Option<ash::extensions::khr::Surface>,
 
-    pub(crate) images: Vec<vk::Image>,
-    pub(crate) image_views: Vec<vk::ImageView>,
+    pub images: Vec<vk::Image>,
+    image_views: Vec<vk::ImageView>,
 
-    pub(crate) extent: Option<vk::Extent2D>,
-    pub(crate) format: Option<vk::Format>,
+    pub extent: Option<vk::Extent2D>,
+    format: Option<vk::Format>,
     color_space: Option<vk::ColorSpaceKHR>,
     present_mode: Option<vk::PresentModeKHR>,
 
@@ -29,7 +29,7 @@ pub struct RenderSwapchain
     surface_formats: Vec<vk::SurfaceFormatKHR>,
     surface_present_modes: Vec<vk::PresentModeKHR>,
 
-    pub(crate) color_attach_infos: Vec<vk::RenderingAttachmentInfo>,
+    pub color_attach_infos: Vec<vk::RenderingAttachmentInfo>,
 }
 
 pub struct RenderSwapchainInitInfo
@@ -111,7 +111,7 @@ impl RenderSwapchain
     }
 }
 
-mod _render_swapchain_property
+mod impl_property
 {
     use ash::vk;
 
@@ -130,10 +130,22 @@ mod _render_swapchain_property
         {
             unsafe { self.format.unwrap_unchecked() }
         }
+
+        #[inline]
+        pub fn images(&self) -> &[vk::Image]
+        {
+            &self.images
+        }
+
+        #[inline]
+        pub fn image_views(&self) -> &[vk::ImageView]
+        {
+            &self.image_views
+        }
     }
 }
 
-mod _render_swapchain_init
+mod impl_init
 {
     use ash::vk;
     use itertools::Itertools;

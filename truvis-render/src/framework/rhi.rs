@@ -257,399 +257,454 @@ pub struct Rhi
 }
 
 // 初始化
-impl Rhi
+mod impl_init
 {
-    const MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
-    const MAX_MATERIAL_CNT: u32 = 256;
+    use std::{rc::Rc, sync::Arc};
 
-    pub fn new(mut init_info: RhiInitInfo) -> anyhow::Result<Self>
+    use ash::vk;
+    use itertools::Itertools;
+
+    use crate::framework::{
+        core::{device::RhiDevice, instance::RhiInstance, physical_device::RhiPhysicalDevice},
+        rhi::{Rhi, RhiInitInfo},
+    };
+
+    impl Rhi
     {
-        let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");
+        const MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
+        const MAX_MATERIAL_CNT: u32 = 256;
 
-        let instance = RhiInstance::old_new(&vk_pf, &init_info)?;
+        pub fn new(mut init_info: RhiInitInfo) -> anyhow::Result<Self>
+        {
+            let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");
 
-        let pdevice = Arc::new(Self::init_pdevice(&instance.handle)?);
-        let device = RhiDevice::old_new(&vk_pf, &mut init_info, &instance, pdevice.clone())?;
+            let instance = RhiInstance::old_new(&vk_pf, &init_info)?;
 
-        let mut rhi = Self {
-            vk_pf: unsafe { Some(ash::Entry::load()?) },
-            instance,
-            physical_device: pdevice,
-            device,
-            vk_dynamic_render_pf: None,
-            vma: None,
-            descriptor_pool: None,
-            graphics_command_pool: None,
-            transfer_command_pool: None,
-            compute_command_pool: None,
-            vk_acceleration_pf: None,
-        };
+            let pdevice = Arc::new(Self::init_pdevice(&instance.handle)?);
+            let device = RhiDevice::old_new(&vk_pf, &mut init_info, &instance, pdevice.clone())?;
 
-        rhi.init_pf();
-        rhi.init_vma(&init_info);
-        rhi.init_descriptor_pool();
-        rhi.init_default_command_pool();
+            let mut rhi = Self {
+                vk_pf: unsafe { Some(ash::Entry::load()?) },
+                instance,
+                physical_device: pdevice,
+                device,
+                vk_dynamic_render_pf: None,
+                vma: None,
+                descriptor_pool: None,
+                graphics_command_pool: None,
+                transfer_command_pool: None,
+                compute_command_pool: None,
+                vk_acceleration_pf: None,
+            };
 
-        rhi.set_debug_name(rhi.physical_device().handle, "main-physical-device");
-        rhi.set_debug_name(rhi.device().handle(), "main-device");
-        rhi.set_debug_name(rhi.descriptor_pool.unwrap(), "main-descriptor-pool");
+            rhi.init_pf();
+            rhi.init_vma(&init_info);
+            rhi.init_descriptor_pool();
+            rhi.init_default_command_pool();
 
-        Ok(rhi)
-    }
+            rhi.set_debug_name(rhi.physical_device().handle, "main-physical-device");
+            rhi.set_debug_name(rhi.device().handle(), "main-device");
+            rhi.set_debug_name(rhi.descriptor_pool.unwrap(), "main-descriptor-pool");
 
-    fn init_descriptor_pool(&mut self)
-    {
-        let pool_size = [
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
-                descriptor_count: 128,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: Self::MAX_VERTEX_BLENDING_MESH_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: Self::MAX_MATERIAL_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                descriptor_count: Self::MAX_MATERIAL_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::INPUT_ATTACHMENT,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_IMAGE,
-                descriptor_count: 32,
-            },
-        ];
+            Ok(rhi)
+        }
 
-        let pool_create_info = vk::DescriptorPoolCreateInfo::builder()
-            .pool_sizes(&pool_size)
-            .max_sets(Self::MAX_MATERIAL_CNT + Self::MAX_VERTEX_BLENDING_MESH_CNT + 32);
+        fn init_descriptor_pool(&mut self)
+        {
+            let pool_size = [
+                vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
+                    descriptor_count: 128,
+                },
+                vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::STORAGE_BUFFER,
+                    descriptor_count: Self::MAX_VERTEX_BLENDING_MESH_CNT + 32,
+                },
+                vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::UNIFORM_BUFFER,
+                    descriptor_count: Self::MAX_MATERIAL_CNT + 32,
+                },
+                vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    descriptor_count: Self::MAX_MATERIAL_CNT + 32,
+                },
+                vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::INPUT_ATTACHMENT,
+                    descriptor_count: 32,
+                },
+                vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
+                    descriptor_count: 32,
+                },
+                vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::STORAGE_IMAGE,
+                    descriptor_count: 32,
+                },
+            ];
 
-        unsafe {
-            self.descriptor_pool = Some(self.device().create_descriptor_pool(&pool_create_info, None).unwrap());
+            let pool_create_info = vk::DescriptorPoolCreateInfo::builder()
+                .pool_sizes(&pool_size)
+                .max_sets(Self::MAX_MATERIAL_CNT + Self::MAX_VERTEX_BLENDING_MESH_CNT + 32);
+
+            unsafe {
+                self.descriptor_pool = Some(self.device().create_descriptor_pool(&pool_create_info, None).unwrap());
+            }
+        }
+
+        fn init_default_command_pool(&mut self)
+        {
+            self.graphics_command_pool = self.create_command_pool(
+                vk::QueueFlags::GRAPHICS,
+                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+                "rhi-graphics-command-pool",
+            );
+            self.compute_command_pool = self.create_command_pool(
+                vk::QueueFlags::COMPUTE,
+                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+                "rhi-compute-command-pool",
+            );
+            self.transfer_command_pool = self.create_command_pool(
+                vk::QueueFlags::TRANSFER,
+                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+                "rhi-transfer-command-pool",
+            );
+
+            // 非空检测
+            self.compute_command_pool.as_ref().unwrap();
+            self.graphics_command_pool.as_ref().unwrap();
+            self.transfer_command_pool.as_ref().unwrap();
+        }
+
+
+        fn init_pdevice(instance: &ash::Instance) -> anyhow::Result<RhiPhysicalDevice>
+        {
+            Ok(unsafe { instance.enumerate_physical_devices() }?
+                .iter()
+                .map(|pdevice| RhiPhysicalDevice::new(*pdevice, instance))
+                // 优先使用独立显卡
+                .find_or_first(RhiPhysicalDevice::is_descrete_gpu)
+                .unwrap())
+        }
+
+
+        fn init_pf(&mut self)
+        {
+            self.vk_dynamic_render_pf =
+                Some(ash::extensions::khr::DynamicRendering::new(&self.instance.handle, self.device.device()));
+            self.vk_acceleration_pf =
+                Some(ash::extensions::khr::AccelerationStructure::new(&self.instance.handle, self.device.device()));
+        }
+
+        fn init_vma(&mut self, init_info: &RhiInitInfo)
+        {
+            let vma_create_info = vk_mem::AllocatorCreateInfo::new(
+                Rc::new(&self.instance.handle),
+                Rc::new(self.device.device()),
+                self.physical_device.handle,
+            )
+            .vulkan_api_version(init_info.vk_version)
+            .flags(vk_mem::AllocatorCreateFlags::BUFFER_DEVICE_ADDRESS);
+
+            self.vma = Some(vk_mem::Allocator::new(vma_create_info).unwrap());
         }
     }
-
-    fn init_default_command_pool(&mut self)
-    {
-        self.graphics_command_pool = self.create_command_pool(
-            vk::QueueFlags::GRAPHICS,
-            vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-            "rhi-graphics-command-pool",
-        );
-        self.compute_command_pool = self.create_command_pool(
-            vk::QueueFlags::COMPUTE,
-            vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-            "rhi-compute-command-pool",
-        );
-        self.transfer_command_pool = self.create_command_pool(
-            vk::QueueFlags::TRANSFER,
-            vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-            "rhi-transfer-command-pool",
-        );
-
-        // 非空检测
-        self.compute_command_pool.as_ref().unwrap();
-        self.graphics_command_pool.as_ref().unwrap();
-        self.transfer_command_pool.as_ref().unwrap();
-    }
-
-
-    fn init_pdevice(instance: &ash::Instance) -> anyhow::Result<RhiPhysicalDevice>
-    {
-        Ok(unsafe { instance.enumerate_physical_devices() }?
-            .iter()
-            .map(|pdevice| RhiPhysicalDevice::new(*pdevice, instance))
-            // 优先使用独立显卡
-            .find_or_first(RhiPhysicalDevice::is_descrete_gpu)
-            .unwrap())
-    }
-
-
-    fn init_pf(&mut self)
-    {
-        self.vk_dynamic_render_pf =
-            Some(ash::extensions::khr::DynamicRendering::new(&self.instance.handle, self.device.device()));
-        self.vk_acceleration_pf =
-            Some(ash::extensions::khr::AccelerationStructure::new(&self.instance.handle, self.device.device()));
-    }
-
-    fn init_vma(&mut self, init_info: &RhiInitInfo)
-    {
-        let vma_create_info = vk_mem::AllocatorCreateInfo::new(
-            Rc::new(&self.instance.handle),
-            Rc::new(self.device.device()),
-            self.physical_device.handle,
-        )
-        .vulkan_api_version(init_info.vk_version)
-        .flags(vk_mem::AllocatorCreateFlags::BUFFER_DEVICE_ADDRESS);
-
-        self.vma = Some(vk_mem::Allocator::new(vma_create_info).unwrap());
-    }
 }
-
 
 // 属性访问
-impl Rhi
+mod impl_propery
 {
-    #[inline]
-    pub fn graphics_command_pool(&self) -> &RhiCommandPool
+    use ash::vk;
+
+    use crate::framework::{
+        core::{command_pool::RhiCommandPool, physical_device::RhiPhysicalDevice, queue::RhiQueue},
+        rhi::Rhi,
+    };
+
+    impl Rhi
     {
-        self.graphics_command_pool.as_ref().unwrap()
-    }
-    #[inline]
-    pub fn compute_command_pool(&self) -> &RhiCommandPool
-    {
-        self.compute_command_pool.as_ref().unwrap()
-    }
-    #[inline]
-    pub fn transfer_command_pool(&self) -> &RhiCommandPool
-    {
-        self.transfer_command_pool.as_ref().unwrap()
-    }
-    #[inline]
-    pub(crate) fn vk_instance(&self) -> &ash::Instance
-    {
-        &self.instance.handle
-    }
-    #[inline]
-    pub(crate) fn device(&self) -> &ash::Device
-    {
-        self.device.device()
-    }
-    #[inline]
-    pub(crate) fn physical_device(&self) -> &RhiPhysicalDevice
-    {
-        &self.physical_device
-    }
-    #[inline]
-    pub fn compute_queue(&self) -> &RhiQueue
-    {
-        &self.device.compute_queue
-    }
-    #[inline]
-    pub fn graphics_queue(&self) -> &RhiQueue
-    {
-        &self.device.graphics_queue
-    }
-    #[inline]
-    pub fn transfer_queue(&self) -> &RhiQueue
-    {
-        &self.device.transfer_queue
-    }
-    #[inline]
-    pub fn descriptor_pool(&self) -> vk::DescriptorPool
-    {
-        unsafe { self.descriptor_pool.unwrap_unchecked() }
-    }
-    #[inline]
-    pub(crate) fn vma(&self) -> &vk_mem::Allocator
-    {
-        unsafe { self.vma.as_ref().unwrap_unchecked() }
-    }
-    #[inline]
-    pub(crate) fn vk_pf(&self) -> &ash::Entry
-    {
-        unsafe { self.vk_pf.as_ref().unwrap_unchecked() }
-    }
-    #[inline]
-    pub(crate) fn dynamic_render_pf(&self) -> &ash::extensions::khr::DynamicRendering
-    {
-        unsafe { self.vk_dynamic_render_pf.as_ref().unwrap_unchecked() }
-    }
-    #[inline]
-    pub(crate) fn acceleration_structure_pf(&self) -> &ash::extensions::khr::AccelerationStructure
-    {
-        unsafe { self.vk_acceleration_pf.as_ref().unwrap_unchecked() }
+        #[inline]
+        pub fn graphics_command_pool(&self) -> &RhiCommandPool
+        {
+            self.graphics_command_pool.as_ref().unwrap()
+        }
+        #[inline]
+        pub fn compute_command_pool(&self) -> &RhiCommandPool
+        {
+            self.compute_command_pool.as_ref().unwrap()
+        }
+        #[inline]
+        pub fn transfer_command_pool(&self) -> &RhiCommandPool
+        {
+            self.transfer_command_pool.as_ref().unwrap()
+        }
+        #[inline]
+        pub(crate) fn vk_instance(&self) -> &ash::Instance
+        {
+            &self.instance.handle
+        }
+        #[inline]
+        pub(crate) fn device(&self) -> &ash::Device
+        {
+            self.device.device()
+        }
+        #[inline]
+        pub(crate) fn physical_device(&self) -> &RhiPhysicalDevice
+        {
+            &self.physical_device
+        }
+        #[inline]
+        pub fn compute_queue(&self) -> &RhiQueue
+        {
+            &self.device.compute_queue
+        }
+        #[inline]
+        pub fn graphics_queue(&self) -> &RhiQueue
+        {
+            &self.device.graphics_queue
+        }
+        #[inline]
+        pub fn transfer_queue(&self) -> &RhiQueue
+        {
+            &self.device.transfer_queue
+        }
+        #[inline]
+        pub fn descriptor_pool(&self) -> vk::DescriptorPool
+        {
+            unsafe { self.descriptor_pool.unwrap_unchecked() }
+        }
+        #[inline]
+        pub(crate) fn vma(&self) -> &vk_mem::Allocator
+        {
+            unsafe { self.vma.as_ref().unwrap_unchecked() }
+        }
+        #[inline]
+        pub(crate) fn vk_pf(&self) -> &ash::Entry
+        {
+            unsafe { self.vk_pf.as_ref().unwrap_unchecked() }
+        }
+        #[inline]
+        pub(crate) fn dynamic_render_pf(&self) -> &ash::extensions::khr::DynamicRendering
+        {
+            unsafe { self.vk_dynamic_render_pf.as_ref().unwrap_unchecked() }
+        }
+        #[inline]
+        pub(crate) fn acceleration_structure_pf(&self) -> &ash::extensions::khr::AccelerationStructure
+        {
+            unsafe { self.vk_acceleration_pf.as_ref().unwrap_unchecked() }
+        }
     }
 }
 
-
 // 工具方法
-impl Rhi
+mod impl_tools
 {
-    /// 需要在 debug_util_pf 以及 device 初始化完成后调用
-    pub(crate) fn set_debug_name<T, S>(&self, handle: T, name: S)
-    where
-        T: vk::Handle + Copy,
-        S: AsRef<str>,
+    use std::ffi::CString;
+
+    use ash::vk;
+    use itertools::Itertools;
+    use vk_mem::Alloc;
+
+    use crate::framework::{
+        core::{
+            command_pool::RhiCommandPool,
+            queue::{RhiQueue, RhiSubmitBatch},
+            synchronize::RhiFence,
+        },
+        rhi::Rhi,
+    };
+
+    impl Rhi
     {
-        let name = if name.as_ref().is_empty() { "empty-debug-name" } else { name.as_ref() };
-        let name = CString::new(name).unwrap();
-        unsafe {
-            self.device
-                .debug_utils
-                .vk_debug_utils
-                .set_debug_utils_object_name(
-                    self.device.device().handle(),
-                    &vk::DebugUtilsObjectNameInfoEXT::builder()
-                        .object_name(name.as_c_str())
-                        .object_type(T::TYPE)
-                        .object_handle(handle.as_raw()),
-                )
-                .unwrap();
+        /// 需要在 debug_util_pf 以及 device 初始化完成后调用
+        pub(crate) fn set_debug_name<T, S>(&self, handle: T, name: S)
+        where
+            T: vk::Handle + Copy,
+            S: AsRef<str>,
+        {
+            let name = if name.as_ref().is_empty() { "empty-debug-name" } else { name.as_ref() };
+            let name = CString::new(name).unwrap();
+            unsafe {
+                self.device
+                    .debug_utils
+                    .vk_debug_utils
+                    .set_debug_utils_object_name(
+                        self.device.device().handle(),
+                        &vk::DebugUtilsObjectNameInfoEXT::builder()
+                            .object_name(name.as_c_str())
+                            .object_type(T::TYPE)
+                            .object_handle(handle.as_raw()),
+                    )
+                    .unwrap();
+            }
         }
-    }
 
-    pub fn set_debug_label(&self)
-    {
-        todo!()
-        // self.debug_util_pf.unwrap().cmd_begin_debug_utils_label()
-    }
+        pub fn set_debug_label(&self)
+        {
+            todo!()
+            // self.debug_util_pf.unwrap().cmd_begin_debug_utils_label()
+        }
 
-    pub fn create_command_pool<S: AsRef<str> + Clone>(
-        &self,
-        queue_flags: vk::QueueFlags,
-        flags: vk::CommandPoolCreateFlags,
-        debug_name: S,
-    ) -> Option<RhiCommandPool>
-    {
-        let queue_family_index = self.physical_device().find_queue_family_index(queue_flags)?;
+        pub fn create_command_pool<S: AsRef<str> + Clone>(
+            &self,
+            queue_flags: vk::QueueFlags,
+            flags: vk::CommandPoolCreateFlags,
+            debug_name: S,
+        ) -> Option<RhiCommandPool>
+        {
+            let queue_family_index = self.physical_device().find_queue_family_index(queue_flags)?;
 
-        let pool = unsafe {
-            self.device()
-                .create_command_pool(
-                    &vk::CommandPoolCreateInfo::builder().queue_family_index(queue_family_index).flags(flags),
-                    None,
-                )
-                .unwrap()
-        };
+            let pool = unsafe {
+                self.device()
+                    .create_command_pool(
+                        &vk::CommandPoolCreateInfo::builder().queue_family_index(queue_family_index).flags(flags),
+                        None,
+                    )
+                    .unwrap()
+            };
 
-        self.set_debug_name(pool, debug_name);
-        Some(RhiCommandPool {
-            command_pool: pool,
-            queue_family_index,
-        })
-    }
-
-    pub fn create_image<S>(&self, create_info: &vk::ImageCreateInfo, debug_name: S) -> (vk::Image, vk_mem::Allocation)
-    where
-        S: AsRef<str>,
-    {
-        let alloc_info = vk_mem::AllocationCreateInfo {
-            usage: vk_mem::MemoryUsage::AutoPreferDevice,
-            ..Default::default()
-        };
-        let (image, allocation) = unsafe { self.vma().create_image(create_info, &alloc_info).unwrap() };
-
-        self.set_debug_name(image, debug_name);
-        (image, allocation)
-    }
-
-    #[inline]
-    pub fn create_image_view<S>(&self, create_info: &vk::ImageViewCreateInfo, debug_name: S) -> vk::ImageView
-    where
-        S: AsRef<str>,
-    {
-        let view = unsafe { self.device().create_image_view(create_info, None).unwrap() };
-
-        self.set_debug_name(view, debug_name);
-        view
-    }
-
-
-    pub(crate) fn find_supported_format(
-        &self,
-        candidates: &[vk::Format],
-        tiling: vk::ImageTiling,
-        features: vk::FormatFeatureFlags,
-    ) -> Vec<vk::Format>
-    {
-        candidates
-            .iter()
-            .filter(|f| {
-                let props = unsafe {
-                    self.vk_instance().get_physical_device_format_properties(self.physical_device().handle, **f)
-                };
-                match tiling {
-                    vk::ImageTiling::LINEAR => props.linear_tiling_features.contains(features),
-                    vk::ImageTiling::OPTIMAL => props.optimal_tiling_features.contains(features),
-                    _ => panic!("not supported tiling."),
-                }
+            self.set_debug_name(pool, debug_name);
+            Some(RhiCommandPool {
+                command_pool: pool,
+                queue_family_index,
             })
-            .copied()
-            .collect()
-    }
-
-    pub fn reset_command_pool(&self, command_pool: &mut RhiCommandPool)
-    {
-        unsafe {
-            self.device()
-                .reset_command_pool(command_pool.command_pool, vk::CommandPoolResetFlags::RELEASE_RESOURCES)
-                .unwrap();
         }
-    }
 
-    pub fn wait_for_fence(&self, fence: &RhiFence)
-    {
-        unsafe {
-            self.device().wait_for_fences(std::slice::from_ref(&fence.fence), true, u64::MAX).unwrap();
+        pub fn create_image<S>(
+            &self,
+            create_info: &vk::ImageCreateInfo,
+            debug_name: S,
+        ) -> (vk::Image, vk_mem::Allocation)
+        where
+            S: AsRef<str>,
+        {
+            let alloc_info = vk_mem::AllocationCreateInfo {
+                usage: vk_mem::MemoryUsage::AutoPreferDevice,
+                ..Default::default()
+            };
+            let (image, allocation) = unsafe { self.vma().create_image(create_info, &alloc_info).unwrap() };
+
+            self.set_debug_name(image, debug_name);
+            (image, allocation)
         }
-    }
 
-    pub fn reset_fence(&self, fence: &RhiFence)
-    {
-        unsafe {
-            self.device().reset_fences(std::slice::from_ref(&fence.fence)).unwrap();
+        #[inline]
+        pub fn create_image_view<S>(&self, create_info: &vk::ImageViewCreateInfo, debug_name: S) -> vk::ImageView
+        where
+            S: AsRef<str>,
+        {
+            let view = unsafe { self.device().create_image_view(create_info, None).unwrap() };
+
+            self.set_debug_name(view, debug_name);
+            view
         }
-    }
 
-    pub fn queue_submit(&self, queue: &RhiQueue, batches: Vec<RhiSubmitBatch>, fence: Option<RhiFence>)
-    {
-        unsafe {
-            // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
-            let batches = batches.iter().map(|b| b.to_vk_batch()).collect_vec();
-            let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();
 
-            self.device()
-                .queue_submit(queue.queue, &submit_infos, fence.map_or(vk::Fence::null(), |f| f.fence))
-                .unwrap();
+        pub(crate) fn find_supported_format(
+            &self,
+            candidates: &[vk::Format],
+            tiling: vk::ImageTiling,
+            features: vk::FormatFeatureFlags,
+        ) -> Vec<vk::Format>
+        {
+            candidates
+                .iter()
+                .filter(|f| {
+                    let props = unsafe {
+                        self.vk_instance().get_physical_device_format_properties(self.physical_device().handle, **f)
+                    };
+                    match tiling {
+                        vk::ImageTiling::LINEAR => props.linear_tiling_features.contains(features),
+                        vk::ImageTiling::OPTIMAL => props.optimal_tiling_features.contains(features),
+                        _ => panic!("not supported tiling."),
+                    }
+                })
+                .copied()
+                .collect()
         }
-    }
 
-    pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str) -> vk::RenderPass
-    {
-        let render_pass = unsafe { self.device().create_render_pass(render_pass_ci, None).unwrap() };
-        self.set_debug_name(render_pass, debug_name);
-        render_pass
-    }
+        pub fn reset_command_pool(&self, command_pool: &mut RhiCommandPool)
+        {
+            unsafe {
+                self.device()
+                    .reset_command_pool(command_pool.command_pool, vk::CommandPoolResetFlags::RELEASE_RESOURCES)
+                    .unwrap();
+            }
+        }
 
-    pub fn create_pipeline_cache(
-        &self,
-        pipeline_cache_ci: &vk::PipelineCacheCreateInfo,
-        debug_name: &str,
-    ) -> vk::PipelineCache
-    {
-        let pipeline_cache = unsafe { self.device().create_pipeline_cache(pipeline_cache_ci, None).unwrap() };
-        self.set_debug_name(pipeline_cache, debug_name);
-        pipeline_cache
-    }
+        pub fn wait_for_fence(&self, fence: &RhiFence)
+        {
+            unsafe {
+                self.device().wait_for_fences(std::slice::from_ref(&fence.fence), true, u64::MAX).unwrap();
+            }
+        }
 
-    pub fn get_depth_format(&self) -> vk::Format
-    {
-        let depth_formats = vec![
-            vk::Format::D32_SFLOAT_S8_UINT,
-            vk::Format::D32_SFLOAT,
-            vk::Format::D32_SFLOAT_S8_UINT,
-            vk::Format::D16_UNORM_S8_UINT,
-            vk::Format::D16_UNORM,
-        ];
+        pub fn reset_fence(&self, fence: &RhiFence)
+        {
+            unsafe {
+                self.device().reset_fences(std::slice::from_ref(&fence.fence)).unwrap();
+            }
+        }
 
-        let depth_format = self.find_supported_format(
-            &depth_formats,
-            vk::ImageTiling::OPTIMAL,
-            vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
-        );
+        pub fn queue_submit(&self, queue: &RhiQueue, batches: Vec<RhiSubmitBatch>, fence: Option<RhiFence>)
+        {
+            unsafe {
+                // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
+                let batches = batches.iter().map(|b| b.to_vk_batch()).collect_vec();
+                let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();
 
-        depth_format.first().copied().unwrap()
+                self.device()
+                    .queue_submit(queue.queue, &submit_infos, fence.map_or(vk::Fence::null(), |f| f.fence))
+                    .unwrap();
+            }
+        }
+
+        pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str)
+            -> vk::RenderPass
+        {
+            let render_pass = unsafe { self.device().create_render_pass(render_pass_ci, None).unwrap() };
+            self.set_debug_name(render_pass, debug_name);
+            render_pass
+        }
+
+        pub fn create_pipeline_cache(
+            &self,
+            pipeline_cache_ci: &vk::PipelineCacheCreateInfo,
+            debug_name: &str,
+        ) -> vk::PipelineCache
+        {
+            let pipeline_cache = unsafe { self.device().create_pipeline_cache(pipeline_cache_ci, None).unwrap() };
+            self.set_debug_name(pipeline_cache, debug_name);
+            pipeline_cache
+        }
+
+        pub fn get_depth_format(&self) -> vk::Format
+        {
+            let depth_formats = vec![
+                vk::Format::D32_SFLOAT_S8_UINT,
+                vk::Format::D32_SFLOAT,
+                vk::Format::D32_SFLOAT_S8_UINT,
+                vk::Format::D16_UNORM_S8_UINT,
+                vk::Format::D16_UNORM,
+            ];
+
+            let depth_format = self.find_supported_format(
+                &depth_formats,
+                vk::ImageTiling::OPTIMAL,
+                vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+            );
+
+            depth_format.first().copied().unwrap()
+        }
+
+        pub fn create_frame_buffer(
+            &self,
+            frame_buffer_ci: &vk::FramebufferCreateInfo,
+            debug_name: &str,
+        ) -> vk::Framebuffer
+        {
+            let frame_buffer = unsafe { self.device().create_framebuffer(frame_buffer_ci, None).unwrap() };
+            self.set_debug_name(frame_buffer, debug_name);
+            frame_buffer
+        }
     }
 }

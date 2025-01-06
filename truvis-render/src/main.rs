@@ -1,4 +1,5 @@
 use ash::vk;
+use itertools::Itertools;
 use truvis_render::{
     framework::{
         core::{create_utils::RhiCreateInfoUtil, image::RhiImage2D},
@@ -6,17 +7,38 @@ use truvis_render::{
         rhi::Rhi,
     },
     render::{RenderInitInfo, Timer},
-    run::App,
+    run::{run, App},
 };
 use vk_mem::MemoryUsage;
 
-fn main() {}
+fn main()
+{
+    run::<VkApp>()
+}
 
+struct AppInitInfo
+{
+    width: u32,
+    height: u32,
+}
+
+struct DepthStencil
+{
+    image: vk::Image,
+    mem: vk_mem::Allocation,
+    view: vk::ImageView,
+}
 
 struct VkApp
 {
-    width: i32,
-    height: i32,
+    width: u32,
+    height: u32,
+
+    depth_stencil: DepthStencil,
+
+    render_pass: vk::RenderPass,
+    framebuffers: Vec<vk::Framebuffer>,
+    pipeline_cache: vk::PipelineCache,
 }
 
 impl VkApp
@@ -88,7 +110,7 @@ impl VkApp
         render_pass
     }
 
-    fn setup_frame_buffer(rhi: &Rhi, width: u32, height: u32)
+    fn setup_depth_stencil(rhi: &Rhi, init_info: &AppInitInfo) -> DepthStencil
     {
         // TODO 使用 vkmem
 
@@ -100,8 +122,8 @@ impl VkApp
             .image_type(vk::ImageType::TYPE_2D)
             .format(depth_format)
             .extent(vk::Extent3D {
-                width,
-                height,
+                width: init_info.width,
+                height: init_info.height,
                 depth: 1,
             })
             .mip_levels(1)
@@ -128,28 +150,73 @@ impl VkApp
             .image(depth_image);
 
         let depth_image_view = rhi.create_image_view(&depth_stencil_view_ci, "depth view");
+
+        DepthStencil {
+            image: depth_image,
+            mem: depth_alloc,
+            view: depth_image_view,
+        }
     }
 
-    fn prepare(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext)
+    fn setup_frame_buffer(
+        rhi: &Rhi,
+        render_context: &RenderContext,
+        render_pass: vk::RenderPass,
+        init_info: &AppInitInfo,
+        depth_stencil: &DepthStencil,
+    ) -> Vec<vk::Framebuffer>
     {
-        let render_pass = Self::prepare_render_pass(rhi);
+        let frame_buffers = render_context
+            .swapchain()
+            .image_views()
+            .iter()
+            .map(|image_view| {
+                let attachments = [*image_view, depth_stencil.view];
+                let frame_buffer_ci = vk::FramebufferCreateInfo::builder()
+                    .render_pass(render_pass)
+                    .attachments(&attachments)
+                    .width(init_info.width)
+                    .height(init_info.height)
+                    .layers(1);
+                rhi.create_frame_buffer(&frame_buffer_ci, "frame buffer")
+            })
+            .collect_vec();
 
-        // Pipeline cache
-        let pipeline_cache_create_info = vk::PipelineCacheCreateInfo::default();
-        let pipeline_cache = rhi.create_pipeline_cache(&pipeline_cache_create_info, "pipeline cache");
+        frame_buffers
+    }
 
-        todo!()
+    fn setup_desriptors() {
+
     }
 
     fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
     {
-        let mut app = VkApp {
+        let init_info = AppInitInfo {
             width: 800,
             height: 800,
         };
-        app.prepare(rhi, render_context);
 
-        app
+        let render_pass = Self::prepare_render_pass(rhi);
+
+        let pipeline_cache = rhi.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), "pipeline cache");
+
+        // TODO 考虑把这个挪到 render_context 里
+        let depth_stencil = Self::setup_depth_stencil(rhi, &init_info);
+
+        let frame_buffers = Self::setup_frame_buffer(rhi, render_context, render_pass, &init_info, &depth_stencil);
+
+        // TODO 考虑将 lut 和 mipmap 的生成做成一个单独的 main()
+
+        Self {
+            width: init_info.width,
+            height: init_info.height,
+
+            depth_stencil,
+
+            render_pass,
+            framebuffers: frame_buffers,
+            pipeline_cache,
+        }
     }
 }
 
