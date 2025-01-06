@@ -167,8 +167,8 @@ impl VkApp
     ) -> Vec<vk::Framebuffer>
     {
         let frame_buffers = render_context
-            .swapchain()
-            .image_views()
+            .render_swapchain
+            .image_views
             .iter()
             .map(|image_view| {
                 let attachments = [*image_view, depth_stencil.view];
@@ -185,9 +185,7 @@ impl VkApp
         frame_buffers
     }
 
-    fn setup_desriptors() {
-
-    }
+    fn setup_desriptors() {}
 
     fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
     {

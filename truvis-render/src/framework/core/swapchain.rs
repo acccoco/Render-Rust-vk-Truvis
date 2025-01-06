@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use ash::vk;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
@@ -9,50 +7,28 @@ use crate::framework::{
     rhi::Rhi,
 };
 
+struct Surface
+{
+    handle: vk::SurfaceKHR,
+    pf: ash::extensions::khr::Surface,
+}
+
 pub struct RenderSwapchain
 {
     swapchain_pf: ash::extensions::khr::Swapchain,
-    handle: Option<vk::SwapchainKHR>,
+    swapchain_handle: vk::SwapchainKHR,
 
-    surface: Option<vk::SurfaceKHR>,
-    surface_pf: Option<ash::extensions::khr::Surface>,
+    surface: Surface,
 
     pub images: Vec<vk::Image>,
-    image_views: Vec<vk::ImageView>,
+    pub image_views: Vec<vk::ImageView>,
 
-    pub extent: Option<vk::Extent2D>,
-    format: Option<vk::Format>,
-    color_space: Option<vk::ColorSpaceKHR>,
-    present_mode: Option<vk::PresentModeKHR>,
-
-    surface_capabilities: vk::SurfaceCapabilitiesKHR,
-    surface_formats: Vec<vk::SurfaceFormatKHR>,
-    surface_present_modes: Vec<vk::PresentModeKHR>,
+    pub extent: vk::Extent2D,
+    pub color_format: vk::Format,
+    pub color_space: vk::ColorSpaceKHR,
+    pub present_mode: vk::PresentModeKHR,
 
     pub color_attach_infos: Vec<vk::RenderingAttachmentInfo>,
-}
-
-pub struct RenderSwapchainInitInfo
-{
-    pub format: vk::SurfaceFormatKHR,
-    pub swapchain_present_mode: vk::PresentModeKHR,
-    pub window: Option<Arc<WindowSystem>>,
-}
-
-impl Default for RenderSwapchainInitInfo
-{
-    fn default() -> Self
-    {
-        Self {
-            // 以下字段表示 present engine 应该如何处理线性颜色值。shader 还有 image 都不用关心这两个字段
-            format: vk::SurfaceFormatKHR {
-                format: vk::Format::B8G8R8A8_UNORM,
-                color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
-            },
-            swapchain_present_mode: vk::PresentModeKHR::MAILBOX,
-            window: None,
-        }
-    }
 }
 
 
@@ -61,37 +37,34 @@ impl RenderSwapchain
     #[inline]
     pub fn acquire_next_frame(&self, semaphore: &RhiSemaphore, fence: Option<&RhiFence>) -> u32
     {
-        unsafe {
-            // TODO 处理 optimal 的情况
-            let (image_index, _is_optimal) = self
-                .swapchain_pf
+        // TODO 处理 optimal 的情况
+        let (image_index, _is_optimal) = unsafe {
+            self.swapchain_pf
                 .acquire_next_image(
-                    self.handle.unwrap_unchecked(),
+                    self.swapchain_handle,
                     u64::MAX,
                     semaphore.semaphore,
                     fence.map_or(vk::Fence::null(), |f| f.fence),
                 )
-                .unwrap();
-            // TODO 处理 optimal
-            image_index
-        }
+                .unwrap()
+        };
+        // TODO 处理 optimal
+        image_index
     }
 
     #[inline]
     pub fn submit_frame(&self, rhi: &Rhi, image_index: u32, wait_semaphores: &[vk::Semaphore])
     {
-        unsafe {
-            let present_info = vk::PresentInfoKHR::builder()
-                .wait_semaphores(wait_semaphores)
-                .image_indices(std::slice::from_ref(&image_index))
-                .swapchains(std::slice::from_ref(self.handle.as_ref().unwrap_unchecked()));
+        let present_info = vk::PresentInfoKHR::builder()
+            .wait_semaphores(wait_semaphores)
+            .image_indices(std::slice::from_ref(&image_index))
+            .swapchains(std::slice::from_ref(&self.swapchain_handle));
 
-            self.swapchain_pf.queue_present(rhi.graphics_queue().queue, &present_info).unwrap();
-        }
+        unsafe { self.swapchain_pf.queue_present(rhi.graphics_queue().queue, &present_info).unwrap() };
     }
 
 
-    fn create_surface(rhi: &Rhi, window: &WindowSystem) -> (vk::SurfaceKHR, ash::extensions::khr::Surface)
+    fn create_surface(rhi: &Rhi, window: &WindowSystem) -> Surface
     {
         let surface_pf = ash::extensions::khr::Surface::new(rhi.vk_pf(), rhi.vk_instance());
 
@@ -107,163 +80,151 @@ impl RenderSwapchain
         };
         rhi.set_debug_name(surface, "main-surface");
 
-        (surface, surface_pf)
-    }
-}
-
-mod impl_property
-{
-    use ash::vk;
-
-    use crate::framework::core::swapchain::RenderSwapchain;
-
-    impl RenderSwapchain
-    {
-        #[inline]
-        pub fn extent(&self) -> vk::Extent2D
-        {
-            unsafe { *self.extent.as_ref().unwrap_unchecked() }
-        }
-
-        #[inline]
-        pub fn color_format(&self) -> vk::Format
-        {
-            unsafe { self.format.unwrap_unchecked() }
-        }
-
-        #[inline]
-        pub fn images(&self) -> &[vk::Image]
-        {
-            &self.images
-        }
-
-        #[inline]
-        pub fn image_views(&self) -> &[vk::ImageView]
-        {
-            &self.image_views
+        Surface {
+            handle: surface,
+            pf: surface_pf,
         }
     }
 }
 
-mod impl_init
+
+pub use _impl_init::RenderSwapchainInitInfo;
+
+mod _impl_init
 {
+    use std::sync::Arc;
+
     use ash::vk;
     use itertools::Itertools;
 
     use crate::framework::{
-        core::swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
+        core::swapchain::{RenderSwapchain, Surface},
+        platform::window_system::WindowSystem,
         rhi::Rhi,
     };
+
+    pub struct RenderSwapchainInitInfo
+    {
+        pub format: vk::SurfaceFormatKHR,
+        pub swapchain_present_mode: vk::PresentModeKHR,
+
+        pub window: Option<Arc<WindowSystem>>, // TODO 移除这个 Option，增加理解负担
+    }
+
+    impl Default for RenderSwapchainInitInfo
+    {
+        fn default() -> Self
+        {
+            Self {
+                // 以下字段表示 present engine 应该如何处理线性颜色值。shader 还有 image 都不用关心这两个字段
+                format: vk::SurfaceFormatKHR {
+                    format: vk::Format::B8G8R8A8_UNORM,
+                    color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
+                },
+                swapchain_present_mode: vk::PresentModeKHR::MAILBOX,
+                window: None,
+            }
+        }
+    }
+
 
     impl RenderSwapchain
     {
         pub fn new(rhi: &Rhi, init_info: &RenderSwapchainInitInfo) -> Self
         {
-            let mut swapchain = unsafe {
-                let pdevice = rhi.physical_device().handle;
-                let (surface, surface_pf) = Self::create_surface(rhi, init_info.window.as_ref().unwrap());
+            let pdevice = rhi.physical_device().handle;
+            let surface = Self::create_surface(rhi, init_info.window.as_ref().unwrap());
 
-                Self {
-                    swapchain_pf: ash::extensions::khr::Swapchain::new(rhi.vk_instance(), rhi.device()),
-                    handle: None,
-                    images: Vec::new(),
-                    image_views: Vec::new(),
-                    extent: None,
-                    format: None,
-                    color_space: None,
-                    present_mode: None,
-                    surface_capabilities: surface_pf
-                        .get_physical_device_surface_capabilities(pdevice, surface)
-                        .unwrap(),
-                    surface_formats: surface_pf.get_physical_device_surface_formats(pdevice, surface).unwrap(),
-                    surface_present_modes: surface_pf
-                        .get_physical_device_surface_present_modes(pdevice, surface)
-                        .unwrap(),
-                    surface: Some(surface),
-                    surface_pf: Some(surface_pf),
-                    color_attach_infos: vec![],
-                }
+            let present_mode = Self::init_present_mode2(rhi, &surface, init_info.swapchain_present_mode);
+            let (format, color_space) = Self::init_format_and_colorspace(rhi, &surface, init_info.format);
+
+            let surface_capabilities =
+                unsafe { surface.pf.get_physical_device_surface_capabilities(pdevice, surface.handle).unwrap() };
+
+            let extent = surface_capabilities.current_extent;
+
+            let (swapchain_handle, swapchain_pf) =
+                Self::init_handle(rhi, &surface, &surface_capabilities, format, color_space, extent, present_mode);
+
+            let (images, image_views) = Self::init_images_and_views(rhi, swapchain_handle, &swapchain_pf, format);
+
+            let color_attach_infos = Self::init_color_attachment_infos(&image_views);
+
+            let swapchain = Self {
+                swapchain_pf,
+                swapchain_handle,
+                images,
+                image_views,
+                extent,
+                color_format: format,
+                color_space,
+                present_mode,
+                surface,
+
+                color_attach_infos,
             };
-            swapchain.init_format(init_info.format);
-            swapchain.init_present_mode(init_info.swapchain_present_mode);
-            swapchain.init_extent();
-            swapchain.init_handle(rhi);
-            swapchain.init_images_and_views(rhi);
-            swapchain.init_color_attachs();
 
             swapchain
         }
 
-        fn init_color_attachs(&mut self)
-        {
-            self.color_attach_infos = self
-                .image_views
-                .iter()
-                .map(|v| {
-                    vk::RenderingAttachmentInfo::builder()
-                        .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                        .image_view(*v)
-                        .load_op(vk::AttachmentLoadOp::CLEAR)
-                        .store_op(vk::AttachmentStoreOp::STORE)
-                        .clear_value(vk::ClearValue {
-                            color: vk::ClearColorValue {
-                                float32: [0_f32, 0_f32, 0_f32, 1_f32],
-                            },
-                        })
-                        .build()
-                })
-                .collect();
-            //
-        }
 
-
-        fn init_extent(&mut self)
-        {
-            self.extent = Some(self.surface_capabilities.current_extent)
-        }
-
-        fn init_handle(&mut self, rhi: &Rhi)
+        fn init_handle(
+            rhi: &Rhi,
+            surface: &Surface,
+            surface_capabilities: &vk::SurfaceCapabilitiesKHR,
+            format: vk::Format,
+            color_space: vk::ColorSpaceKHR,
+            extent: vk::Extent2D,
+            present_mode: vk::PresentModeKHR,
+        ) -> (vk::SwapchainKHR, ash::extensions::khr::Swapchain)
         {
             // 确定 image count
             // max_image_count == 0，表示不限制 image 数量
-            let image_count = if self.surface_capabilities.max_image_count == 0 {
-                self.surface_capabilities.min_image_count + 1
+            let image_count = if surface_capabilities.max_image_count == 0 {
+                surface_capabilities.min_image_count + 1
             } else {
-                u32::min(self.surface_capabilities.max_image_count, self.surface_capabilities.min_image_count + 1)
+                u32::min(surface_capabilities.max_image_count, surface_capabilities.min_image_count + 1)
             };
 
             let create_info = vk::SwapchainCreateInfoKHR::builder()
-                .surface(self.surface.unwrap())
+                .surface(surface.handle)
                 .min_image_count(image_count)
-                .image_format(self.format.unwrap())
-                .image_color_space(self.color_space.unwrap())
-                .image_extent(self.extent.unwrap())
+                .image_format(format)
+                .image_color_space(color_space)
+                .image_extent(extent)
                 .image_array_layers(1)
                 // TRANSFER_DST 用于 Nsight 分析
                 .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST)
-                .pre_transform(self.surface_capabilities.current_transform)
+                .pre_transform(surface_capabilities.current_transform)
                 .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-                .present_mode(self.present_mode.unwrap())
+                .present_mode(present_mode)
                 .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
                 .clipped(true);
 
             unsafe {
-                let swapchain = self.swapchain_pf.create_swapchain(&create_info, None).unwrap();
-                rhi.set_debug_name(swapchain, "main-swapchain");
-                self.handle = Some(swapchain);
+                let swapchain_pf = ash::extensions::khr::Swapchain::new(rhi.vk_instance(), rhi.device());
+                let swapchain_handle = swapchain_pf.create_swapchain(&create_info, None).unwrap();
+                rhi.set_debug_name(swapchain_handle, "main-swapchain");
+
+                (swapchain_handle, swapchain_pf)
             }
         }
 
-        fn init_images_and_views(&mut self, rhi: &Rhi)
+        fn init_images_and_views(
+            rhi: &Rhi,
+            swapchain_handle: vk::SwapchainKHR,
+            swapchain_pf: &ash::extensions::khr::Swapchain,
+            format: vk::Format,
+        ) -> (Vec<vk::Image>, Vec<vk::ImageView>)
         {
-            let swapchain_images = unsafe { self.swapchain_pf.get_swapchain_images(self.handle.unwrap()).unwrap() };
+            let swapchain_images = unsafe { swapchain_pf.get_swapchain_images(swapchain_handle).unwrap() };
 
             let image_views = swapchain_images
                 .iter()
                 .map(|img| {
                     let create_info = vk::ImageViewCreateInfo::builder()
                         .image(*img)
-                        .format(self.format.unwrap())
+                        .format(format)
                         .view_type(vk::ImageViewType::TYPE_2D)
                         .subresource_range(
                             vk::ImageSubresourceRange::builder()
@@ -277,27 +238,81 @@ mod impl_init
                 })
                 .collect_vec();
 
-            self.images = swapchain_images;
-            self.image_views = image_views;
+            let images = swapchain_images;
+            let image_views = image_views;
 
-            for i in 0..self.images.len() {
-                rhi.set_debug_name(self.images[i], &format!("swapchain-image-{}", i));
-                rhi.set_debug_name(self.image_views[i], &format!("swapchain-image-view-{}", i));
+            // 为 images 和 image_views 设置 debug name
+            for i in 0..images.len() {
+                rhi.set_debug_name(images[i], &format!("swapchain-image-{}", i));
+                rhi.set_debug_name(image_views[i], &format!("swapchain-image-view-{}", i));
+            }
+
+            (images, image_views)
+        }
+
+        /// 找到一个合适的 present mode
+        ///
+        /// @param present_mode: 优先使用的 present mode
+        ///
+        /// 可以是：immediate, mailbox, fifo, fifo_relaxed
+        fn init_present_mode2(rhi: &Rhi, surface: &Surface, present_mode: vk::PresentModeKHR) -> vk::PresentModeKHR
+        {
+            unsafe {
+                surface
+                    .pf
+                    .get_physical_device_surface_present_modes(rhi.physical_device().handle, surface.handle)
+                    .unwrap()
+                    .iter()
+                    .find_or_first(|p| **p == present_mode)
+                    .copied()
+                    .unwrap()
             }
         }
 
-        fn init_present_mode(&mut self, present_mode: vk::PresentModeKHR)
+
+        /// 找到合适的 format 和 colorspace
+        ///
+        /// @param format: 优先使用的 format
+        ///
+        /// panic: 如果没有找到，就 panic
+        fn init_format_and_colorspace(
+            rhi: &Rhi,
+            surface: &Surface,
+            format: vk::SurfaceFormatKHR,
+        ) -> (vk::Format, vk::ColorSpaceKHR)
         {
-            self.present_mode = self.surface_present_modes.iter().find(|p| **p == present_mode).copied();
+            let surface_format = unsafe {
+                surface
+                    .pf
+                    .get_physical_device_surface_formats(rhi.physical_device().handle, surface.handle)
+                    .unwrap()
+                    .into_iter()
+                    .find(|f| *f == format)
+                    .unwrap()
+            };
+
+            (surface_format.format, surface_format.color_space)
         }
 
-
-        fn init_format(&mut self, format: vk::SurfaceFormatKHR)
+        fn init_color_attachment_infos(image_views: &[vk::ImageView]) -> Vec<vk::RenderingAttachmentInfo>
         {
-            let surface_format = self.surface_formats.iter().find(|f| **f == format).unwrap();
-
-            self.format = Some(surface_format.format);
-            self.color_space = Some(surface_format.color_space);
+            image_views
+                .iter()
+                .enumerate()
+                .map(|(index, image_view)| {
+                    vk::RenderingAttachmentInfo::builder()
+                        .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                        .image_view(*image_view)
+                        .load_op(vk::AttachmentLoadOp::CLEAR)
+                        .store_op(vk::AttachmentStoreOp::STORE)
+                        .clear_value(vk::ClearValue {
+                            color: vk::ClearColorValue {
+                                float32: [0_f32, 0_f32, 0_f32, 1_f32],
+                            },
+                        })
+                        .build()
+                })
+                .collect_vec()
         }
     }
 }

@@ -91,7 +91,7 @@ impl ShaderToy
 
     fn init_pipeline(rhi: &'static Rhi, render_context: &RenderContext) -> RhiPipeline
     {
-        let extent = render_context.extent();
+        let extent = render_context.swapchain_extent();
         let push_constant_ranges = vec![vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::ALL,
             offset: 0,
@@ -151,10 +151,10 @@ impl ShaderToy
             delta_time: timer.delta_time,
             frame: timer.total_frame,
             frame_rate: 1.0 / timer.delta_time,
-            resolution: glam::Vec2::new(render_context.extent().width as f32, render_context.extent().height as f32),
+            resolution: glam::Vec2::new(render_context.swapchain_extent().width as f32, render_context.swapchain_extent().height as f32),
             mouse: glam::Vec4::new(
-                0.2 * (render_context.extent().width as f32),
-                0.2 * (render_context.extent().height as f32),
+                0.2 * (render_context.swapchain_extent().width as f32),
+                0.2 * (render_context.swapchain_extent().height as f32),
                 0.0,
                 0.0,
             ),
