@@ -31,8 +31,6 @@ pub struct RenderContext
     depth_image_allcation: vk_mem::Allocation,
     pub depth_image_view: vk::ImageView,
 
-    depth_attach_info: vk::RenderingAttachmentInfo,
-
     present_complete_semaphores: Vec<RhiSemaphore>,
     render_complete_semaphores: Vec<RhiSemaphore>,
     fence_frame_in_flight: Vec<RhiFence>,
@@ -130,18 +128,6 @@ impl RenderContext
     }
 
 
-    #[inline]
-    pub fn render_info(&self) -> vk::RenderingInfo
-    {
-        vk::RenderingInfo::builder()
-            .layer_count(1)
-            .render_area(self.swapchain_extent().into())
-            .color_attachments(std::slice::from_ref(self.color_attach_info()))
-            .depth_attachment(&self.depth_attach_info)
-            .build()
-    }
-
-
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer<S: AsRef<str>>(&mut self, debug_name: S) -> RhiCommandBuffer
     {
@@ -205,8 +191,6 @@ mod _impl_init
             let (depth_format, depth_image, depth_image_allcation, depth_image_view) =
                 Self::init_depth_image_and_view(rhi, &render_swapchain, &init_info.depth_format_dedicate);
 
-            let depth_attach_info = Self::init_depth_attach_info(depth_image_view);
-
             let create_semaphore = |name: &str| {
                 (0..init_info.frames_in_flight).map(|i| RhiSemaphore::new(rhi, format!("{name}_{i}"))).collect_vec()
             };
@@ -233,8 +217,6 @@ mod _impl_init
                 depth_image,
                 depth_image_allcation,
                 depth_image_view,
-
-                depth_attach_info,
 
                 present_complete_semaphores,
                 render_complete_semaphores,
@@ -299,22 +281,6 @@ mod _impl_init
 
             graphics_command_pools
         }
-
-        fn init_depth_attach_info(depth_image_view: vk::ImageView) -> vk::RenderingAttachmentInfo
-        {
-            vk::RenderingAttachmentInfo::builder()
-                .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-                .image_view(depth_image_view)
-                .load_op(vk::AttachmentLoadOp::CLEAR)
-                .store_op(vk::AttachmentStoreOp::DONT_CARE)
-                .clear_value(vk::ClearValue {
-                    depth_stencil: vk::ClearDepthStencilValue {
-                        depth: 1_f32,
-                        stencil: 0,
-                    },
-                })
-                .build()
-        }
     }
 }
 
@@ -372,17 +338,17 @@ mod _impl_property
             self.present_complete_semaphores[self.current_frame]
         }
 
-        #[inline]
-        pub fn color_attach_info(&self) -> &vk::RenderingAttachmentInfo
-        {
-            &self.render_swapchain.color_attach_infos[self.swapchain_image_index]
-        }
-
         /// 当前帧从 swapchain 获取到的用于 present 的 image
         #[inline]
         pub fn current_present_image(&self) -> vk::Image
         {
             self.render_swapchain.images[self.swapchain_image_index]
+        }
+
+        #[inline]
+        pub fn current_present_image_view(&self) -> vk::ImageView
+        {
+            self.render_swapchain.image_views[self.swapchain_image_index]
         }
     }
 }

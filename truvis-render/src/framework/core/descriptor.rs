@@ -1,4 +1,4 @@
-use std::{cell::OnceCell, sync::OnceLock};
+use std::sync::OnceLock;
 
 use ash::vk;
 use itertools::Itertools;
@@ -25,29 +25,12 @@ impl<T> RhiDescriptorLayout<T>
 where
     T: RHiDescriptorBindings,
 {
-    fn get_bindings() -> &'static [vk::DescriptorSetLayoutBinding]
-    {
-        unsafe {
-            static mut BINDINGS: Vec<vk::DescriptorSetLayoutBinding> = vec![];
-            if BINDINGS.is_empty() {
-                BINDINGS = T::bindings();
-            }
-            &BINDINGS
-        }
-    }
-
     fn create_layout(rhi: &Rhi) -> vk::DescriptorSetLayout
     {
-        let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(Self::get_bindings());
+        let bindings = T::bindings();
+        let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
 
         unsafe { rhi.device().create_descriptor_set_layout(&create_info, None).unwrap() }
-    }
-
-    /// 可以确保每种类型的 layout 在内存中只有 1 份
-    fn get_layout(rhi: &Rhi) -> vk::DescriptorSetLayout
-    {
-        static LAYOUT: OnceLock<vk::DescriptorSetLayout> = OnceLock::new();
-        *LAYOUT.get_or_init(|| Self::create_layout(rhi))
     }
 }
 
@@ -55,7 +38,7 @@ where
 struct RhiDescriptorSet
 {
     descriptor_set: vk::DescriptorSet,
-    bindings: &'static [vk::DescriptorSetLayoutBinding],
+    bindings: Vec<vk::DescriptorSetLayoutBinding>,
     rhi: &'static Rhi,
 }
 enum RhiDescriptorUpdateInfo
@@ -69,14 +52,15 @@ impl RhiDescriptorSet
     where
         T: RHiDescriptorBindings,
     {
-        let layout = [RhiDescriptorLayout::<T>::get_layout(rhi)];
+        let layout = RhiDescriptorLayout::<T>::create_layout(rhi);
         unsafe {
-            let alloc_info =
-                vk::DescriptorSetAllocateInfo::builder().descriptor_pool(rhi.descriptor_pool()).set_layouts(&layout);
+            let alloc_info = vk::DescriptorSetAllocateInfo::builder()
+                .descriptor_pool(rhi.descriptor_pool())
+                .set_layouts(std::slice::from_ref(&layout));
             let descriptor_set = rhi.device().allocate_descriptor_sets(&alloc_info).unwrap()[0];
             Self {
                 descriptor_set,
-                bindings: RhiDescriptorLayout::<T>::get_bindings(),
+                bindings: T::bindings(),
                 rhi,
             }
         }

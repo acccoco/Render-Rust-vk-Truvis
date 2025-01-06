@@ -1,6 +1,7 @@
 use ash::vk;
 use vk_mem::Alloc;
 
+// TODO remove this
 static mut VMA: Option<vk_mem::Allocator> = None;
 
 pub struct AllocatedBase
@@ -32,9 +33,8 @@ impl AllocatedBase
 
         let allocator = Self::get_memory_allocator();
         unsafe {
-            let (image, allocation) = allocator
-                .create_image(create_info, &self.alloc_create_info)
-                .expect("cannot create image");
+            let (image, allocation) =
+                allocator.create_image(create_info, &self.alloc_create_info).expect("cannot create image");
             let allocation_info = allocator.get_allocation_info(&allocation).unwrap();
 
             self.post_create(&allocation_info);

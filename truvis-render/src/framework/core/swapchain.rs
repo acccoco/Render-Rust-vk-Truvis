@@ -27,8 +27,6 @@ pub struct RenderSwapchain
     pub color_format: vk::Format,
     pub color_space: vk::ColorSpaceKHR,
     pub present_mode: vk::PresentModeKHR,
-
-    pub color_attach_infos: Vec<vk::RenderingAttachmentInfo>,
 }
 
 
@@ -148,8 +146,6 @@ mod _impl_init
 
             let (images, image_views) = Self::init_images_and_views(rhi, swapchain_handle, &swapchain_pf, format);
 
-            let color_attach_infos = Self::init_color_attachment_infos(&image_views);
-
             let swapchain = Self {
                 swapchain_pf,
                 swapchain_handle,
@@ -160,8 +156,6 @@ mod _impl_init
                 color_space,
                 present_mode,
                 surface,
-
-                color_attach_infos,
             };
 
             swapchain
@@ -292,27 +286,6 @@ mod _impl_init
             };
 
             (surface_format.format, surface_format.color_space)
-        }
-
-        fn init_color_attachment_infos(image_views: &[vk::ImageView]) -> Vec<vk::RenderingAttachmentInfo>
-        {
-            image_views
-                .iter()
-                .enumerate()
-                .map(|(index, image_view)| {
-                    vk::RenderingAttachmentInfo::builder()
-                        .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                        .image_view(*image_view)
-                        .load_op(vk::AttachmentLoadOp::CLEAR)
-                        .store_op(vk::AttachmentStoreOp::STORE)
-                        .clear_value(vk::ClearValue {
-                            color: vk::ClearColorValue {
-                                float32: [0_f32, 0_f32, 0_f32, 1_f32],
-                            },
-                        })
-                        .build()
-                })
-                .collect_vec()
         }
     }
 }

@@ -110,10 +110,21 @@ impl HelloTriangle
     {
         render_context.acquire_frame();
 
+        let color_attach = <Self as App>::get_color_attachment(render_context.current_present_image_view());
+        let depth_attach = <Self as App>::get_depth_attachment(render_context.depth_image_view);
+        let render_info = <Self as App>::get_render_info(
+            vk::Rect2D {
+                offset: vk::Offset2D::default(),
+                extent: render_context.swapchain_extent(),
+            },
+            &[color_attach],
+            &depth_attach,
+        );
+
         let mut cmd = RenderContext::alloc_command_buffer(render_context, "render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         {
-            cmd.begin_rendering(&render_context.render_info());
+            cmd.begin_rendering(&render_info);
             cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
             cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
             cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
@@ -147,6 +158,11 @@ impl HelloTriangle
 
 impl App for HelloTriangle
 {
+    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _: &Timer)
+    {
+        self.my_update(rhi, render_context);
+    }
+
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
     {
         log::info!("start.");
@@ -160,11 +176,6 @@ impl App for HelloTriangle
             window_height: 800,
             app_name: "hello-triangle".to_string(),
         }
-    }
-
-    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _: &Timer)
-    {
-        self.my_update(rhi, render_context);
     }
 }
 
