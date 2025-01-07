@@ -9,7 +9,8 @@ use raw_window_handle::HasRawDisplayHandle;
 
 use crate::framework::{
     core::{
-        command_pool::RhiCommandPool, device::RhiDevice, instance::RhiInstance, physical_device::RhiPhysicalDevice,
+        command_pool::RhiCommandPool, debug::RhiDebugUtils, device::RhiDevice, instance::RhiInstance,
+        physical_device::RhiPhysicalDevice,
     },
     platform::window_system::WindowSystem,
 };
@@ -54,168 +55,6 @@ pub unsafe extern "system" fn vk_debug_callback(
     vk::FALSE
 }
 
-pub struct RhiInitInfo
-{
-    pub app_name: Option<String>,
-    pub engine_name: Option<String>,
-
-    pub window: Option<Arc<WindowSystem>>,
-
-    pub vk_version: u32,
-
-    pub instance_layers: Vec<&'static CStr>,
-    pub instance_extensions: Vec<&'static CStr>,
-    pub instance_create_flags: vk::InstanceCreateFlags,
-    pub device_extensions: Vec<&'static CStr>,
-
-    pub core_features: vk::PhysicalDeviceFeatures,
-    pub ext_features: Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>>,
-
-    pub debug_msg_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
-    pub debug_msg_type: vk::DebugUtilsMessageTypeFlagsEXT,
-    pub debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT,
-
-    pub frames_in_flight: u32,
-}
-
-
-impl RhiInitInfo
-{
-    const VALIDATION_LAYER_NAME: &'static CStr = cstr::cstr!("VK_LAYER_KHRONOS_validation");
-
-    pub fn init_basic(debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT, window: Arc<WindowSystem>) -> Self
-    {
-        let instance_create_flags = if cfg!(target_os = "macos") {
-            vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR
-        } else {
-            vk::InstanceCreateFlags::empty()
-        };
-
-        let mut info = Self {
-            app_name: None,
-            engine_name: None,
-
-            window: Some(window.clone()),
-
-            // 版本过低时，有些函数无法正确加载
-            vk_version: vk::API_VERSION_1_3,
-
-            instance_layers: Self::basic_instance_layers(),
-            instance_extensions: Self::basic_instance_extensions(window.as_ref()),
-            instance_create_flags,
-            device_extensions: Self::basic_device_extensions(),
-
-            core_features: Default::default(),
-            ext_features: vec![],
-            debug_msg_severity: vk::DebugUtilsMessageSeverityFlagsEXT::WARNING |
-                vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
-            debug_msg_type: vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION |
-                vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
-            debug_callback,
-
-            frames_in_flight: 3,
-        };
-        info.set_device_features();
-
-        info
-    }
-
-    pub fn is_complete(&self) -> anyhow::Result<()>
-    {
-        self.app_name.as_ref().context("")?;
-        self.engine_name.as_ref().context("")?;
-        Ok(())
-    }
-
-
-    fn basic_device_extensions() -> Vec<&'static CStr>
-    {
-        let mut exts = vec![Swapchain::name()];
-
-        if cfg!(target_os = "macos") {
-            // 在 metal 上模拟出 vulkan
-            exts.push(vk::KhrPortabilitySubsetFn::name());
-        }
-
-        // dynamic rendering
-        exts.append(&mut vec![
-            cstr::cstr!("VK_KHR_depth_stencil_resolve"),
-            // cstr::cstr!("VK_KHR_multiview"),     // 于 vk-1.1 加入到 core
-            // cstr::cstr!("VK_KHR_maintenance2"),  // 于 vk-1.1 加入到 core
-            ash::extensions::khr::CreateRenderPass2::name(),
-            ash::extensions::khr::DynamicRendering::name(),
-        ]);
-
-        // RayTracing 相关的
-        exts.append(&mut vec![
-            ash::extensions::khr::AccelerationStructure::name(), // 主要的 ext
-            cstr::cstr!("VK_EXT_descriptor_indexing"),
-            cstr::cstr!("VK_KHR_buffer_device_address"),
-            ash::extensions::khr::RayTracingPipeline::name(), // 主要的 ext
-            ash::extensions::khr::DeferredHostOperations::name(),
-            cstr::cstr!("VK_KHR_spirv_1_4"),
-            cstr::cstr!("VK_KHR_shader_float_controls"),
-        ]);
-
-        exts
-    }
-
-    fn basic_instance_layers() -> Vec<&'static CStr>
-    {
-        vec![Self::VALIDATION_LAYER_NAME]
-    }
-
-    fn basic_instance_extensions(window: &WindowSystem) -> Vec<&'static CStr>
-    {
-        let mut exts = Vec::new();
-
-        // 这个 extension 可以单独使用，提供以下功能：
-        // 1. debug messenger
-        // 2. 为 vulkan object 设置 debug name
-        // 2. 使用 label 标记 queue 或者 command buffer 中的一个一个 section
-        // 这个 extension 可以和 validation layer 配合使用，提供更详细的信息
-        exts.push(ash::extensions::ext::DebugUtils::name());
-
-        // 追加 window system 需要的 extension
-        for ext in ash_window::enumerate_required_extensions(window.window().raw_display_handle()).unwrap() {
-            unsafe {
-                exts.push(CStr::from_ptr(*ext));
-            }
-        }
-
-        if cfg!(target_os = "macos") {
-            // 这个扩展能够在枚举 pdevice 时，将不受支持的 pdevice 也列举出来
-            // 不受支持的 pdevice 可以通过模拟层运行 vulkan
-            exts.push(vk::KhrPortabilityEnumerationFn::name());
-
-            // device extension VK_KHR_portability_subset 需要这个扩展
-            exts.push(vk::KhrGetPhysicalDeviceProperties2Fn::name());
-        }
-        exts
-    }
-
-    fn set_device_features(&mut self)
-    {
-        self.core_features = vk::PhysicalDeviceFeatures::builder()
-            .sampler_anisotropy(true)
-            .fragment_stores_and_atomics(true)
-            .independent_blend(true)
-            .build();
-
-        // TODO 改一下这个构建过程，后面会用到 &mut
-        self.ext_features = vec![
-            Box::new(vk::PhysicalDeviceDynamicRenderingFeatures::builder().dynamic_rendering(true).build()),
-            Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::builder().buffer_device_address(true).build()),
-            Box::new(vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder().ray_tracing_pipeline(true).build()),
-            Box::new(
-                vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder().acceleration_structure(true).build(),
-            ),
-            Box::new(vk::PhysicalDeviceHostQueryResetFeatures::builder().host_query_reset(true).build()),
-            Box::new(vk::PhysicalDeviceSynchronization2Features::builder().synchronization2(true).build()),
-        ];
-    }
-}
-
 
 pub static RHI: OnceLock<Rhi> = OnceLock::new();
 
@@ -245,61 +84,249 @@ pub struct Rhi
     pub graphics_command_pool: RhiCommandPool,
     pub transfer_command_pool: RhiCommandPool,
     pub compute_command_pool: RhiCommandPool,
+
+    pub debug_utils: RhiDebugUtils,
 }
 
 
 mod _impl_init
 {
-    use std::{rc::Rc, sync::Arc};
+    use std::{ffi::CStr, rc::Rc, sync::Arc};
 
-    use ash::vk;
+    use ash::{extensions::khr::Swapchain, vk};
     use itertools::Itertools;
+    use raw_window_handle::HasRawDisplayHandle;
 
     use crate::framework::{
-        core::{device::RhiDevice, instance::RhiInstance, physical_device::RhiPhysicalDevice},
-        rhi::{Rhi, RhiInitInfo},
+        core::{
+            command_pool::RhiCommandPool, debug::RhiDebugUtils, device::RhiDevice, instance::RhiInstance,
+            physical_device::RhiPhysicalDevice,
+        },
+        platform::window_system::WindowSystem,
+        rhi::Rhi,
     };
+
+    pub struct RhiInitInfo
+    {
+        pub app_name: String,
+        pub engine_name: String,
+
+        pub enable_validation: bool,
+
+        pub window: Arc<WindowSystem>,
+
+        pub vk_version: u32,
+
+        pub instance_layers: Vec<&'static CStr>,
+        pub instance_extensions: Vec<&'static CStr>,
+        pub instance_create_flags: vk::InstanceCreateFlags,
+        pub device_extensions: Vec<&'static CStr>,
+
+        pub core_features: vk::PhysicalDeviceFeatures,
+        pub ext_features: Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>>,
+
+        pub debug_msg_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
+        pub debug_msg_type: vk::DebugUtilsMessageTypeFlagsEXT,
+        pub debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT,
+
+        pub frames_in_flight: u32,
+    }
+
+
+    impl RhiInitInfo
+    {
+        pub fn init_basic(app_name: String, window: Arc<WindowSystem>, enable_validation: bool) -> Self
+        {
+            let core_features = vk::PhysicalDeviceFeatures::builder()
+                .sampler_anisotropy(true)
+                .fragment_stores_and_atomics(true)
+                .independent_blend(true)
+                .build();
+
+            let ext_features: Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>> = vec![
+                Box::new(vk::PhysicalDeviceDynamicRenderingFeatures::builder().dynamic_rendering(true).build()),
+                Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::builder().buffer_device_address(true).build()),
+                Box::new(vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder().ray_tracing_pipeline(true).build()),
+                Box::new(
+                    vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder().acceleration_structure(true).build(),
+                ),
+                Box::new(vk::PhysicalDeviceHostQueryResetFeatures::builder().host_query_reset(true).build()),
+                Box::new(vk::PhysicalDeviceSynchronization2Features::builder().synchronization2(true).build()),
+            ];
+
+            let info = Self {
+                app_name,
+                engine_name: "DruvisIII".to_string(), // 槲寄生
+
+                enable_validation,
+
+                window: window.clone(),
+
+                // 版本过低时，有些函数无法正确加载
+                vk_version: vk::API_VERSION_1_3,
+
+                instance_layers: Self::basic_instance_layers(enable_validation),
+                instance_extensions: Self::basic_instance_extensions(window.as_ref(), enable_validation),
+                instance_create_flags: vk::InstanceCreateFlags::empty(),
+                device_extensions: Self::basic_device_extensions(enable_validation),
+
+                core_features,
+                ext_features,
+                debug_msg_severity: vk::DebugUtilsMessageSeverityFlagsEXT::WARNING |
+                    vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
+                debug_msg_type: vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION |
+                    vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
+
+                debug_callback: None,
+
+                frames_in_flight: 3,
+            };
+
+            info
+        }
+
+        pub fn set_debug_callback(&mut self, callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT)
+        {
+            self.debug_callback = callback;
+        }
+
+
+        fn basic_device_extensions(enable_validation: bool) -> Vec<&'static CStr>
+        {
+            let mut exts = vec![Swapchain::name()];
+
+            // dynamic rendering
+            exts.append(&mut vec![
+                cstr::cstr!("VK_KHR_depth_stencil_resolve"),
+                ash::extensions::khr::CreateRenderPass2::name(),
+                ash::extensions::khr::DynamicRendering::name(),
+            ]);
+
+            // RayTracing 相关的
+            exts.append(&mut vec![
+                ash::extensions::khr::AccelerationStructure::name(), // 主要的 ext
+                cstr::cstr!("VK_EXT_descriptor_indexing"),
+                cstr::cstr!("VK_KHR_buffer_device_address"),
+                ash::extensions::khr::RayTracingPipeline::name(), // 主要的 ext
+                ash::extensions::khr::DeferredHostOperations::name(),
+                cstr::cstr!("VK_KHR_spirv_1_4"),
+                cstr::cstr!("VK_KHR_shader_float_controls"),
+            ]);
+
+            exts
+        }
+
+        fn basic_instance_layers(enable_validation: bool) -> Vec<&'static CStr>
+        {
+            let mut layers = Vec::new();
+            if enable_validation {
+                layers.push(cstr::cstr!("VK_LAYER_KHRONOS_validation"));
+            }
+            layers
+        }
+
+        fn basic_instance_extensions(window: &WindowSystem, _enable_validation: bool) -> Vec<&'static CStr>
+        {
+            let mut exts = Vec::new();
+
+            // 这个 extension 可以单独使用，提供以下功能：
+            // 1. debug messenger
+            // 2. 为 vulkan object 设置 debug name
+            // 2. 使用 label 标记 queue 或者 command buffer 中的一个一个 section
+            // 这个 extension 可以和 validation layer 配合使用，提供更详细的信息
+            exts.push(ash::extensions::ext::DebugUtils::name());
+
+            // 追加 window system 需要的 extension，在 windows 下也就是 khr::Surface
+            for ext in ash_window::enumerate_required_extensions(window.window().raw_display_handle()).unwrap() {
+                unsafe {
+                    exts.push(CStr::from_ptr(*ext));
+                }
+            }
+
+            // 这个 extension 是 VK_KHR_performance_query 的前置条件，而后者是用于 stats gathering 的
+            exts.push(ash::extensions::khr::GetPhysicalDeviceProperties2::name());
+
+            exts
+        }
+
+        pub fn get_debug_utils_messenger_ci(&self) -> vk::DebugUtilsMessengerCreateInfoEXT
+        {
+            vk::DebugUtilsMessengerCreateInfoEXT::builder()
+                .message_severity(self.debug_msg_severity)
+                .message_type(self.debug_msg_type)
+                .pfn_user_callback(self.debug_callback)
+                .build()
+        }
+
+        pub fn add_instance_extension(&mut self, exts: &[&'static CStr])
+        {
+            self.instance_extensions.extend_from_slice(exts);
+        }
+
+        pub fn add_instance_layers(&mut self, layers: &[&'static CStr])
+        {
+            self.instance_layers.extend_from_slice(layers);
+        }
+
+        pub fn add_device_extensions(&mut self, exts: &[&'static CStr])
+        {
+            self.device_extensions.extend_from_slice(exts);
+        }
+    }
+
 
     impl Rhi
     {
         const MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
         const MAX_MATERIAL_CNT: u32 = 256;
 
-        pub fn new(mut init_info: RhiInitInfo) -> anyhow::Result<Self>
+        pub fn new(mut init_info: RhiInitInfo) -> Self
         {
             let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");
 
-            let instance = RhiInstance::old_new(&vk_pf, &init_info)?;
+            let instance = RhiInstance::new(&vk_pf, &init_info);
 
-            let pdevice = Arc::new(Self::init_pdevice(&instance.handle)?);
-            let device = RhiDevice::old_new(&vk_pf, &mut init_info, &instance, pdevice.clone())?;
+            let debug_utils = RhiDebugUtils::new(&vk_pf, &instance.handle, &init_info);
 
-            let vk_dynamic_render_pf = ash::extensions::khr::DynamicRendering::new(&instance.handle, device.device());
-            let vk_acceleration_pf =
-                ash::extensions::khr::AccelerationStructure::new(&instance.handle, device.device());
+            let pdevice = Arc::new(Self::init_pdevice(&instance.handle));
+            let device = RhiDevice::new(&mut init_info, &instance, pdevice.clone(), &debug_utils);
+
+            // 在 device 以及 debug_utils 之前创建的 vk::Handle
+            {
+                debug_utils.set_debug_name(device.device.handle(), instance.handle.handle(), "instance");
+                debug_utils.set_debug_name(device.device.handle(), pdevice.handle, "physical device");
+            }
+
+            let vk_dynamic_render_pf = ash::extensions::khr::DynamicRendering::new(&instance.handle, &device.device);
+            let vk_acceleration_pf = ash::extensions::khr::AccelerationStructure::new(&instance.handle, &device.device);
 
             let vma = Self::init_vma(&instance, &device, &init_info);
 
             let descriptor_pool = Self::init_descriptor_pool(&device);
+            debug_utils.set_debug_name(device.device.handle(), descriptor_pool, "main-descriptor-pool");
 
-            let graphics_command_pool = Self::create_command_pool(
+            let graphics_command_pool = Self::init_command_pool(
                 &device,
+                &debug_utils,
                 vk::QueueFlags::GRAPHICS,
                 vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
                 "rhi-graphics-command-pool",
             );
-            let compute_command_pool = Self::create_command_pool(
+            let compute_command_pool = Self::init_command_pool(
                 &device,
+                &debug_utils,
                 vk::QueueFlags::COMPUTE,
                 vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
                 "rhi-compute-command-pool",
             );
-            let transfer_command_pool = Self::create_command_pool(
+            let transfer_command_pool = Self::init_command_pool(
                 &device,
+                &debug_utils,
                 vk::QueueFlags::TRANSFER,
                 vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
                 "rhi-transfer-command-pool",
             );
+
 
             let rhi = Self {
                 vk_pf,
@@ -313,13 +340,10 @@ mod _impl_init
                 graphics_command_pool,
                 transfer_command_pool,
                 compute_command_pool,
+                debug_utils,
             };
 
-            rhi.set_debug_name(rhi.physical_device().handle, "main-physical-device");
-            rhi.set_debug_name(rhi.vk_device().handle(), "main-device");
-            rhi.set_debug_name(rhi.descriptor_pool, "main-descriptor-pool");
-
-            Ok(rhi)
+            rhi
         }
 
         fn init_descriptor_pool(device: &RhiDevice) -> vk::DescriptorPool
@@ -360,16 +384,17 @@ mod _impl_init
                 .max_sets(Self::MAX_MATERIAL_CNT + Self::MAX_VERTEX_BLENDING_MESH_CNT + 32);
 
             unsafe {
-                let descriptor_pool = device.device().create_descriptor_pool(&pool_create_info, None).unwrap();
+                let descriptor_pool = device.device.create_descriptor_pool(&pool_create_info, None).unwrap();
                 descriptor_pool
             }
         }
 
-        fn init_pdevice(instance: &ash::Instance) -> anyhow::Result<RhiPhysicalDevice>
+        fn init_pdevice(instance: &ash::Instance) -> RhiPhysicalDevice
         {
             let pdevice = unsafe {
                 instance
-                    .enumerate_physical_devices()?
+                    .enumerate_physical_devices()
+                    .unwrap()
                     .iter()
                     .map(|pdevice| RhiPhysicalDevice::new(*pdevice, instance))
                     // 优先使用独立显卡
@@ -377,14 +402,14 @@ mod _impl_init
                     .unwrap()
             };
 
-            Ok(pdevice)
+            pdevice
         }
 
         fn init_vma(instance: &RhiInstance, device: &RhiDevice, init_info: &RhiInitInfo) -> vk_mem::Allocator
         {
             let vma_create_info = vk_mem::AllocatorCreateInfo::new(
                 Rc::new(&instance.handle),
-                Rc::new(device.device()),
+                Rc::new(&device.device),
                 device.pdevice.handle,
             )
             .vulkan_api_version(init_info.vk_version)
@@ -393,8 +418,38 @@ mod _impl_init
             let vma = vk_mem::Allocator::new(vma_create_info).unwrap();
             vma
         }
+
+        /// 仅在初始化阶段使用的一个函数
+        pub(super) fn init_command_pool<S: AsRef<str> + Clone>(
+            device: &RhiDevice,
+            debug_utils: &RhiDebugUtils,
+            queue_flags: vk::QueueFlags,
+            flags: vk::CommandPoolCreateFlags,
+            debug_name: S,
+        ) -> RhiCommandPool
+        {
+            let queue_family_index = device.pdevice.find_queue_family_index(queue_flags).unwrap();
+
+            let pool = unsafe {
+                device
+                    .device
+                    .create_command_pool(
+                        &vk::CommandPoolCreateInfo::builder().queue_family_index(queue_family_index).flags(flags),
+                        None,
+                    )
+                    .unwrap()
+            };
+
+            debug_utils.set_debug_name(device.device.handle(), pool, debug_name.clone());
+            RhiCommandPool {
+                command_pool: pool,
+                queue_family_index,
+            }
+        }
     }
 }
+
+pub use _impl_init::RhiInitInfo;
 
 
 mod _impl_property
@@ -415,7 +470,7 @@ mod _impl_property
         #[inline]
         pub(crate) fn vk_device(&self) -> &ash::Device
         {
-            self.device.device()
+            &self.device.device
         }
 
         #[inline]
@@ -454,7 +509,6 @@ mod _impl_tools
     use crate::framework::{
         core::{
             command_pool::RhiCommandPool,
-            device::RhiDevice,
             queue::{RhiQueue, RhiSubmitBatch},
             synchronize::RhiFence,
         },
@@ -469,7 +523,7 @@ mod _impl_tools
             T: vk::Handle + Copy,
             S: AsRef<str>,
         {
-            self.device.set_debug_name(handle, name)
+            self.debug_utils.set_debug_name(self.vk_device().handle(), handle, name);
         }
 
         #[inline]
@@ -618,29 +672,13 @@ mod _impl_tools
         }
 
         pub fn create_command_pool<S: AsRef<str> + Clone>(
-            device: &RhiDevice,
+            &self,
             queue_flags: vk::QueueFlags,
             flags: vk::CommandPoolCreateFlags,
             debug_name: S,
         ) -> RhiCommandPool
         {
-            let queue_family_index = device.pdevice.find_queue_family_index(queue_flags).unwrap();
-
-            let pool = unsafe {
-                device
-                    .device()
-                    .create_command_pool(
-                        &vk::CommandPoolCreateInfo::builder().queue_family_index(queue_family_index).flags(flags),
-                        None,
-                    )
-                    .unwrap()
-            };
-
-            device.set_debug_name(pool, debug_name);
-            RhiCommandPool {
-                command_pool: pool,
-                queue_family_index,
-            }
+            Self::init_command_pool(&self.device, &self.debug_utils, queue_flags, flags, debug_name)
         }
     }
 }

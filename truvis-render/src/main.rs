@@ -6,7 +6,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{RenderInitInfo, Timer},
+    render::{AppInitInfo, Timer},
     run::{run, App},
 };
 use vk_mem::MemoryUsage;
@@ -225,9 +225,9 @@ impl App for VkApp
         VkApp::new(rhi, render_context)
     }
 
-    fn get_render_init_info() -> RenderInitInfo
+    fn get_render_init_info() -> AppInitInfo
     {
-        RenderInitInfo {
+        AppInitInfo {
             window_width: 800,
             window_height: 800,
             app_name: "Vk-glTF-PBR".to_string(),

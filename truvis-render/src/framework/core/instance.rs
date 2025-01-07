@@ -1,59 +1,7 @@
-use std::ffi::{CStr, CString};
-
 use anyhow::Context;
-use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::{
-    core::physical_device::RhiPhysicalDevice,
-    rhi::{vk_debug_callback, RhiInitInfo},
-};
-
-/// 所需的 layers 是否全部支持
-fn validate_layers(required: &[&'static CStr], available: &[vk::LayerProperties]) -> bool
-{
-    required.iter().all(|layer| {
-        let found = available
-            .iter()
-            .any(|available_layer| *layer == unsafe { CStr::from_ptr(available_layer.layer_name.as_ptr()) });
-        if !found {
-            log::error!("Validation Layer {:?} not found", layer);
-        }
-
-        found
-    })
-}
-
-/// 返回一系列的尝试启用的 Validation Layers
-fn get_optimal_validation_layers(supported_instance_layers: &[vk::LayerProperties]) -> Vec<&'static CStr>
-{
-    let validation_layer_priority_list = [
-        // 首选这个 validation layer
-        vec![cstr::cstr!("VK_LAYER_KHRONOS_validation")],
-        // fallback: 选择 LunarG meta layer
-        vec![cstr::cstr!("VK_LAYER_LUNARG_standard_validation")],
-        // fallback: 选择
-        vec![
-            cstr::cstr!("VK_LAYER_GOOGLE_threading"),
-            cstr::cstr!("VK_LAYER_LUNARG_parameter_validation"),
-            cstr::cstr!("VK_LAYER_LUNARG_object_tracker"),
-            cstr::cstr!("VK_LAYER_LUNARG_core_validation"),
-            cstr::cstr!("VK_LAYER_GOOGLE_unique_objects"),
-        ],
-        // fallback: 选择 LunarG core layer
-        vec![cstr::cstr!("VK_LAYER_LUNARG_core_validation")],
-    ];
-
-    for validation_layers in validation_layer_priority_list.iter() {
-        if validate_layers(validation_layers, supported_instance_layers) {
-            return validation_layers.clone();
-        }
-
-        log::error!("Couldn't enable validation layers - falling back");
-    }
-
-    Vec::new()
-}
+use crate::framework::core::physical_device::RhiPhysicalDevice;
 
 
 pub struct RhiInstance
@@ -61,280 +9,132 @@ pub struct RhiInstance
     pub handle: ash::Instance,
 
     /// 当前机器上找到的所有 physical device
-    gpus: Vec<RhiPhysicalDevice>,
-
-    debug_report_callback: Option<vk::DebugReportCallbackEXT>,
+    pub gpus: Vec<RhiPhysicalDevice>,
 }
 
 
-impl RhiInstance
+mod _impl_init
 {
-    pub fn old_new(vk_pf: &ash::Entry, init_info: &RhiInitInfo) -> anyhow::Result<Self>
+    use std::{
+        collections::HashSet,
+        ffi::{c_char, CStr, CString},
+    };
+
+    use ash::{vk, Instance};
+    use itertools::Itertools;
+
+    use crate::framework::{
+        core::{instance::RhiInstance, physical_device::RhiPhysicalDevice},
+        rhi::RhiInitInfo,
+    };
+
+    impl RhiInstance
     {
-        let app_name = CString::new(init_info.app_name.as_ref().context("")?.as_str()).context("")?;
-        let engine_name = CString::new(init_info.engine_name.as_ref().context("")?.as_str()).context("")?;
-        let app_info = vk::ApplicationInfo::builder()
-            .application_name(app_name.as_ref())
-            .application_version(vk::make_api_version(0, 1, 0, 0))
-            .engine_name(engine_name.as_ref())
-            .engine_version(vk::make_api_version(0, 1, 0, 0))
-            .api_version(init_info.vk_version);
-
-        let instance_extensions = init_info.instance_extensions.iter().map(|x| x.as_ptr()).collect_vec();
-        let instance_layers = init_info.instance_layers.iter().map(|l| l.as_ptr()).collect_vec();
-
-        let mut debug_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
-            .message_severity(init_info.debug_msg_severity)
-            .message_type(init_info.debug_msg_type)
-            .pfn_user_callback(init_info.debug_callback)
-            .build();
-
-        let create_flags = if cfg!(target_os = "macos") {
-            vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR
-        } else {
-            Default::default()
-        };
-
-        let instance_info = vk::InstanceCreateInfo::builder()
-            .application_info(&app_info)
-            .enabled_extension_names(&instance_extensions)
-            .enabled_layer_names(&instance_layers)
-            .flags(create_flags)
-            .push_next(&mut debug_info);
-
-        let instance = unsafe { vk_pf.create_instance(&instance_info, None)? };
-
-        Ok(Self {
-            handle: instance,
-            gpus: Vec::new(),
-            debug_report_callback: None,
-        })
-    }
-
-    /// 设置所需的 layers 和 extensions，创建 vk instance
-    ///
-    /// # Arguments
-    ///
-    /// * `required_extensions`: 额外需要的 extension。（extension-name; optional）
-    /// * `api_version`: vk 的版本，会影响某些函数的调用
-    pub fn new(
-        vk_entry: &ash::Entry,
-        application_name: String,
-        required_extensions: Vec<(&'static CStr, bool)>,
-        required_validation_layer: Vec<&'static CStr>,
-        api_version: u32,
-    ) -> Self
-    {
-        let application_name = CString::new(application_name.as_str()).unwrap();
-        let app_info = vk::ApplicationInfo::builder()
-            .api_version(vk::API_VERSION_1_3)
-            .application_name(application_name.as_ref())
-            .application_version(vk::make_api_version(0, 1, 0, 0))
-            .engine_name(cstr::cstr!("Truvis"))
-            .engine_version(vk::make_api_version(0, 1, 0, 0));
-
-        let enabled_extensions =
-            Self::get_extensions(required_extensions, &vk_entry.enumerate_instance_extension_properties(None).unwrap())
-                .iter()
-                .map(|ext| ext.as_ptr())
-                .collect_vec();
-        let enabled_layers =
-            Self::get_layers(required_validation_layer, &vk_entry.enumerate_instance_layer_properties().unwrap())
-                .iter()
-                .map(|layer| layer.as_ptr())
-                .collect_vec();
-        let mut instance_info = vk::InstanceCreateInfo::builder()
-            .application_info(&app_info)
-            .enabled_extension_names(&enabled_extensions)
-            .enabled_layer_names(&enabled_layers);
-
-        fn get_debug_utils_create_info() -> vk::DebugUtilsMessengerCreateInfoEXT
+        /// 设置所需的 layers 和 extensions，创建 vk instance
+        pub fn new(vk_entry: &ash::Entry, init_info: &RhiInitInfo) -> Self
         {
-            vk::DebugUtilsMessengerCreateInfoEXT::builder()
-                .message_severity(
-                    vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
-                )
-                .message_type(
-                    vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
-                )
-                .pfn_user_callback(Some(vk_debug_callback))
-                .build()
-        }
+            let app_name = CString::new(init_info.app_name.as_str()).unwrap();
+            let engine_name = CString::new(init_info.engine_name.as_str()).unwrap();
+            let app_info = vk::ApplicationInfo::builder()
+                .api_version(init_info.vk_version)
+                .application_name(app_name.as_ref())
+                .application_version(vk::make_api_version(0, 1, 0, 0))
+                .engine_name(engine_name.as_ref())
+                .engine_version(vk::make_api_version(0, 1, 0, 0));
 
-        // 为 instance info 添加 debug messenger
-        let mut debug_utils_create_info = get_debug_utils_create_info();
-        #[cfg(feature = "validation")]
-        {
-            instance_info = instance_info.push_next(&mut debug_utils_create_info);
-        }
+            let enabled_extensions = Self::get_extensions(vk_entry, init_info);
+            let enabled_layers = Self::get_layers(vk_entry, init_info);
 
-        let handle = unsafe { vk_entry.create_instance(&instance_info, None) }.unwrap();
+            let mut instance_ci = vk::InstanceCreateInfo::builder()
+                .application_info(&app_info)
+                .enabled_extension_names(&enabled_extensions)
+                .enabled_layer_names(&enabled_layers)
+                .flags(init_info.instance_create_flags);
 
-        #[cfg(feature = "validation")]
-        {
-            let debug_utils_pf = ash::extensions::ext::DebugUtils::new(vk_entry, &handle);
-            let debug_utils_create_info = get_debug_utils_create_info();
-            let debug_utils_messenger =
-                Some(unsafe { debug_utils_pf.create_debug_utils_messenger(&debug_utils_create_info, None).unwrap() });
-        }
+            // 为 instance info 添加 debug messenger
+            let mut debug_utils_messenger_ci = init_info.get_debug_utils_messenger_ci();
 
-        let debug_utils_pf = ash::extensions::ext::DebugUtils::new(vk_entry, &handle);
-
-
-        let mut s = Self {
-            handle,
-            gpus: Vec::new(),
-            debug_report_callback: None,
-        };
-
-        s.query_gpus();
-
-        s
-    }
-
-
-    /// instance 所需的所有 extension
-    fn get_extensions(
-        required_extensions: Vec<(&'static CStr, bool)>,
-        available_instance_extensions: &[vk::ExtensionProperties],
-    ) -> Vec<&'static CStr>
-    {
-        let mut enabled_extensions = Vec::new();
-
-        // 尝试开启 DEBUG_UTILS extension
-        #[cfg(feature = "validation")]
-        {
-            let has_debug_utils = RhiInstance::enable_extension(
-                ash::extensions::ext::DebugUtils::name(),
-                available_instance_extensions,
-                &mut enabled_extensions,
-            );
-
-            if !has_debug_utils {
-                log::warn!(
-                    "{:?} are not available; disableing debug reporting",
-                    ash::extensions::ext::DebugUtils::name()
-                );
+            if init_info.enable_validation {
+                instance_ci = instance_ci.push_next(&mut debug_utils_messenger_ci);
             }
+
+            let handle = unsafe { vk_entry.create_instance(&instance_ci, None).unwrap() };
+
+            let gpus = Self::query_gpus(&handle);
+
+            let instance = Self { handle, gpus };
+            instance
         }
 
-        // 显示在 surface 上所需的 extension
-        enabled_extensions.push(ash::extensions::khr::Surface::name());
 
-        // 这个 extension 时 VK_KHR_performance_query 的前置条件；而后者是用于 stats gathering 的
-        RhiInstance::enable_extension(
-            ash::extensions::khr::GetPhysicalDeviceProperties2::name(),
-            available_instance_extensions,
-            &mut enabled_extensions,
-        );
+        /// instance 所需的所有 extension
+        ///
+        /// # params
+        /// enable_validation 是否开启 validation layers
+        ///
+        /// # return
+        /// instance 所需的，且受支持的 extension
+        fn get_extensions(vk_entry: &ash::Entry, init_info: &RhiInitInfo) -> Vec<*const c_char>
+        {
+            let all_ext_props = vk_entry.enumerate_instance_extension_properties(None).unwrap();
+            let mut enabled_extensions: HashSet<&'static CStr> = HashSet::new();
 
-        // 检查外部传入的 extension 是否支持
-        let mut extension_error = false;
-        for extension in required_extensions {
-            let (extension_name, extension_is_optional) = extension;
-            if !RhiInstance::enable_extension(extension_name, available_instance_extensions, &mut enabled_extensions) {
-                if extension_is_optional {
-                    log::warn!(
-                        "Optional instance extension {:?} not available, some features may be disabled",
-                        extension_name
-                    );
+            let mut enable_ext = |ext: &'static CStr| {
+                let supported = all_ext_props
+                    .iter()
+                    .any(|supported_ext| ext == unsafe { CStr::from_ptr(supported_ext.extension_name.as_ptr()) });
+                if supported {
+                    enabled_extensions.insert(ext);
                 } else {
-                    log::error!("Required instance extension {:?} not available, cannot run", extension_name);
-                    extension_error = true;
+                    panic!("Required instance extensions ({:?}) are missin", ext)
                 }
+            };
+
+            // 检查外部传入的 extension 是否支持
+            for ext in &init_info.instance_extensions {
+                enable_ext(*ext);
             }
-        }
-        if extension_error {
-            panic!("Required instance extensions are missin");
+
+            enabled_extensions.iter().map(|ext| ext.as_ptr()).collect_vec()
         }
 
-        enabled_extensions
-    }
-
-    /// instance 所需的所有 layers
-    fn get_layers(
-        mut required_validation_layers: Vec<&'static CStr>,
-        supported_validation_layers: &[vk::LayerProperties],
-    ) -> Vec<&'static CStr>
-    {
-        #[cfg(feature = "validation")]
+        /// instance 所需的所有 layers
+        fn get_layers(vk_entry: &ash::Entry, init_info: &RhiInitInfo) -> Vec<*const c_char>
         {
-            let optimal_validation_layers = get_optimal_validation_layers(supported_validation_layers);
-            required_validation_layers.extend(optimal_validation_layers);
-        }
+            let all_layer_props = vk_entry.enumerate_instance_layer_properties().unwrap();
 
+            let mut validation_layers = Vec::new();
 
-        if validate_layers(&required_validation_layers, supported_validation_layers) {
-            log::info!("Enabled Validation Layers:");
-            for layer in &required_validation_layers {
-                log::info!("\t{:?}", layer);
+            let mut enable_layer = |layer: &'static CStr| {
+                let is_layer_supported = all_layer_props
+                    .iter()
+                    .any(|available_layer| layer == unsafe { CStr::from_ptr(available_layer.layer_name.as_ptr()) });
+                if is_layer_supported {
+                    validation_layers.push(layer);
+                } else {
+                    panic!("Required instance layers ({:?}) are missing", layer);
+                }
+            };
+
+            for layer in &init_info.instance_layers {
+                enable_layer(*layer);
             }
-        } else {
-            panic!("Required validation layers are missing.");
+
+            validation_layers.iter().map(|ext| ext.as_ptr()).collect_vec()
         }
 
-        required_validation_layers
-    }
 
-
-    pub fn get_handle(&self) -> &ash::Instance
-    {
-        &self.handle
-    }
-
-
-    /// 尝试开启某项 extension
-    ///
-    /// # Arguments
-    ///
-    /// * `required_ext_name`: 尝试开启的 extension
-    /// * `available_exts`: 机器上所有可用的 extension
-    /// * `enabled_extensions`: 已经开启的 extension；如果成功开启，则会添加到这个 vec 中
-    ///
-    /// # Returns
-    ///
-    /// * 是否成功开启了这个 extension
-    fn enable_extension(
-        required_ext_name: &'static CStr,
-        available_exts: &[vk::ExtensionProperties],
-        enabled_extensions: &mut Vec<&'static CStr>,
-    ) -> bool
-    {
-        let available = available_exts
-            .iter()
-            .any(|ext| required_ext_name == unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) });
-
-        if available && !enabled_extensions.iter().any(|ext| *ext == required_ext_name) {
-            log::info!("Extension {:?} found, enabling it", required_ext_name);
-            enabled_extensions.push(required_ext_name);
-        }
-
-        available
-    }
-
-    /// 尝试找到第一个可以渲染到给定 surface 上的 discrete gpu
-    pub fn get_suitable_gpu(&self, surface: vk::SurfaceKHR) -> &RhiPhysicalDevice
-    {
-        todo!()
-    }
-
-    /// 检查是否启用了某个 extension
-    pub fn is_enabled(&self, extension: &str) -> bool
-    {
-        todo!()
-    }
-
-    /// 找到机器上所有的 PhysicalDevice, 并缓存到 self.gpus 中
-    fn query_gpus(&mut self)
-    {
-        unsafe {
-            self.gpus = self
-                .handle
-                .enumerate_physical_devices()
-                .unwrap()
-                .iter()
-                .map(|pdevice| RhiPhysicalDevice::new(*pdevice, &self.handle))
-                .collect();
+        /// 找到机器上所有的 PhysicalDevice, 并缓存到 self.gpus 中
+        fn query_gpus(instance: &Instance) -> Vec<RhiPhysicalDevice>
+        {
+            unsafe {
+                instance
+                    .enumerate_physical_devices()
+                    .unwrap()
+                    .iter()
+                    .map(|pdevice| RhiPhysicalDevice::new(*pdevice, instance))
+                    .collect()
+            }
         }
     }
 }

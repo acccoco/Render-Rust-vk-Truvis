@@ -16,11 +16,7 @@ impl RhiDebugUtils
     {
         let loader = ash::extensions::ext::DebugUtils::new(vk_pf, instance);
 
-        let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
-            .message_severity(init_info.debug_msg_severity)
-            .message_type(init_info.debug_msg_type)
-            .pfn_user_callback(init_info.debug_callback)
-            .build();
+        let create_info = init_info.get_debug_utils_messenger_ci();
         let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None).unwrap() };
 
         Self {

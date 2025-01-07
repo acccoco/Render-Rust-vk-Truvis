@@ -2,7 +2,7 @@ use ash::vk;
 
 use crate::{
     framework::{rendering::render_context::RenderContext, rhi::Rhi},
-    render::{RenderInitInfo, Renderer, Timer},
+    render::{AppInitInfo, Renderer, Timer},
 };
 
 pub trait App
@@ -13,7 +13,7 @@ pub trait App
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self;
 
     /// 由 App 提供的，用于初始化 Rhi
-    fn get_render_init_info() -> RenderInitInfo;
+    fn get_render_init_info() -> AppInitInfo;
 
 
     fn get_depth_attachment(depth_image_view: vk::ImageView) -> vk::RenderingAttachmentInfo

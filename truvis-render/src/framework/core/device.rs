@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::CString, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use ash::vk;
 use itertools::Itertools;
@@ -10,25 +10,23 @@ use crate::framework::{
 
 pub struct RhiDevice
 {
-    device: ash::Device,
+    pub device: ash::Device,
 
     pub graphics_queue: RhiQueue,
     pub transfer_queue: RhiQueue,
     pub compute_queue: RhiQueue,
 
     pub pdevice: Arc<RhiPhysicalDevice>,
-
-    pub debug_utils: RhiDebugUtils,
 }
 
 impl RhiDevice
 {
-    pub fn old_new(
-        vk_pf: &ash::Entry,
+    pub fn new(
         init_info: &mut RhiInitInfo,
         instance: &RhiInstance,
         pdevice: Arc<RhiPhysicalDevice>,
-    ) -> anyhow::Result<Self>
+        debug_utils: &RhiDebugUtils,
+    ) -> Self
     {
         let graphics_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::GRAPHICS).unwrap();
         let compute_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::COMPUTE).unwrap();
@@ -85,25 +83,21 @@ impl RhiDevice
             .enabled_extension_names(&device_exts)
             .push_next(&mut features);
 
-        let debug_utils = RhiDebugUtils::new(vk_pf, instance.get_handle(), init_info);
-
         unsafe {
-            let device = instance.handle.create_device(pdevice.handle, &device_create_info, None)?;
+            let device = instance.handle.create_device(pdevice.handle, &device_create_info, None).unwrap();
 
             let graphics_queue = device.get_device_queue(graphics_queue_family_index, graphics_queue_num);
             let compute_queue = device.get_device_queue(compute_queue_family_index, compute_queue_num);
             let transfer_queue = device.get_device_queue(transfer_queue_family_index, transfer_queue_num);
 
+            debug_utils.set_debug_name(device.handle(), graphics_queue, "graphics-queue");
+            debug_utils.set_debug_name(device.handle(), compute_queue, "compute-queue");
+            debug_utils.set_debug_name(device.handle(), transfer_queue, "transfer-queue");
+            debug_utils.set_debug_name(device.handle(), device.handle(), "device");
 
-            // TODO
-            // self.set_debug_name(graphics_queue, "graphics-queue");
-            // self.set_debug_name(compute_queue, "compute-queue");
-            // self.set_debug_name(transfer_queue, "transfer-queue");
-
-            Ok(Self {
+            Self {
                 device,
                 pdevice,
-                debug_utils,
                 graphics_queue: RhiQueue {
                     queue: graphics_queue,
                     queue_family_index: graphics_queue_family_index,
@@ -116,33 +110,7 @@ impl RhiDevice
                     queue: compute_queue,
                     queue_family_index: compute_queue_family_index,
                 },
-            })
-        }
-    }
-
-    pub fn device(&self) -> &ash::Device
-    {
-        &self.device
-    }
-
-    pub fn set_debug_name<T, S>(&self, handle: T, name: S)
-    where
-        T: vk::Handle + Copy,
-        S: AsRef<str>,
-    {
-        let name = if name.as_ref().is_empty() { "empty-debug-name" } else { name.as_ref() };
-        let name = CString::new(name).unwrap();
-        unsafe {
-            self.debug_utils
-                .vk_debug_utils
-                .set_debug_utils_object_name(
-                    self.device.handle(),
-                    &vk::DebugUtilsObjectNameInfoEXT::builder()
-                        .object_name(name.as_c_str())
-                        .object_type(T::TYPE)
-                        .object_handle(handle.as_raw()),
-                )
-                .unwrap();
+            }
         }
     }
 }

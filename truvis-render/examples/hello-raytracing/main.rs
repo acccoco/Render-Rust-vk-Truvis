@@ -12,7 +12,7 @@ use truvis_render::{
         rendering::{render_context, render_context::RenderContext},
         rhi::Rhi,
     },
-    render::{RenderInitInfo, Renderer, Timer},
+    render::{AppInitInfo, Renderer, Timer},
     run::{run, App},
 };
 
@@ -243,9 +243,9 @@ impl App for HelloRT
         HelloRT::new(rhi, render_context)
     }
 
-    fn get_render_init_info() -> RenderInitInfo
+    fn get_render_init_info() -> AppInitInfo
     {
-        RenderInitInfo {
+        AppInitInfo {
             window_width: 800,
             window_height: 800,
             app_name: "hello-triangle".to_string(),

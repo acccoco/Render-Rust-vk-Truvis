@@ -1,6 +1,5 @@
 //! 将指定目录下的所有 shader 文件编译为 spv 文件，输出到同一目录下
 
-
 use anyhow::bail;
 
 #[derive(Debug)]
@@ -101,7 +100,7 @@ impl Shader
     }
 
     /// 使用 glslc 编译 glsl 文件
-    fn build_glsl(&self) -> anyhow::Result<()>
+    fn build_glsl(&self)
     {
         let output = std::process::Command::new("glslc")
             .args([
@@ -113,22 +112,21 @@ impl Shader
                 self.output_path.to_str().unwrap(),
                 self.shader_path.to_str().unwrap(),
             ])
-            .output()?;
+            .output()
+            .unwrap();
 
         if !output.status.success() {
             println!("stdout: {stdout}", stdout = String::from_utf8_lossy(&output.stdout));
             println!("stderr: {stderr}", stderr = String::from_utf8_lossy(&output.stderr));
-            bail!("failed to compilie shader: {:#?}", self.shader_path);
+            panic!("failed to compilie shader: {:#?}", self.shader_path);
         }
-        Ok(())
     }
 
     /// 使用 dxc 编译 hlsl 文件，dxc 在 vulkan sdk 中附带
-    fn build_hlsl(&self) -> anyhow::Result<()>
+    fn build_hlsl(&self)
     {
         // dxc.exe -spirv -T vs_6_1 -E main .\input.vert -Fo .\output.vert.spv -fspv-extension=SPV_EXT_descriptor_indexing
-
-        let output = std::process::Command::new("dxc")
+        std::process::Command::new("dxc")
             .args([
                 "-Ishader/include",
                 "-g",
@@ -138,9 +136,8 @@ impl Shader
                 self.output_path.to_str().unwrap(),
                 self.shader_path.to_str().unwrap(),
             ])
-            .output()?;
-
-        Ok(())
+            .output()
+            .unwrap();
     }
 
     /// see: https://docs.vulkan.org/guide/latest/hlsl.html
@@ -167,33 +164,27 @@ impl Shader
 }
 
 
-fn compile_one_dir(dir: &std::path::Path) -> anyhow::Result<()>
+fn compile_one_dir(dir: &std::path::Path)
 {
-    std::fs::read_dir(dir)?
-        .filter_map(|entry| Shader::from_dir_entry(entry.as_ref().unwrap()))
-        .for_each(|entry| {
-            println!("compile shader: {:#?}", entry);
-            entry.build_glsl().unwrap()
-        });
-
-    Ok(())
-}
-
-
-fn compile_all_shader() -> anyhow::Result<()>
-{
-    std::fs::read_dir("shader")?.filter(|entry| entry.as_ref().unwrap().path().is_dir()).for_each(
+    std::fs::read_dir(dir).unwrap().filter_map(|entry| Shader::from_dir_entry(entry.as_ref().unwrap())).for_each(
         |entry| {
-            println!("compile shader in dir: {:#?}", entry.as_ref().unwrap().path());
-            compile_one_dir(&entry.unwrap().path()).unwrap()
+            println!("compile shader: {:#?}", entry);
+            entry.build_glsl()
         },
     );
-
-    Ok(())
 }
 
 
-fn main() -> anyhow::Result<()>
+fn compile_all_shader()
+{
+    std::fs::read_dir("shader").unwrap().filter(|entry| entry.as_ref().unwrap().path().is_dir()).for_each(|entry| {
+        println!("compile shader in dir: {:#?}", entry.as_ref().unwrap().path());
+        compile_one_dir(&entry.unwrap().path())
+    });
+}
+
+
+fn main()
 {
     compile_all_shader()
 }

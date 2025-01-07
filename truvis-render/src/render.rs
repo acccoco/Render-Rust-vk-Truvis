@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use crate::{
-    framework::{
-        core::swapchain::RenderSwapchainInitInfo,
-        platform::window_system::{WindowCreateInfo, WindowSystem},
-        rendering::render_context::{RenderContext, RenderContextInitInfo},
-        rhi::{vk_debug_callback, Rhi, RhiInitInfo, RHI},
-    },
-    render_init::ENGINE_NAME,
+use crate::framework::{
+    core::swapchain::RenderSwapchainInitInfo,
+    platform::window_system::{WindowCreateInfo, WindowSystem},
+    rendering::render_context::{RenderContext, RenderContextInitInfo},
+    rhi::{vk_debug_callback, Rhi, RhiInitInfo, RHI},
 };
 
 pub struct Timer
@@ -67,11 +64,12 @@ pub struct Renderer
 }
 
 
-pub struct RenderInitInfo
+pub struct AppInitInfo
 {
     pub window_width: u32,
     pub window_height: u32,
     pub app_name: String,
+    pub enable_validation: bool,
 }
 
 
@@ -85,7 +83,7 @@ impl Renderer
             .unwrap();
     }
 
-    pub fn new(init_info: &RenderInitInfo) -> Self
+    pub fn new(init_info: &AppInitInfo) -> Self
     {
         Self::init_logger();
 
@@ -96,11 +94,10 @@ impl Renderer
         });
         let window = Arc::new(window);
 
-        let mut rhi_init_info = RhiInitInfo::init_basic(Some(vk_debug_callback), window.clone());
-        rhi_init_info.app_name = Some(init_info.app_name.clone());
-        rhi_init_info.engine_name = Some(ENGINE_NAME.to_string());
-        rhi_init_info.is_complete().unwrap();
-        RHI.get_or_init(|| Rhi::new(rhi_init_info).unwrap());
+        let mut rhi_init_info =
+            RhiInitInfo::init_basic(init_info.app_name.clone(), window.clone(), init_info.enable_validation);
+        rhi_init_info.set_debug_callback(Some(vk_debug_callback));
+        RHI.get_or_init(|| Rhi::new(rhi_init_info));
         let rhi = RHI.get().unwrap();
 
         let render_swapchain_init_info = RenderSwapchainInitInfo {

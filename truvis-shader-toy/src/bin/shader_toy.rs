@@ -11,7 +11,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{RenderInitInfo, Timer},
+    render::{AppInitInfo, Timer},
     run::{run, App},
 };
 
@@ -222,9 +222,9 @@ impl App for ShaderToy
         ShaderToy::new(rhi, render_context)
     }
 
-    fn get_render_init_info() -> RenderInitInfo
+    fn get_render_init_info() -> AppInitInfo
     {
-        RenderInitInfo {
+        AppInitInfo {
             window_width: 1600,
             window_height: 900,
             app_name: "hello-triangle".to_string(),
