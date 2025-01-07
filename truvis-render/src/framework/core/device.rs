@@ -1,52 +1,12 @@
-use std::{
-    cell::{Cell, OnceCell},
-    collections::HashMap,
-    sync::{Arc, OnceLock},
-};
+use std::{collections::HashMap, ffi::CString, sync::Arc};
 
 use ash::vk;
 use itertools::Itertools;
 
 use crate::framework::{
-    core::{
-        command_pool::RhiCommandPool,
-        debug::RhiDebugUtils,
-        fence_pool::FencePool,
-        instance::RhiInstance,
-        physical_device::RhiPhysicalDevice,
-        queue::RhiQueue,
-        vulkan_resource::{IVulkanResource, VulkanResource},
-    },
+    core::{debug::RhiDebugUtils, instance::RhiInstance, physical_device::RhiPhysicalDevice, queue::RhiQueue},
     rhi::RhiInitInfo,
 };
-
-pub struct Device
-{
-    inner_resource: VulkanResource<vk::Device>,
-
-    gpu: Arc<RhiPhysicalDevice>,
-
-    surface: vk::SurfaceKHR,
-
-    debug_utils: RhiDebugUtils,
-
-    enabled_extensions: Vec<String>,
-
-    queues: Vec<Vec<RhiQueue>>,
-
-    command_pool: RhiCommandPool,
-
-    fence_pool: FencePool,
-}
-
-impl Device
-{
-    pub fn get_debug_utils(&self) -> &RhiDebugUtils
-    {
-        &self.debug_utils
-    }
-}
-
 
 pub struct RhiDevice
 {
@@ -128,7 +88,7 @@ impl RhiDevice
         let debug_utils = RhiDebugUtils::new(vk_pf, instance.get_handle(), init_info);
 
         unsafe {
-            let device = instance.handle.create_device(pdevice.handle, &device_create_info, None).unwrap();
+            let device = instance.handle.create_device(pdevice.handle, &device_create_info, None)?;
 
             let graphics_queue = device.get_device_queue(graphics_queue_family_index, graphics_queue_num);
             let compute_queue = device.get_device_queue(compute_queue_family_index, compute_queue_num);
@@ -163,5 +123,26 @@ impl RhiDevice
     pub fn device(&self) -> &ash::Device
     {
         &self.device
+    }
+
+    pub fn set_debug_name<T, S>(&self, handle: T, name: S)
+    where
+        T: vk::Handle + Copy,
+        S: AsRef<str>,
+    {
+        let name = if name.as_ref().is_empty() { "empty-debug-name" } else { name.as_ref() };
+        let name = CString::new(name).unwrap();
+        unsafe {
+            self.debug_utils
+                .vk_debug_utils
+                .set_debug_utils_object_name(
+                    self.device.handle(),
+                    &vk::DebugUtilsObjectNameInfoEXT::builder()
+                        .object_name(name.as_c_str())
+                        .object_type(T::TYPE)
+                        .object_handle(handle.as_raw()),
+                )
+                .unwrap();
+        }
     }
 }

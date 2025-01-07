@@ -18,7 +18,7 @@ impl RhiShaderModule
         let shader_module_info = vk::ShaderModuleCreateInfo::builder().code(&shader_code);
 
         unsafe {
-            let shader_module = rhi.device().create_shader_module(&shader_module_info, None).unwrap();
+            let shader_module = rhi.vk_device().create_shader_module(&shader_module_info, None).unwrap();
             Self {
                 handle: shader_module,
                 rhi,
@@ -29,7 +29,7 @@ impl RhiShaderModule
     pub fn destroy(self)
     {
         unsafe {
-            self.rhi.device().destroy_shader_module(self.handle, None);
+            self.rhi.vk_device().destroy_shader_module(self.handle, None);
         }
     }
 }

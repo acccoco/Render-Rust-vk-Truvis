@@ -13,7 +13,7 @@ impl RhiCommandPool
     pub fn reset(&mut self, rhi: &Rhi)
     {
         unsafe {
-            rhi.device().reset_command_pool(self.command_pool, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();
+            rhi.vk_device().reset_command_pool(self.command_pool, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();
         }
     }
 }

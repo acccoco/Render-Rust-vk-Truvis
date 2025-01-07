@@ -64,7 +64,7 @@ impl RhiAcceleration
         };
 
         let size_info = unsafe {
-            rhi.acceleration_structure_pf().get_acceleration_structure_build_sizes(
+            rhi.vk_acceleration_pf.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &build_geometry_info,
                 &range_infos.iter().map(|r| r.primitive_count).collect_vec(),
@@ -181,7 +181,7 @@ impl RhiAcceleration
 
         // 获得 AccelerationStructure 所需的尺寸
         let size_info = unsafe {
-            rhi.acceleration_structure_pf().get_acceleration_structure_build_sizes(
+            rhi.vk_acceleration_pf.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &geometry_info,
                 &[instances.len() as u32],
@@ -238,7 +238,7 @@ impl RhiAcceleration
         };
 
         let acceleration_structure =
-            unsafe { rhi.acceleration_structure_pf().create_acceleration_structure(&create_info, None).unwrap() };
+            unsafe { rhi.vk_acceleration_pf.create_acceleration_structure(&create_info, None).unwrap() };
         rhi.set_debug_name(acceleration_structure, debug_name);
 
         Self {
@@ -253,7 +253,7 @@ impl RhiAcceleration
     pub fn get_device_address(&self) -> vk::DeviceAddress
     {
         unsafe {
-            self.rhi.acceleration_structure_pf().get_acceleration_structure_device_address(
+            self.rhi.vk_acceleration_pf.get_acceleration_structure_device_address(
                 &vk::AccelerationStructureDeviceAddressInfoKHR::builder()
                     .acceleration_structure(self.acceleration_structure),
             )
@@ -265,7 +265,7 @@ impl RhiAcceleration
     pub fn destroy(self)
     {
         unsafe {
-            self.rhi.acceleration_structure_pf().destroy_acceleration_structure(self.acceleration_structure, None);
+            self.rhi.vk_acceleration_pf.destroy_acceleration_structure(self.acceleration_structure, None);
             self.buffer.destroy();
         }
     }

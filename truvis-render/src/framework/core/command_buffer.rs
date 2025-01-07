@@ -25,7 +25,7 @@ impl RhiCommandBuffer
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_buffer_count(1);
 
-        let command_buffer = unsafe { rhi.device().allocate_command_buffers(&info).unwrap()[0] };
+        let command_buffer = unsafe { rhi.vk_device().allocate_command_buffers(&info).unwrap()[0] };
         rhi.set_debug_name(command_buffer, debug_name);
         Self {
             command_buffer,
@@ -43,15 +43,15 @@ impl RhiCommandBuffer
         let queue;
         match ty {
             vk::QueueFlags::COMPUTE => {
-                pool = rhi.compute_command_pool();
+                pool = &rhi.compute_command_pool;
                 queue = rhi.compute_queue();
             }
             vk::QueueFlags::TRANSFER => {
-                pool = rhi.transfer_command_pool();
+                pool = &rhi.transfer_command_pool;
                 queue = rhi.transfer_queue();
             }
             vk::QueueFlags::GRAPHICS => {
-                pool = rhi.graphics_command_pool();
+                pool = &rhi.graphics_command_pool;
                 queue = rhi.graphics_queue();
             }
             other => panic!("not supported queue type: SPARSE_BINDING, {:?}", other),
@@ -78,7 +78,7 @@ impl RhiCommandBuffer
     pub fn free(self)
     {
         unsafe {
-            self.rhi.device().free_command_buffers(self.command_pool, std::slice::from_ref(&self.command_buffer));
+            self.rhi.vk_device().free_command_buffers(self.command_pool, std::slice::from_ref(&self.command_buffer));
         }
     }
 
@@ -86,7 +86,7 @@ impl RhiCommandBuffer
     {
         unsafe {
             self.rhi
-                .device()
+                .vk_device()
                 .begin_command_buffer(self.command_buffer, &vk::CommandBufferBeginInfo::builder().flags(usage_flag))
                 .unwrap();
         }
@@ -95,7 +95,7 @@ impl RhiCommandBuffer
     #[inline]
     pub fn end(&mut self)
     {
-        unsafe { self.rhi.device().end_command_buffer(self.command_buffer).unwrap() }
+        unsafe { self.rhi.vk_device().end_command_buffer(self.command_buffer).unwrap() }
     }
 }
 
@@ -112,7 +112,7 @@ mod _transfer_cmd
         pub fn copy_buffer(&mut self, src: &RhiBuffer, dst: &mut RhiBuffer, regions: &[vk::BufferCopy])
         {
             unsafe {
-                self.rhi.device().cmd_copy_buffer(self.command_buffer, src.buffer, dst.buffer, regions);
+                self.rhi.vk_device().cmd_copy_buffer(self.command_buffer, src.buffer, dst.buffer, regions);
             }
         }
 
@@ -121,7 +121,7 @@ mod _transfer_cmd
         pub fn copy_acceleration_structure(&mut self, copy_info: &vk::CopyAccelerationStructureInfoKHR)
         {
             unsafe {
-                self.rhi.acceleration_structure_pf().cmd_copy_acceleration_structure(self.command_buffer, copy_info);
+                self.rhi.vk_acceleration_pf.cmd_copy_acceleration_structure(self.command_buffer, copy_info);
             }
         }
     }
@@ -140,7 +140,7 @@ mod _draw_cmd
         pub fn begin_rendering(&mut self, render_info: &vk::RenderingInfo)
         {
             unsafe {
-                self.rhi.dynamic_render_pf().cmd_begin_rendering(self.command_buffer, render_info);
+                self.rhi.vk_dynamic_render_pf.cmd_begin_rendering(self.command_buffer, render_info);
             }
         }
 
@@ -148,7 +148,7 @@ mod _draw_cmd
         pub fn end_rendering(&mut self)
         {
             unsafe {
-                self.rhi.dynamic_render_pf().cmd_end_rendering(self.command_buffer);
+                self.rhi.vk_dynamic_render_pf.cmd_end_rendering(self.command_buffer);
             }
         }
 
@@ -158,7 +158,7 @@ mod _draw_cmd
         pub fn draw_indexed(&mut self, index_info: (u32, u32), instance_info: (u32, u32), vertex_offset: i32)
         {
             unsafe {
-                self.rhi.device().cmd_draw_indexed(
+                self.rhi.vk_device().cmd_draw_indexed(
                     self.command_buffer,
                     index_info.0,
                     instance_info.0,
@@ -186,7 +186,7 @@ mod _status_cmd
         pub fn bind_pipeline(&mut self, bind_point: vk::PipelineBindPoint, pipeline: &RhiPipeline)
         {
             unsafe {
-                self.rhi.device().cmd_bind_pipeline(self.command_buffer, bind_point, pipeline.pipeline);
+                self.rhi.vk_device().cmd_bind_pipeline(self.command_buffer, bind_point, pipeline.pipeline);
             }
         }
 
@@ -196,7 +196,7 @@ mod _status_cmd
         {
             unsafe {
                 let buffers = buffers.iter().map(|b| b.buffer).collect_vec();
-                self.rhi.device().cmd_bind_vertex_buffers(self.command_buffer, first_bind, &buffers, offsets);
+                self.rhi.vk_device().cmd_bind_vertex_buffers(self.command_buffer, first_bind, &buffers, offsets);
             }
         }
 
@@ -204,7 +204,7 @@ mod _status_cmd
         pub fn bind_index_buffer(&mut self, buffer: &RhiBuffer, offset: vk::DeviceSize, index_type: vk::IndexType)
         {
             unsafe {
-                self.rhi.device().cmd_bind_index_buffer(self.command_buffer, buffer.buffer, offset, index_type);
+                self.rhi.vk_device().cmd_bind_index_buffer(self.command_buffer, buffer.buffer, offset, index_type);
             }
         }
     }
@@ -246,7 +246,7 @@ mod _sync_cmd
                 );
 
             unsafe {
-                self.rhi.device().cmd_pipeline_barrier(
+                self.rhi.vk_device().cmd_pipeline_barrier(
                     self.command_buffer,
                     src.0,
                     dst.0,
@@ -263,7 +263,7 @@ mod _sync_cmd
         {
             let dependency_info = vk::DependencyInfo::builder().memory_barriers(barriers);
             unsafe {
-                self.rhi.device().cmd_pipeline_barrier2(self.command_buffer, &dependency_info);
+                self.rhi.vk_device().cmd_pipeline_barrier2(self.command_buffer, &dependency_info);
             }
         }
     }
@@ -289,7 +289,7 @@ mod _ray_tracing_cmd
         {
             unsafe {
                 // 该函数可以一次构建多个 AccelerationStructure，这里只构建了 1 个
-                self.rhi.acceleration_structure_pf().cmd_build_acceleration_structures(
+                self.rhi.vk_acceleration_pf.cmd_build_acceleration_structures(
                     self.command_buffer,
                     std::slice::from_ref(geometry),
                     &[ranges],
@@ -307,7 +307,7 @@ mod _ray_tracing_cmd
         )
         {
             unsafe {
-                self.rhi.acceleration_structure_pf().cmd_write_acceleration_structures_properties(
+                self.rhi.vk_acceleration_pf.cmd_write_acceleration_structures_properties(
                     self.command_buffer,
                     acceleration_structures,
                     query_pool.query_type,
@@ -331,7 +331,7 @@ mod _other_cmd
         pub fn push_constants(&mut self, pipeline: &RhiPipeline, stage: vk::ShaderStageFlags, offset: u32, data: &[u8])
         {
             unsafe {
-                self.rhi.device().cmd_push_constants(
+                self.rhi.vk_device().cmd_push_constants(
                     self.command_buffer,
                     pipeline.pipeline_layout,
                     stage,

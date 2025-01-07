@@ -1,5 +1,3 @@
-use std::sync::OnceLock;
-
 use ash::vk;
 use itertools::Itertools;
 
@@ -30,7 +28,7 @@ where
         let bindings = T::bindings();
         let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
 
-        unsafe { rhi.device().create_descriptor_set_layout(&create_info, None).unwrap() }
+        unsafe { rhi.vk_device().create_descriptor_set_layout(&create_info, None).unwrap() }
     }
 }
 
@@ -55,9 +53,9 @@ impl RhiDescriptorSet
         let layout = RhiDescriptorLayout::<T>::create_layout(rhi);
         unsafe {
             let alloc_info = vk::DescriptorSetAllocateInfo::builder()
-                .descriptor_pool(rhi.descriptor_pool())
+                .descriptor_pool(rhi.descriptor_pool)
                 .set_layouts(std::slice::from_ref(&layout));
-            let descriptor_set = rhi.device().allocate_descriptor_sets(&alloc_info).unwrap()[0];
+            let descriptor_set = rhi.vk_device().allocate_descriptor_sets(&alloc_info).unwrap()[0];
             Self {
                 descriptor_set,
                 bindings: T::bindings(),
@@ -96,7 +94,7 @@ impl RhiDescriptorSet
             .collect_vec();
 
         unsafe {
-            self.rhi.device().update_descriptor_sets(&writes, &[]);
+            self.rhi.vk_device().update_descriptor_sets(&writes, &[]);
         }
         //
     }

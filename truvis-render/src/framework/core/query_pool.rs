@@ -26,7 +26,7 @@ impl RhiQueryPool
 
 
         unsafe {
-            let handle = rhi.device().create_query_pool(&create_info, None).unwrap();
+            let handle = rhi.vk_device().create_query_pool(&create_info, None).unwrap();
             rhi.set_debug_name(handle, debug_name);
 
             Self {
@@ -46,7 +46,7 @@ impl RhiQueryPool
         unsafe {
             let mut res = vec![Default::default(); query_cnt as usize];
             self.rhi
-                .device()
+                .vk_device()
                 .get_query_pool_results(self.handle, first_index, query_cnt, &mut res, vk::QueryResultFlags::WAIT)
                 .unwrap();
             res
@@ -57,7 +57,7 @@ impl RhiQueryPool
     pub fn reset(&mut self, first_query: u32, query_cnt: u32)
     {
         unsafe {
-            self.rhi.device().reset_query_pool(self.handle, first_query, query_cnt);
+            self.rhi.vk_device().reset_query_pool(self.handle, first_query, query_cnt);
         }
     }
 
@@ -65,7 +65,7 @@ impl RhiQueryPool
     pub fn destroy(self)
     {
         unsafe {
-            self.rhi.device().destroy_query_pool(self.handle, None);
+            self.rhi.vk_device().destroy_query_pool(self.handle, None);
         }
     }
 }

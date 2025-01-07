@@ -24,7 +24,7 @@ impl RhiQueue
             let batches = batches.iter().map(|b| b.to_vk_batch()).collect_vec();
             let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();
 
-            rhi.device().queue_submit(self.queue, &submit_infos, fence.map_or(vk::Fence::null(), |f| f.fence)).unwrap();
+            rhi.vk_device().queue_submit(self.queue, &submit_infos, fence.map_or(vk::Fence::null(), |f| f.fence)).unwrap();
         }
     }
 
@@ -32,7 +32,7 @@ impl RhiQueue
     #[inline]
     pub fn wait_idle(&self, rhi: &Rhi)
     {
-        unsafe { rhi.device().queue_wait_idle(self.queue).unwrap() }
+        unsafe { rhi.vk_device().queue_wait_idle(self.queue).unwrap() }
     }
 }
 

@@ -1,24 +1,15 @@
 use std::{
-    ffi::{CStr, CString},
-    rc::Rc,
+    ffi::CStr,
     sync::{Arc, OnceLock},
 };
 
 use anyhow::Context;
 use ash::{extensions::khr::Swapchain, vk};
-use itertools::Itertools;
 use raw_window_handle::HasRawDisplayHandle;
-use vk_mem::Alloc;
 
 use crate::framework::{
     core::{
-        command_pool::RhiCommandPool,
-        debug::RhiDebugUtils,
-        device::RhiDevice,
-        instance::RhiInstance,
-        physical_device::RhiPhysicalDevice,
-        queue::{RhiQueue, RhiSubmitBatch},
-        synchronize::RhiFence,
+        command_pool::RhiCommandPool, device::RhiDevice, instance::RhiInstance, physical_device::RhiPhysicalDevice,
     },
     platform::window_system::WindowSystem,
 };
@@ -235,29 +226,29 @@ pub static RHI: OnceLock<Rhi> = OnceLock::new();
 pub struct Rhi
 {
     /// vk 基础函数的接口
-    vk_pf: Option<ash::Entry>,
+    pub vk_pf: ash::Entry,
     instance: RhiInstance,
     // vk_instance: Option<Instance>,
 
     // vk_debug_util_pf: Option<ash::extensions::ext::DebugUtils>,
-    vk_dynamic_render_pf: Option<ash::extensions::khr::DynamicRendering>,
-    vk_acceleration_pf: Option<ash::extensions::khr::AccelerationStructure>,
+    pub vk_dynamic_render_pf: ash::extensions::khr::DynamicRendering,
+    pub vk_acceleration_pf: ash::extensions::khr::AccelerationStructure,
 
     // vk_debug_util_messenger: Option<vk::DebugUtilsMessengerEXT>,
     physical_device: Arc<RhiPhysicalDevice>,
-    device: RhiDevice,
+    pub device: RhiDevice,
 
-    vma: Option<vk_mem::Allocator>,
+    pub vma: vk_mem::Allocator,
 
-    descriptor_pool: Option<vk::DescriptorPool>,
+    pub descriptor_pool: vk::DescriptorPool,
 
-    graphics_command_pool: Option<RhiCommandPool>,
-    transfer_command_pool: Option<RhiCommandPool>,
-    compute_command_pool: Option<RhiCommandPool>,
+    pub graphics_command_pool: RhiCommandPool,
+    pub transfer_command_pool: RhiCommandPool,
+    pub compute_command_pool: RhiCommandPool,
 }
 
-// 初始化
-mod impl_init
+
+mod _impl_init
 {
     use std::{rc::Rc, sync::Arc};
 
@@ -283,33 +274,55 @@ mod impl_init
             let pdevice = Arc::new(Self::init_pdevice(&instance.handle)?);
             let device = RhiDevice::old_new(&vk_pf, &mut init_info, &instance, pdevice.clone())?;
 
-            let mut rhi = Self {
-                vk_pf: unsafe { Some(ash::Entry::load()?) },
+            let vk_dynamic_render_pf = ash::extensions::khr::DynamicRendering::new(&instance.handle, device.device());
+            let vk_acceleration_pf =
+                ash::extensions::khr::AccelerationStructure::new(&instance.handle, device.device());
+
+            let vma = Self::init_vma(&instance, &device, &init_info);
+
+            let descriptor_pool = Self::init_descriptor_pool(&device);
+
+            let graphics_command_pool = Self::create_command_pool(
+                &device,
+                vk::QueueFlags::GRAPHICS,
+                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+                "rhi-graphics-command-pool",
+            );
+            let compute_command_pool = Self::create_command_pool(
+                &device,
+                vk::QueueFlags::COMPUTE,
+                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+                "rhi-compute-command-pool",
+            );
+            let transfer_command_pool = Self::create_command_pool(
+                &device,
+                vk::QueueFlags::TRANSFER,
+                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+                "rhi-transfer-command-pool",
+            );
+
+            let rhi = Self {
+                vk_pf,
                 instance,
                 physical_device: pdevice,
                 device,
-                vk_dynamic_render_pf: None,
-                vma: None,
-                descriptor_pool: None,
-                graphics_command_pool: None,
-                transfer_command_pool: None,
-                compute_command_pool: None,
-                vk_acceleration_pf: None,
+                vk_dynamic_render_pf,
+                vk_acceleration_pf,
+                vma,
+                descriptor_pool,
+                graphics_command_pool,
+                transfer_command_pool,
+                compute_command_pool,
             };
 
-            rhi.init_pf();
-            rhi.init_vma(&init_info);
-            rhi.init_descriptor_pool();
-            rhi.init_default_command_pool();
-
             rhi.set_debug_name(rhi.physical_device().handle, "main-physical-device");
-            rhi.set_debug_name(rhi.device().handle(), "main-device");
-            rhi.set_debug_name(rhi.descriptor_pool.unwrap(), "main-descriptor-pool");
+            rhi.set_debug_name(rhi.vk_device().handle(), "main-device");
+            rhi.set_debug_name(rhi.descriptor_pool, "main-descriptor-pool");
 
             Ok(rhi)
         }
 
-        fn init_descriptor_pool(&mut self)
+        fn init_descriptor_pool(device: &RhiDevice) -> vk::DescriptorPool
         {
             let pool_size = [
                 vk::DescriptorPoolSize {
@@ -347,159 +360,93 @@ mod impl_init
                 .max_sets(Self::MAX_MATERIAL_CNT + Self::MAX_VERTEX_BLENDING_MESH_CNT + 32);
 
             unsafe {
-                self.descriptor_pool = Some(self.device().create_descriptor_pool(&pool_create_info, None).unwrap());
+                let descriptor_pool = device.device().create_descriptor_pool(&pool_create_info, None).unwrap();
+                descriptor_pool
             }
         }
 
-        fn init_default_command_pool(&mut self)
-        {
-            self.graphics_command_pool = self.create_command_pool(
-                vk::QueueFlags::GRAPHICS,
-                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-                "rhi-graphics-command-pool",
-            );
-            self.compute_command_pool = self.create_command_pool(
-                vk::QueueFlags::COMPUTE,
-                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-                "rhi-compute-command-pool",
-            );
-            self.transfer_command_pool = self.create_command_pool(
-                vk::QueueFlags::TRANSFER,
-                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
-                "rhi-transfer-command-pool",
-            );
-
-            // 非空检测
-            self.compute_command_pool.as_ref().unwrap();
-            self.graphics_command_pool.as_ref().unwrap();
-            self.transfer_command_pool.as_ref().unwrap();
-        }
-
-
         fn init_pdevice(instance: &ash::Instance) -> anyhow::Result<RhiPhysicalDevice>
         {
-            Ok(unsafe { instance.enumerate_physical_devices() }?
-                .iter()
-                .map(|pdevice| RhiPhysicalDevice::new(*pdevice, instance))
-                // 优先使用独立显卡
-                .find_or_first(RhiPhysicalDevice::is_descrete_gpu)
-                .unwrap())
+            let pdevice = unsafe {
+                instance
+                    .enumerate_physical_devices()?
+                    .iter()
+                    .map(|pdevice| RhiPhysicalDevice::new(*pdevice, instance))
+                    // 优先使用独立显卡
+                    .find_or_first(RhiPhysicalDevice::is_descrete_gpu)
+                    .unwrap()
+            };
+
+            Ok(pdevice)
         }
 
-
-        fn init_pf(&mut self)
-        {
-            self.vk_dynamic_render_pf =
-                Some(ash::extensions::khr::DynamicRendering::new(&self.instance.handle, self.device.device()));
-            self.vk_acceleration_pf =
-                Some(ash::extensions::khr::AccelerationStructure::new(&self.instance.handle, self.device.device()));
-        }
-
-        fn init_vma(&mut self, init_info: &RhiInitInfo)
+        fn init_vma(instance: &RhiInstance, device: &RhiDevice, init_info: &RhiInitInfo) -> vk_mem::Allocator
         {
             let vma_create_info = vk_mem::AllocatorCreateInfo::new(
-                Rc::new(&self.instance.handle),
-                Rc::new(self.device.device()),
-                self.physical_device.handle,
+                Rc::new(&instance.handle),
+                Rc::new(device.device()),
+                device.pdevice.handle,
             )
             .vulkan_api_version(init_info.vk_version)
             .flags(vk_mem::AllocatorCreateFlags::BUFFER_DEVICE_ADDRESS);
 
-            self.vma = Some(vk_mem::Allocator::new(vma_create_info).unwrap());
+            let vma = vk_mem::Allocator::new(vma_create_info).unwrap();
+            vma
         }
     }
 }
 
-// 属性访问
-mod impl_propery
-{
-    use ash::vk;
 
+mod _impl_property
+{
     use crate::framework::{
-        core::{command_pool::RhiCommandPool, physical_device::RhiPhysicalDevice, queue::RhiQueue},
+        core::{physical_device::RhiPhysicalDevice, queue::RhiQueue},
         rhi::Rhi,
     };
 
     impl Rhi
     {
         #[inline]
-        pub fn graphics_command_pool(&self) -> &RhiCommandPool
-        {
-            self.graphics_command_pool.as_ref().unwrap()
-        }
-        #[inline]
-        pub fn compute_command_pool(&self) -> &RhiCommandPool
-        {
-            self.compute_command_pool.as_ref().unwrap()
-        }
-        #[inline]
-        pub fn transfer_command_pool(&self) -> &RhiCommandPool
-        {
-            self.transfer_command_pool.as_ref().unwrap()
-        }
-        #[inline]
         pub(crate) fn vk_instance(&self) -> &ash::Instance
         {
             &self.instance.handle
         }
+
         #[inline]
-        pub(crate) fn device(&self) -> &ash::Device
+        pub(crate) fn vk_device(&self) -> &ash::Device
         {
             self.device.device()
         }
+
         #[inline]
         pub(crate) fn physical_device(&self) -> &RhiPhysicalDevice
         {
             &self.physical_device
         }
+
         #[inline]
         pub fn compute_queue(&self) -> &RhiQueue
         {
             &self.device.compute_queue
         }
+
         #[inline]
         pub fn graphics_queue(&self) -> &RhiQueue
         {
             &self.device.graphics_queue
         }
+
         #[inline]
         pub fn transfer_queue(&self) -> &RhiQueue
         {
             &self.device.transfer_queue
         }
-        #[inline]
-        pub fn descriptor_pool(&self) -> vk::DescriptorPool
-        {
-            unsafe { self.descriptor_pool.unwrap_unchecked() }
-        }
-        #[inline]
-        pub(crate) fn vma(&self) -> &vk_mem::Allocator
-        {
-            unsafe { self.vma.as_ref().unwrap_unchecked() }
-        }
-        #[inline]
-        pub(crate) fn vk_pf(&self) -> &ash::Entry
-        {
-            unsafe { self.vk_pf.as_ref().unwrap_unchecked() }
-        }
-        #[inline]
-        pub(crate) fn dynamic_render_pf(&self) -> &ash::extensions::khr::DynamicRendering
-        {
-            unsafe { self.vk_dynamic_render_pf.as_ref().unwrap_unchecked() }
-        }
-        #[inline]
-        pub(crate) fn acceleration_structure_pf(&self) -> &ash::extensions::khr::AccelerationStructure
-        {
-            unsafe { self.vk_acceleration_pf.as_ref().unwrap_unchecked() }
-        }
     }
 }
 
 // 工具方法
-mod impl_tools
+mod _impl_tools
 {
-    use std::ffi::CString;
-
     use ash::vk;
     use itertools::Itertools;
     use vk_mem::Alloc;
@@ -507,6 +454,7 @@ mod impl_tools
     use crate::framework::{
         core::{
             command_pool::RhiCommandPool,
+            device::RhiDevice,
             queue::{RhiQueue, RhiSubmitBatch},
             synchronize::RhiFence,
         },
@@ -515,58 +463,20 @@ mod impl_tools
 
     impl Rhi
     {
-        /// 需要在 debug_util_pf 以及 device 初始化完成后调用
+        #[inline]
         pub(crate) fn set_debug_name<T, S>(&self, handle: T, name: S)
         where
             T: vk::Handle + Copy,
             S: AsRef<str>,
         {
-            let name = if name.as_ref().is_empty() { "empty-debug-name" } else { name.as_ref() };
-            let name = CString::new(name).unwrap();
-            unsafe {
-                self.device
-                    .debug_utils
-                    .vk_debug_utils
-                    .set_debug_utils_object_name(
-                        self.device.device().handle(),
-                        &vk::DebugUtilsObjectNameInfoEXT::builder()
-                            .object_name(name.as_c_str())
-                            .object_type(T::TYPE)
-                            .object_handle(handle.as_raw()),
-                    )
-                    .unwrap();
-            }
+            self.device.set_debug_name(handle, name)
         }
 
+        #[inline]
         pub fn set_debug_label(&self)
         {
             todo!()
             // self.debug_util_pf.unwrap().cmd_begin_debug_utils_label()
-        }
-
-        pub fn create_command_pool<S: AsRef<str> + Clone>(
-            &self,
-            queue_flags: vk::QueueFlags,
-            flags: vk::CommandPoolCreateFlags,
-            debug_name: S,
-        ) -> Option<RhiCommandPool>
-        {
-            let queue_family_index = self.physical_device().find_queue_family_index(queue_flags)?;
-
-            let pool = unsafe {
-                self.device()
-                    .create_command_pool(
-                        &vk::CommandPoolCreateInfo::builder().queue_family_index(queue_family_index).flags(flags),
-                        None,
-                    )
-                    .unwrap()
-            };
-
-            self.set_debug_name(pool, debug_name);
-            Some(RhiCommandPool {
-                command_pool: pool,
-                queue_family_index,
-            })
         }
 
         pub fn create_image<S>(
@@ -581,7 +491,7 @@ mod impl_tools
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
             };
-            let (image, allocation) = unsafe { self.vma().create_image(create_info, &alloc_info).unwrap() };
+            let (image, allocation) = unsafe { self.vma.create_image(create_info, &alloc_info).unwrap() };
 
             self.set_debug_name(image, debug_name);
             (image, allocation)
@@ -592,7 +502,7 @@ mod impl_tools
         where
             S: AsRef<str>,
         {
-            let view = unsafe { self.device().create_image_view(create_info, None).unwrap() };
+            let view = unsafe { self.vk_device().create_image_view(create_info, None).unwrap() };
 
             self.set_debug_name(view, debug_name);
             view
@@ -625,7 +535,7 @@ mod impl_tools
         pub fn reset_command_pool(&self, command_pool: &mut RhiCommandPool)
         {
             unsafe {
-                self.device()
+                self.vk_device()
                     .reset_command_pool(command_pool.command_pool, vk::CommandPoolResetFlags::RELEASE_RESOURCES)
                     .unwrap();
             }
@@ -634,14 +544,14 @@ mod impl_tools
         pub fn wait_for_fence(&self, fence: &RhiFence)
         {
             unsafe {
-                self.device().wait_for_fences(std::slice::from_ref(&fence.fence), true, u64::MAX).unwrap();
+                self.vk_device().wait_for_fences(std::slice::from_ref(&fence.fence), true, u64::MAX).unwrap();
             }
         }
 
         pub fn reset_fence(&self, fence: &RhiFence)
         {
             unsafe {
-                self.device().reset_fences(std::slice::from_ref(&fence.fence)).unwrap();
+                self.vk_device().reset_fences(std::slice::from_ref(&fence.fence)).unwrap();
             }
         }
 
@@ -652,7 +562,7 @@ mod impl_tools
                 let batches = batches.iter().map(|b| b.to_vk_batch()).collect_vec();
                 let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();
 
-                self.device()
+                self.vk_device()
                     .queue_submit(queue.queue, &submit_infos, fence.map_or(vk::Fence::null(), |f| f.fence))
                     .unwrap();
             }
@@ -661,7 +571,7 @@ mod impl_tools
         pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str)
             -> vk::RenderPass
         {
-            let render_pass = unsafe { self.device().create_render_pass(render_pass_ci, None).unwrap() };
+            let render_pass = unsafe { self.vk_device().create_render_pass(render_pass_ci, None).unwrap() };
             self.set_debug_name(render_pass, debug_name);
             render_pass
         }
@@ -672,7 +582,7 @@ mod impl_tools
             debug_name: &str,
         ) -> vk::PipelineCache
         {
-            let pipeline_cache = unsafe { self.device().create_pipeline_cache(pipeline_cache_ci, None).unwrap() };
+            let pipeline_cache = unsafe { self.vk_device().create_pipeline_cache(pipeline_cache_ci, None).unwrap() };
             self.set_debug_name(pipeline_cache, debug_name);
             pipeline_cache
         }
@@ -702,9 +612,35 @@ mod impl_tools
             debug_name: &str,
         ) -> vk::Framebuffer
         {
-            let frame_buffer = unsafe { self.device().create_framebuffer(frame_buffer_ci, None).unwrap() };
+            let frame_buffer = unsafe { self.vk_device().create_framebuffer(frame_buffer_ci, None).unwrap() };
             self.set_debug_name(frame_buffer, debug_name);
             frame_buffer
+        }
+
+        pub fn create_command_pool<S: AsRef<str> + Clone>(
+            device: &RhiDevice,
+            queue_flags: vk::QueueFlags,
+            flags: vk::CommandPoolCreateFlags,
+            debug_name: S,
+        ) -> RhiCommandPool
+        {
+            let queue_family_index = device.pdevice.find_queue_family_index(queue_flags).unwrap();
+
+            let pool = unsafe {
+                device
+                    .device()
+                    .create_command_pool(
+                        &vk::CommandPoolCreateInfo::builder().queue_family_index(queue_family_index).flags(flags),
+                        None,
+                    )
+                    .unwrap()
+            };
+
+            device.set_debug_name(pool, debug_name);
+            RhiCommandPool {
+                command_pool: pool,
+                queue_family_index,
+            }
         }
     }
 }

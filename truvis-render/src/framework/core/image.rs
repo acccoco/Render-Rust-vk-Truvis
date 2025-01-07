@@ -75,7 +75,7 @@ impl RhiImage2D
         debug_name: &str,
     ) -> Self
     {
-        let (image, alloc) = unsafe { rhi.vma().create_image(image_info, alloc_info).unwrap() };
+        let (image, alloc) = unsafe { rhi.vma.create_image(image_info, alloc_info).unwrap() };
 
         rhi.set_debug_name(image, debug_name);
 

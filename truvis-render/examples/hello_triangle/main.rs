@@ -7,11 +7,10 @@ use truvis_render::{
             pipeline::{RhiPipeline, RhiPipelineTemplate},
             queue::RhiSubmitBatch,
         },
-        platform::window_system::WindowSystem,
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{RenderInitInfo, Renderer, Timer},
+    render::{RenderInitInfo, Timer},
     run::{run, App},
 };
 

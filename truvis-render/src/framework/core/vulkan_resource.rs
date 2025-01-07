@@ -1,11 +1,6 @@
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-};
-
 use ash::vk;
 
-use crate::framework::core::device::{Device, RhiDevice};
+use crate::framework::core::device::RhiDevice;
 
 
 pub struct VulkanResource<Handle: vk::Handle + Copy>

@@ -270,12 +270,12 @@ mod _impl_init
         {
             let graphics_command_pools = (0..init_info.frames_in_flight)
                 .map(|i| {
-                    rhi.create_command_pool(
+                    Rhi::create_command_pool(
+                        &rhi.device,
                         vk::QueueFlags::GRAPHICS,
                         vk::CommandPoolCreateFlags::TRANSIENT,
                         format!("render_context_graphics_command_pool_{}", i),
                     )
-                    .unwrap()
                 })
                 .collect();
 

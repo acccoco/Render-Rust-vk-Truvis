@@ -64,11 +64,11 @@ impl RenderSwapchain
 
     fn create_surface(rhi: &Rhi, window: &WindowSystem) -> Surface
     {
-        let surface_pf = ash::extensions::khr::Surface::new(rhi.vk_pf(), rhi.vk_instance());
+        let surface_pf = ash::extensions::khr::Surface::new(&rhi.vk_pf, rhi.vk_instance());
 
         let surface = unsafe {
             ash_window::create_surface(
-                rhi.vk_pf(),
+                &rhi.vk_pf,
                 rhi.vk_instance(),
                 window.window().raw_display_handle(),
                 window.window().raw_window_handle(),
@@ -196,7 +196,7 @@ mod _impl_init
                 .clipped(true);
 
             unsafe {
-                let swapchain_pf = ash::extensions::khr::Swapchain::new(rhi.vk_instance(), rhi.device());
+                let swapchain_pf = ash::extensions::khr::Swapchain::new(rhi.vk_instance(), rhi.vk_device());
                 let swapchain_handle = swapchain_pf.create_swapchain(&create_info, None).unwrap();
                 rhi.set_debug_name(swapchain_handle, "main-swapchain");
 
@@ -228,7 +228,7 @@ mod _impl_init
                                 .build(),
                         );
 
-                    unsafe { rhi.device().create_image_view(&create_info, None).unwrap() }
+                    unsafe { rhi.vk_device().create_image_view(&create_info, None).unwrap() }
                 })
                 .collect_vec();
 

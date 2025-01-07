@@ -18,7 +18,7 @@ impl RhiSampler
 {
     pub fn new(rhi: &'static Rhi, info: &vk::SamplerCreateInfo, debug_name: &str) -> Self
     {
-        let handle = unsafe { rhi.device().create_sampler(info, None).unwrap() };
+        let handle = unsafe { rhi.vk_device().create_sampler(info, None).unwrap() };
         rhi.set_debug_name(handle, debug_name);
 
         Self {

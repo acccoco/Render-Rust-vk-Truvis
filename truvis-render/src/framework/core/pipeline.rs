@@ -116,7 +116,7 @@ impl RhiPipelineTemplate
             let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::builder()
                 .set_layouts(&self.descriptor_set_layouts)
                 .push_constant_ranges(&self.push_constant_ranges);
-            unsafe { rhi.device().create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() }
+            unsafe { rhi.vk_device().create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() }
         };
         rhi.set_debug_name(pipeline_layout, debug_name.clone());
 
@@ -180,7 +180,7 @@ impl RhiPipelineTemplate
             .push_next(&mut attach_info);
 
         let pipeline = unsafe {
-            rhi.device()
+            rhi.vk_device()
                 .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
                 .unwrap()[0]
         };
