@@ -54,8 +54,75 @@ mod _impl_init
             // 为 instance info 添加 debug messenger
             let mut debug_utils_messenger_ci = init_info.get_debug_utils_messenger_ci();
 
+            // validation layer settings
+            let layer_name = cstr::cstr!("VK_LAYER_KHRONOS_validation");
+            let setting_validate_core = vk::TRUE;
+            let setting_validate_sync = vk::TRUE;
+            let setting_thread_safety = vk::TRUE;
+            let setting_debug_action = [cstr::cstr!("VK_DBG_LAYER_ACTION_LOG_MSG")];
+            let setting_report_flags = [
+                cstr::cstr!("info"),
+                cstr::cstr!("warn"),
+                cstr::cstr!("perf"),
+                cstr::cstr!("error"),
+                cstr::cstr!("debug"),
+            ];
+            let setting_enable_message_limit = vk::TRUE;
+            let setting_duplicate_message_limit = 3;
+            let mut validation_settings: Vec<vk::LayerSettingEXT> = Vec::new();
+            if init_info.enable_validation {
+                unsafe {
+                    validation_settings = vec![
+                        Self::get_layer_setting_for_single(
+                            layer_name,
+                            cstr::cstr!("validate_core"),
+                            vk::LayerSettingTypeEXT::BOOL32,
+                            &setting_validate_core,
+                        ),
+                        Self::get_layer_setting_for_single(
+                            layer_name,
+                            cstr::cstr!("validate_sync"),
+                            vk::LayerSettingTypeEXT::BOOL32,
+                            &setting_validate_sync,
+                        ),
+                        Self::get_layer_setting_for_single(
+                            layer_name,
+                            cstr::cstr!("thread_safety"),
+                            vk::LayerSettingTypeEXT::BOOL32,
+                            &setting_thread_safety,
+                        ),
+                        Self::get_layer_setting_for_array(
+                            layer_name,
+                            cstr::cstr!("debug_action"),
+                            vk::LayerSettingTypeEXT::STRING,
+                            &setting_debug_action,
+                        ),
+                        Self::get_layer_setting_for_array(
+                            layer_name,
+                            cstr::cstr!("report_flags"),
+                            vk::LayerSettingTypeEXT::STRING,
+                            &setting_report_flags,
+                        ),
+                        Self::get_layer_setting_for_single(
+                            layer_name,
+                            cstr::cstr!("enable_message_limit"),
+                            vk::LayerSettingTypeEXT::BOOL32,
+                            &setting_enable_message_limit,
+                        ),
+                        Self::get_layer_setting_for_single(
+                            layer_name,
+                            cstr::cstr!("duplicate_message_limit"),
+                            vk::LayerSettingTypeEXT::INT32,
+                            &setting_duplicate_message_limit,
+                        ),
+                    ];
+                }
+            }
+            let mut layer_settings_ci = vk::LayerSettingsCreateInfoEXT::default().settings(&validation_settings);
+
             if init_info.enable_validation {
                 instance_ci = instance_ci.push_next(&mut debug_utils_messenger_ci);
+                instance_ci = instance_ci.push_next(&mut layer_settings_ci);
             }
 
             let handle = unsafe { vk_entry.create_instance(&instance_ci, None).unwrap() };
@@ -66,6 +133,39 @@ mod _impl_init
             instance
         }
 
+        fn get_layer_setting_for_single<'a, T>(
+            layer_name: &'static CStr,
+            setting_name: &'static CStr,
+            ty: vk::LayerSettingTypeEXT,
+            value: &'a T,
+        ) -> vk::LayerSettingEXT<'a>
+        {
+            vk::LayerSettingEXT {
+                p_layer_name: layer_name.as_ptr(),
+                p_setting_name: setting_name.as_ptr(),
+                ty,
+                value_count: 1,
+                p_values: value as *const _ as *const std::ffi::c_void,
+                ..Default::default()
+            }
+        }
+
+        fn get_layer_setting_for_array<'a, T>(
+            layer_name: &'static CStr,
+            setting_name: &'static CStr,
+            ty: vk::LayerSettingTypeEXT,
+            value: &'a [T],
+        ) -> vk::LayerSettingEXT<'a>
+        {
+            vk::LayerSettingEXT {
+                p_layer_name: layer_name.as_ptr(),
+                p_setting_name: setting_name.as_ptr(),
+                ty,
+                value_count: value.len() as u32,
+                p_values: value.as_ptr() as *const std::ffi::c_void,
+                ..Default::default()
+            }
+        }
 
         /// instance 所需的所有 extension
         ///
