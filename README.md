@@ -1,3 +1,5 @@
+[![Lines of Code](https://tokei.rs/b1/github/acccoco/Render-Rust-vk-Truvis)](https://github.com/acccoco/Render-Rust-vk-Truvis)
+
 TODO
 
 - [ ] 使用新版的 `ash` 配合 `vk-mem`

@@ -20,7 +20,7 @@ impl RhiCommandBuffer
     where
         S: AsRef<str>,
     {
-        let info = vk::CommandBufferAllocateInfo::builder()
+        let info = vk::CommandBufferAllocateInfo::default()
             .command_pool(pool.command_pool)
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_buffer_count(1);
@@ -87,7 +87,7 @@ impl RhiCommandBuffer
         unsafe {
             self.rhi
                 .vk_device()
-                .begin_command_buffer(self.command_buffer, &vk::CommandBufferBeginInfo::builder().flags(usage_flag))
+                .begin_command_buffer(self.command_buffer, &vk::CommandBufferBeginInfo::default().flags(usage_flag))
                 .unwrap();
         }
     }
@@ -121,7 +121,7 @@ mod _transfer_cmd
         pub fn copy_acceleration_structure(&mut self, copy_info: &vk::CopyAccelerationStructureInfoKHR)
         {
             unsafe {
-                self.rhi.vk_acceleration_pf.cmd_copy_acceleration_structure(self.command_buffer, copy_info);
+                self.rhi.vk_acceleration_struct_pf.cmd_copy_acceleration_structure(self.command_buffer, copy_info);
             }
         }
     }
@@ -231,18 +231,14 @@ mod _sync_cmd
             new_layout: vk::ImageLayout,
         )
         {
-            let barrier = vk::ImageMemoryBarrier::builder()
+            let barrier = vk::ImageMemoryBarrier::default()
                 .src_access_mask(src.1)
                 .dst_access_mask(dst.1)
                 .old_layout(old_layout)
                 .new_layout(new_layout)
                 .image(image)
                 .subresource_range(
-                    vk::ImageSubresourceRange::builder()
-                        .aspect_mask(image_aspect)
-                        .layer_count(1)
-                        .level_count(1)
-                        .build(),
+                    vk::ImageSubresourceRange::default().aspect_mask(image_aspect).layer_count(1).level_count(1),
                 );
 
             unsafe {
@@ -253,7 +249,7 @@ mod _sync_cmd
                     vk::DependencyFlags::empty(),
                     &[],
                     &[],
-                    &[barrier.build()],
+                    &[barrier],
                 );
             }
         }
@@ -261,7 +257,7 @@ mod _sync_cmd
         #[inline]
         pub fn memory_barrier(&mut self, barriers: &[vk::MemoryBarrier2])
         {
-            let dependency_info = vk::DependencyInfo::builder().memory_barriers(barriers);
+            let dependency_info = vk::DependencyInfo::default().memory_barriers(barriers);
             unsafe {
                 self.rhi.vk_device().cmd_pipeline_barrier2(self.command_buffer, &dependency_info);
             }
@@ -289,7 +285,7 @@ mod _ray_tracing_cmd
         {
             unsafe {
                 // 该函数可以一次构建多个 AccelerationStructure，这里只构建了 1 个
-                self.rhi.vk_acceleration_pf.cmd_build_acceleration_structures(
+                self.rhi.vk_acceleration_struct_pf.cmd_build_acceleration_structures(
                     self.command_buffer,
                     std::slice::from_ref(geometry),
                     &[ranges],
@@ -307,7 +303,7 @@ mod _ray_tracing_cmd
         )
         {
             unsafe {
-                self.rhi.vk_acceleration_pf.cmd_write_acceleration_structures_properties(
+                self.rhi.vk_acceleration_struct_pf.cmd_write_acceleration_structures_properties(
                     self.command_buffer,
                     acceleration_structures,
                     query_pool.query_type,

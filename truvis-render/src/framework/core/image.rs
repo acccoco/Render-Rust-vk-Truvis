@@ -17,7 +17,7 @@ pub struct RhiImage2DInfo
     samples: vk::SampleCountFlags,
 }
 
-impl From<vk::ImageCreateInfo> for RhiImage2DInfo
+impl From<vk::ImageCreateInfo<'static>> for RhiImage2DInfo
 {
     fn from(value: vk::ImageCreateInfo) -> Self
     {
@@ -70,12 +70,13 @@ impl RhiImage2D
 {
     pub fn new(
         rhi: &'static Rhi,
-        image_info: &vk::ImageCreateInfo,
+        // FIXME 声明周期问题
+        image_info: &vk::ImageCreateInfo<'static>,
         alloc_info: &vk_mem::AllocationCreateInfo,
         debug_name: &str,
     ) -> Self
     {
-        let (image, alloc) = unsafe { rhi.vma.create_image(image_info, alloc_info).unwrap() };
+        let (image, alloc) = unsafe { rhi.vma().create_image(image_info, alloc_info).unwrap() };
 
         rhi.set_debug_name(image, debug_name);
 

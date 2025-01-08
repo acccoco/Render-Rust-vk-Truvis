@@ -5,12 +5,14 @@ pub struct RhiCreateInfoUtil;
 
 impl RhiCreateInfoUtil
 {
+    // FIXME 这个声明周期还是感觉不太安全
+    /// 返回值的声明周期来自于 queue_family_indices
     #[inline]
     pub fn make_image2d_create_info(
         extent: vk::Extent2D,
         format: vk::Format,
         usage: vk::ImageUsageFlags,
-    ) -> vk::ImageCreateInfo
+    ) -> vk::ImageCreateInfo<'static>
     {
         vk::ImageCreateInfo {
             extent: extent.into(),
@@ -26,12 +28,13 @@ impl RhiCreateInfoUtil
         }
     }
 
+    // FIXME 这个声明周期还是感觉不太安全
     #[inline]
     pub fn make_image_view_2d_create_info(
         image: vk::Image,
         format: vk::Format,
         aspect: vk::ImageAspectFlags,
-    ) -> vk::ImageViewCreateInfo
+    ) -> vk::ImageViewCreateInfo<'static>
     {
         vk::ImageViewCreateInfo {
             image,

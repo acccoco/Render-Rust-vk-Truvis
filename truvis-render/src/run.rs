@@ -16,9 +16,10 @@ pub trait App
     fn get_render_init_info() -> AppInitInfo;
 
 
-    fn get_depth_attachment(depth_image_view: vk::ImageView) -> vk::RenderingAttachmentInfo
+    // FIXME
+    fn get_depth_attachment(depth_image_view: vk::ImageView) -> vk::RenderingAttachmentInfo<'static>
     {
-        vk::RenderingAttachmentInfo::builder()
+        vk::RenderingAttachmentInfo::default()
             .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
             .image_view(depth_image_view)
             .load_op(vk::AttachmentLoadOp::CLEAR)
@@ -29,12 +30,11 @@ pub trait App
                     stencil: 0,
                 },
             })
-            .build()
     }
 
-    fn get_color_attachment(image_view: vk::ImageView) -> vk::RenderingAttachmentInfo
+    fn get_color_attachment(image_view: vk::ImageView) -> vk::RenderingAttachmentInfo<'static>
     {
-        vk::RenderingAttachmentInfo::builder()
+        vk::RenderingAttachmentInfo::default()
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
             .image_view(image_view)
             .load_op(vk::AttachmentLoadOp::CLEAR)
@@ -44,21 +44,23 @@ pub trait App
                     float32: [0_f32, 0_f32, 0_f32, 1_f32],
                 },
             })
-            .build()
     }
 
-    fn get_render_info(
+    // FIXME
+    fn get_render_info<'a, 'b, 'c>(
         area: vk::Rect2D,
-        color_attachs: &[vk::RenderingAttachmentInfo],
-        depth_attach: &vk::RenderingAttachmentInfo,
-    ) -> vk::RenderingInfo
+        color_attachs: &'a [vk::RenderingAttachmentInfo],
+        depth_attach: &'b vk::RenderingAttachmentInfo,
+    ) -> vk::RenderingInfo<'c>
+    where
+        'b: 'c,
+        'a: 'c,
     {
-        vk::RenderingInfo::builder()
+        vk::RenderingInfo::default()
             .layer_count(1)
             .render_area(area)
             .color_attachments(color_attachs)
             .depth_attachment(depth_attach)
-            .build()
     }
 }
 

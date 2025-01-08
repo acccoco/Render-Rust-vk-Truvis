@@ -94,10 +94,9 @@ impl HelloTriangle
                     offset: offset_of!(Vertex, color) as u32,
                 },
             ],
-            color_attach_blend_states: vec![vk::PipelineColorBlendAttachmentState::builder()
+            color_attach_blend_states: vec![vk::PipelineColorBlendAttachmentState::default()
                 .blend_enable(false)
-                .color_write_mask(vk::ColorComponentFlags::RGBA)
-                .build()],
+                .color_write_mask(vk::ColorComponentFlags::RGBA)],
             ..Default::default()
         }
         .create_pipeline(rhi, "");
@@ -116,7 +115,7 @@ impl HelloTriangle
                 offset: vk::Offset2D::default(),
                 extent: render_context.swapchain_extent(),
             },
-            &[color_attach],
+            std::slice::from_ref(&color_attach),
             &depth_attach,
         );
 

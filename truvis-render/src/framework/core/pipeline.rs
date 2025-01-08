@@ -34,7 +34,8 @@ pub struct RhiPipelineTemplate
     pub viewport: Option<vk::Viewport>,
     pub scissor: Option<vk::Rect2D>,
 
-    pub rasterize_state_info: vk::PipelineRasterizationStateCreateInfo,
+    // FIXME
+    pub rasterize_state_info: vk::PipelineRasterizationStateCreateInfo<'static>,
 
     pub msaa_sample: vk::SampleCountFlags,
     pub enable_sample_shading: bool,
@@ -42,7 +43,8 @@ pub struct RhiPipelineTemplate
     pub color_attach_blend_states: Vec<vk::PipelineColorBlendAttachmentState>,
     pub enable_logical_op: bool,
 
-    pub depth_stencil_info: vk::PipelineDepthStencilStateCreateInfo,
+    // FIXME
+    pub depth_stencil_info: vk::PipelineDepthStencilStateCreateInfo<'static>,
 
     pub dynamic_states: Vec<vk::DynamicState>,
 }
@@ -72,7 +74,7 @@ impl Default for RhiPipelineTemplate
             viewport: None,
             scissor: None,
 
-            rasterize_state_info: vk::PipelineRasterizationStateCreateInfo::builder()
+            rasterize_state_info: vk::PipelineRasterizationStateCreateInfo::default()
                 .depth_clamp_enable(false)
                 .rasterizer_discard_enable(false)
                 .polygon_mode(vk::PolygonMode::FILL)
@@ -80,23 +82,19 @@ impl Default for RhiPipelineTemplate
                 .cull_mode(vk::CullModeFlags::BACK)
                 // FIXME 背面剔除，会涉及到 vulkan 的投影矩阵
                 .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-                .depth_bias_enable(false)
-                .build(),
-
+                .depth_bias_enable(false),
             msaa_sample: vk::SampleCountFlags::TYPE_1,
             enable_sample_shading: false,
 
             color_attach_blend_states: vec![],
             enable_logical_op: false,
 
-            depth_stencil_info: vk::PipelineDepthStencilStateCreateInfo::builder()
+            depth_stencil_info: vk::PipelineDepthStencilStateCreateInfo::default()
                 .depth_test_enable(false)
                 .depth_write_enable(true)
                 .depth_compare_op(vk::CompareOp::LESS)
                 .depth_bounds_test_enable(false)
-                .stencil_test_enable(false)
-                .build(),
-
+                .stencil_test_enable(false),
             dynamic_states: vec![],
         }
     }
@@ -107,13 +105,13 @@ impl RhiPipelineTemplate
     pub fn create_pipeline<S: AsRef<str> + Clone>(&self, rhi: &'static Rhi, debug_name: S) -> RhiPipeline
     {
         // dynamic rendering 需要的 framebuffer 信息
-        let mut attach_info = vk::PipelineRenderingCreateInfo::builder()
+        let mut attach_info = vk::PipelineRenderingCreateInfo::default()
             .color_attachment_formats(&self.color_formats)
             .depth_attachment_format(self.depth_format)
             .stencil_attachment_format(self.stencil_format);
 
         let pipeline_layout = {
-            let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::builder()
+            let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&self.descriptor_set_layouts)
                 .push_constant_ranges(&self.push_constant_ranges);
             unsafe { rhi.vk_device().create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() }
@@ -124,49 +122,47 @@ impl RhiPipelineTemplate
         let vertex_shader_module = RhiShaderModule::new(rhi, self.vertex_shader_path.as_ref().unwrap());
         let fragment_shader_module = RhiShaderModule::new(rhi, self.fragment_shader_path.as_ref().unwrap());
         let shader_stages_info = [
-            vk::PipelineShaderStageCreateInfo::builder()
+            vk::PipelineShaderStageCreateInfo::default()
                 .stage(vk::ShaderStageFlags::VERTEX)
                 .module(vertex_shader_module.handle)
-                .name(cstr::cstr!("main"))
-                .build(),
-            vk::PipelineShaderStageCreateInfo::builder()
+                .name(cstr::cstr!("main")),
+            vk::PipelineShaderStageCreateInfo::default()
                 .stage(vk::ShaderStageFlags::FRAGMENT)
                 .module(fragment_shader_module.handle)
-                .name(cstr::cstr!("main"))
-                .build(),
+                .name(cstr::cstr!("main")),
         ];
 
         // 顶点和 index
-        let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
+        let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::default()
             .vertex_binding_descriptions(&self.vertex_binding_desc)
             .vertex_attribute_descriptions(&self.vertex_attribute_desec);
 
-        let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
+        let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::default()
             .topology(self.primitive_topology)
             .primitive_restart_enable(false);
 
         let viewport = self.viewport.as_ref().unwrap();
         let scissor = self.scissor.as_ref().unwrap();
-        let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
+        let viewport_info = vk::PipelineViewportStateCreateInfo::default()
             .viewports(std::slice::from_ref(viewport))
             .scissors(std::slice::from_ref(scissor));
 
         // MSAA 配置
-        let msaa_info = vk::PipelineMultisampleStateCreateInfo::builder()
+        let msaa_info = vk::PipelineMultisampleStateCreateInfo::default()
             .sample_shading_enable(self.enable_sample_shading)
             .rasterization_samples(self.msaa_sample);
 
         // 混合设置：需要为每个 color attachment 分别指定
-        let color_blend_info = vk::PipelineColorBlendStateCreateInfo::builder()
+        let color_blend_info = vk::PipelineColorBlendStateCreateInfo::default()
             .logic_op_enable(self.enable_logical_op)
             .attachments(&self.color_attach_blend_states);
 
-        let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&self.dynamic_states);
+        let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&self.dynamic_states);
 
         // =======================================
         // === 创建 pipeline
 
-        let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
+        let pipeline_info = vk::GraphicsPipelineCreateInfo::default()
             .stages(&shader_stages_info)
             .vertex_input_state(&vertex_input_state_info)
             .input_assembly_state(&input_assembly_info)

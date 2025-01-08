@@ -11,8 +11,8 @@ use crate::framework::{
 
 pub struct RhiQueue
 {
-    pub(crate) queue: vk::Queue,
-    pub(crate) queue_family_index: u32,
+    pub vk_queue: vk::Queue,
+    pub queue_family_index: u32,
 }
 
 impl RhiQueue
@@ -24,7 +24,9 @@ impl RhiQueue
             let batches = batches.iter().map(|b| b.to_vk_batch()).collect_vec();
             let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();
 
-            rhi.vk_device().queue_submit(self.queue, &submit_infos, fence.map_or(vk::Fence::null(), |f| f.fence)).unwrap();
+            rhi.vk_device()
+                .queue_submit(self.vk_queue, &submit_infos, fence.map_or(vk::Fence::null(), |f| f.fence))
+                .unwrap();
         }
     }
 
@@ -32,7 +34,7 @@ impl RhiQueue
     #[inline]
     pub fn wait_idle(&self, rhi: &Rhi)
     {
-        unsafe { rhi.vk_device().queue_wait_idle(self.queue).unwrap() }
+        unsafe { rhi.vk_device().queue_wait_idle(self.vk_queue).unwrap() }
     }
 }
 
@@ -63,12 +65,11 @@ impl RhiSubmitBatchVk
     /// 返回的 submitInfo 仅仅在 self 存在时有效
     pub unsafe fn submit_info(&self) -> vk::SubmitInfo
     {
-        let mut info = vk::SubmitInfo::builder()
+        let mut info = vk::SubmitInfo::default()
             .command_buffers(&self.command_buffers)
             .wait_semaphores(&self.wait_semaphores)
             .wait_dst_stage_mask(&self.wait_stages)
-            .signal_semaphores(&self.signal_semaphores)
-            .build();
+            .signal_semaphores(&self.signal_semaphores);
 
         if self.wait_semaphores.is_empty() {
             info.p_wait_semaphores = std::ptr::null();

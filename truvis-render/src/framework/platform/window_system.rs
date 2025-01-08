@@ -4,11 +4,10 @@ use std::cell::RefCell;
 
 use derive_getters::Getters;
 use winit::{
-    event_loop::{ControlFlow, EventLoop},
-    platform::run_return::EventLoopExtRunReturn,
-    window::{Window, WindowBuilder},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    platform::run_on_demand::EventLoopExtRunOnDemand,
+    window::{Window, WindowAttributes},
 };
-
 
 pub struct WindowCreateInfo
 {
@@ -68,12 +67,14 @@ impl WindowSystem
 {
     pub fn new(create_info: WindowCreateInfo) -> Self
     {
-        let event_loop = EventLoop::new();
-        let window = WindowBuilder::new()
-            .with_title(create_info.title)
-            .with_inner_size(winit::dpi::LogicalSize::new(f64::from(create_info.width), f64::from(create_info.height)))
-            .build(&event_loop)
-            .unwrap();
+        let event_loop = EventLoop::new().unwrap();
+
+        let mut window_attr = WindowAttributes::new()
+            .with_title(create_info.title.clone())
+            .with_inner_size(winit::dpi::LogicalSize::new(f64::from(create_info.width), f64::from(create_info.height)));
+
+        // TODO 需要参考 winit 的 example 去做。似乎 window 是在 event loop 中创建的，无法主动创建
+        let window = event_loop.create_window(window_attr).unwrap();
 
         Self {
             window,
@@ -87,13 +88,16 @@ impl WindowSystem
 
     pub fn render_loop(&self, mut f: impl FnMut())
     {
-        self.event_loop.borrow_mut().run_return(|event, _, control_flow| {
-            *control_flow = ControlFlow::Poll;
-            match event {
-                // TODO 这里需要做的，应该是去记录事件。应该使用回调模式，还是使用查询模式？
-                winit::event::Event::MainEventsCleared => f(),
-                _ => (),
-            }
-        });
+        self.event_loop
+            .borrow_mut()
+            .run_on_demand(|event, active_event_loop| {
+                // *control_flow = ControlFlow::Poll;
+                match event {
+                    // TODO 这里需要做的，应该是去记录事件。应该使用回调模式，还是使用查询模式？
+                    winit::event::Event::WindowEvent { .. } => f(),
+                    _ => (),
+                }
+            })
+            .expect("TODO: panic message");
     }
 }

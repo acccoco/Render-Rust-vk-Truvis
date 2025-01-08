@@ -47,7 +47,7 @@ impl RhiQueryPool
             let mut res = vec![Default::default(); query_cnt as usize];
             self.rhi
                 .vk_device()
-                .get_query_pool_results(self.handle, first_index, query_cnt, &mut res, vk::QueryResultFlags::WAIT)
+                .get_query_pool_results(self.handle, first_index, &mut res, vk::QueryResultFlags::WAIT)
                 .unwrap();
             res
         }

@@ -19,7 +19,7 @@ impl RhiFence
     {
         let fence_flags = if signaled { vk::FenceCreateFlags::SIGNALED } else { vk::FenceCreateFlags::empty() };
         let fence =
-            unsafe { rhi.vk_device().create_fence(&vk::FenceCreateInfo::builder().flags(fence_flags), None).unwrap() };
+            unsafe { rhi.vk_device().create_fence(&vk::FenceCreateInfo::default().flags(fence_flags), None).unwrap() };
 
         rhi.set_debug_name(fence, debug_name);
         Self { fence, rhi }

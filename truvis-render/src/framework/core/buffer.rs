@@ -44,9 +44,9 @@ impl RhiBuffer
 
         unsafe {
             let (buffer, allocation) = if let Some(offset_align) = min_align {
-                rhi.vma.create_buffer_with_alignment(&buffer_info, &alloc_info, offset_align).unwrap()
+                rhi.vma().create_buffer_with_alignment(&buffer_info, &alloc_info, offset_align).unwrap()
             } else {
-                rhi.vma.create_buffer(&buffer_info, &alloc_info).unwrap()
+                rhi.vma().create_buffer(&buffer_info, &alloc_info).unwrap()
             };
 
             rhi.set_debug_name(buffer, debug_name.as_str());
@@ -172,7 +172,7 @@ impl RhiBuffer
             return;
         }
         unsafe {
-            self.map_ptr = Some(self.rhi.vma.map_memory(&mut self.allocation).unwrap());
+            self.map_ptr = Some(self.rhi.vma().map_memory(&mut self.allocation).unwrap());
         }
     }
 
@@ -182,15 +182,15 @@ impl RhiBuffer
             return;
         }
         unsafe {
-            self.rhi.vma.unmap_memory(&mut self.allocation);
+            self.rhi.vma().unmap_memory(&mut self.allocation);
             self.map_ptr = None;
         }
     }
 
-    pub fn destroy(self)
+    pub fn destroy(mut self)
     {
         unsafe {
-            self.rhi.vma.destroy_buffer(self.buffer, self.allocation);
+            self.rhi.vma().destroy_buffer(self.buffer, &mut self.allocation);
         }
     }
 
@@ -236,7 +236,7 @@ impl RhiBuffer
     pub fn get_device_address(&self) -> vk::DeviceAddress
     {
         unsafe {
-            self.rhi.vk_device().get_buffer_device_address(&vk::BufferDeviceAddressInfo::builder().buffer(self.buffer))
+            self.rhi.vk_device().get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.buffer))
         }
     }
 }

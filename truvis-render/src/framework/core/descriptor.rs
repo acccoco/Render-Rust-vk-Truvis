@@ -5,7 +5,8 @@ use crate::framework::rhi::Rhi;
 
 pub trait RHiDescriptorBindings
 {
-    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding>;
+    // FIXME 这个声明周期还是感觉不太安全
+    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>;
 }
 
 /// brief：
@@ -26,7 +27,7 @@ where
     fn create_layout(rhi: &Rhi) -> vk::DescriptorSetLayout
     {
         let bindings = T::bindings();
-        let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
+        let create_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
 
         unsafe { rhi.vk_device().create_descriptor_set_layout(&create_info, None).unwrap() }
     }
@@ -36,7 +37,8 @@ where
 struct RhiDescriptorSet
 {
     descriptor_set: vk::DescriptorSet,
-    bindings: Vec<vk::DescriptorSetLayoutBinding>,
+    // FIXME
+    bindings: Vec<vk::DescriptorSetLayoutBinding<'static>>,
     rhi: &'static Rhi,
 }
 enum RhiDescriptorUpdateInfo
@@ -52,7 +54,7 @@ impl RhiDescriptorSet
     {
         let layout = RhiDescriptorLayout::<T>::create_layout(rhi);
         unsafe {
-            let alloc_info = vk::DescriptorSetAllocateInfo::builder()
+            let alloc_info = vk::DescriptorSetAllocateInfo::default()
                 .descriptor_pool(rhi.descriptor_pool)
                 .set_layouts(std::slice::from_ref(&layout));
             let descriptor_set = rhi.vk_device().allocate_descriptor_sets(&alloc_info).unwrap()[0];
@@ -74,7 +76,7 @@ impl RhiDescriptorSet
         let writes = write_datas
             .iter()
             .map(|(binding_index, info)| {
-                let mut write = vk::WriteDescriptorSet::builder()
+                let mut write = vk::WriteDescriptorSet::default()
                     .dst_set(self.descriptor_set)
                     .dst_binding(*binding_index)
                     .dst_array_element(1)
@@ -89,7 +91,7 @@ impl RhiDescriptorSet
                     }
                 }
 
-                write.build()
+                write
             })
             .collect_vec();
 
@@ -103,7 +105,8 @@ impl RhiDescriptorSet
 pub struct RayTracingBindings;
 impl RHiDescriptorBindings for RayTracingBindings
 {
-    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding>
+    // FIXME
+    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
     {
         vec![
             vk::DescriptorSetLayoutBinding {

@@ -6,26 +6,30 @@ use crate::framework::rhi::RhiInitInfo;
 
 pub struct RhiDebugUtils
 {
-    pub vk_debug_utils: ash::extensions::ext::DebugUtils,
-    pub vk_debug_messenger: vk::DebugUtilsMessengerEXT,
+    pub vk_debug_utils_instance: ash::ext::debug_utils::Instance,
+    pub vk_debug_utils_device: ash::ext::debug_utils::Device,
+    pub vk_debug_utils_messenger: vk::DebugUtilsMessengerEXT,
 }
 
 impl RhiDebugUtils
 {
-    pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, init_info: &RhiInitInfo) -> Self
+    pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, device: &ash::Device, init_info: &RhiInitInfo) -> Self
     {
-        let loader = ash::extensions::ext::DebugUtils::new(vk_pf, instance);
+        let loader = ash::ext::debug_utils::Instance::new(vk_pf, instance);
 
         let create_info = init_info.get_debug_utils_messenger_ci();
         let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None).unwrap() };
 
+        let debug_utils = ash::ext::debug_utils::Device::new(instance, device);
+
         Self {
-            vk_debug_messenger: debug_messenger,
-            vk_debug_utils: loader,
+            vk_debug_utils_instance: loader,
+            vk_debug_utils_messenger: debug_messenger,
+            vk_debug_utils_device: debug_utils,
         }
     }
 
-    pub fn set_debug_name<T, S>(&self, device: vk::Device, handle: T, name: S)
+    pub fn set_debug_name<T, S>(&self, handle: T, name: S)
     where
         T: vk::Handle + Copy,
         S: AsRef<str>,
@@ -33,13 +37,9 @@ impl RhiDebugUtils
         let name = if name.as_ref().is_empty() { "empty-debug-name" } else { name.as_ref() };
         let name = CString::new(name).unwrap();
         unsafe {
-            self.vk_debug_utils
+            self.vk_debug_utils_device
                 .set_debug_utils_object_name(
-                    device,
-                    &vk::DebugUtilsObjectNameInfoEXT::builder()
-                        .object_name(name.as_c_str())
-                        .object_type(T::TYPE)
-                        .object_handle(handle.as_raw()),
+                    &vk::DebugUtilsObjectNameInfoEXT::default().object_name(name.as_c_str()).object_handle(handle),
                 )
                 .unwrap();
         }
@@ -51,9 +51,9 @@ impl RhiDebugUtils
     {
         let name = CString::new(name.as_ref()).unwrap();
         unsafe {
-            self.vk_debug_utils.cmd_begin_debug_utils_label(
+            self.vk_debug_utils_device.cmd_begin_debug_utils_label(
                 command_buffer,
-                &vk::DebugUtilsLabelEXT::builder().label_name(name.as_c_str()).color(color.into()),
+                &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(color.into()),
             );
         }
     }
@@ -61,7 +61,7 @@ impl RhiDebugUtils
     pub fn cmd_end_label(&self, command_buffer: vk::CommandBuffer)
     {
         unsafe {
-            self.vk_debug_utils.cmd_end_debug_utils_label(command_buffer);
+            self.vk_debug_utils_device.cmd_end_debug_utils_label(command_buffer);
         }
     }
 
@@ -71,9 +71,9 @@ impl RhiDebugUtils
     {
         let name = CString::new(name.as_ref()).unwrap();
         unsafe {
-            self.vk_debug_utils.cmd_insert_debug_utils_label(
+            self.vk_debug_utils_device.cmd_insert_debug_utils_label(
                 command_buffer,
-                &vk::DebugUtilsLabelEXT::builder().label_name(name.as_c_str()).color(color.into()),
+                &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(color.into()),
             );
         }
     }

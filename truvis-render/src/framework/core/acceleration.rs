@@ -1,6 +1,5 @@
 //! Ray Tracing 所需的加速结构
 
-
 use ash::vk;
 use itertools::Itertools;
 
@@ -64,11 +63,14 @@ impl RhiAcceleration
         };
 
         let size_info = unsafe {
-            rhi.vk_acceleration_pf.get_acceleration_structure_build_sizes(
+            let mut size_info = vk::AccelerationStructureBuildSizesInfoKHR::default();
+            rhi.vk_acceleration_struct_pf.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &build_geometry_info,
                 &range_infos.iter().map(|r| r.primitive_count).collect_vec(),
-            )
+                &mut size_info,
+            );
+            size_info
         };
 
         let uncompact_acceleration = Self::new(
@@ -181,11 +183,15 @@ impl RhiAcceleration
 
         // 获得 AccelerationStructure 所需的尺寸
         let size_info = unsafe {
-            rhi.vk_acceleration_pf.get_acceleration_structure_build_sizes(
+            let mut size_info = vk::AccelerationStructureBuildSizesInfoKHR::default();
+            rhi.vk_acceleration_struct_pf.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &geometry_info,
                 &[instances.len() as u32],
-            )
+                &mut size_info,
+            );
+
+            size_info
         };
 
         let acceleration = Self::new(
@@ -238,7 +244,7 @@ impl RhiAcceleration
         };
 
         let acceleration_structure =
-            unsafe { rhi.vk_acceleration_pf.create_acceleration_structure(&create_info, None).unwrap() };
+            unsafe { rhi.vk_acceleration_struct_pf.create_acceleration_structure(&create_info, None).unwrap() };
         rhi.set_debug_name(acceleration_structure, debug_name);
 
         Self {
@@ -253,8 +259,8 @@ impl RhiAcceleration
     pub fn get_device_address(&self) -> vk::DeviceAddress
     {
         unsafe {
-            self.rhi.vk_acceleration_pf.get_acceleration_structure_device_address(
-                &vk::AccelerationStructureDeviceAddressInfoKHR::builder()
+            self.rhi.vk_acceleration_struct_pf.get_acceleration_structure_device_address(
+                &vk::AccelerationStructureDeviceAddressInfoKHR::default()
                     .acceleration_structure(self.acceleration_structure),
             )
         }
@@ -265,7 +271,7 @@ impl RhiAcceleration
     pub fn destroy(self)
     {
         unsafe {
-            self.rhi.vk_acceleration_pf.destroy_acceleration_structure(self.acceleration_structure, None);
+            self.rhi.vk_acceleration_struct_pf.destroy_acceleration_structure(self.acceleration_structure, None);
             self.buffer.destroy();
         }
     }

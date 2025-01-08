@@ -10,12 +10,12 @@ use crate::framework::{
 struct Surface
 {
     handle: vk::SurfaceKHR,
-    pf: ash::extensions::khr::Surface,
+    pf: ash::khr::surface::Instance,
 }
 
 pub struct RenderSwapchain
 {
-    swapchain_pf: ash::extensions::khr::Swapchain,
+    swapchain_pf: ash::khr::swapchain::Device,
     swapchain_handle: vk::SwapchainKHR,
 
     surface: Surface,
@@ -53,25 +53,25 @@ impl RenderSwapchain
     #[inline]
     pub fn submit_frame(&self, rhi: &Rhi, image_index: u32, wait_semaphores: &[vk::Semaphore])
     {
-        let present_info = vk::PresentInfoKHR::builder()
+        let present_info = vk::PresentInfoKHR::default()
             .wait_semaphores(wait_semaphores)
             .image_indices(std::slice::from_ref(&image_index))
             .swapchains(std::slice::from_ref(&self.swapchain_handle));
 
-        unsafe { self.swapchain_pf.queue_present(rhi.graphics_queue().queue, &present_info).unwrap() };
+        unsafe { self.swapchain_pf.queue_present(rhi.graphics_queue().vk_queue, &present_info).unwrap() };
     }
 
 
     fn create_surface(rhi: &Rhi, window: &WindowSystem) -> Surface
     {
-        let surface_pf = ash::extensions::khr::Surface::new(&rhi.vk_pf, rhi.vk_instance());
+        let surface_pf = ash::khr::surface::Instance::new(&rhi.vk_pf, rhi.vk_instance());
 
         let surface = unsafe {
             ash_window::create_surface(
                 &rhi.vk_pf,
                 rhi.vk_instance(),
-                window.window().raw_display_handle(),
-                window.window().raw_window_handle(),
+                window.window().raw_display_handle().unwrap(),
+                window.window().raw_window_handle().unwrap(),
                 None,
             )
             .unwrap()
@@ -170,7 +170,7 @@ mod _impl_init
             color_space: vk::ColorSpaceKHR,
             extent: vk::Extent2D,
             present_mode: vk::PresentModeKHR,
-        ) -> (vk::SwapchainKHR, ash::extensions::khr::Swapchain)
+        ) -> (vk::SwapchainKHR, ash::khr::swapchain::Device)
         {
             // 确定 image count
             // max_image_count == 0，表示不限制 image 数量
@@ -180,7 +180,7 @@ mod _impl_init
                 u32::min(surface_capabilities.max_image_count, surface_capabilities.min_image_count + 1)
             };
 
-            let create_info = vk::SwapchainCreateInfoKHR::builder()
+            let create_info = vk::SwapchainCreateInfoKHR::default()
                 .surface(surface.handle)
                 .min_image_count(image_count)
                 .image_format(format)
@@ -196,7 +196,7 @@ mod _impl_init
                 .clipped(true);
 
             unsafe {
-                let swapchain_pf = ash::extensions::khr::Swapchain::new(rhi.vk_instance(), rhi.vk_device());
+                let swapchain_pf = ash::khr::swapchain::Device::new(rhi.vk_instance(), rhi.vk_device());
                 let swapchain_handle = swapchain_pf.create_swapchain(&create_info, None).unwrap();
                 rhi.set_debug_name(swapchain_handle, "main-swapchain");
 
@@ -207,7 +207,7 @@ mod _impl_init
         fn init_images_and_views(
             rhi: &Rhi,
             swapchain_handle: vk::SwapchainKHR,
-            swapchain_pf: &ash::extensions::khr::Swapchain,
+            swapchain_pf: &ash::khr::swapchain::Device,
             format: vk::Format,
         ) -> (Vec<vk::Image>, Vec<vk::ImageView>)
         {
@@ -216,16 +216,15 @@ mod _impl_init
             let image_views = swapchain_images
                 .iter()
                 .map(|img| {
-                    let create_info = vk::ImageViewCreateInfo::builder()
+                    let create_info = vk::ImageViewCreateInfo::default()
                         .image(*img)
                         .format(format)
                         .view_type(vk::ImageViewType::TYPE_2D)
                         .subresource_range(
-                            vk::ImageSubresourceRange::builder()
+                            vk::ImageSubresourceRange::default()
                                 .aspect_mask(vk::ImageAspectFlags::COLOR)
                                 .layer_count(1)
-                                .level_count(1)
-                                .build(),
+                                .level_count(1),
                         );
 
                     unsafe { rhi.vk_device().create_image_view(&create_info, None).unwrap() }

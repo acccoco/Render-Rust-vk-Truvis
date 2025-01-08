@@ -15,7 +15,7 @@ impl RhiShaderModule
         let mut file = std::fs::File::open(path).unwrap();
         let shader_code = ash::util::read_spv(&mut file).unwrap();
 
-        let shader_module_info = vk::ShaderModuleCreateInfo::builder().code(&shader_code);
+        let shader_module_info = vk::ShaderModuleCreateInfo::default().code(&shader_code);
 
         unsafe {
             let shader_module = rhi.vk_device().create_shader_module(&shader_module_info, None).unwrap();

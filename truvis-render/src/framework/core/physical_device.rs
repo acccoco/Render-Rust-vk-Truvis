@@ -27,7 +27,7 @@ impl RhiPhysicalDevice
     {
         unsafe {
             let mut pd_rt_props = vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
-            let mut pd_props2 = vk::PhysicalDeviceProperties2::builder().push_next(&mut pd_rt_props);
+            let mut pd_props2 = vk::PhysicalDeviceProperties2::default().push_next(&mut pd_rt_props);
             instance.get_physical_device_properties2(pdevice, &mut pd_props2);
 
             let gpu_name = CStr::from_ptr(pd_props2.properties.device_name.as_ptr());

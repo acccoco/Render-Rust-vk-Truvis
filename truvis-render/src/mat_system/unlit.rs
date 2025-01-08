@@ -9,7 +9,8 @@ struct UnlitMatBindings;
 
 impl RHiDescriptorBindings for UnlitMatBindings
 {
-    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding>
+    // FIXME
+    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
     {
         vec![
             // color texture

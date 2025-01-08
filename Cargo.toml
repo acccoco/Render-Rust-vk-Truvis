@@ -9,15 +9,14 @@ resolver = "2"
 
 
 [workspace.dependencies]
-ash = "0.37"
-# ash = "0.38.0+1.3.281"
-ash-window = "0.12.0"
+ash = "0.38.0+1.3.281"
+ash-window = "0.13.0"
 
 # window creation lib
-winit = "0.27.5"
+winit = "0.30.8"
 
 # 让 winit 可以和图形库通信
-raw-window-handle = "0.5.0"
+raw-window-handle = "0.6.2"
 
 # image parser
 image = "0.24.5"
@@ -61,9 +60,8 @@ serde_json = "1.0.91"
 tobj = "3.2.3"
 
 # vulkan memory allocate
-# 只有 git 上 0.23 才和 ash(0.37.3+1.3.251) 兼容
-vk-mem = { git = "https://github.com/gwihlidal/vk-mem-rs", rev = "0b18c5d" }
-# vk-mem = "0.4.0"
+# vk-mem-0.4.0 和 ash-0.38.0+1.3.281 匹配
+vk-mem = { git = "https://github.com/gwihlidal/vk-mem-rs", tag = "0.4.0" }
 
 # 随机数
 rand = "0.8.5"

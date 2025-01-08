@@ -21,12 +21,7 @@ pub struct RhiDevice
 
 impl RhiDevice
 {
-    pub fn new(
-        init_info: &mut RhiInitInfo,
-        instance: &RhiInstance,
-        pdevice: Arc<RhiPhysicalDevice>,
-        debug_utils: &RhiDebugUtils,
-    ) -> Self
+    pub fn new(init_info: &mut RhiInitInfo, instance: &RhiInstance, pdevice: Arc<RhiPhysicalDevice>) -> Self
     {
         let graphics_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::GRAPHICS).unwrap();
         let compute_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::COMPUTE).unwrap();
@@ -60,16 +55,15 @@ impl RhiDevice
         let queue_create_infos = queues
             .keys()
             .map(|index| {
-                vk::DeviceQueueCreateInfo::builder()
+                vk::DeviceQueueCreateInfo::default()
                     .queue_family_index(*index)
                     .queue_priorities(&queue_priorities[*index as usize])
-                    .build()
             })
             .collect_vec();
 
         let device_exts = init_info.device_extensions.iter().map(|e| e.as_ptr()).collect_vec();
 
-        let mut features = vk::PhysicalDeviceFeatures2::builder().features(init_info.core_features).build();
+        let mut features = vk::PhysicalDeviceFeatures2::default().features(init_info.core_features);
         unsafe {
             init_info.ext_features.iter_mut().for_each(|f| {
                 let ptr = <*mut dyn vk::ExtendsPhysicalDeviceFeatures2>::cast::<vk::BaseOutStructure>(f.as_mut());
@@ -78,7 +72,7 @@ impl RhiDevice
             });
         }
 
-        let device_create_info = vk::DeviceCreateInfo::builder()
+        let device_create_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_create_infos)
             .enabled_extension_names(&device_exts)
             .push_next(&mut features);
@@ -90,24 +84,19 @@ impl RhiDevice
             let compute_queue = device.get_device_queue(compute_queue_family_index, compute_queue_num);
             let transfer_queue = device.get_device_queue(transfer_queue_family_index, transfer_queue_num);
 
-            debug_utils.set_debug_name(device.handle(), graphics_queue, "graphics-queue");
-            debug_utils.set_debug_name(device.handle(), compute_queue, "compute-queue");
-            debug_utils.set_debug_name(device.handle(), transfer_queue, "transfer-queue");
-            debug_utils.set_debug_name(device.handle(), device.handle(), "device");
-
             Self {
                 device,
                 pdevice,
                 graphics_queue: RhiQueue {
-                    queue: graphics_queue,
+                    vk_queue: graphics_queue,
                     queue_family_index: graphics_queue_family_index,
                 },
                 transfer_queue: RhiQueue {
-                    queue: transfer_queue,
+                    vk_queue: transfer_queue,
                     queue_family_index: transfer_queue_family_index,
                 },
                 compute_queue: RhiQueue {
-                    queue: compute_queue,
+                    vk_queue: compute_queue,
                     queue_family_index: compute_queue_family_index,
                 },
             }

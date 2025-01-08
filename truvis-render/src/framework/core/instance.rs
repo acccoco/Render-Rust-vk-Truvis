@@ -35,7 +35,7 @@ mod _impl_init
         {
             let app_name = CString::new(init_info.app_name.as_str()).unwrap();
             let engine_name = CString::new(init_info.engine_name.as_str()).unwrap();
-            let app_info = vk::ApplicationInfo::builder()
+            let app_info = vk::ApplicationInfo::default()
                 .api_version(init_info.vk_version)
                 .application_name(app_name.as_ref())
                 .application_version(vk::make_api_version(0, 1, 0, 0))
@@ -45,7 +45,7 @@ mod _impl_init
             let enabled_extensions = Self::get_extensions(vk_entry, init_info);
             let enabled_layers = Self::get_layers(vk_entry, init_info);
 
-            let mut instance_ci = vk::InstanceCreateInfo::builder()
+            let mut instance_ci = vk::InstanceCreateInfo::default()
                 .application_info(&app_info)
                 .enabled_extension_names(&enabled_extensions)
                 .enabled_layer_names(&enabled_layers)
@@ -76,7 +76,7 @@ mod _impl_init
         /// instance 所需的，且受支持的 extension
         fn get_extensions(vk_entry: &ash::Entry, init_info: &RhiInitInfo) -> Vec<*const c_char>
         {
-            let all_ext_props = vk_entry.enumerate_instance_extension_properties(None).unwrap();
+            let all_ext_props = unsafe { vk_entry.enumerate_instance_extension_properties(None).unwrap() };
             let mut enabled_extensions: HashSet<&'static CStr> = HashSet::new();
 
             let mut enable_ext = |ext: &'static CStr| {
@@ -101,7 +101,7 @@ mod _impl_init
         /// instance 所需的所有 layers
         fn get_layers(vk_entry: &ash::Entry, init_info: &RhiInitInfo) -> Vec<*const c_char>
         {
-            let all_layer_props = vk_entry.enumerate_instance_layer_properties().unwrap();
+            let all_layer_props = unsafe { vk_entry.enumerate_instance_layer_properties().unwrap() };
 
             let mut validation_layers = Vec::new();
 
