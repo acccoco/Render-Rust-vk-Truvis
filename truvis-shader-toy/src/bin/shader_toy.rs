@@ -81,10 +81,10 @@ impl ShaderToy
     fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
     {
         let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data(&INDEX_DATA);
+        index_buffer.transfer_data_device(&INDEX_DATA);
 
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data(&VERTEX_DATA);
+        vertex_buffer.transfer_data_device(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }

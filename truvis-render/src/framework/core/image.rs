@@ -1,10 +1,8 @@
-use std::ops::{Deref, DerefMut};
-
 use ash::vk;
 use vk_mem::Alloc;
 
 use crate::framework::{
-    core::{buffer::RhiBuffer, vulkan_resource::VulkanResource},
+    core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer},
     rhi::Rhi,
 };
 
@@ -38,31 +36,13 @@ pub struct RhiImage2D
 {
     name: String,
 
-    resource: VulkanResource<vk::Image>,
+    pub handle: vk::Image,
 
     alloc: vk_mem::Allocation,
 
     image_info: RhiImage2DInfo,
 
     rhi: &'static Rhi,
-}
-
-impl Deref for RhiImage2D
-{
-    type Target = VulkanResource<vk::Image>;
-
-    fn deref(&self) -> &Self::Target
-    {
-        &self.resource
-    }
-}
-
-impl DerefMut for RhiImage2D
-{
-    fn deref_mut(&mut self) -> &mut Self::Target
-    {
-        &mut self.resource
-    }
 }
 
 
@@ -83,7 +63,7 @@ impl RhiImage2D
         Self {
             name: debug_name.to_string(),
 
-            resource: VulkanResource::new(image),
+            handle: image,
             alloc,
 
             image_info: (*image_info).into(),
@@ -91,15 +71,101 @@ impl RhiImage2D
         }
     }
 
-    pub fn transfer_data(&mut self, data: &[u8])
+    /// 根据 RGBA8_UNORM 的 data 创建 image
+    pub fn from_rgba8(rhi: &'static Rhi, width: u32, height: u32, data: &[u8]) -> Self
+    {
+        RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::GRAPHICS, |cmd| {
+            RhiBuffer::new_stage_buffer(rhi, data.len() as vk::DeviceSize, "image-stage-buffer")
+                .transfer_data_device(data);
+        });
+        todo!()
+    }
+
+    pub fn transfer_data(&mut self, command_buffer: &mut RhiCommandBuffer, data: &[u8])
     {
         let pixels_cnt = self.image_info.extent.width * self.image_info.extent.height;
         assert_eq!(data.len(), Self::format_byte_count(self.image_info.format) * pixels_cnt as usize);
 
         let mut stage_buffer =
             RhiBuffer::new_stage_buffer(self.rhi, std::mem::size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
-        stage_buffer.map();
+        stage_buffer.transfer_data_map(data);
 
+        // 1. transition the image layout
+        // 2. copy the buffer into the image
+        // 3. transition the layout 为了让 fragment shader 可读
+        {
+            let mut barrier = vk::ImageMemoryBarrier::default()
+                .old_layout(vk::ImageLayout::UNDEFINED)
+                .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .image(self.handle)
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .src_access_mask(vk::AccessFlags::empty())
+                .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE);
+
+            command_buffer.image_memory_barrier(&[vk::ImageMemoryBarrier2::default()]);
+            unsafe {
+                device.cmd_pipeline_barrier(
+                    command_buffer,
+                    vk::PipelineStageFlags::TOP_OF_PIPE,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::DependencyFlags::empty(),
+                    &[],
+                    &[],
+                    &[barrier],
+                )
+            };
+
+            let region = vk::BufferImageCopy::default()
+                .buffer_offset(0)
+                .buffer_row_length(0)
+                .buffer_image_height(0)
+                .image_subresource(vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
+                .image_extent(vk::Extent3D {
+                    width,
+                    height,
+                    depth: 1,
+                });
+            unsafe {
+                device.cmd_copy_buffer_to_image(
+                    command_buffer,
+                    buffer,
+                    image,
+                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    &[region],
+                )
+            }
+
+            barrier.old_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+            barrier.new_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+            barrier.src_access_mask = vk::AccessFlags::TRANSFER_WRITE;
+            barrier.dst_access_mask = vk::AccessFlags::SHADER_READ;
+
+            unsafe {
+                device.cmd_pipeline_barrier(
+                    command_buffer,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::PipelineStageFlags::FRAGMENT_SHADER,
+                    vk::DependencyFlags::empty(),
+                    &[],
+                    &[],
+                    &[barrier],
+                )
+            };
+        }
         // TODO
     }
 

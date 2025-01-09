@@ -8,6 +8,7 @@ use winit::{
     platform::run_on_demand::EventLoopExtRunOnDemand,
     window::{Window, WindowAttributes},
 };
+use crate::framework::platform::ui::UI;
 
 pub struct WindowCreateInfo
 {
@@ -69,7 +70,7 @@ impl WindowSystem
     {
         let event_loop = EventLoop::new().unwrap();
 
-        let mut window_attr = WindowAttributes::new()
+        let window_attr = WindowAttributes::new()
             .with_title(create_info.title.clone())
             .with_inner_size(winit::dpi::LogicalSize::new(f64::from(create_info.width), f64::from(create_info.height)));
 
@@ -88,14 +89,93 @@ impl WindowSystem
 
     pub fn render_loop(&self, mut f: impl FnMut())
     {
+        let mut imgui = imgui::Context::create();
+        imgui.set_ini_filename(None); // disable automatic saving .ini file
+        let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui);
+
+        let hidpi_factor = platform.hidpi_factor();
+        let font_size = (13.0 * hidpi_factor) as f32;
+        imgui.fonts().add_font(&[
+            imgui::FontSource::DefaultFontData {
+                config: Some(imgui::FontConfig {
+                    size_pixels: font_size,
+                    ..Default::default()
+                }),
+            },
+            imgui::FontSource::TtfData {
+                data: include_bytes!("assets/fonts/mplus-1p-regular.ttf"),
+                size_pixels: font_size,
+                config: Some(imgui::FontConfig {
+                    rasterizer_multiply: 1.75,
+                    glyph_ranges: imgui::FontGlyphRanges::japanese(),
+                    ..Default::default()
+                }),
+            },
+        ]);
+        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
+
+        platform.attach_window(imgui.io_mut(), &self.window, imgui_winit_support::HiDpiMode::Rounded);
+        
+        // TODO
+        UI::new(&rhi, &render_ctx);
+
+        // TODO 改用最新的回调模式
         self.event_loop
             .borrow_mut()
-            .run_on_demand(|event, active_event_loop| {
-                // *control_flow = ControlFlow::Poll;
-                match event {
-                    // TODO 这里需要做的，应该是去记录事件。应该使用回调模式，还是使用查询模式？
-                    winit::event::Event::WindowEvent { .. } => f(),
-                    _ => (),
+            .run_on_demand({
+                let mut last_frame = std::time::Instant::now();
+
+                move |event, _active_event_loop| {
+                    platform.handle_event(imgui.io_mut(), &self.window, &event);
+
+                    match event {
+                        winit::event::Event::NewEvents(_) => {
+                            let now = std::time::Instant::now();
+                            imgui.io_mut().update_delta_time(now - last_frame);
+                            last_frame = now;
+                        }
+                        winit::event::Event::AboutToWait => {
+                            platform.prepare_frame(imgui.io_mut(), &self.window).unwrap();
+
+                            // draw under the UI
+                            // ..
+
+                            let ui = imgui.frame();
+                            // construct thi UI
+                            platform.prepare_render(&ui, &self.window);
+                            let draw_data = imgui.render();
+                            // renderer.render(.., draw_data);
+
+                            // draw over the UI
+                        }
+
+                        // 这个只是打算退出
+                        winit::event::Event::WindowEvent {
+                            event: winit::event::WindowEvent::CloseRequested,
+                            ..
+                        } => {
+                            // TODO exit
+                            _active_event_loop.exit();
+                        }
+                        winit::event::Event::WindowEvent {
+                            event: winit::event::WindowEvent::Resized(new_size),
+                            ..
+                        } => {
+                            log::info!("window was resized, new size is : {}x{}", new_size.width, new_size.height);
+                        }
+                        winit::event::Event::WindowEvent {
+                            event: winit::event::WindowEvent::RedrawRequested,
+                            ..
+                        } => f(),
+                        winit::event::Event::WindowEvent { .. } => f(),
+
+                        // 这个应该是真正的退出
+                        winit::event::Event::LoopExiting => {
+                            log::info!("loop exiting");
+                            // TODO cleanup
+                        }
+                        _ => {}
+                    }
                 }
             })
             .expect("TODO: panic message");

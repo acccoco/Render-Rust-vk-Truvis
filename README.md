@@ -1,8 +1,9 @@
 [![Lines of Code](https://tokei.rs/b1/github/acccoco/Render-Rust-vk-Truvis)](https://github.com/acccoco/Render-Rust-vk-Truvis)
+[![CI Status](https://github.com/acccoco/Render-Rust-vk-Truvis/workflows/Rust/badge.svg)](https://github.com/acccoco/Render-Rust-vk-Truvis/actions)
+
 
 TODO
 
-- [ ] 使用新版的 `ash` 配合 `vk-mem`
 - [ ] 多种材质系统，多种渲染流程(forward, deferred, etc)
 - [ ] 使用 `hlsl` 而不是 `glsl`
 - [ ] 完善窗口系统，以及 `imgui`

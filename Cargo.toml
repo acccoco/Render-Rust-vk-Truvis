@@ -14,6 +14,8 @@ ash-window = "0.13.0"
 
 # window creation lib
 winit = "0.30.8"
+imgui-winit-support = "0.13.0"
+imgui = "0.12.0"
 
 # 让 winit 可以和图形库通信
 raw-window-handle = "0.6.2"

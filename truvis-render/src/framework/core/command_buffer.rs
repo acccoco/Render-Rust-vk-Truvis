@@ -236,6 +236,8 @@ mod _sync_cmd
                 .dst_access_mask(dst.1)
                 .old_layout(old_layout)
                 .new_layout(new_layout)
+                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
                 .image(image)
                 .subresource_range(
                     vk::ImageSubresourceRange::default().aspect_mask(image_aspect).layer_count(1).level_count(1),
@@ -258,6 +260,15 @@ mod _sync_cmd
         pub fn memory_barrier(&mut self, barriers: &[vk::MemoryBarrier2])
         {
             let dependency_info = vk::DependencyInfo::default().memory_barriers(barriers);
+            unsafe {
+                self.rhi.vk_device().cmd_pipeline_barrier2(self.command_buffer, &dependency_info);
+            }
+        }
+
+        #[inline]
+        pub fn image_memory_barrier(&mut self, barriers: &[vk::ImageMemoryBarrier2])
+        {
+            let dependency_info = vk::DependencyInfo::default().image_memory_barriers(barriers);
             unsafe {
                 self.rhi.vk_device().cmd_pipeline_barrier2(self.command_buffer, &dependency_info);
             }

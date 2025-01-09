@@ -232,12 +232,11 @@ mod _impl_init
                 .collect_vec();
 
             let images = swapchain_images;
-            let image_views = image_views;
 
             // 为 images 和 image_views 设置 debug name
             for i in 0..images.len() {
-                rhi.set_debug_name(images[i], &format!("swapchain-image-{}", i));
-                rhi.set_debug_name(image_views[i], &format!("swapchain-image-view-{}", i));
+                rhi.set_debug_name(images[i], format!("swapchain-image-{}", i));
+                rhi.set_debug_name(image_views[i], format!("swapchain-image-view-{}", i));
             }
 
             (images, image_views)
