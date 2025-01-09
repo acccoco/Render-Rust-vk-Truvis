@@ -131,10 +131,9 @@ impl ShaderToy
                     offset: offset_of!(Vertex, color) as u32,
                 },
             ],
-            color_attach_blend_states: vec![vk::PipelineColorBlendAttachmentState::builder()
+            color_attach_blend_states: vec![vk::PipelineColorBlendAttachmentState::default()
                 .blend_enable(false)
-                .color_write_mask(vk::ColorComponentFlags::RGBA)
-                .build()],
+                .color_write_mask(vk::ColorComponentFlags::RGBA)],
             ..Default::default()
         }
         .create_pipeline(rhi, "");
@@ -171,7 +170,7 @@ impl ShaderToy
                 offset: Default::default(),
                 extent: render_context.swapchain_extent(),
             },
-            &[color_attach_info],
+            std::slice::from_ref(&color_attach_info),
             &depth_attach_info,
         );
 
@@ -228,6 +227,7 @@ impl App for ShaderToy
             window_width: 1600,
             window_height: 900,
             app_name: "hello-triangle".to_string(),
+            enable_validation: true,
         }
     }
 

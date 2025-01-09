@@ -220,7 +220,7 @@ impl HelloRT
                 offset: Default::default(),
                 extent: render_context.swapchain_extent(),
             },
-            &[color_attach_info],
+            std::slice::from_ref(&color_attach_info),
             &depth_attach_info,
         );
 
