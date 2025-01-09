@@ -34,14 +34,16 @@ where
 }
 
 
-struct RhiDescriptorSet
+pub struct RhiDescriptorSet
 {
     descriptor_set: vk::DescriptorSet,
     // FIXME
     bindings: Vec<vk::DescriptorSetLayoutBinding<'static>>,
     rhi: &'static Rhi,
 }
-enum RhiDescriptorUpdateInfo
+
+
+pub enum RhiDescriptorUpdateInfo
 {
     Image(vk::DescriptorImageInfo),
     Buffer(vk::DescriptorBufferInfo),
@@ -99,32 +101,5 @@ impl RhiDescriptorSet
             self.rhi.vk_device().update_descriptor_sets(&writes, &[]);
         }
         //
-    }
-}
-
-pub struct RayTracingBindings;
-impl RHiDescriptorBindings for RayTracingBindings
-{
-    // FIXME
-    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
-    {
-        vec![
-            vk::DescriptorSetLayoutBinding {
-                // TLAS
-                binding: 0,
-                descriptor_type: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::RAYGEN_KHR,
-                ..Default::default()
-            },
-            vk::DescriptorSetLayoutBinding {
-                // Output image
-                binding: 0,
-                descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::RAYGEN_KHR,
-                ..Default::default()
-            },
-        ]
     }
 }

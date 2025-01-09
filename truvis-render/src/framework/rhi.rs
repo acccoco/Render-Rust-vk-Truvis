@@ -655,25 +655,6 @@ mod _impl_tools
             pipeline_cache
         }
 
-        pub fn get_depth_format(&self) -> vk::Format
-        {
-            let depth_formats = vec![
-                vk::Format::D32_SFLOAT_S8_UINT,
-                vk::Format::D32_SFLOAT,
-                vk::Format::D32_SFLOAT_S8_UINT,
-                vk::Format::D16_UNORM_S8_UINT,
-                vk::Format::D16_UNORM,
-            ];
-
-            let depth_format = self.find_supported_format(
-                &depth_formats,
-                vk::ImageTiling::OPTIMAL,
-                vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
-            );
-
-            depth_format.first().copied().unwrap()
-        }
-
         pub fn create_frame_buffer(
             &self,
             frame_buffer_ci: &vk::FramebufferCreateInfo,

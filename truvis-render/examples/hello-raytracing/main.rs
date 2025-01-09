@@ -5,6 +5,7 @@ use truvis_render::{
         core::{
             acceleration::RhiAcceleration,
             buffer::RhiBuffer,
+            descriptor::RHiDescriptorBindings,
             pipeline::{RhiPipeline, RhiPipelineTemplate},
             queue::RhiSubmitBatch,
         },
@@ -48,6 +49,35 @@ const VERTEX_DATA: [Vertex; 4] = [
         color: [1.0, 1.0, 1.0, 1.0],
     },
 ];
+
+
+pub struct RayTracingBindings;
+impl RHiDescriptorBindings for RayTracingBindings
+{
+    // FIXME
+    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
+    {
+        vec![
+            vk::DescriptorSetLayoutBinding {
+                // TLAS
+                binding: 0,
+                descriptor_type: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::RAYGEN_KHR,
+                ..Default::default()
+            },
+            vk::DescriptorSetLayoutBinding {
+                // Output image
+                binding: 0,
+                descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::RAYGEN_KHR,
+                ..Default::default()
+            },
+        ]
+    }
+}
+
 
 struct HelloRT
 {
@@ -169,10 +199,9 @@ impl HelloRT
                     offset: offset_of!(Vertex, color) as u32,
                 },
             ],
-            color_attach_blend_states: vec![vk::PipelineColorBlendAttachmentState::builder()
+            color_attach_blend_states: vec![vk::PipelineColorBlendAttachmentState::default()
                 .blend_enable(false)
-                .color_write_mask(vk::ColorComponentFlags::RGBA)
-                .build()],
+                .color_write_mask(vk::ColorComponentFlags::RGBA)],
             ..Default::default()
         }
         .create_pipeline(rhi, "");
@@ -249,6 +278,7 @@ impl App for HelloRT
             window_width: 800,
             window_height: 800,
             app_name: "hello-triangle".to_string(),
+            enable_validation: true,
         }
     }
 

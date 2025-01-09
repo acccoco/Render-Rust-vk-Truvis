@@ -1,22 +1,21 @@
-use ash::vk;
+use ash::{vk, vk::DescriptorSetLayoutBinding};
 use itertools::Itertools;
 use truvis_render::{
     framework::{
-        core::{create_utils::RhiCreateInfoUtil, image::RhiImage2D},
+        core::descriptor::{RHiDescriptorBindings, RhiDescriptorSet, RhiDescriptorUpdateInfo},
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
     render::{AppInitInfo, Timer},
     run::{run, App},
 };
-use vk_mem::MemoryUsage;
 
 fn main()
 {
     run::<VkApp>()
 }
 
-struct AppInitInfo
+struct InitInfo
 {
     width: u32,
     height: u32,
@@ -41,84 +40,117 @@ struct VkApp
     pipeline_cache: vk::PipelineCache,
 }
 
+struct SceneDescriptorSetLayoutBinding;
+impl RHiDescriptorBindings for SceneDescriptorSetLayoutBinding
+{
+    fn bindings() -> Vec<DescriptorSetLayoutBinding<'static>>
+    {
+        let set_layout_bindins = vec![
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(0)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT),
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(1)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(2)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(3)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(4)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
+        ];
+        set_layout_bindins
+    }
+}
+
 impl VkApp
 {
-    fn prepare_render_pass(rhi: &Rhi) -> vk::RenderPass
+    fn prepare_render_pass(rhi: &Rhi, render_ctx: &RenderContext) -> vk::RenderPass
     {
         // attachment
         let attachments = vec![
             // Color attachment
-            vk::AttachmentDescription::builder()
+            vk::AttachmentDescription::default()
+                .format(render_ctx.color_format())
                 .samples(vk::SampleCountFlags::TYPE_1)
                 .load_op(vk::AttachmentLoadOp::CLEAR)
                 .store_op(vk::AttachmentStoreOp::STORE)
                 .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
                 .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
                 .initial_layout(vk::ImageLayout::UNDEFINED)
-                .final_layout(vk::ImageLayout::PRESENT_SRC_KHR)
-                .build(),
+                .final_layout(vk::ImageLayout::PRESENT_SRC_KHR),
             // Depth attachment
-            vk::AttachmentDescription::builder()
+            vk::AttachmentDescription::default()
+                .format(render_ctx.depth_format)
                 .samples(vk::SampleCountFlags::TYPE_1)
                 .load_op(vk::AttachmentLoadOp::CLEAR)
                 .store_op(vk::AttachmentStoreOp::STORE)
                 .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
                 .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
                 .initial_layout(vk::ImageLayout::UNDEFINED)
-                .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-                .build(),
+                .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL),
         ];
 
         let color_reference =
-            vk::AttachmentReference::builder().attachment(0).layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+            vk::AttachmentReference::default().attachment(0).layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
         let depth_reference =
-            vk::AttachmentReference::builder().attachment(1).layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            vk::AttachmentReference::default().attachment(1).layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-        let subpass_description = vk::SubpassDescription::builder()
+        let subpass_description = vk::SubpassDescription::default()
             .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
             .color_attachments(std::slice::from_ref(&color_reference))
             .depth_stencil_attachment(&depth_reference);
 
         let dependencies = vec![
-            vk::SubpassDependency::builder()
+            vk::SubpassDependency::default()
                 .src_subpass(vk::SUBPASS_EXTERNAL)
                 .dst_subpass(0)
                 .src_stage_mask(vk::PipelineStageFlags::BOTTOM_OF_PIPE)
                 .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
                 .src_access_mask(vk::AccessFlags::MEMORY_READ)
                 .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
-                .dependency_flags(vk::DependencyFlags::BY_REGION)
-                .build(),
-            vk::SubpassDependency::builder()
+                .dependency_flags(vk::DependencyFlags::BY_REGION),
+            vk::SubpassDependency::default()
                 .src_subpass(0)
                 .dst_subpass(vk::SUBPASS_EXTERNAL)
                 .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
                 .dst_stage_mask(vk::PipelineStageFlags::TOP_OF_PIPE) // FIXME 原文这里写的是 BOTTOM
                 .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
                 .dst_access_mask(vk::AccessFlags::MEMORY_READ)
-                .dependency_flags(vk::DependencyFlags::BY_REGION)
-                .build(),
+                .dependency_flags(vk::DependencyFlags::BY_REGION),
         ];
 
-        let render_pass_ci = vk::RenderPassCreateInfo::builder()
+        let render_pass_ci = vk::RenderPassCreateInfo::default()
             .attachments(&attachments)
             .subpasses(std::slice::from_ref(&subpass_description))
-            .dependencies(&dependencies)
-            .build();
+            .dependencies(&dependencies);
         let render_pass = rhi.create_render_pass(&render_pass_ci, "main pass");
 
         render_pass
     }
 
-    fn setup_depth_stencil(rhi: &Rhi, init_info: &AppInitInfo) -> DepthStencil
+    fn setup_depth_stencil(rhi: &Rhi, render_ctx: &RenderContext, init_info: &InitInfo) -> DepthStencil
     {
         // TODO 使用 vkmem
 
         // TODO 可以把这个 format 存下来
-        let depth_format = rhi.get_depth_format();
+        let depth_format = render_ctx.depth_format;
 
         // depth image
-        let image_ci = vk::ImageCreateInfo::builder()
+        let image_ci = vk::ImageCreateInfo::default()
             .image_type(vk::ImageType::TYPE_2D)
             .format(depth_format)
             .extent(vk::Extent3D {
@@ -131,12 +163,11 @@ impl VkApp
             .samples(vk::SampleCountFlags::TYPE_1)
             .tiling(vk::ImageTiling::OPTIMAL)
             .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC)
-            .flags(vk::ImageCreateFlags::empty())
-            .build();
+            .flags(vk::ImageCreateFlags::empty());
 
         let (depth_image, depth_alloc) = rhi.create_image(&image_ci, "depth_buffer");
 
-        let depth_stencil_view_ci = vk::ImageViewCreateInfo::builder()
+        let depth_stencil_view_ci = vk::ImageViewCreateInfo::default()
             .view_type(vk::ImageViewType::TYPE_2D)
             .format(depth_format)
             .flags(vk::ImageViewCreateFlags::empty())
@@ -162,7 +193,7 @@ impl VkApp
         rhi: &Rhi,
         render_context: &RenderContext,
         render_pass: vk::RenderPass,
-        init_info: &AppInitInfo,
+        init_info: &InitInfo,
         depth_stencil: &DepthStencil,
     ) -> Vec<vk::Framebuffer>
     {
@@ -172,7 +203,7 @@ impl VkApp
             .iter()
             .map(|image_view| {
                 let attachments = [*image_view, depth_stencil.view];
-                let frame_buffer_ci = vk::FramebufferCreateInfo::builder()
+                let frame_buffer_ci = vk::FramebufferCreateInfo::default()
                     .render_pass(render_pass)
                     .attachments(&attachments)
                     .width(init_info.width)
@@ -185,21 +216,42 @@ impl VkApp
         frame_buffers
     }
 
-    fn setup_desriptors() {}
+    // TODO
+    fn setup_desriptors(rhi: &'static Rhi, render_ctx: &RenderContext)
+    {
+        // scene descriptor sets: matrices and environment maps
+        // 数量和 swapchain 的 image 保持一致
+        {
+            let mut descriptor_sets = (0..render_ctx.render_swapchain.image_views.len())
+                .map(|_| RhiDescriptorSet::new::<SceneDescriptorSetLayoutBinding>(rhi))
+                .collect_vec();
+
+            for mut descriptor_set in descriptor_sets {
+                descriptor_set.write(vec![(0, RhiDescriptorUpdateInfo::Buffer(vk::DescriptorBufferInfo::default()))]);
+            }
+        }
+
+        // material descriptor sets
+
+        // skybox descriptor sets
+    }
+
+
+    fn setup_pipelines() {}
 
     fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
     {
-        let init_info = AppInitInfo {
+        let init_info = InitInfo {
             width: 800,
             height: 800,
         };
 
-        let render_pass = Self::prepare_render_pass(rhi);
+        let render_pass = Self::prepare_render_pass(rhi, render_context);
 
         let pipeline_cache = rhi.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), "pipeline cache");
 
         // TODO 考虑把这个挪到 render_context 里
-        let depth_stencil = Self::setup_depth_stencil(rhi, &init_info);
+        let depth_stencil = Self::setup_depth_stencil(rhi, render_context, &init_info);
 
         let frame_buffers = Self::setup_frame_buffer(rhi, render_context, render_pass, &init_info, &depth_stencil);
 
@@ -220,6 +272,11 @@ impl VkApp
 
 impl App for VkApp
 {
+    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    {
+        todo!()
+    }
+
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
     {
         VkApp::new(rhi, render_context)
@@ -231,11 +288,7 @@ impl App for VkApp
             window_width: 800,
             window_height: 800,
             app_name: "Vk-glTF-PBR".to_string(),
+            enable_validation: true,
         }
-    }
-
-    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
-    {
-        todo!()
     }
 }

@@ -170,9 +170,11 @@ mod _impl_init
         {
             Self {
                 depth_format_dedicate: vec![
-                    vk::Format::D32_SFLOAT,
                     vk::Format::D32_SFLOAT_S8_UINT,
+                    vk::Format::D32_SFLOAT,
                     vk::Format::D24_UNORM_S8_UINT,
+                    vk::Format::D16_UNORM_S8_UINT,
+                    vk::Format::D16_UNORM,
                 ],
                 frames_in_flight: 3,
             }
