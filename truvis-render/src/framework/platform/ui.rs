@@ -89,9 +89,11 @@ pub struct UI
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     descriptor_set_layout: vk::DescriptorSetLayout,
-    fonts_texture: Option<RhiTexture>,
+
     descriptor_pool: vk::DescriptorPool,
-    descriptor_set: vk::DescriptorSet,
+
+    fonts_texture: RhiTexture,
+    font_descriptor_set: vk::DescriptorSet,
 
     meshes: Vec<Option<UiMesh>>,
 }
@@ -104,6 +106,10 @@ pub struct UiOptions
 
 impl UI
 {
+    /// fonts atlas 使用的 texture id
+    const FONT_TEX_ID: usize = usize::MAX;
+
+
     pub fn new(
         rhi: &'static Rhi,
         render_ctx: &RenderContext,
@@ -132,7 +138,7 @@ impl UI
         };
 
         let fonts = imgui.fonts();
-        fonts.tex_id = imgui::TextureId::from(usize::MAX);
+        fonts.tex_id = imgui::TextureId::from(Self::FONT_TEX_ID);
 
         let pool_sizes =
             [vk::DescriptorPoolSize::default().descriptor_count(1).ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)];
@@ -174,9 +180,9 @@ impl UI
             pipeline_layout,
 
             descriptor_set_layout,
-            fonts_texture: Some(fonts_texture),
+            fonts_texture,
             descriptor_pool,
-            descriptor_set,
+            font_descriptor_set: descriptor_set,
 
             meshes: (0..options.frames_in_flight).map(|_| None).collect(),
         }
@@ -195,7 +201,6 @@ impl UI
 
         let frame_index = render_ctx.current_frame_index();
         self.meshes[frame_index].replace(UiMesh::from_draw_data(rhi, draw_data)).map(|mesh| mesh.destroy());
-        // TODO 使用 draw_data 更新 mesh
 
         let mut cmd = render_ctx.alloc_command_buffer("imgui-render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
@@ -203,6 +208,17 @@ impl UI
         cmd.end();
 
         Some(cmd)
+    }
+
+    // TODO imgui 自己有个 Texture<> 类型，可以作为 hash 容器
+    /// 根据 imgui 传来的 texture id，找到对应的 descriptor set
+    fn get_texture(&self, texture_id: imgui::TextureId) -> vk::DescriptorSet
+    {
+        if texture_id.id() == Self::FONT_TEX_ID {
+            self.font_descriptor_set
+        } else {
+            unimplemented!()
+        }
     }
 
     fn record_cmd(
@@ -253,6 +269,7 @@ impl UI
         let clip_offset = draw_data.display_pos;
         let clip_scale = draw_data.framebuffer_scale;
 
+        // 简而言之：对于每个 command，设置正确的 vertex, index, texture, scissor 即可
         for draw_list in draw_data.draw_lists() {
             for command in draw_list.commands() {
                 match command {
@@ -285,8 +302,23 @@ impl UI
 
                         // 加载 texture，如果和上一个 command 使用的 texture 不是同一个，则需要重新加载
                         if Some(texture_id) != last_texture_id {
-                            // TODO
+                            cmd.bind_descriptor_sets(
+                                vk::PipelineBindPoint::GRAPHICS,
+                                self.pipeline_layout,
+                                0,
+                                &[self.get_texture(texture_id)],
+                                &[],
+                            );
+                            last_texture_id = Some(texture_id);
                         }
+
+                        cmd.draw_indexed2(
+                            count as u32,
+                            1,
+                            index_offset + idx_offset as u32,
+                            vertex_offset + vtx_offset as i32,
+                            0,
+                        );
                     }
                     imgui::DrawCmd::ResetRenderState => {
                         log::warn!("imgui reset render state");

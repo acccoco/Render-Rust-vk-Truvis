@@ -161,6 +161,7 @@ mod _draw_cmd
         }
 
         /// index_info: (index_count, first_index)
+        ///
         /// instance_info: (instance_count, first_instance)
         #[inline]
         pub fn draw_indexed(&mut self, index_info: (u32, u32), instance_info: (u32, u32), vertex_offset: i32)
@@ -178,6 +179,28 @@ mod _draw_cmd
         }
 
         #[inline]
+        pub fn draw_indexed2(
+            &mut self,
+            index_count: u32,
+            instance_count: u32,
+            first_index: u32,
+            vertex_offset: i32,
+            first_instance: u32,
+        )
+        {
+            unsafe {
+                self.rhi.vk_device().cmd_draw_indexed(
+                    self.command_buffer,
+                    index_count,
+                    instance_count,
+                    first_index,
+                    vertex_offset,
+                    first_instance,
+                );
+            }
+        }
+
+        #[inline]
         pub fn cmd_push_constants(
             &mut self,
             pipeline_layout: vk::PipelineLayout,
@@ -188,6 +211,28 @@ mod _draw_cmd
         {
             unsafe {
                 self.rhi.vk_device().cmd_push_constants(self.command_buffer, pipeline_layout, stage, offset, data);
+            }
+        }
+
+        #[inline]
+        pub fn bind_descriptor_sets(
+            &mut self,
+            bind_point: vk::PipelineBindPoint,
+            pipeline_layout: vk::PipelineLayout,
+            first_set: u32,
+            descriptor_sets: &[vk::DescriptorSet],
+            dynamic_offsets: &[u32],
+        )
+        {
+            unsafe {
+                self.rhi.vk_device().cmd_bind_descriptor_sets(
+                    self.command_buffer,
+                    bind_point,
+                    pipeline_layout,
+                    first_set,
+                    descriptor_sets,
+                    dynamic_offsets,
+                );
             }
         }
     }
