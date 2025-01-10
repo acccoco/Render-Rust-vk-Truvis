@@ -547,6 +547,7 @@ mod _impl_tools
             // self.debug_util_pf.unwrap().cmd_begin_debug_utils_label()
         }
 
+        #[inline]
         pub fn create_image<S>(
             &self,
             create_info: &vk::ImageCreateInfo,
@@ -600,6 +601,7 @@ mod _impl_tools
                 .collect()
         }
 
+        #[inline]
         pub fn reset_command_pool(&self, command_pool: &mut RhiCommandPool)
         {
             unsafe {
@@ -609,6 +611,7 @@ mod _impl_tools
             }
         }
 
+        #[inline]
         pub fn wait_for_fence(&self, fence: &RhiFence)
         {
             unsafe {
@@ -616,6 +619,7 @@ mod _impl_tools
             }
         }
 
+        #[inline]
         pub fn reset_fence(&self, fence: &RhiFence)
         {
             unsafe {
@@ -623,6 +627,7 @@ mod _impl_tools
             }
         }
 
+        #[inline]
         pub fn queue_submit(&self, queue: &RhiQueue, batches: Vec<RhiSubmitBatch>, fence: Option<RhiFence>)
         {
             unsafe {
@@ -636,6 +641,7 @@ mod _impl_tools
             }
         }
 
+        #[inline]
         pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str)
             -> vk::RenderPass
         {
@@ -644,6 +650,7 @@ mod _impl_tools
             render_pass
         }
 
+        #[inline]
         pub fn create_pipeline_cache(
             &self,
             pipeline_cache_ci: &vk::PipelineCacheCreateInfo,
@@ -655,6 +662,7 @@ mod _impl_tools
             pipeline_cache
         }
 
+        #[inline]
         pub fn create_frame_buffer(
             &self,
             frame_buffer_ci: &vk::FramebufferCreateInfo,
@@ -666,6 +674,7 @@ mod _impl_tools
             frame_buffer
         }
 
+        #[inline]
         pub fn create_command_pool<S: AsRef<str> + Clone>(
             &self,
             queue_flags: vk::QueueFlags,
@@ -674,6 +683,40 @@ mod _impl_tools
         ) -> RhiCommandPool
         {
             Self::init_command_pool(&self.device, &self.debug_utils, queue_flags, flags, debug_name)
+        }
+
+        #[inline]
+        pub fn create_sampler(&self, sampler_ci: &vk::SamplerCreateInfo, name: &str) -> vk::Sampler
+        {
+            let sampler = unsafe { self.vk_device().create_sampler(sampler_ci, None).unwrap() };
+            self.set_debug_name(sampler, name);
+            sampler
+        }
+
+        #[inline]
+        pub fn create_descriptor_pool(
+            &self,
+            descriptor_pool_ci: &vk::DescriptorPoolCreateInfo,
+            name: &str,
+        ) -> vk::DescriptorPool
+        {
+            let pool = unsafe { self.vk_device().create_descriptor_pool(descriptor_pool_ci, None).unwrap() };
+            self.set_debug_name(pool, name);
+            pool
+        }
+
+        #[inline]
+        pub fn allocate_descriptor_sets(&self, alloc_info: &vk::DescriptorSetAllocateInfo) -> Vec<vk::DescriptorSet>
+        {
+            unsafe { self.vk_device().allocate_descriptor_sets(alloc_info).unwrap() }
+        }
+
+        #[inline]
+        pub fn update_descriptor_sets(&self, writes: &[vk::WriteDescriptorSet])
+        {
+            unsafe {
+                self.vk_device().update_descriptor_sets(writes, &[]);
+            }
         }
     }
 }

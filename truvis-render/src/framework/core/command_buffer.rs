@@ -35,9 +35,9 @@ impl RhiCommandBuffer
     }
 
     /// 从 Rhi 中的 command pool 分配 command buffer 进行执行
-    pub fn one_time_exec<F>(rhi: &'static Rhi, ty: vk::QueueFlags, f: F)
+    pub fn one_time_exec<F, R>(rhi: &'static Rhi, ty: vk::QueueFlags, f: F) -> R
     where
-        F: FnOnce(&mut RhiCommandBuffer),
+        F: FnOnce(&mut RhiCommandBuffer) -> R,
     {
         let pool;
         let queue;
@@ -60,7 +60,7 @@ impl RhiCommandBuffer
         let mut command_buffer = Self::new(rhi, pool, "one-time-command-buffer");
 
         command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        f(&mut command_buffer);
+        let result = f(&mut command_buffer);
         command_buffer.end();
 
         queue.submit(
@@ -73,6 +73,8 @@ impl RhiCommandBuffer
         );
         queue.wait_idle(rhi);
         command_buffer.free();
+
+        result
     }
 
     pub fn free(self)
@@ -112,7 +114,7 @@ mod _transfer_cmd
         pub fn copy_buffer(&mut self, src: &RhiBuffer, dst: &mut RhiBuffer, regions: &[vk::BufferCopy])
         {
             unsafe {
-                self.rhi.vk_device().cmd_copy_buffer(self.command_buffer, src.buffer, dst.buffer, regions);
+                self.rhi.vk_device().cmd_copy_buffer(self.command_buffer, src.handle, dst.handle, regions);
             }
         }
 
@@ -123,6 +125,12 @@ mod _transfer_cmd
             unsafe {
                 self.rhi.vk_acceleration_struct_pf.cmd_copy_acceleration_structure(self.command_buffer, copy_info);
             }
+        }
+
+        #[inline]
+        pub fn cmd_copy_buffer_to_image(&mut self, copy_info: &vk::CopyBufferToImageInfo2)
+        {
+            unsafe { self.rhi.vk_device().cmd_copy_buffer_to_image2(self.command_buffer, copy_info) }
         }
     }
 }
@@ -137,7 +145,7 @@ mod _draw_cmd
     impl RhiCommandBuffer
     {
         #[inline]
-        pub fn begin_rendering(&mut self, render_info: &vk::RenderingInfo)
+        pub fn cmd_begin_rendering(&mut self, render_info: &vk::RenderingInfo)
         {
             unsafe {
                 self.rhi.vk_dynamic_render_pf.cmd_begin_rendering(self.command_buffer, render_info);
@@ -168,6 +176,20 @@ mod _draw_cmd
                 );
             }
         }
+
+        #[inline]
+        pub fn cmd_push_constants(
+            &mut self,
+            pipeline_layout: vk::PipelineLayout,
+            stage: vk::ShaderStageFlags,
+            offset: u32,
+            data: &[u8],
+        )
+        {
+            unsafe {
+                self.rhi.vk_device().cmd_push_constants(self.command_buffer, pipeline_layout, stage, offset, data);
+            }
+        }
     }
 }
 
@@ -183,10 +205,10 @@ mod _status_cmd
     impl RhiCommandBuffer
     {
         #[inline]
-        pub fn bind_pipeline(&mut self, bind_point: vk::PipelineBindPoint, pipeline: &RhiPipeline)
+        pub fn bind_pipeline(&mut self, bind_point: vk::PipelineBindPoint, pipeline: vk::Pipeline)
         {
             unsafe {
-                self.rhi.vk_device().cmd_bind_pipeline(self.command_buffer, bind_point, pipeline.pipeline);
+                self.rhi.vk_device().cmd_bind_pipeline(self.command_buffer, bind_point, pipeline);
             }
         }
 
@@ -195,7 +217,7 @@ mod _status_cmd
         pub fn bind_vertex_buffer(&mut self, first_bind: u32, buffers: &[RhiBuffer], offsets: &[vk::DeviceSize])
         {
             unsafe {
-                let buffers = buffers.iter().map(|b| b.buffer).collect_vec();
+                let buffers = buffers.iter().map(|b| b.handle).collect_vec();
                 self.rhi.vk_device().cmd_bind_vertex_buffers(self.command_buffer, first_bind, &buffers, offsets);
             }
         }
@@ -204,7 +226,23 @@ mod _status_cmd
         pub fn bind_index_buffer(&mut self, buffer: &RhiBuffer, offset: vk::DeviceSize, index_type: vk::IndexType)
         {
             unsafe {
-                self.rhi.vk_device().cmd_bind_index_buffer(self.command_buffer, buffer.buffer, offset, index_type);
+                self.rhi.vk_device().cmd_bind_index_buffer(self.command_buffer, buffer.handle, offset, index_type);
+            }
+        }
+
+        #[inline]
+        pub fn cmd_set_viewport(&mut self, first_viewport: u32, viewports: &[vk::Viewport])
+        {
+            unsafe {
+                self.rhi.vk_device().cmd_set_viewport(self.command_buffer, first_viewport, viewports);
+            }
+        }
+
+        #[inline]
+        pub fn cmd_set_scissor(&mut self, first_scissor: u32, scissors: &[vk::Rect2D])
+        {
+            unsafe {
+                self.rhi.vk_device().cmd_set_scissor(self.command_buffer, first_scissor, scissors);
             }
         }
     }
@@ -212,7 +250,7 @@ mod _status_cmd
 
 mod _sync_cmd
 {
-    use ash::vk;
+    use ash::{vk, vk::DependencyFlags};
 
     use crate::framework::core::command_buffer::RhiCommandBuffer;
 
@@ -266,9 +304,10 @@ mod _sync_cmd
         }
 
         #[inline]
-        pub fn image_memory_barrier(&mut self, barriers: &[vk::ImageMemoryBarrier2])
+        pub fn image_memory_barrier(&mut self, dependency_flags: DependencyFlags, barriers: &[vk::ImageMemoryBarrier2])
         {
-            let dependency_info = vk::DependencyInfo::default().image_memory_barriers(barriers);
+            let dependency_info =
+                vk::DependencyInfo::default().image_memory_barriers(barriers).dependency_flags(dependency_flags);
             unsafe {
                 self.rhi.vk_device().cmd_pipeline_barrier2(self.command_buffer, &dependency_info);
             }

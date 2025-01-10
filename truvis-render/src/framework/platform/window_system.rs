@@ -8,7 +8,8 @@ use winit::{
     platform::run_on_demand::EventLoopExtRunOnDemand,
     window::{Window, WindowAttributes},
 };
-use crate::framework::platform::ui::UI;
+
+use crate::framework::{platform::ui::UI, rendering::render_context::RenderContext, rhi::Rhi};
 
 pub struct WindowCreateInfo
 {
@@ -87,66 +88,28 @@ impl WindowSystem
         }
     }
 
-    pub fn render_loop(&self, mut f: impl FnMut())
+    // TODO 改用最新的回调模式
+    // FIXME 不应该传入 ui 参数，而是应该对事件进行包装，让外部在对应的事件中进行处理。window 不应该关心什么时候绘制 ui
+    pub fn render_loop<F>(&self, ui: &mut UI, mut f: F)
+    where
+        F: FnMut(&mut UI),
     {
-        let mut imgui = imgui::Context::create();
-        imgui.set_ini_filename(None); // disable automatic saving .ini file
-        let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui);
-
-        let hidpi_factor = platform.hidpi_factor();
-        let font_size = (13.0 * hidpi_factor) as f32;
-        imgui.fonts().add_font(&[
-            imgui::FontSource::DefaultFontData {
-                config: Some(imgui::FontConfig {
-                    size_pixels: font_size,
-                    ..Default::default()
-                }),
-            },
-            imgui::FontSource::TtfData {
-                data: include_bytes!("assets/fonts/mplus-1p-regular.ttf"),
-                size_pixels: font_size,
-                config: Some(imgui::FontConfig {
-                    rasterizer_multiply: 1.75,
-                    glyph_ranges: imgui::FontGlyphRanges::japanese(),
-                    ..Default::default()
-                }),
-            },
-        ]);
-        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
-
-        platform.attach_window(imgui.io_mut(), &self.window, imgui_winit_support::HiDpiMode::Rounded);
-        
-        // TODO
-        UI::new(&rhi, &render_ctx);
-
-        // TODO 改用最新的回调模式
         self.event_loop
             .borrow_mut()
             .run_on_demand({
                 let mut last_frame = std::time::Instant::now();
 
                 move |event, _active_event_loop| {
-                    platform.handle_event(imgui.io_mut(), &self.window, &event);
+                    ui.platform.handle_event(ui.imgui.io_mut(), &self.window, &event);
 
                     match event {
                         winit::event::Event::NewEvents(_) => {
                             let now = std::time::Instant::now();
-                            imgui.io_mut().update_delta_time(now - last_frame);
+                            ui.imgui.io_mut().update_delta_time(now - last_frame);
                             last_frame = now;
                         }
                         winit::event::Event::AboutToWait => {
-                            platform.prepare_frame(imgui.io_mut(), &self.window).unwrap();
-
-                            // draw under the UI
-                            // ..
-
-                            let ui = imgui.frame();
-                            // construct thi UI
-                            platform.prepare_render(&ui, &self.window);
-                            let draw_data = imgui.render();
-                            // renderer.render(.., draw_data);
-
-                            // draw over the UI
+                            f(ui);
                         }
 
                         // 这个只是打算退出
@@ -166,8 +129,8 @@ impl WindowSystem
                         winit::event::Event::WindowEvent {
                             event: winit::event::WindowEvent::RedrawRequested,
                             ..
-                        } => f(),
-                        winit::event::Event::WindowEvent { .. } => f(),
+                        } => (),
+                        winit::event::Event::WindowEvent { .. } => (),
 
                         // 这个应该是真正的退出
                         winit::event::Event::LoopExiting => {

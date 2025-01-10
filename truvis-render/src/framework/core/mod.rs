@@ -18,3 +18,4 @@ pub mod shader;
 pub mod swapchain;
 pub mod synchronize;
 pub mod vulkan_resource;
+pub mod texture;

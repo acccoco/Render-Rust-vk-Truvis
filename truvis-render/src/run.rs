@@ -7,6 +7,7 @@ use crate::{
 
 pub trait App
 {
+    /// 发生于 acquire_frame 之后，submit_frame 之前
     fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer);
 
 
@@ -81,9 +82,10 @@ pub fn run<T: App>()
     let app = T::init(Renderer::get_rhi(), &mut renderer.render_context);
 
     renderer.timer.reset();
-    // 由于 Rust 的借用检查器，这里不能直接调用 Renderer 的 render_loop()，而是需要调用 window 的 render_loop()
-    renderer.window.render_loop(|| {
-        renderer.timer.update();
-        app.update(Renderer::get_rhi(), &mut renderer.render_context, &renderer.timer);
-    });
+    renderer.render_loop(
+        |rhi, render_ctx, timer| {
+            app.update(rhi, render_ctx, timer);
+        },
+        |ui_frame| {},
+    );
 }

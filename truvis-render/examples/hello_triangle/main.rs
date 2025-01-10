@@ -50,10 +50,10 @@ impl HelloTriangle
     fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
     {
         let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data_device(&INDEX_DATA);
+        index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
 
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data_device(&VERTEX_DATA);
+        vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }
@@ -106,7 +106,8 @@ impl HelloTriangle
 
     fn my_update(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
-        render_context.acquire_frame();
+        // FIXME 多余了
+        ~render_context.acquire_frame();
 
         let color_attach = <Self as App>::get_color_attachment(render_context.current_present_image_view());
         let depth_attach = <Self as App>::get_depth_attachment(render_context.depth_image_view);
@@ -122,7 +123,7 @@ impl HelloTriangle
         let mut cmd = RenderContext::alloc_command_buffer(render_context, "render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         {
-            cmd.begin_rendering(&render_info);
+            cmd.cmd_begin_rendering(&render_info);
             cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
             cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
             cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
@@ -139,7 +140,7 @@ impl HelloTriangle
             None,
         );
 
-        render_context.submit_frame();
+        ~render_context.submit_frame();
     }
 
     fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self

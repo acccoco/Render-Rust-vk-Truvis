@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use crate::framework::{
     core::swapchain::RenderSwapchainInitInfo,
-    platform::window_system::{WindowCreateInfo, WindowSystem},
+    platform::{
+        ui::UI,
+        window_system::{WindowCreateInfo, WindowSystem},
+    },
     rendering::render_context::{RenderContext, RenderContextInitInfo},
     rhi::{vk_debug_callback, Rhi, RhiInitInfo, RHI},
 };
@@ -61,6 +64,7 @@ pub struct Renderer
     pub timer: Timer,
     pub window: Arc<WindowSystem>,
     pub render_context: RenderContext,
+    pub ui: UI,
 }
 
 
@@ -108,16 +112,52 @@ impl Renderer
         let render_context_init_info = RenderContextInitInfo::default();
         let render_context = RenderContext::new(rhi, &render_context_init_info, render_swapchain_init_info);
 
+        let ui = UI::new(rhi, &render_context, &window.window());
 
         Self {
             window,
             render_context,
             timer: Timer::default(),
+            ui,
         }
     }
 
     pub fn get_rhi() -> &'static Rhi
     {
         RHI.get().unwrap()
+    }
+
+    pub fn render_loop<F, G>(&mut self, mut render_func: F, mut ui_builder: G)
+    where
+        F: FnMut(&'static Rhi, &mut RenderContext, &Timer),
+        G: FnMut(&mut imgui::Ui),
+    {
+        let rhi = Self::get_rhi();
+
+        self.window.render_loop(&mut self.ui, |ui| {
+            ui.platform.prepare_frame(ui.imgui.io_mut(), self.window.window()).unwrap();
+
+            // draw under the UI
+            // ..
+
+            let frame = ui.imgui.new_frame();
+            ui_builder(frame);
+            ui.platform.prepare_render(frame, self.window.window());
+            let draw_data = ui.imgui.render();
+            // renderer.render(.., draw_data);
+
+            // draw over the UI
+
+            // TODO render_func 应该返回多个 command buffer，然后统一提交
+
+
+            self.timer.update();
+
+            self.render_context.acquire_frame();
+
+            render_func(rhi, &mut self.render_context, &self.timer);
+
+            self.render_context.submit_frame();
+        });
     }
 }

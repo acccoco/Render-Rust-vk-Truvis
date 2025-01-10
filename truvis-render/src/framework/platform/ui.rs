@@ -1,38 +1,338 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use std::{ffi::CString, mem};
+use std::ffi::CString;
 
 use ash::vk;
+use image::EncodableLayout;
+use imgui::TextureId;
 
-use crate::framework::{core::shader::RhiShaderModule, rendering::render_context::RenderContext, rhi::Rhi};
+use crate::framework::{
+    core::{
+        buffer::RhiBuffer, command_buffer::RhiCommandBuffer, image::RhiImage2D, shader::RhiShaderModule,
+        texture::RhiTexture,
+    },
+    rendering::render_context::RenderContext,
+    rhi::Rhi,
+};
 
-pub struct UI {}
+pub struct UiMesh
+{
+    pub vertex: RhiBuffer,
+    vertex_count: usize,
+
+    pub indices: RhiBuffer,
+    index_count: usize,
+}
+
+impl UiMesh
+{
+    // TODO 频繁的创建和销毁 buffer，性能不好
+    pub fn from_draw_data(rhi: &'static Rhi, draw_data: &imgui::DrawData) -> Self
+    {
+        let (vertex_buffer, vertex_cnt) = Self::create_vertices(rhi, draw_data);
+        let (index_buffer, index_cnt) = Self::create_indices(rhi, draw_data);
+        Self {
+            vertex: vertex_buffer,
+            vertex_count: vertex_cnt,
+            indices: index_buffer,
+            index_count: index_cnt,
+        }
+    }
+
+    /// # Return
+    /// (vertices buffer, vertex count)
+    fn create_vertices(rhi: &'static Rhi, draw_data: &imgui::DrawData) -> (RhiBuffer, usize)
+    {
+        let vertex_count = draw_data.total_vtx_count as usize;
+        let mut vertices = Vec::with_capacity(vertex_count);
+        for draw_list in draw_data.draw_lists() {
+            vertices.extend_from_slice(draw_list.vtx_buffer());
+        }
+
+        let vertices_size = vertex_count * std::mem::size_of::<imgui::DrawVert>();
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, vertices_size, "imgui-vertex-buffer");
+        vertex_buffer.transfer_data_by_stage_buffer(&vertices);
+
+        (vertex_buffer, vertex_count)
+    }
+
+    /// # Return
+    /// (index buffer, index count)
+    fn create_indices(rhi: &'static Rhi, draw_data: &imgui::DrawData) -> (RhiBuffer, usize)
+    {
+        let index_count = draw_data.total_idx_count as usize;
+        let mut indices = Vec::with_capacity(index_count);
+        for draw_list in draw_data.draw_lists() {
+            indices.extend_from_slice(draw_list.idx_buffer());
+        }
+
+        let indices_size = index_count * std::mem::size_of::<imgui::DrawIdx>();
+        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, indices_size, "imgui-index-buffer");
+        index_buffer.transfer_data_by_stage_buffer(&indices);
+
+        (index_buffer, index_count)
+    }
+
+    fn destroy(mut self)
+    {
+        self.indices.destroy();
+        self.vertex.destroy();
+    }
+}
+
+
+pub struct UI
+{
+    pub imgui: imgui::Context,
+    pub platform: imgui_winit_support::WinitPlatform,
+
+    pipeline: vk::Pipeline,
+    pipeline_layout: vk::PipelineLayout,
+    descriptor_set_layout: vk::DescriptorSetLayout,
+    fonts_texture: Option<RhiTexture>,
+    descriptor_pool: vk::DescriptorPool,
+    descriptor_set: vk::DescriptorSet,
+
+    meshes: Vec<Option<UiMesh>>,
+}
+
+pub struct UiOptions
+{
+    pub frames_in_flight: usize,
+}
 
 
 impl UI
 {
-    pub fn new(rhi: &'static Rhi, render_ctx: &RenderContext) -> Self
+    pub fn new(
+        rhi: &'static Rhi,
+        render_ctx: &RenderContext,
+        window: &winit::window::Window,
+        options: &UiOptions,
+    ) -> Self
     {
+        let (mut imgui, platform) = Self::create_imgui(window);
+
         let descriptor_set_layout = Self::create_descriptor_set(&rhi.device.device);
         let pipeline_layout = Self::create_pipeline_layout(&rhi.device.device, descriptor_set_layout);
         let pipeline = Self::create_pipeline(rhi, render_ctx, pipeline_layout);
-        
+
         let fonts_texture = {
             let fonts = imgui.fonts();
             let atlas_texture = fonts.build_rgba32_texture();
 
-            Texture::from_rgba8(
-                &device,
-                queue,
-                command_pool,
-                &mut allocator,
+            let image = RhiImage2D::from_rgba8(
+                rhi,
                 atlas_texture.width,
                 atlas_texture.height,
                 atlas_texture.data,
-            )    
+                "imgui-fonts-image",
+            );
+            RhiTexture::new(rhi, image, "imgui-fonts-texture")
         };
 
-        Self {}
+        let fonts = imgui.fonts();
+        fonts.tex_id = imgui::TextureId::from(usize::MAX);
+
+        let pool_sizes =
+            [vk::DescriptorPoolSize::default().descriptor_count(1).ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)];
+        let descriptor_pool = rhi.create_descriptor_pool(
+            &vk::DescriptorPoolCreateInfo::default()
+                .pool_sizes(&pool_sizes)
+                .max_sets(1)
+                .flags(vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET),
+            "imgui-descriptor-pool",
+        );
+
+        let descriptor_set = rhi.allocate_descriptor_sets(
+            &vk::DescriptorSetAllocateInfo::default()
+                .descriptor_pool(descriptor_pool)
+                .set_layouts(std::slice::from_ref(&descriptor_set_layout)),
+        )[0];
+
+        // write
+        {
+            let image_info = vk::DescriptorImageInfo::default()
+                .sampler(fonts_texture.sampler)
+                .image_view(fonts_texture.image_view)
+                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+            let writes = vk::WriteDescriptorSet::default()
+                .dst_set(descriptor_set)
+                .dst_binding(0)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .image_info(std::slice::from_ref(&image_info));
+            rhi.update_descriptor_sets(std::slice::from_ref(&writes));
+        }
+
+        // TODO Textures::new()
+
+        Self {
+            imgui,
+            platform,
+
+            pipeline,
+            pipeline_layout,
+
+            descriptor_set_layout,
+            fonts_texture: Some(fonts_texture),
+            descriptor_pool,
+            descriptor_set,
+
+            meshes: (0..options.frames_in_flight).map(|_| None).collect(),
+        }
+    }
+
+    pub fn draw(
+        &mut self,
+        rhi: &'static Rhi,
+        render_ctx: &mut RenderContext,
+        draw_data: &imgui::DrawData,
+    ) -> Option<RhiCommandBuffer>
+    {
+        if draw_data.total_vtx_count == 0 {
+            return None;
+        }
+
+        let frame_index = render_ctx.current_frame_index();
+        self.meshes[frame_index].replace(UiMesh::from_draw_data(rhi, draw_data)).map(|mesh| mesh.destroy());
+        // TODO 使用 draw_data 更新 mesh
+
+        let mut cmd = render_ctx.alloc_command_buffer("imgui-render");
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        self.record_cmd(render_ctx, &mut cmd, self.meshes[frame_index].as_ref().unwrap(), draw_data);
+        cmd.end();
+
+        Some(cmd)
+    }
+
+    fn record_cmd(
+        &self,
+        render_ctx: &mut RenderContext,
+        cmd: &mut RhiCommandBuffer,
+        mesh: &UiMesh,
+        draw_data: &imgui::DrawData,
+    )
+    {
+        let color_attach_info = vk::RenderingAttachmentInfo::default()
+            .image_view(render_ctx.current_present_image_view())
+            .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+            .load_op(vk::AttachmentLoadOp::LOAD)
+            .store_op(vk::AttachmentStoreOp::STORE);
+        let depth_attach_info = vk::RenderingAttachmentInfo::default()
+            .image_view(render_ctx.depth_image_view)
+            .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+            .load_op(vk::AttachmentLoadOp::LOAD)
+            .store_op(vk::AttachmentStoreOp::STORE);
+        let render_info = vk::RenderingInfo::default()
+            .layer_count(1)
+            .render_area(render_ctx.swapchain_extent().into())
+            .color_attachments(std::slice::from_ref(&color_attach_info))
+            .depth_attachment(&depth_attach_info);
+
+        let viewport = vk::Viewport {
+            width: draw_data.framebuffer_scale[0] * draw_data.display_size[0],
+            height: draw_data.framebuffer_scale[1] * draw_data.display_size[1],
+            min_depth: 0.0,
+            ..Default::default()
+        };
+
+        cmd.cmd_begin_rendering(&render_info);
+        cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+        cmd.cmd_set_viewport(0, std::slice::from_ref(&viewport));
+        // FIXME 这个也许会出问题
+        let projection =
+            glam::Mat4::orthographic_rh(0.0, draw_data.display_size[0], 0.0, draw_data.display_size[1], -1.0, 1.0);
+        cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::VERTEX, 0, projection.as_ref().as_bytes());
+        cmd.bind_index_buffer(&mesh.indices, 0, vk::IndexType::UINT16);
+        cmd.bind_vertex_buffer(0, std::slice::from_ref(&mesh.vertex), &[0]);
+
+        let mut index_offset = 0;
+        let mut vertex_offset = 0;
+        // 缓存之前已经加载过的 texture
+        let mut last_texture_id: Option<TextureId> = None;
+        let clip_offset = draw_data.display_pos;
+        let clip_scale = draw_data.framebuffer_scale;
+
+        for draw_list in draw_data.draw_lists() {
+            for command in draw_list.commands() {
+                match command {
+                    imgui::DrawCmd::Elements {
+                        count,
+                        cmd_params:
+                            imgui::DrawCmdParams {
+                                clip_rect,
+                                texture_id, // 当前绘制命令用到的 texture，这个 id 是 app 决定的
+                                vtx_offset,
+                                idx_offset,
+                            },
+                    } => {
+                        let clip_x = (clip_rect[0] - clip_offset[0]) * clip_scale[0];
+                        let clip_y = (clip_rect[1] - clip_offset[1]) * clip_scale[1];
+                        let clip_w = (clip_rect[2] - clip_offset[0]) * clip_scale[0] - clip_x;
+                        let clip_h = (clip_rect[3] - clip_offset[1]) * clip_scale[1] - clip_y;
+
+                        let scissors = [vk::Rect2D {
+                            offset: vk::Offset2D {
+                                x: (clip_x as i32).max(0),
+                                y: (clip_y as i32).max(0),
+                            },
+                            extent: vk::Extent2D {
+                                width: clip_w as _,
+                                height: clip_h as _,
+                            },
+                        }];
+                        cmd.cmd_set_scissor(0, &scissors);
+
+                        // 加载 texture，如果和上一个 command 使用的 texture 不是同一个，则需要重新加载
+                        if Some(texture_id) != last_texture_id {
+                            // TODO
+                        }
+                    }
+                    imgui::DrawCmd::ResetRenderState => {
+                        log::warn!("imgui reset render state");
+                    }
+                    imgui::DrawCmd::RawCallback { .. } => {
+                        log::warn!("imgui raw callback");
+                    }
+                }
+            }
+
+            index_offset += draw_list.idx_buffer().len() as u32;
+            vertex_offset += draw_list.vtx_buffer().len() as i32;
+        }
+        cmd.end_rendering();
+    }
+
+    fn create_imgui(window: &winit::window::Window) -> (imgui::Context, imgui_winit_support::WinitPlatform)
+    {
+        let mut imgui = imgui::Context::create();
+        imgui.set_ini_filename(None); // disable automatic saving .ini file
+        let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui);
+
+        let hidpi_factor = platform.hidpi_factor();
+        let font_size = (13.0 * hidpi_factor) as f32;
+        imgui.fonts().add_font(&[
+            imgui::FontSource::DefaultFontData {
+                config: Some(imgui::FontConfig {
+                    size_pixels: font_size,
+                    ..Default::default()
+                }),
+            },
+            imgui::FontSource::TtfData {
+                data: include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/fonts/mplus-1p-regular.ttf")),
+                size_pixels: font_size,
+                config: Some(imgui::FontConfig {
+                    rasterizer_multiply: 1.75,
+                    glyph_ranges: imgui::FontGlyphRanges::japanese(),
+                    ..Default::default()
+                }),
+            },
+        ]);
+        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
+
+        platform.attach_window(imgui.io_mut(), window, imgui_winit_support::HiDpiMode::Rounded);
+
+        (imgui, platform)
     }
 
     // TODO refactor
@@ -58,7 +358,7 @@ impl UI
         let push_const_range = [vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::VERTEX,
             offset: 0,
-            size: std::mem::size_of::<glam::Mat4>() as u32,
+            size: size_of::<glam::Mat4>() as u32,
         }];
 
         let descriptor_set_layouts = [descriptor_set_layout];
@@ -76,11 +376,6 @@ impl UI
     ) -> vk::Pipeline
     {
         let entry_point_name = CString::new("main").unwrap();
-
-        let vertex_shader_source =
-            std::include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../shader/imgui/shader.vert.spv"));
-        let fragment_shader_source =
-            std::include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../shader/imgui/shader.frag.spv"));
 
         let vert_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.vert.spv"));
         let frag_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.frag.spv"));

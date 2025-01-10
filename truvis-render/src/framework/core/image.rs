@@ -71,34 +71,64 @@ impl RhiImage2D
         }
     }
 
-    /// 根据 RGBA8_UNORM 的 data 创建 image
-    pub fn from_rgba8(rhi: &'static Rhi, width: u32, height: u32, data: &[u8]) -> Self
+    #[inline]
+    pub fn width(&self) -> u32
     {
-        RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::GRAPHICS, |cmd| {
-            RhiBuffer::new_stage_buffer(rhi, data.len() as vk::DeviceSize, "image-stage-buffer")
-                .transfer_data_device(data);
-        });
-        todo!()
+        self.image_info.extent.width
     }
 
-    pub fn transfer_data(&mut self, command_buffer: &mut RhiCommandBuffer, data: &[u8])
+    #[inline]
+    pub fn height(&self) -> u32
+    {
+        self.image_info.extent.height
+    }
+
+    /// 根据 RGBA8_UNORM 的 data 创建 image
+    pub fn from_rgba8(rhi: &'static Rhi, width: u32, height: u32, data: &[u8], name: &str) -> Self
+    {
+        let mut image = Self::new(
+            rhi,
+            &vk::ImageCreateInfo::default().extent(vk::Extent3D {
+                width,
+                height,
+                depth: 1,
+            }),
+            &vk_mem::AllocationCreateInfo {
+                required_flags: vk::MemoryPropertyFlags::DEVICE_LOCAL,
+                ..Default::default()
+            },
+            name,
+        );
+
+        let stage_buffer =
+            RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::GRAPHICS, |cmd| image.transfer_data(cmd, data));
+        stage_buffer.destroy();
+
+        image
+    }
+
+    pub fn transfer_data(&mut self, command_buffer: &mut RhiCommandBuffer, data: &[u8]) -> RhiBuffer
     {
         let pixels_cnt = self.image_info.extent.width * self.image_info.extent.height;
         assert_eq!(data.len(), Self::format_byte_count(self.image_info.format) * pixels_cnt as usize);
 
         let mut stage_buffer =
             RhiBuffer::new_stage_buffer(self.rhi, std::mem::size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
-        stage_buffer.transfer_data_map(data);
+        stage_buffer.transfer_data_by_mem_map(data);
 
         // 1. transition the image layout
         // 2. copy the buffer into the image
         // 3. transition the layout 为了让 fragment shader 可读
         {
-            let mut barrier = vk::ImageMemoryBarrier::default()
-                .old_layout(vk::ImageLayout::UNDEFINED)
-                .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+            let image_barrier = vk::ImageMemoryBarrier2::default()
+                .src_stage_mask(vk::PipelineStageFlags2::TOP_OF_PIPE)
+                .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                .src_access_mask(vk::AccessFlags2::empty())
+                .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
                 .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
                 .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .old_layout(vk::ImageLayout::UNDEFINED)
+                .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
                 .image(self.handle)
                 .subresource_range(vk::ImageSubresourceRange {
                     aspect_mask: vk::ImageAspectFlags::COLOR,
@@ -106,67 +136,44 @@ impl RhiImage2D
                     level_count: 1,
                     base_array_layer: 0,
                     layer_count: 1,
-                })
-                .src_access_mask(vk::AccessFlags::empty())
-                .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE);
+                });
+            command_buffer.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));
 
-            command_buffer.image_memory_barrier(&[vk::ImageMemoryBarrier2::default()]);
-            unsafe {
-                device.cmd_pipeline_barrier(
-                    command_buffer,
-                    vk::PipelineStageFlags::TOP_OF_PIPE,
-                    vk::PipelineStageFlags::TRANSFER,
-                    vk::DependencyFlags::empty(),
-                    &[],
-                    &[],
-                    &[barrier],
-                )
-            };
-
-            let region = vk::BufferImageCopy::default()
+            let buffer_image_copy = vk::BufferImageCopy2::default()
                 .buffer_offset(0)
                 .buffer_row_length(0)
                 .buffer_image_height(0)
+                .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
+                .image_extent(vk::Extent3D {
+                    width: self.width(),
+                    height: self.height(),
+                    depth: 1,
+                })
                 .image_subresource(vk::ImageSubresourceLayers {
                     aspect_mask: vk::ImageAspectFlags::COLOR,
                     mip_level: 0,
                     base_array_layer: 0,
                     layer_count: 1,
-                })
-                .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
-                .image_extent(vk::Extent3D {
-                    width,
-                    height,
-                    depth: 1,
                 });
-            unsafe {
-                device.cmd_copy_buffer_to_image(
-                    command_buffer,
-                    buffer,
-                    image,
-                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                    &[region],
-                )
-            }
+            command_buffer.cmd_copy_buffer_to_image(
+                &vk::CopyBufferToImageInfo2::default()
+                    .src_buffer(stage_buffer.handle)
+                    .dst_image(self.handle)
+                    .dst_image_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                    .regions(std::slice::from_ref(&buffer_image_copy)),
+            );
 
-            barrier.old_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
-            barrier.new_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
-            barrier.src_access_mask = vk::AccessFlags::TRANSFER_WRITE;
-            barrier.dst_access_mask = vk::AccessFlags::SHADER_READ;
-
-            unsafe {
-                device.cmd_pipeline_barrier(
-                    command_buffer,
-                    vk::PipelineStageFlags::TRANSFER,
-                    vk::PipelineStageFlags::FRAGMENT_SHADER,
-                    vk::DependencyFlags::empty(),
-                    &[],
-                    &[],
-                    &[barrier],
-                )
+            let image_barrier = vk::ImageMemoryBarrier2 {
+                old_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                src_access_mask: vk::AccessFlags2::TRANSFER_WRITE,
+                dst_access_mask: vk::AccessFlags2::SHADER_READ,
+                ..image_barrier
             };
+            command_buffer.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));
         }
-        // TODO
+
+        stage_buffer
     }
 
     /// 某种格式的像素需要的字节数

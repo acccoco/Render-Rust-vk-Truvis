@@ -81,10 +81,10 @@ impl ShaderToy
     fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
     {
         let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data_device(&INDEX_DATA);
+        index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
 
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data_device(&VERTEX_DATA);
+        vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }
@@ -179,7 +179,7 @@ impl ShaderToy
         {
             cmd.push_constants(&self.pipeline, vk::ShaderStageFlags::ALL, 0, bytemuck::bytes_of(&push_constants));
 
-            cmd.begin_rendering(&render_info);
+            cmd.cmd_begin_rendering(&render_info);
             cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
             cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
             cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);

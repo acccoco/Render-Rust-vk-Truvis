@@ -7,7 +7,7 @@ use crate::framework::{core::command_buffer::RhiCommandBuffer, rhi::Rhi};
 
 pub struct RhiBuffer
 {
-    pub(crate) buffer: vk::Buffer,
+    pub handle: vk::Buffer,
     allocation: vk_mem::Allocation,
 
     map_ptr: Option<*mut u8>,
@@ -52,7 +52,7 @@ impl RhiBuffer
             rhi.set_debug_name(buffer, debug_name.as_str());
             Self {
                 rhi,
-                buffer,
+                handle: buffer,
                 allocation,
                 map_ptr: None,
                 size,
@@ -112,9 +112,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_index_buffer<S>(rhi: &'static Rhi, size: usize, debug_name: S) -> Self
-    where
-        S: AsRef<str>,
+    pub fn new_index_buffer(rhi: &'static Rhi, size: usize, debug_name: &str) -> Self
     {
         Self::new_device_buffer(
             rhi,
@@ -128,9 +126,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_vertex_buffer<S>(rhi: &'static Rhi, size: usize, debug_name: S) -> Self
-    where
-        S: AsRef<str>,
+    pub fn new_vertex_buffer(rhi: &'static Rhi, size: usize, debug_name: &str) -> Self
     {
         Self::new_device_buffer(
             rhi,
@@ -190,12 +186,12 @@ impl RhiBuffer
     pub fn destroy(mut self)
     {
         unsafe {
-            self.rhi.vma().destroy_buffer(self.buffer, &mut self.allocation);
+            self.rhi.vma().destroy_buffer(self.handle, &mut self.allocation);
         }
     }
 
     /// 通过 mem map 的方式将 data 传入到 buffer 中
-    pub fn transfer_data_map<T>(&mut self, data: &[T])
+    pub fn transfer_data_by_mem_map<T>(&mut self, data: &[T])
     where
         T: Sized + Copy,
     {
@@ -214,7 +210,7 @@ impl RhiBuffer
     }
 
     /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到 self
-    pub fn transfer_data_device<T>(&mut self, data: &[T])
+    pub fn transfer_data_by_stage_buffer<T>(&mut self, data: &[T])
     where
         T: Sized + Copy,
     {
@@ -224,7 +220,7 @@ impl RhiBuffer
             format!("{}-stage-buffer", self.debug_name),
         );
 
-        stage_buffer.transfer_data_map(data);
+        stage_buffer.transfer_data_by_mem_map(data);
 
         RhiCommandBuffer::one_time_exec(self.rhi, vk::QueueFlags::TRANSFER, |cmd| {
             cmd.copy_buffer(
@@ -243,7 +239,7 @@ impl RhiBuffer
     pub fn get_device_address(&self) -> vk::DeviceAddress
     {
         unsafe {
-            self.rhi.vk_device().get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.buffer))
+            self.rhi.vk_device().get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.handle))
         }
     }
 }
