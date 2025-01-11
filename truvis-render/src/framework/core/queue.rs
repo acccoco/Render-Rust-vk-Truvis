@@ -20,6 +20,7 @@ impl RhiQueue
     pub fn submit(&self, rhi: &Rhi, batches: Vec<RhiSubmitBatch>, fence: Option<RhiFence>)
     {
         unsafe {
+            // TODO 这里既有 RhiSubmiBatch 又有 RhiSubmitBatchVk，感觉不太好
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = batches.iter().map(|b| b.to_vk_batch()).collect_vec();
             let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();

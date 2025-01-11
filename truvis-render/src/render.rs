@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use crate::framework::{
-    core::swapchain::RenderSwapchainInitInfo,
+    core::{queue::RhiSubmitBatch, swapchain::RenderSwapchainInitInfo},
     platform::{
-        ui::UI,
+        ui::{UiOptions, UI},
         window_system::{WindowCreateInfo, WindowSystem},
     },
     rendering::render_context::{RenderContext, RenderContextInitInfo},
@@ -101,6 +101,7 @@ impl Renderer
         let mut rhi_init_info =
             RhiInitInfo::init_basic(init_info.app_name.clone(), window.clone(), init_info.enable_validation);
         rhi_init_info.set_debug_callback(Some(vk_debug_callback));
+        let frames_in_flight = rhi_init_info.frames_in_flight;
         RHI.get_or_init(|| Rhi::new(rhi_init_info));
         let rhi = RHI.get().unwrap();
 
@@ -112,7 +113,14 @@ impl Renderer
         let render_context_init_info = RenderContextInitInfo::default();
         let render_context = RenderContext::new(rhi, &render_context_init_info, render_swapchain_init_info);
 
-        let ui = UI::new(rhi, &render_context, &window.window());
+        let ui = UI::new(
+            rhi,
+            &render_context,
+            &window.window(),
+            &UiOptions {
+                frames_in_flight: frames_in_flight as usize,
+            },
+        );
 
         Self {
             window,
@@ -129,8 +137,8 @@ impl Renderer
 
     pub fn render_loop<F, G>(&mut self, mut render_func: F, mut ui_builder: G)
     where
-        F: FnMut(&'static Rhi, &mut RenderContext, &Timer),
-        G: FnMut(&mut imgui::Ui),
+        F: FnMut(&'static Rhi, &mut RenderContext, &Timer) -> Vec<RhiSubmitBatch>,
+        G: FnMut(&mut imgui::Ui) -> RhiSubmitBatch,
     {
         let rhi = Self::get_rhi();
 
@@ -141,7 +149,7 @@ impl Renderer
             // ..
 
             let frame = ui.imgui.new_frame();
-            ui_builder(frame);
+            let ui_batch = ui_builder(frame);
             ui.platform.prepare_render(frame, self.window.window());
             let draw_data = ui.imgui.render();
             // renderer.render(.., draw_data);
@@ -155,9 +163,14 @@ impl Renderer
 
             self.render_context.acquire_frame();
 
-            render_func(rhi, &mut self.render_context, &self.timer);
+            let mut app_render_batches = render_func(rhi, &mut self.render_context, &self.timer);
 
             self.render_context.submit_frame();
+
+            let mut submit_batches = Vec::new();
+            submit_batches.append(&mut app_render_batches);
+            submit_batches.push(ui_batch);
+            rhi.graphics_queue().submit(rhi, submit_batches, None);
         });
     }
 }
