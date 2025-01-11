@@ -188,13 +188,9 @@ impl UI
         }
     }
 
-    pub fn draw(
-        &mut self,
-        rhi: &'static Rhi,
-        render_ctx: &mut RenderContext,
-        draw_data: &imgui::DrawData,
-    ) -> Option<RhiCommandBuffer>
+    pub fn draw(&mut self, rhi: &'static Rhi, render_ctx: &mut RenderContext) -> Option<RhiCommandBuffer>
     {
+        let draw_data = self.imgui.render();
         if draw_data.total_vtx_count == 0 {
             return None;
         }

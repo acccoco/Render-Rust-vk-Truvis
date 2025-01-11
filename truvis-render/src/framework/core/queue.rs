@@ -40,6 +40,7 @@ impl RhiQueue
 }
 
 
+// TODO 这个封装的不怎么样
 /// RHi 关于 submitInfo 的封装，更易用
 #[derive(Default)]
 pub struct RhiSubmitBatch
