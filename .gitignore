@@ -20,3 +20,4 @@ imgui.ini
 
 # drawio
 *.drawio.bkp
+*.drawio.dtmp
