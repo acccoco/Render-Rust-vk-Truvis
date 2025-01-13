@@ -56,7 +56,6 @@ impl RenderContext
         self.swapchain_image_index =
             self.render_swapchain.acquire_next_frame(&self.present_complete_semaphores[self.current_frame], None)
                 as usize;
-
         {
             let mut cmd = self.alloc_command_buffer(format!("ctx-1st-color-layout-trans-frame-{}", self.current_frame));
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);

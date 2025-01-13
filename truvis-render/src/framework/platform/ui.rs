@@ -1,6 +1,6 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use std::ffi::CString;
+use std::{cell::RefCell, ffi::CString};
 
 use ash::vk;
 use image::EncodableLayout;
@@ -83,7 +83,7 @@ impl UiMesh
 
 pub struct UI
 {
-    pub imgui: imgui::Context,
+    pub imgui: RefCell<imgui::Context>,
     pub platform: imgui_winit_support::WinitPlatform,
 
     pipeline: vk::Pipeline,
@@ -173,7 +173,7 @@ impl UI
         // TODO Textures::new()
 
         Self {
-            imgui,
+            imgui: RefCell::new(imgui),
             platform,
 
             pipeline,
@@ -190,7 +190,8 @@ impl UI
 
     pub fn draw(&mut self, rhi: &'static Rhi, render_ctx: &mut RenderContext) -> Option<RhiCommandBuffer>
     {
-        let draw_data = self.imgui.render();
+        let mut temp_imgui = self.imgui.borrow_mut();
+        let draw_data = temp_imgui.render();
         if draw_data.total_vtx_count == 0 {
             return None;
         }

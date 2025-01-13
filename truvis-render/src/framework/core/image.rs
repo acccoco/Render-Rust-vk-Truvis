@@ -88,13 +88,23 @@ impl RhiImage2D
     {
         let mut image = Self::new(
             rhi,
-            &vk::ImageCreateInfo::default().extent(vk::Extent3D {
-                width,
-                height,
-                depth: 1,
-            }),
+            &vk::ImageCreateInfo::default()
+                .image_type(vk::ImageType::TYPE_2D)
+                .format(vk::Format::R8G8B8A8_UNORM)
+                .extent(vk::Extent3D {
+                    width,
+                    height,
+                    depth: 1,
+                })
+                .mip_levels(1)
+                .array_layers(1)
+                .samples(vk::SampleCountFlags::TYPE_1)
+                .tiling(vk::ImageTiling::OPTIMAL)
+                .usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED)
+                .sharing_mode(vk::SharingMode::EXCLUSIVE)
+                .initial_layout(vk::ImageLayout::UNDEFINED),
             &vk_mem::AllocationCreateInfo {
-                required_flags: vk::MemoryPropertyFlags::DEVICE_LOCAL,
+                usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
             },
             name,
@@ -168,6 +178,8 @@ impl RhiImage2D
                 new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                 src_access_mask: vk::AccessFlags2::TRANSFER_WRITE,
                 dst_access_mask: vk::AccessFlags2::SHADER_READ,
+                src_stage_mask: vk::PipelineStageFlags2::TRANSFER,
+                dst_stage_mask: vk::PipelineStageFlags2::FRAGMENT_SHADER,
                 ..image_barrier
             };
             command_buffer.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));

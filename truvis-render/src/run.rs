@@ -7,8 +7,10 @@ use crate::{
 
 pub trait App
 {
+    fn update(&self, ui: &mut imgui::Ui);
+
     /// 发生于 acquire_frame 之后，submit_frame 之前
-    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer);
+    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer);
 
 
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self;
@@ -79,13 +81,13 @@ pub fn run<T: App>()
     std::panic::set_hook(Box::new(panic_handler));
 
     let mut renderer = Renderer::new(&render_init_info);
-    let app = T::init(Renderer::get_rhi(), &mut renderer.render_context);
+    let mut app = T::init(Renderer::get_rhi(), &mut renderer.render_context);
 
     renderer.timer.reset();
     renderer.render_loop(
         |rhi, render_ctx, timer| {
-            app.update(rhi, render_ctx, timer);
+            app.draw(rhi, render_ctx, timer);
         },
-        |ui_frame| {},
+        |ui| app.update(ui),
     );
 }

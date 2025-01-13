@@ -231,7 +231,7 @@ impl App for ShaderToy
         }
     }
 
-    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
     {
         self.run(rhi, render_context, timer)
     }

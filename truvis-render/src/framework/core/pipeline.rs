@@ -4,8 +4,8 @@ use crate::framework::{core::shader::RhiShaderModule, rhi::Rhi};
 
 pub struct RhiPipeline
 {
-    pub(crate) pipeline: vk::Pipeline,
-    pub(crate) pipeline_layout: vk::PipelineLayout,
+    pub pipeline: vk::Pipeline,
+    pub pipeline_layout: vk::PipelineLayout,
 
     rhi: &'static Rhi,
 }

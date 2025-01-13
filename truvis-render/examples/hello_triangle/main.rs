@@ -1,4 +1,5 @@
 use ash::vk;
+use imgui::Ui;
 use memoffset::offset_of;
 use truvis_render::{
     framework::{
@@ -106,9 +107,6 @@ impl HelloTriangle
 
     fn my_update(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
-        // FIXME 多余了
-        ~render_context.acquire_frame();
-
         let color_attach = <Self as App>::get_color_attachment(render_context.current_present_image_view());
         let depth_attach = <Self as App>::get_depth_attachment(render_context.depth_image_view);
         let render_info = <Self as App>::get_render_info(
@@ -124,7 +122,7 @@ impl HelloTriangle
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         {
             cmd.cmd_begin_rendering(&render_info);
-            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
+            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
             cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
             cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
             cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
@@ -139,8 +137,6 @@ impl HelloTriangle
             }],
             None,
         );
-
-        ~render_context.submit_frame();
     }
 
     fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
@@ -157,7 +153,25 @@ impl HelloTriangle
 
 impl App for HelloTriangle
 {
-    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _: &Timer)
+    fn update(&self, ui: &mut Ui)
+    {
+        ui.text_wrapped("Hello world!");
+        ui.text_wrapped("こんにちは世界！");
+        let choices = ["test test this is 1", "test test this is 2"];
+        let mut value = 0;
+
+        if ui.button(choices[value]) {
+            value += 1;
+            value %= 2;
+        }
+
+        ui.button("This...is...imgui-rs!");
+        ui.separator();
+        let mouse_pos = ui.io().mouse_pos;
+        ui.text(format!("Mouse Position: ({:.1},{:.1})", mouse_pos[0], mouse_pos[1]));
+    }
+
+    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _: &Timer)
     {
         self.my_update(rhi, render_context);
     }

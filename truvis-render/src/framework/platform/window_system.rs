@@ -100,12 +100,12 @@ impl WindowSystem
                 let mut last_frame = std::time::Instant::now();
 
                 move |event, _active_event_loop| {
-                    ui.platform.handle_event(ui.imgui.io_mut(), &self.window, &event);
+                    ui.platform.handle_event(ui.imgui.get_mut().io_mut(), &self.window, &event);
 
                     match event {
                         winit::event::Event::NewEvents(_) => {
                             let now = std::time::Instant::now();
-                            ui.imgui.io_mut().update_delta_time(now - last_frame);
+                            ui.imgui.get_mut().io_mut().update_delta_time(now - last_frame);
                             last_frame = now;
                         }
                         winit::event::Event::AboutToWait => {

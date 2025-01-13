@@ -272,7 +272,7 @@ impl VkApp
 
 impl App for VkApp
 {
-    fn update(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
     {
         todo!()
     }

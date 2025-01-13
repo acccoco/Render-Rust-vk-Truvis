@@ -149,15 +149,14 @@ impl Renderer
 
             self.render_context.acquire_frame();
 
-            // TODO 还是需要将 cmd 统一提交的，因为 submit 时会指定 render_complete_semaphore
             // main pass
             render_func(rhi, &mut self.render_context, &self.timer);
 
             // ui pass
             {
-                ui.platform.prepare_frame(ui.imgui.io_mut(), self.window.window()).unwrap();
+                ui.platform.prepare_frame(ui.imgui.get_mut().io_mut(), self.window.window()).unwrap();
 
-                let frame = ui.imgui.new_frame();
+                let frame = ui.imgui.get_mut().new_frame();
                 ui_builder(frame);
                 ui.platform.prepare_render(frame, self.window.window());
                 let ui_cmd = ui.draw(rhi, &mut self.render_context);
