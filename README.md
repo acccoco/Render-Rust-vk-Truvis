@@ -12,4 +12,9 @@ TODO
 - [x] 不要 static，减少函数理解的心智负担
 - [x] 不要 option，减少调用开销。
 
-初始化流程：
+`Texture` 的实现思路：`texture` 应该包含如下内容：
+
+* `image`
+* `image view`
+* `descriptor image info`
+* `sampler`
