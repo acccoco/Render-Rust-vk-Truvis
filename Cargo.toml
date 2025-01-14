@@ -2,7 +2,6 @@
 members = [
     "truvis-render",
     "truvis-xtask",
-    "truvis-shader-toy",
 ]
 
 resolver = "2"

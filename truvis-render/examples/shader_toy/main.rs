@@ -80,10 +80,10 @@ impl ShaderToy
 {
     fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
     {
-        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
+        let mut index_buffer = RhiBuffer::new_index_buffer(rhi,size_of_val(&INDEX_DATA), "index-buffer");
         index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
 
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, size_of_val(&VERTEX_DATA), "vertex-buffer");
         vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
@@ -113,7 +113,7 @@ impl ShaderToy
             scissor: Some(extent.into()),
             vertex_binding_desc: vec![vk::VertexInputBindingDescription {
                 binding: 0,
-                stride: std::mem::size_of::<Vertex>() as u32,
+                stride: size_of::<Vertex>() as u32,
                 input_rate: vk::VertexInputRate::VERTEX,
             }],
             push_constant_ranges,
@@ -143,8 +143,6 @@ impl ShaderToy
 
     fn run(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
     {
-        render_context.acquire_frame();
-
         let push_constants = PushConstants {
             time: timer.total_time,
             delta_time: timer.delta_time,
@@ -180,7 +178,7 @@ impl ShaderToy
             cmd.push_constants(&self.pipeline, vk::ShaderStageFlags::ALL, 0, bytemuck::bytes_of(&push_constants));
 
             cmd.cmd_begin_rendering(&render_info);
-            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
+            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
             cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
             cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
             cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
@@ -195,8 +193,6 @@ impl ShaderToy
             }],
             None,
         );
-
-        render_context.submit_frame();
     }
 
     fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
@@ -216,6 +212,17 @@ impl ShaderToy
 
 impl App for ShaderToy
 {
+    fn update(&self, ui: &mut imgui::Ui)
+    {
+        ui.text_wrapped("Hello world!");
+        ui.text_wrapped("こんにちは世界！");
+    }
+
+    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    {
+        self.run(rhi, render_context, timer)
+    }
+
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
     {
         ShaderToy::new(rhi, render_context)
@@ -229,11 +236,6 @@ impl App for ShaderToy
             app_name: "hello-triangle".to_string(),
             enable_validation: true,
         }
-    }
-
-    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
-    {
-        self.run(rhi, render_context, timer)
     }
 }
 

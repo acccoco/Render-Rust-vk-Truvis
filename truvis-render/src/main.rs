@@ -1,4 +1,5 @@
 use ash::{vk, vk::DescriptorSetLayoutBinding};
+use imgui::Ui;
 use itertools::Itertools;
 use truvis_render::{
     framework::{
@@ -272,6 +273,10 @@ impl VkApp
 
 impl App for VkApp
 {
+    fn update(&self, ui: &mut Ui) {
+        todo!()
+    }
+
     fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
     {
         todo!()

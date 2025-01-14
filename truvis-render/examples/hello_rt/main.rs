@@ -1,4 +1,5 @@
 use ash::vk;
+use imgui::Ui;
 use memoffset::offset_of;
 use truvis_render::{
     framework::{
@@ -211,8 +212,6 @@ impl HelloRT
 
     fn run(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
     {
-        render_context.acquire_frame();
-
         let depth_attach_info = <Self as App>::get_depth_attachment(render_context.depth_image_view);
         let color_attach_info = <Self as App>::get_color_attachment(render_context.current_present_image_view());
         let render_info = <Self as App>::get_render_info(
@@ -228,7 +227,7 @@ impl HelloRT
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         {
             cmd.cmd_begin_rendering(&render_info);
-            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, &self.pipeline);
+            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
             cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
             cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
             cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
@@ -243,8 +242,6 @@ impl HelloRT
             }],
             None,
         );
-
-        render_context.submit_frame();
     }
 
 
@@ -267,6 +264,17 @@ impl HelloRT
 
 impl App for HelloRT
 {
+    fn update(&self, ui: &mut Ui)
+    {
+        ui.text_wrapped("Hello world!");
+        ui.text_wrapped("こんにちは世界！");
+    }
+
+    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    {
+        self.run(rhi, render_context);
+    }
+
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
     {
         HelloRT::new(rhi, render_context)
@@ -280,11 +288,6 @@ impl App for HelloRT
             app_name: "hello-triangle".to_string(),
             enable_validation: true,
         }
-    }
-
-    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
-    {
-        self.run(rhi, render_context);
     }
 }
 
