@@ -33,9 +33,9 @@ pub unsafe extern "system" fn vk_debug_callback(
 
 
     // 按照 | 切分 msg 字符串，并在中间插入换行符
-    let msg = msg.split('|').collect::<Vec<&str>>().join("\n");
-    let msg = msg.split(" ] ").collect::<Vec<&str>>().join(" ]\n ");
-    let format_msg = format!("[{:?}]\n {}\n", message_type, msg);
+    // let msg = msg.split('|').collect::<Vec<&str>>().join("\n\t");
+    // let msg = msg.split(" ] ").collect::<Vec<&str>>().join(" ]\n\t ");
+    let format_msg = format!("[{:?}]\n{}\n", message_type, msg);
 
     match message_severity {
         vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {

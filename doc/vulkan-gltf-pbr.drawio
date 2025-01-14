@@ -1,0 +1,139 @@
+<mxfile host="drawio-plugin" modified="2025-01-14T03:47:50.984Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" etag="OzGrWTDUYqhjBrl2Jiqb" version="22.1.22" type="embed">
+  <diagram id="23iRSUPoRavnBvh4doch" name="Page-1">
+    <mxGraphModel dx="1134" dy="748" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="37" value="" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="640" y="653" width="180" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="31" value="" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="158" width="210" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=0;" edge="1" parent="1" source="2" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="2" value="WinMain()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="40" y="268" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=0;" edge="1" parent="1" source="3" target="6">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280" y="378" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="3" value="VulkanApplication::&lt;br&gt;initVulkan()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="200" y="268" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=block;endFill=0;" edge="1" parent="1" source="6" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="VulkanExampleBase::&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;setupWindow()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="200" y="388" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=0;" edge="1" parent="1" source="8" target="9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=0;" edge="1" parent="1" source="8" target="31">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="420" y="478" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8" value="VulkanApplication::&lt;br&gt;prepare()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="200" y="498" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="33" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=0;" edge="1" parent="1" source="9" target="32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="VulkanExampleBase::&lt;br&gt;rendreLoop()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="200" y="698" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="VulkanExampleBase::&lt;br&gt;prepare()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="480" y="168" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="16" value="初始化相机参数&lt;br&gt;同步原语&lt;br&gt;command buffers&lt;br&gt;其他资源" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="480" y="213" width="120" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="19" value="VulkanApplication::&lt;br&gt;loadAssets()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="480" y="288" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="21" value="VulkanApplication::&lt;br&gt;generateBRDFLUT()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="480" y="338" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="23" value="VulkanApplication::&lt;br&gt;prepareUniformBuffers()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="480" y="388" width="180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="25" value="VulkanApplication::&lt;br&gt;setupDescriptors()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="480" y="438" width="180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="27" value="VulkanApplication::&lt;br&gt;preparePipelines()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="480" y="488" width="180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="29" value="VulkanApplication::&lt;br&gt;updateOverlay()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="480" y="538" width="180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="35" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=0;" edge="1" parent="1" source="32" target="37">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="32" value="VulkanExampleBase::&lt;br&gt;renderFrame()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="420" y="698" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="38" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=0;" edge="1" parent="1" source="34" target="39">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="880" y="693" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="34" value="VulkanApplication::&lt;br&gt;render()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="650" y="673" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="36" value="更新相机&lt;br&gt;更新 Timer" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="650" y="733" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="39" value="" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="920" y="530.5" width="210" height="325" as="geometry" />
+        </mxCell>
+        <mxCell id="40" value="acquire image&lt;br&gt;wait for fence" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="930" y="600.5" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="42" value="VulkanApplication::&lt;br&gt;recordCommandBuffer()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="930" y="655.5" width="170" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="43" value="VulkanApplication::&lt;br&gt;updateUniformBuffers()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="930" y="705.5" width="180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="45" value="queue submit" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="930" y="755.5" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="46" value="VulkanApplication::&lt;br&gt;updateParams()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="930" y="805.5" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="48" value="VulkanApplication::&lt;br&gt;updateOverlay()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="930" y="550.5" width="180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="49" value="" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="787" y="40" width="180" height="325" as="geometry" />
+        </mxCell>
+        <mxCell id="50" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.454;entryDx=0;entryDy=0;entryPerimeter=0;endArrow=block;endFill=0;" edge="1" parent="1" source="14" target="49">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="51" value="VulkanExampleBase::&lt;br&gt;initSwapchain()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="797" y="55" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="52" value="VulkanExampleBase::&lt;br&gt;setupSwapChain()" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="797" y="105" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="53" value="create command pool" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="797" y="160" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="55" value="create render pass" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="797" y="215" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="56" value="create pipeline" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="797" y="265" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="57" value="setup framebuffer" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+          <mxGeometry x="797" y="315" width="160" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
