@@ -63,8 +63,8 @@ impl HelloTriangle
     {
         let extent = render_context.swapchain_extent();
         let pipeline = RhiPipelineTemplate {
-            fragment_shader_path: Some("shader/hello_triangle/triangle.frag.spv".into()),
-            vertex_shader_path: Some("shader/hello_triangle/triangle.vert.spv".into()),
+            fragment_shader_path: Some("shader/hello_triangle/triangle.ps.hlsl.spv".into()),
+            vertex_shader_path: Some("shader/hello_triangle/triangle.vs.hlsl.spv".into()),
             color_formats: vec![render_context.color_format()],
             depth_format: render_context.depth_format(),
             viewport: Some(vk::Viewport {
