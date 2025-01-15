@@ -406,8 +406,8 @@ impl UI
     {
         let entry_point_name = CString::new("main").unwrap();
 
-        let vert_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.vert.spv"));
-        let frag_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.frag.spv"));
+        let vert_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.vs.hlsl.spv"));
+        let frag_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.ps.hlsl.spv"));
 
         let shader_states_infos = [
             vk::PipelineShaderStageCreateInfo::default()

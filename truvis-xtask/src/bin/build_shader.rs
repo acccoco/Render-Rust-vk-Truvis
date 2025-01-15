@@ -138,6 +138,7 @@ impl ShaderCompileEntry
             .arg("-T")
             .arg(format!("{}_{}", shader_stage_tag, shader_model))
             .arg("-Zi") // 包含 debug 信息
+            .arg("-Zpc") // col-major
             .arg("-E")
             .arg(entry_point)
             .arg(self.shader_path.as_os_str())
@@ -156,15 +157,16 @@ impl ShaderCompileEntry
 /// 编译一个文件夹中的 shader
 fn compile_one_dir(dir: &std::path::Path)
 {
-    std::fs::read_dir(dir).unwrap().filter_map(|entry| ShaderCompileEntry::new(entry.as_ref().unwrap())).for_each(
-        |entry| {
+    std::fs::read_dir(dir)
+        .unwrap()
+        .filter_map(|entry| ShaderCompileEntry::new(entry.as_ref().unwrap())) //
+        .for_each(|entry| {
             println!("compile shader: {:#?}", entry);
             match entry.shader_type {
                 ShaderType::Glsl => entry.build_glsl(),
                 ShaderType::Hlsl => entry.build_hlsl(),
             }
-        },
-    );
+        });
 }
 
 

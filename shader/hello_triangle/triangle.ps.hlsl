@@ -1,3 +1,5 @@
+/// 结构体名称并没有强制规定
+/// sementics 是必要的，但是 spv 并不会使用吧
 struct PS_INPUT
 {
     [[vk::location(0)]]
