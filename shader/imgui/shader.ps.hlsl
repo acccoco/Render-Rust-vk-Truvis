@@ -1,10 +1,10 @@
 struct PsInput
 {
     [[vk::location(0)]]
-    float4 color : ARRAY;
+    float4 color : I0;
 
     [[vk::location(1)]]
-    float2 uv : TEXCOORD0;
+    float2 uv : I1;
 };
 
 struct PsOutput

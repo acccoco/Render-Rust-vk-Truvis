@@ -9,13 +9,13 @@ PushConstants matrices;
 struct VsInput
 {
     [[vk::location(0)]]
-    float2 pos : POSITION;
+    float2 pos : I0;
 
     [[vk::location(1)]]
-    float2 uv : TEXCOORD0;
+    float2 uv : I1;
 
     [[vk::location(2)]]
-    float4 color : COLOR0;
+    float4 color : I2;
 };
 
 struct VsOutput
@@ -23,10 +23,10 @@ struct VsOutput
     float4 pos : SV_Position;
 
     [[vk::location(0)]]
-    float4 color : COLOR0;
+    float4 color : O0;
 
     [[vk::location(1)]]
-    float2 uv : TEXCOORD0;
+    float2 uv : O1;
 };
 
 VsOutput main(VsInput input)
