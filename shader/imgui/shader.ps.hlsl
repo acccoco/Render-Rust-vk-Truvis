@@ -13,6 +13,7 @@ struct PsOutput
     float4 color : SV_TARGET0;
 };
 
+// combined image sampler 就因该这样写
 [[vk::combinedImageSampler]]
 [[vk::binding(0, 0)]]
 Texture2D<float4> fontTexture;

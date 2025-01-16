@@ -3,7 +3,7 @@ use imgui::Ui;
 use itertools::Itertools;
 use truvis_render::{
     framework::{
-        core::descriptor::{RHiDescriptorBindings, RhiDescriptorSet, RhiDescriptorUpdateInfo},
+        core::descriptor::{RhiDescriptorBindings, RhiDescriptorSet, RhiDescriptorUpdateInfo},
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
@@ -42,7 +42,7 @@ struct VkApp
 }
 
 struct SceneDescriptorSetLayoutBinding;
-impl RHiDescriptorBindings for SceneDescriptorSetLayoutBinding
+impl RhiDescriptorBindings for SceneDescriptorSetLayoutBinding
 {
     fn bindings() -> Vec<DescriptorSetLayoutBinding<'static>>
     {

@@ -1,5 +1,6 @@
 //! 将指定目录下的所有 shader 文件编译为 spv 文件，输出到同一目录下
 
+use std::fs;
 
 #[derive(Debug)]
 enum ShaderStage
@@ -99,8 +100,8 @@ impl ShaderCompileEntry
             .unwrap();
 
         if !output.status.success() {
-            println!("stdout: {stdout}", stdout = String::from_utf8_lossy(&output.stdout));
-            println!("stderr: {stderr}", stderr = String::from_utf8_lossy(&output.stderr));
+            log::info!("stdout: {stdout}", stdout = String::from_utf8_lossy(&output.stdout));
+            log::error!("stderr: {stderr}", stderr = String::from_utf8_lossy(&output.stderr));
             panic!("failed to compilie shader: {:#?}", self.shader_path);
         }
     }
@@ -138,7 +139,7 @@ impl ShaderCompileEntry
             .arg("-T")
             .arg(format!("{}_{}", shader_stage_tag, shader_model))
             .arg("-Zi") // 包含 debug 信息
-            .arg("-Zpc") // col-major
+            // .arg("-Zpc") // col-major
             .arg("-E")
             .arg(entry_point)
             .arg(self.shader_path.as_os_str())
@@ -146,8 +147,8 @@ impl ShaderCompileEntry
             .arg(self.output_path.as_os_str());
         let output = cmd.output().unwrap();
         if !output.status.success() {
-            println!("stdout: {stdout}", stdout = String::from_utf8_lossy(&output.stdout));
-            println!("stderr: {stderr}", stderr = String::from_utf8_lossy(&output.stderr));
+            log::info!("stdout: \n{stdout}", stdout = String::from_utf8_lossy(&output.stdout));
+            log::info!("stderr: \n{stderr}", stderr = String::from_utf8_lossy(&output.stderr));
             panic!("failed to compilie shader: {:#?}", self.shader_path);
         }
     }
@@ -160,8 +161,19 @@ fn compile_one_dir(dir: &std::path::Path)
     std::fs::read_dir(dir)
         .unwrap()
         .filter_map(|entry| ShaderCompileEntry::new(entry.as_ref().unwrap())) //
+        .filter(|entry| {
+            if !entry.output_path.exists() {
+                return true;
+            }
+            let need_re_compile = fs::metadata(&entry.shader_path).unwrap().modified().unwrap() >
+                fs::metadata(&entry.output_path).unwrap().modified().unwrap();
+            if !need_re_compile {
+                log::info!("skip compile shader: {:?}", entry.shader_path);
+            }
+            need_re_compile
+        })
         .for_each(|entry| {
-            println!("compile shader: {:#?}", entry);
+            log::info!("compile shader: {:#?}", entry);
             match entry.shader_type {
                 ShaderType::Glsl => entry.build_glsl(),
                 ShaderType::Hlsl => entry.build_hlsl(),
@@ -173,14 +185,20 @@ fn compile_one_dir(dir: &std::path::Path)
 /// 编译 shader 文件夹下的所有 shader
 fn compile_all_shader()
 {
-    std::fs::read_dir("shader").unwrap().filter(|entry| entry.as_ref().unwrap().path().is_dir()).for_each(|entry| {
-        println!("compile shader in dir: {:#?}", entry.as_ref().unwrap().path());
-        compile_one_dir(&entry.unwrap().path())
-    });
+    std::fs::read_dir("shader")
+        .unwrap() //
+        .filter(|entry| entry.as_ref().unwrap().path().is_dir())
+        .for_each(|entry| {
+            log::info!("compile shader in dir: {:#?}", entry.as_ref().unwrap().path());
+            compile_one_dir(&entry.unwrap().path())
+        });
 }
 
 
 fn main()
 {
+    use simplelog::*;
+    TermLogger::init(LevelFilter::Info, ConfigBuilder::new().build(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
+
     compile_all_shader()
 }

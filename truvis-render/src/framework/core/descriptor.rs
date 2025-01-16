@@ -3,7 +3,8 @@ use itertools::Itertools;
 
 use crate::framework::rhi::Rhi;
 
-pub trait RHiDescriptorBindings
+/// 将 descriptor set layout 的 bindings 抽象为一个 trait，通过类型系统来保证 bindings 的正确性
+pub trait RhiDescriptorBindings
 {
     // FIXME 这个声明周期还是感觉不太安全
     fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>;
@@ -15,91 +16,56 @@ pub trait RHiDescriptorBindings
 /// 这样可以在每种 struct 内部存放一个 static 的 DescriptorSetLayout
 pub struct RhiDescriptorLayout<T>
 where
-    T: RHiDescriptorBindings,
+    T: RhiDescriptorBindings,
 {
+    pub layout: vk::DescriptorSetLayout,
     phantom_data: std::marker::PhantomData<T>,
 }
-
 impl<T> RhiDescriptorLayout<T>
 where
-    T: RHiDescriptorBindings,
+    T: RhiDescriptorBindings,
 {
-    fn create_layout(rhi: &Rhi) -> vk::DescriptorSetLayout
+    pub fn new(rhi: &Rhi) -> Self
     {
         let bindings = T::bindings();
         let create_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
 
-        unsafe { rhi.vk_device().create_descriptor_set_layout(&create_info, None).unwrap() }
+        let layout = unsafe { rhi.vk_device().create_descriptor_set_layout(&create_info, None).unwrap() };
+        Self {
+            layout,
+            phantom_data: std::marker::PhantomData,
+        }
     }
 }
 
 
-pub struct RhiDescriptorSet
+pub struct RhiDescriptorSet<T>
+where
+    T: RhiDescriptorBindings,
 {
     descriptor_set: vk::DescriptorSet,
-    // FIXME
-    bindings: Vec<vk::DescriptorSetLayoutBinding<'static>>,
-    rhi: &'static Rhi,
+    phantom_data: std::marker::PhantomData<T>,
 }
-
-
 pub enum RhiDescriptorUpdateInfo
 {
     Image(vk::DescriptorImageInfo),
     Buffer(vk::DescriptorBufferInfo),
 }
-impl RhiDescriptorSet
+impl<T> RhiDescriptorSet<T>
+where
+    T: RhiDescriptorBindings,
 {
-    pub fn new<T>(rhi: &'static Rhi) -> Self
-    where
-        T: RHiDescriptorBindings,
+    pub fn new(rhi: &Rhi, layout: &RhiDescriptorLayout<T>) -> Self
     {
-        let layout = RhiDescriptorLayout::<T>::create_layout(rhi);
         unsafe {
             let alloc_info = vk::DescriptorSetAllocateInfo::default()
                 .descriptor_pool(rhi.descriptor_pool)
-                .set_layouts(std::slice::from_ref(&layout));
+                .set_layouts(std::slice::from_ref(&layout.layout));
             let descriptor_set = rhi.vk_device().allocate_descriptor_sets(&alloc_info).unwrap()[0];
             Self {
                 descriptor_set,
-                bindings: T::bindings(),
-                rhi,
+                phantom_data: std::marker::PhantomData,
             }
         }
-    }
-
-    pub fn get_descriptor_type(&self, binding_index: u32) -> vk::DescriptorType
-    {
-        self.bindings.get(binding_index as usize).unwrap().descriptor_type
-    }
-
-    pub fn write(&mut self, write_datas: Vec<(u32, RhiDescriptorUpdateInfo)>)
-    {
-        let writes = write_datas
-            .iter()
-            .map(|(binding_index, info)| {
-                let mut write = vk::WriteDescriptorSet::default()
-                    .dst_set(self.descriptor_set)
-                    .dst_binding(*binding_index)
-                    .dst_array_element(1)
-                    .descriptor_type(self.bindings.get(*binding_index as usize).unwrap().descriptor_type);
-
-                match info {
-                    RhiDescriptorUpdateInfo::Buffer(info) => {
-                        write = write.buffer_info(std::slice::from_ref(info));
-                    }
-                    RhiDescriptorUpdateInfo::Image(info) => {
-                        write = write.image_info(std::slice::from_ref(info));
-                    }
-                }
-
-                write
-            })
-            .collect_vec();
-
-        unsafe {
-            self.rhi.vk_device().update_descriptor_sets(&writes, &[]);
-        }
-        //
     }
 }

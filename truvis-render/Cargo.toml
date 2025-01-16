@@ -19,7 +19,6 @@ derive-getters = { workspace = true }
 derive-new = { workspace = true }
 derive_setters = { workspace = true }
 derive_builder = { workspace = true }
-memoffset = { workspace = true }
 gltf = { workspace = true }
 # graphics math
 # bytemuck：可以转换为 bytes slices

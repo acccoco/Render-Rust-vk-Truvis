@@ -31,9 +31,6 @@ derive-new = "0.5.9"
 derive_setters = "0.1.5"
 derive_builder = "0.12.0"
 
-# 结构体 offset
-memoffset = "0.8.0"
-
 # load gltf
 gltf = "1.0.0"
 

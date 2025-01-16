@@ -6,7 +6,7 @@ use truvis_render::{
         core::{
             acceleration::RhiAcceleration,
             buffer::RhiBuffer,
-            descriptor::RHiDescriptorBindings,
+            descriptor::RhiDescriptorBindings,
             pipeline::{RhiPipeline, RhiPipelineTemplate},
             queue::RhiSubmitBatch,
         },
@@ -53,7 +53,7 @@ const VERTEX_DATA: [Vertex; 4] = [
 
 
 pub struct RayTracingBindings;
-impl RHiDescriptorBindings for RayTracingBindings
+impl RhiDescriptorBindings for RayTracingBindings
 {
     // FIXME
     fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>

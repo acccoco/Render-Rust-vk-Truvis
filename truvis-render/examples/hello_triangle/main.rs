@@ -1,6 +1,5 @@
 use ash::vk;
 use imgui::Ui;
-use memoffset::offset_of;
 use truvis_render::{
     framework::{
         core::{
@@ -86,13 +85,13 @@ impl HelloTriangle
                     location: 0,
                     binding: 0,
                     format: vk::Format::R32G32B32A32_SFLOAT,
-                    offset: offset_of!(Vertex, pos) as u32,
+                    offset: std::mem::offset_of!(Vertex, pos) as u32,
                 },
                 vk::VertexInputAttributeDescription {
                     location: 1,
                     binding: 0,
                     format: vk::Format::R32G32B32A32_SFLOAT,
-                    offset: offset_of!(Vertex, color) as u32,
+                    offset: std::mem::offset_of!(Vertex, color) as u32,
                 },
             ],
             color_attach_blend_states: vec![vk::PipelineColorBlendAttachmentState::default()

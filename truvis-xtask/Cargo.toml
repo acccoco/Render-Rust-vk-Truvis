@@ -6,3 +6,5 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+simplelog = { workspace = true }
+log = { workspace = true }

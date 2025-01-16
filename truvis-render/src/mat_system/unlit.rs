@@ -3,11 +3,11 @@
 
 use ash::vk;
 
-use crate::framework::core::descriptor::RHiDescriptorBindings;
+use crate::framework::core::descriptor::RhiDescriptorBindings;
 
 struct UnlitMatBindings;
 
-impl RHiDescriptorBindings for UnlitMatBindings
+impl RhiDescriptorBindings for UnlitMatBindings
 {
     // FIXME
     fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
