@@ -20,6 +20,33 @@ pub struct RhiBuffer
 
 impl RhiBuffer
 {
+    pub fn new2(
+        rhi: &'static Rhi,
+        buffer_ci: &vk::BufferCreateInfo,
+        alloc_ci: &vk_mem::AllocationCreateInfo,
+        align: Option<vk::DeviceSize>,
+        debug_name: &str,
+    ) -> Self
+    {
+        unsafe {
+            let (buffer, allocation) = if let Some(offset_align) = align {
+                rhi.vma().create_buffer_with_alignment(buffer_ci, alloc_ci, offset_align).unwrap()
+            } else {
+                rhi.vma().create_buffer(buffer_ci, alloc_ci).unwrap()
+            };
+
+            rhi.set_debug_name(buffer, debug_name);
+            Self {
+                rhi,
+                handle: buffer,
+                allocation,
+                map_ptr: None,
+                size: buffer_ci.size,
+                debug_name: debug_name.to_string(),
+            }
+        }
+    }
+
     /// @param min_align 对 memory 的 offset align 限制
     pub fn new(
         rhi: &'static Rhi,
@@ -42,23 +69,7 @@ impl RhiBuffer
             ..Default::default()
         };
 
-        unsafe {
-            let (buffer, allocation) = if let Some(offset_align) = min_align {
-                rhi.vma().create_buffer_with_alignment(&buffer_info, &alloc_info, offset_align).unwrap()
-            } else {
-                rhi.vma().create_buffer(&buffer_info, &alloc_info).unwrap()
-            };
-
-            rhi.set_debug_name(buffer, debug_name.as_str());
-            Self {
-                rhi,
-                handle: buffer,
-                allocation,
-                map_ptr: None,
-                size,
-                debug_name,
-            }
-        }
+        Self::new2(rhi, &buffer_info, &alloc_info, min_align, debug_name.as_str())
     }
 
     #[inline]
@@ -206,6 +217,7 @@ impl RhiBuffer
             );
             slice.copy_from_slice(data);
         }
+        // FIXME 这里是否需要 flush 呢
         self.unmap();
     }
 

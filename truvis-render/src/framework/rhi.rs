@@ -462,6 +462,8 @@ pub use _impl_init::RhiInitInfo;
 
 mod _impl_property
 {
+    use ash::vk;
+
     use crate::framework::{
         core::{physical_device::RhiPhysicalDevice, queue::RhiQueue},
         rhi::Rhi,
@@ -509,6 +511,14 @@ mod _impl_property
         pub fn vma(&self) -> &vk_mem::Allocator
         {
             &self.vma.as_ref().unwrap()
+        }
+
+        /// 将 UBO 的尺寸和 minUBOAlign 对齐，使得得到的尺寸是 minUBOAlign 的整数倍
+        #[inline]
+        pub fn ubo_align(&self, ubo_size: vk::DeviceSize) -> vk::DeviceSize
+        {
+            let min_ubo_align = self.physical_device().properties.limits.min_uniform_buffer_offset_alignment;
+            (ubo_size + min_ubo_align - 1) & !(min_ubo_align - 1)
         }
     }
 }

@@ -6,6 +6,7 @@ use itertools::Itertools;
 use truvis_render::{
     framework::{
         core::{
+            buffer::RhiBuffer,
             descriptor::{RhiDescriptorBindings, RhiDescriptorLayout, RhiDescriptorSet},
             pipeline::{RhiPipeline, RhiPipelineTemplate},
         },
@@ -77,23 +78,56 @@ struct SceneUBO
 {
     light_pos: glam::Vec3,
     light_color: glam::Vec3,
-    camera_pos: glam::Vec3,
+    projection: glam::Mat4,
+    view: glam::Mat4,
 }
 
 #[repr(C)]
-struct ModelUBO
+struct MeshUBO
 {
     model: glam::Mat4,
-    vim: glam::Mat4,
-    projection: glam::Mat4,
     trans_inv_model: glam::Mat4,
+}
+
+#[repr(C)]
+struct MaterialUBO
+{
+    color: glam::Vec4,
+}
+
+#[repr(C)]
+struct PushConstant
+{
+    camera_pos: glam::Vec3,
+    camera_dir: glam::Vec3,
+    frame_id: u32,
+    delta_time_ms: f32,
+    mouse_pos: glam::Vec2,
+    resolution: glam::Vec2,
+    time_ms: f32,
+    fps: f32,
+}
+
+struct PhongBuffer
+{
+    scene_uniform_buffer: RhiBuffer,
+    mesh_uniform_buffer: RhiBuffer,
+    material_uniform_buffer: RhiBuffer,
 }
 
 struct PhongApp
 {
     descriptor_set_layouts: PhongAppDescriptorSetLayouts,
+
+    /// 每帧独立的 descriptor set
     descriptor_sets: Vec<PhongAppDescriptorSets>,
     pipeline: RhiPipeline,
+
+    /// 每帧独立的 uniform buffer
+    mesh_uniform_buffers: Vec<PhongBuffer>,
+
+    mesh_ubo_align: vk::DeviceSize,
+    scene_ubo_align: vk::DeviceSize,
 }
 
 
@@ -182,6 +216,64 @@ impl PhongApp
         .create_pipeline(rhi, "");
 
         pipeline
+    }
+
+
+    /// mesh ubo 数量：32 个
+    /// material ubo 数量：32 个
+    fn create_buffers(
+        rhi: &'static Rhi,
+        render_ctx: &mut RenderContext,
+        frames_in_flight: usize,
+        mesh_ubo_align: &mut vk::DeviceSize,
+        mat_ubo_align: &mut vk::DeviceSize,
+    ) -> Vec<PhongBuffer>
+    {
+        let mesh_instance_count = 32;
+        let material_instance_count = 32;
+
+        *mesh_ubo_align = rhi.ubo_align(size_of::<MeshUBO>() as vk::DeviceSize);
+        *mat_ubo_align = rhi.ubo_align(size_of::<MaterialUBO>() as vk::DeviceSize);
+
+        let scene_buffer_ci = vk::BufferCreateInfo::default()
+            .size(size_of::<SceneUBO>() as vk::DeviceSize * frames_in_flight as u64)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .usage(vk::BufferUsageFlags::UNIFORM_BUFFER);
+        let mesh_buffer_ci = vk::BufferCreateInfo::default()
+            .size(*mesh_ubo_align * mesh_instance_count * frames_in_flight as u64)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .usage(vk::BufferUsageFlags::UNIFORM_BUFFER);
+        let material_buffer_ci = vk::BufferCreateInfo::default()
+            .size(*mat_ubo_align * material_instance_count * frames_in_flight as u64)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .usage(vk::BufferUsageFlags::UNIFORM_BUFFER);
+
+        let ubo_alloc_ci = vk_mem::AllocationCreateInfo {
+            flags: vk_mem::AllocationCreateFlags::MAPPED | vk_mem::AllocationCreateFlags::HOST_ACCESS_SEQUENTIAL_WRITE,
+            usage: vk_mem::MemoryUsage::AutoPreferDevice,
+            required_flags: vk::MemoryPropertyFlags::HOST_VISIBLE,
+            ..Default::default()
+        };
+
+        (0..frames_in_flight)
+            .map(|_| PhongBuffer {
+                scene_uniform_buffer: RhiBuffer::new2(rhi, &scene_buffer_ci, &ubo_alloc_ci, None, "scene-ubo"),
+                mesh_uniform_buffer: RhiBuffer::new2(
+                    rhi,
+                    &mesh_buffer_ci,
+                    &ubo_alloc_ci,
+                    Some(mesh_ubo_align),
+                    "mesh-ubo",
+                ),
+                material_uniform_buffer: RhiBuffer::new2(
+                    rhi,
+                    &material_buffer_ci,
+                    &ubo_alloc_ci,
+                    Some(material_ubo_align),
+                    "material-ubo",
+                ),
+            })
+            .collect_vec()
     }
 
     // FIXME 不同信息的更新方式是不一样的：
