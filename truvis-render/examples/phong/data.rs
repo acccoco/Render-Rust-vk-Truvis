@@ -1,3 +1,4 @@
+/// align = 4
 #[repr(C)]
 pub struct Vertex
 {
@@ -8,8 +9,11 @@ pub struct Vertex
 
 
 /// 正方形面片
+///
 /// y-up, right hand
+///
 /// 面片朝向：y+
+///
 /// format: x, y, z, nx, ny, nz, u, v
 pub const FLOOR: [f32; 48] = [
     5.0, 0.0, 5.0, 0.0, 1.0, 0.0, 2.0, 0.0, //
@@ -21,6 +25,9 @@ pub const FLOOR: [f32; 48] = [
 ];
 
 
+/// box
+///
+/// format: x, y, z, nx, ny, nz, u, v
 pub const BOX: [f32; 288] = [
     -0.5, -0.5, -0.5, 0.0, 0.0, -1.0, 0.0, 0.0, //
     0.5, -0.5, -0.5, 0.0, 0.0, -1.0, 1.0, 0.0, //

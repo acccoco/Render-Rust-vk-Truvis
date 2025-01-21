@@ -35,7 +35,7 @@ impl RhiCommandBuffer
     }
 
     /// 从 Rhi 中的 command pool 分配 command buffer 进行执行
-    pub fn one_time_exec<F, R>(rhi: &'static Rhi, ty: vk::QueueFlags, f: F) -> R
+    pub fn one_time_exec<F, R>(rhi: &'static Rhi, ty: vk::QueueFlags, f: F, name: &str) -> R
     where
         F: FnOnce(&mut RhiCommandBuffer) -> R,
     {
@@ -57,7 +57,7 @@ impl RhiCommandBuffer
             other => panic!("not supported queue type: SPARSE_BINDING, {:?}", other),
         }
 
-        let mut command_buffer = Self::new(rhi, pool, "one-time-command-buffer");
+        let mut command_buffer = Self::new(rhi, pool, format!("one-time-{}", name));
 
         command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         let result = f(&mut command_buffer);
@@ -174,6 +174,20 @@ mod _draw_cmd
                     index_info.1,
                     vertex_offset,
                     instance_info.1,
+                );
+            }
+        }
+
+        #[inline]
+        pub fn draw(&mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32)
+        {
+            unsafe {
+                self.rhi.vk_device().cmd_draw(
+                    self.command_buffer,
+                    vertex_count,
+                    instance_count,
+                    first_vertex,
+                    first_instance,
                 );
             }
         }
@@ -353,6 +367,20 @@ mod _sync_cmd
         {
             let dependency_info =
                 vk::DependencyInfo::default().image_memory_barriers(barriers).dependency_flags(dependency_flags);
+            unsafe {
+                self.rhi.vk_device().cmd_pipeline_barrier2(self.command_buffer, &dependency_info);
+            }
+        }
+
+        #[inline]
+        pub fn buffer_memory_barrier(
+            &mut self,
+            dependency_flags: DependencyFlags,
+            barriers: &[vk::BufferMemoryBarrier2],
+        )
+        {
+            let dependency_info =
+                vk::DependencyInfo::default().buffer_memory_barriers(barriers).dependency_flags(dependency_flags);
             unsafe {
                 self.rhi.vk_device().cmd_pipeline_barrier2(self.command_buffer, &dependency_info);
             }

@@ -50,10 +50,10 @@ impl HelloTriangle
     fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
     {
         let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
+        index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA, "hello-triangle-create-index-buffer");
 
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA);
+        vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA, "hello-triangle-create-vertex-buffer");
 
         (vertex_buffer, index_buffer)
     }
@@ -152,7 +152,7 @@ impl HelloTriangle
 
 impl App for HelloTriangle
 {
-    fn update(&self, ui: &mut Ui)
+    fn udpate_ui(&mut self, ui: &mut Ui)
     {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
@@ -169,6 +169,8 @@ impl App for HelloTriangle
         let mouse_pos = ui.io().mouse_pos;
         ui.text(format!("Mouse Position: ({:.1},{:.1})", mouse_pos[0], mouse_pos[1]));
     }
+
+    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer) {}
 
     fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _: &Timer)
     {

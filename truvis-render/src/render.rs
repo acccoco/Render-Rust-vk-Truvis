@@ -137,10 +137,9 @@ impl Renderer
         RHI.get().unwrap()
     }
 
-    pub fn render_loop<F, G>(&mut self, mut render_func: F, mut ui_builder: G)
+    pub fn render_loop<F>(&mut self, mut render_func: F)
     where
-        F: FnMut(&'static Rhi, &mut RenderContext, &Timer),
-        G: FnMut(&mut imgui::Ui),
+        F: FnMut(&'static Rhi, &mut RenderContext, &Timer, &mut imgui::Ui),
     {
         let rhi = Self::get_rhi();
 
@@ -149,19 +148,22 @@ impl Renderer
 
             self.render_context.acquire_frame();
 
+            ui.platform.prepare_frame(ui.imgui.get_mut().io_mut(), self.window.window()).unwrap();
+
+            let frame = ui.imgui.get_mut().new_frame();
+
+            // FIXME 调整一下调用顺序
             // main pass
-            render_func(rhi, &mut self.render_context, &self.timer);
+            render_func(rhi, &mut self.render_context, &self.timer, frame);
 
             // ui pass
             {
-                ui.platform.prepare_frame(ui.imgui.get_mut().io_mut(), self.window.window()).unwrap();
-
-                let frame = ui.imgui.get_mut().new_frame();
-                ui_builder(frame);
+                // FIXME ui cmd 需要释放
                 ui.platform.prepare_render(frame, self.window.window());
                 let ui_cmd = ui.draw(rhi, &mut self.render_context);
 
                 if let Some(ui_cmd) = ui_cmd {
+                    // FIXME barrier cmd 也需要释放
                     let mut barrier_cmd = self.render_context.alloc_command_buffer("ui pipeline barrier");
                     barrier_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
                     barrier_cmd.image_memory_barrier(
@@ -182,6 +184,9 @@ impl Renderer
                             )],
                     );
                     barrier_cmd.end();
+                    
+                    // FIXME
+                    rhi.graphics_queue().wait_idle(rhi);
 
                     rhi.graphics_queue().submit(
                         rhi,

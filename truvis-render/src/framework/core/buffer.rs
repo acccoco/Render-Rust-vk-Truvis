@@ -173,6 +173,7 @@ impl RhiBuffer
         )
     }
 
+    #[inline]
     pub fn map(&mut self)
     {
         if self.map_ptr.is_some() {
@@ -183,6 +184,7 @@ impl RhiBuffer
         }
     }
 
+    #[inline]
     pub fn unmap(&mut self)
     {
         if self.map_ptr.is_none() {
@@ -194,12 +196,14 @@ impl RhiBuffer
         }
     }
 
+    #[inline]
     pub fn destroy(mut self)
     {
         unsafe {
             self.rhi.vma().destroy_buffer(self.handle, &mut self.allocation);
         }
     }
+
 
     /// 通过 mem map 的方式将 data 传入到 buffer 中
     pub fn transfer_data_by_mem_map<T>(&mut self, data: &[T])
@@ -210,19 +214,17 @@ impl RhiBuffer
         unsafe {
             // 这里的 size 是目标内存的最大 size
             // align 表示目标内存位置额外的内存对齐要求，这里使用 align_of 表示和 rust 中 [T; n] 的保持一致
-            let mut slice = ash::util::Align::new(
-                self.map_ptr.unwrap() as *mut c_void,
-                std::mem::align_of::<T>() as u64,
-                self.size,
-            );
+            let mut slice =
+                ash::util::Align::new(self.map_ptr.unwrap() as *mut c_void, align_of::<T>() as u64, self.size);
             slice.copy_from_slice(data);
+            self.rhi.vma().flush_allocation(&self.allocation, 0, size_of_val(data) as vk::DeviceSize).unwrap();
         }
-        // FIXME 这里是否需要 flush 呢
         self.unmap();
     }
 
+    // FIXME 这个隐含同步等待，需要特殊标注一下
     /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到 self
-    pub fn transfer_data_by_stage_buffer<T>(&mut self, data: &[T])
+    pub fn transfer_data_by_stage_buffer<T>(&mut self, data: &[T], name: &str)
     where
         T: Sized + Copy,
     {
@@ -234,16 +236,21 @@ impl RhiBuffer
 
         stage_buffer.transfer_data_by_mem_map(data);
 
-        RhiCommandBuffer::one_time_exec(self.rhi, vk::QueueFlags::TRANSFER, |cmd| {
-            cmd.copy_buffer(
-                &stage_buffer,
-                self,
-                &[vk::BufferCopy {
-                    size: std::mem::size_of_val(data) as vk::DeviceSize,
-                    ..Default::default()
-                }],
-            );
-        });
+        RhiCommandBuffer::one_time_exec(
+            self.rhi,
+            vk::QueueFlags::TRANSFER,
+            |cmd| {
+                cmd.copy_buffer(
+                    &stage_buffer,
+                    self,
+                    &[vk::BufferCopy {
+                        size: size_of_val(data) as vk::DeviceSize,
+                        ..Default::default()
+                    }],
+                );
+            },
+            name,
+        );
 
         stage_buffer.destroy();
     }

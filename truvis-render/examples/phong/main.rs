@@ -9,15 +9,16 @@ use truvis_render::{
             buffer::RhiBuffer,
             descriptor::{RhiDescriptorBindings, RhiDescriptorLayout, RhiDescriptorSet},
             pipeline::{RhiPipeline, RhiPipelineTemplate},
+            queue::RhiSubmitBatch,
         },
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
     render::{AppInitInfo, Timer},
-    run::App,
+    run::{run, App},
 };
 
-use crate::data::Vertex;
+use crate::data::{Vertex, BOX};
 
 struct SceneDescriptorBinding;
 impl RhiDescriptorBindings for SceneDescriptorBinding
@@ -26,7 +27,7 @@ impl RhiDescriptorBindings for SceneDescriptorBinding
     {
         vec![vk::DescriptorSetLayoutBinding::default()
             .binding(0)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
             .descriptor_count(1)
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)]
     }
@@ -39,7 +40,7 @@ impl RhiDescriptorBindings for MeshDescriptorBinding
     {
         vec![vk::DescriptorSetLayoutBinding::default()
             .binding(0)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
             .descriptor_count(1)
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)]
     }
@@ -50,11 +51,18 @@ impl RhiDescriptorBindings for MaterialDescriptorBinding
 {
     fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
     {
-        vec![vk::DescriptorSetLayoutBinding::default()
-            .binding(0)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::FRAGMENT)]
+        vec![
+            vk::DescriptorSetLayoutBinding::default()
+                .binding(0)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT),
+            // vk::DescriptorSetLayoutBinding::default()
+            //     .binding(1)
+            //     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            //     .descriptor_count(1)
+            //     .stage_flags(vk::ShaderStageFlags::FRAGMENT),
+        ]
     }
 }
 
@@ -74,6 +82,7 @@ struct PhongAppDescriptorSets
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 struct SceneUBO
 {
     light_pos: glam::Vec3,
@@ -83,6 +92,7 @@ struct SceneUBO
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 struct MeshUBO
 {
     model: glam::Mat4,
@@ -90,12 +100,16 @@ struct MeshUBO
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 struct MaterialUBO
 {
     color: glam::Vec4,
 }
 
+
+// TODO 考虑差分为 vertex 的和 fragment 的；
 #[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct PushConstant
 {
     camera_pos: glam::Vec3,
@@ -108,12 +122,13 @@ struct PushConstant
     fps: f32,
 }
 
-struct PhongBuffer
+struct PhongUniformBuffer
 {
     scene_uniform_buffer: RhiBuffer,
     mesh_uniform_buffer: RhiBuffer,
     material_uniform_buffer: RhiBuffer,
 }
+
 
 struct PhongApp
 {
@@ -123,11 +138,20 @@ struct PhongApp
     descriptor_sets: Vec<PhongAppDescriptorSets>,
     pipeline: RhiPipeline,
 
-    /// 每帧独立的 uniform buffer
-    mesh_uniform_buffers: Vec<PhongBuffer>,
+    /// BOX
+    vertex_buffer: RhiBuffer,
 
-    mesh_ubo_align: vk::DeviceSize,
-    scene_ubo_align: vk::DeviceSize,
+    /// 每帧独立的 uniform buffer
+    uniform_buffers: Vec<PhongUniformBuffer>,
+
+    mesh_ubo_offset_align: vk::DeviceSize,
+    mat_ubo_offset_align: vk::DeviceSize,
+
+    mesh_ubo: Vec<MeshUBO>,
+    mat_ubo: Vec<MaterialUBO>,
+    scene_ubo: SceneUBO,
+
+    push: PushConstant,
 }
 
 
@@ -171,6 +195,11 @@ impl PhongApp
             vertex_shader_path: Some("shader/phong/phong.vs.hlsl.spv".into()),
 
             descriptor_set_layouts,
+
+            push_constant_ranges: vec![vk::PushConstantRange::default()
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+                .offset(0)
+                .size(std::mem::size_of::<PushConstant>() as u32)],
 
             color_formats: vec![render_ctx.color_format()],
             depth_format: render_ctx.depth_format(),
@@ -218,22 +247,29 @@ impl PhongApp
         pipeline
     }
 
+    fn create_vertices(rhi: &'static Rhi) -> RhiBuffer
+    {
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&BOX), "vertex-buffer");
+        vertex_buffer.transfer_data_by_stage_buffer(&BOX);
+
+        vertex_buffer
+    }
 
     /// mesh ubo 数量：32 个
     /// material ubo 数量：32 个
-    fn create_buffers(
+    fn create_uniform_buffers(
         rhi: &'static Rhi,
         render_ctx: &mut RenderContext,
         frames_in_flight: usize,
         mesh_ubo_align: &mut vk::DeviceSize,
         mat_ubo_align: &mut vk::DeviceSize,
-    ) -> Vec<PhongBuffer>
+    ) -> Vec<PhongUniformBuffer>
     {
         let mesh_instance_count = 32;
         let material_instance_count = 32;
 
-        *mesh_ubo_align = rhi.ubo_align(size_of::<MeshUBO>() as vk::DeviceSize);
-        *mat_ubo_align = rhi.ubo_align(size_of::<MaterialUBO>() as vk::DeviceSize);
+        *mesh_ubo_align = rhi.ubo_offset_align(size_of::<MeshUBO>() as vk::DeviceSize);
+        *mat_ubo_align = rhi.ubo_offset_align(size_of::<MaterialUBO>() as vk::DeviceSize);
 
         let scene_buffer_ci = vk::BufferCreateInfo::default()
             .size(size_of::<SceneUBO>() as vk::DeviceSize * frames_in_flight as u64)
@@ -249,54 +285,176 @@ impl PhongApp
             .usage(vk::BufferUsageFlags::UNIFORM_BUFFER);
 
         let ubo_alloc_ci = vk_mem::AllocationCreateInfo {
-            flags: vk_mem::AllocationCreateFlags::MAPPED | vk_mem::AllocationCreateFlags::HOST_ACCESS_SEQUENTIAL_WRITE,
+            flags: vk_mem::AllocationCreateFlags::HOST_ACCESS_SEQUENTIAL_WRITE,
             usage: vk_mem::MemoryUsage::AutoPreferDevice,
-            required_flags: vk::MemoryPropertyFlags::HOST_VISIBLE,
             ..Default::default()
         };
 
         (0..frames_in_flight)
-            .map(|_| PhongBuffer {
+            .map(|_| PhongUniformBuffer {
                 scene_uniform_buffer: RhiBuffer::new2(rhi, &scene_buffer_ci, &ubo_alloc_ci, None, "scene-ubo"),
                 mesh_uniform_buffer: RhiBuffer::new2(
                     rhi,
                     &mesh_buffer_ci,
                     &ubo_alloc_ci,
-                    Some(mesh_ubo_align),
+                    Some(*mesh_ubo_align),
                     "mesh-ubo",
                 ),
                 material_uniform_buffer: RhiBuffer::new2(
                     rhi,
                     &material_buffer_ci,
                     &ubo_alloc_ci,
-                    Some(material_ubo_align),
+                    Some(*mat_ubo_align),
                     "material-ubo",
                 ),
             })
             .collect_vec()
     }
 
-    // FIXME 不同信息的更新方式是不一样的：
-    //  mesh 可以通过 push constant 去；效率最高
-    //  mat 需要将 buffer 更新到 descriptor set 中去
-    //  scene 的数据不需要重新绑定 buffer，而是需要将数据更新到 buffer 中去
-    /// 将场景的信息更新到 uniform buffer 中去
+    /// 将场景的信息更新到 uniform buffer 中去，并且和 descriptor set 绑定起来
     fn update_scene_uniform(&mut self, rhi: &Rhi, frame_index: usize)
     {
-        todo!()
+        let PhongUniformBuffer {
+            scene_uniform_buffer,
+            mesh_uniform_buffer,
+            material_uniform_buffer,
+        } = &mut self.uniform_buffers[frame_index];
+
+        scene_uniform_buffer.transfer_data_by_mem_map(std::slice::from_ref(&self.scene_ubo));
+        mesh_uniform_buffer.transfer_data_by_mem_map(&self.mesh_ubo);
+        material_uniform_buffer.transfer_data_by_mem_map(&self.mat_ubo);
+
+        let PhongAppDescriptorSets {
+            scene_set,
+            mesh_set,
+            material_set,
+        } = &mut self.descriptor_sets[frame_index];
+
+        let scene_ubo_info = vk::DescriptorBufferInfo::default()
+            .buffer(scene_uniform_buffer.handle)
+            .offset(0)
+            .range(size_of::<SceneUBO>() as vk::DeviceSize);
+        let scene_write = vk::WriteDescriptorSet::default()
+            .dst_set(scene_set.descriptor_set)
+            .dst_binding(0)
+            .dst_array_element(0)
+            .descriptor_count(1)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
+            .buffer_info(std::slice::from_ref(&scene_ubo_info));
+
+        let mesh_ubo_info = vk::DescriptorBufferInfo::default()
+            .buffer(mesh_uniform_buffer.handle)
+            .offset(0)
+            .range(size_of::<MeshUBO>() as vk::DeviceSize);
+        let mesh_write = vk::WriteDescriptorSet::default()
+            .dst_set(mesh_set.descriptor_set)
+            .dst_binding(0)
+            .dst_array_element(0)
+            .descriptor_count(1)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
+            .buffer_info(std::slice::from_ref(&mesh_ubo_info));
+
+        let mat_ubo_info = vk::DescriptorBufferInfo::default()
+            .buffer(material_uniform_buffer.handle)
+            .offset(0)
+            .range(size_of::<MaterialUBO>() as vk::DeviceSize);
+        let mat_write = vk::WriteDescriptorSet::default()
+            .dst_set(material_set.descriptor_set)
+            .dst_binding(0)
+            .dst_array_element(0)
+            .descriptor_count(1)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
+            .buffer_info(std::slice::from_ref(&mat_ubo_info));
+
+        rhi.write_descriptor_sets(&[scene_write, mesh_write, mat_write]);
     }
 }
 
 impl App for PhongApp
 {
-    fn update(&self, ui: &mut Ui)
+    fn udpate_ui(&mut self, ui: &mut Ui)
     {
-        todo!()
+        ui.text_wrapped("Hello world!");
+        ui.text_wrapped("こんにちは世界！");
+    }
+
+    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    {
+        let frame_id = render_context.current_frame_index();
+        self.update_scene_uniform(rhi, render_context.current_frame_index());
     }
 
     fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
     {
-        todo!()
+        let frame_id = render_context.current_frame_index();
+
+        let color_attach = <Self as App>::get_color_attachment(render_context.current_present_image_view());
+        let depth_attach = <Self as App>::get_depth_attachment(render_context.depth_image_view);
+        let render_info = <Self as App>::get_render_info(
+            vk::Rect2D {
+                offset: vk::Offset2D::default(),
+                extent: render_context.swapchain_extent(),
+            },
+            std::slice::from_ref(&color_attach),
+            &depth_attach,
+        );
+
+        let mut cmd = RenderContext::alloc_command_buffer(render_context, "render");
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        {
+            cmd.cmd_begin_rendering(&render_info);
+            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
+            cmd.cmd_push_constants(
+                self.pipeline.pipeline_layout,
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                0,
+                bytemuck::bytes_of(&self.push),
+            );
+
+            // scene data
+            cmd.bind_descriptor_sets(
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline.pipeline_layout,
+                0,
+                &[self.descriptor_sets[frame_id].scene_set.descriptor_set],
+                &[0],
+            );
+
+            // per mat
+            cmd.bind_descriptor_sets(
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline.pipeline_layout,
+                2,
+                &[self.descriptor_sets[frame_id].material_set.descriptor_set],
+                // TODO 只使用一个材质
+                &[0],
+            );
+
+            // index 和 vertex 暂且就用同一个
+            cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
+
+            for (mesh_idx, mesh_ubo) in self.mesh_ubo.iter().enumerate() {
+                cmd.bind_descriptor_sets(
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipeline.pipeline_layout,
+                    1,
+                    &[self.descriptor_sets[frame_id].mesh_set.descriptor_set],
+                    &[(self.mesh_ubo_offset_align * mesh_idx as u64) as u32],
+                );
+                cmd.draw((BOX.len() / 8) as u32, 1, 0, 0);
+            }
+
+            cmd.end_rendering();
+        }
+        cmd.end();
+        rhi.graphics_queue().submit(
+            rhi,
+            vec![RhiSubmitBatch {
+                command_buffers: vec![cmd],
+                ..Default::default()
+            }],
+            None,
+        );
     }
 
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
@@ -313,18 +471,71 @@ impl App for PhongApp
             ],
         );
 
+        let mut mesh_ubo_offset_align = 0;
+        let mut mat_ubo_offset_align = 0;
+        let uniform_buffers =
+            Self::create_uniform_buffers(rhi, render_context, 3, &mut mesh_ubo_offset_align, &mut mat_ubo_offset_align);
+        let vertex_buffer = Self::create_vertices(rhi);
+
+        let mesh_trans = [
+            glam::Mat4::from_translation(glam::vec3(10f32, 0f32, 0f32)),
+            glam::Mat4::from_translation(glam::vec3(0f32, 10f32, 0f32)),
+            glam::Mat4::from_translation(glam::vec3(0f32, 10f32, 10f32)),
+        ];
+
+        let camera_pos = glam::vec3(10f32, 10f32, 10f32);
+        let camera_dir = glam::vec3(-1f32, -1f32, -1f32);
+
         Self {
             descriptor_set_layouts: layouts,
             descriptor_sets: sets,
             pipeline,
+            vertex_buffer,
+            uniform_buffers,
+            mesh_ubo_offset_align,
+            mat_ubo_offset_align,
+            mesh_ubo: mesh_trans
+                .iter()
+                .map(|trans| MeshUBO {
+                    model: *trans,
+                    trans_inv_model: trans.inverse().transpose(),
+                })
+                .collect_vec(),
+            mat_ubo: vec![MaterialUBO {
+                color: glam::Vec4::new(1.0, 0.0, 0.0, 1.0),
+            }],
+            scene_ubo: SceneUBO {
+                light_pos: glam::vec3(20f32, 40f32, -20f32),
+                light_color: glam::vec3(1f32, 1f32, 1f32),
+                projection: glam::Mat4::perspective_infinite_rh(90f32.to_radians(), 1f32, 0.1f32),
+                view: glam::Mat4::look_to_rh(camera_pos, camera_dir, glam::vec3(0.0, 1.0, 0.0)),
+            },
+            push: PushConstant {
+                camera_pos,
+                camera_dir,
+                frame_id: 0,
+                delta_time_ms: 0.0,
+                mouse_pos: Default::default(),
+                resolution: Default::default(),
+                time_ms: 0.0,
+                fps: 0.0,
+            },
         }
     }
 
     fn get_render_init_info() -> AppInitInfo
     {
-        todo!()
+        AppInitInfo {
+            window_width: 800,
+            window_height: 800,
+            app_name: "Phong".to_string(),
+            enable_validation: true,
+        }
     }
 }
 
 
-fn main() {}
+fn main()
+{
+    run::<PhongApp>()
+}

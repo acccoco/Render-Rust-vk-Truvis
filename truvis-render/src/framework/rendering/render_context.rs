@@ -130,7 +130,7 @@ impl RenderContext
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer<S: AsRef<str>>(&mut self, debug_name: S) -> RhiCommandBuffer
     {
-        let name = format!("frame-{}-command-buffer-{}", self.current_frame, debug_name.as_ref());
+        let name = format!("frame-{}-{}", self.current_frame, debug_name.as_ref());
         let cmd = RhiCommandBuffer::new(self.rhi, &self.graphics_command_pools[self.current_frame], name);
 
         self.allocated_command_buffers[self.current_frame].push(cmd.clone());

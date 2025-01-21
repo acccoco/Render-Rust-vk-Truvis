@@ -111,7 +111,7 @@ impl RhiImage2D
         );
 
         let stage_buffer =
-            RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::GRAPHICS, |cmd| image.transfer_data(cmd, data));
+            RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::GRAPHICS, |cmd| image.transfer_data(cmd, data), name);
         stage_buffer.destroy();
 
         image

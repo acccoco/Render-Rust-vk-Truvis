@@ -273,7 +273,7 @@ impl VkApp
 
 impl App for VkApp
 {
-    fn update(&self, ui: &mut Ui) {
+    fn udpate_ui(&self, ui: &mut Ui) {
         todo!()
     }
 

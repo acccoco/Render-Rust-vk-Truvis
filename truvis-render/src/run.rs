@@ -7,7 +7,9 @@ use crate::{
 
 pub trait App
 {
-    fn update(&self, ui: &mut imgui::Ui);
+    fn udpate_ui(&mut self, ui: &mut imgui::Ui);
+
+    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer);
 
     /// 发生于 acquire_frame 之后，submit_frame 之前
     fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer);
@@ -84,10 +86,9 @@ pub fn run<T: App>()
     let mut app = T::init(Renderer::get_rhi(), &mut renderer.render_context);
 
     renderer.timer.reset();
-    renderer.render_loop(
-        |rhi, render_ctx, timer| {
-            app.draw(rhi, render_ctx, timer);
-        },
-        |ui| app.update(ui),
-    );
+    renderer.render_loop(|rhi, render_ctx, timer, ui| {
+        app.update(rhi, render_ctx, timer);
+        app.draw(rhi, render_ctx, timer);
+        app.udpate_ui(ui);
+    });
 }

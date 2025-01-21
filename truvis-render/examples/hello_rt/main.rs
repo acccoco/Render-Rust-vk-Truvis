@@ -264,7 +264,7 @@ impl HelloRT
 
 impl App for HelloRT
 {
-    fn update(&self, ui: &mut Ui)
+    fn udpate_ui(&self, ui: &mut Ui)
     {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");

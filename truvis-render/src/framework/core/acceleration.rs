@@ -97,21 +97,26 @@ impl RhiAcceleration
         query_pool.reset(0, 1);
 
         // 等待初步 build 完成
-        RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::COMPUTE, |cmd| {
-            cmd.build_acceleration_structure(&build_geometry_info, &range_infos);
-            cmd.memory_barrier(std::slice::from_ref(&vk::MemoryBarrier2 {
-                src_stage_mask: vk::PipelineStageFlags2::ACCELERATION_STRUCTURE_BUILD_KHR,
-                dst_stage_mask: vk::PipelineStageFlags2::ACCELERATION_STRUCTURE_BUILD_KHR,
-                src_access_mask: vk::AccessFlags2::ACCELERATION_STRUCTURE_WRITE_KHR,
-                dst_access_mask: vk::AccessFlags2::ACCELERATION_STRUCTURE_READ_KHR,
-                ..Default::default()
-            }));
-            cmd.write_acceleration_structure_properties(
-                &mut query_pool,
-                0,
-                std::slice::from_ref(&build_geometry_info.dst_acceleration_structure),
-            );
-        });
+        RhiCommandBuffer::one_time_exec(
+            rhi,
+            vk::QueueFlags::COMPUTE,
+            |cmd| {
+                cmd.build_acceleration_structure(&build_geometry_info, &range_infos);
+                cmd.memory_barrier(std::slice::from_ref(&vk::MemoryBarrier2 {
+                    src_stage_mask: vk::PipelineStageFlags2::ACCELERATION_STRUCTURE_BUILD_KHR,
+                    dst_stage_mask: vk::PipelineStageFlags2::ACCELERATION_STRUCTURE_BUILD_KHR,
+                    src_access_mask: vk::AccessFlags2::ACCELERATION_STRUCTURE_WRITE_KHR,
+                    dst_access_mask: vk::AccessFlags2::ACCELERATION_STRUCTURE_READ_KHR,
+                    ..Default::default()
+                }));
+                cmd.write_acceleration_structure_properties(
+                    &mut query_pool,
+                    0,
+                    std::slice::from_ref(&build_geometry_info.dst_acceleration_structure),
+                );
+            },
+            "build-blas",
+        );
 
         // 提供更紧凑的 acceleration
         let compact_size: Vec<vk::DeviceSize> = query_pool.get_query_result(0, 1);
@@ -122,15 +127,20 @@ impl RhiAcceleration
             &format!("{}-compact-blas", debug_name),
         );
 
-        RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::COMPUTE, |cmd| {
-            let copy_info = vk::CopyAccelerationStructureInfoKHR {
-                src: uncompact_acceleration.acceleration_structure,
-                dst: compact_acceleration.acceleration_structure,
-                mode: vk::CopyAccelerationStructureModeKHR::COMPACT,
-                ..Default::default()
-            };
-            cmd.copy_acceleration_structure(&copy_info);
-        });
+        RhiCommandBuffer::one_time_exec(
+            rhi,
+            vk::QueueFlags::COMPUTE,
+            |cmd| {
+                let copy_info = vk::CopyAccelerationStructureInfoKHR {
+                    src: uncompact_acceleration.acceleration_structure,
+                    dst: compact_acceleration.acceleration_structure,
+                    mode: vk::CopyAccelerationStructureModeKHR::COMPACT,
+                    ..Default::default()
+                };
+                cmd.copy_acceleration_structure(&copy_info);
+            },
+            "compact-blas",
+        );
 
         // 回收临时资源
         {
@@ -154,7 +164,7 @@ impl RhiAcceleration
             std::mem::size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name),
         );
-        acceleration_instance_buffer.transfer_data_by_stage_buffer(instances);
+        acceleration_instance_buffer.transfer_data_by_stage_buffer(instances, "acceleration-instance-buffer");
 
         let geometry = vk::AccelerationStructureGeometryKHR {
             geometry_type: vk::GeometryTypeKHR::INSTANCES,
@@ -218,9 +228,14 @@ impl RhiAcceleration
         };
 
         // 正式构建 TLAS
-        RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::COMPUTE, |cmd| {
-            cmd.build_acceleration_structure(&geometry_info, std::slice::from_ref(&range_info));
-        });
+        RhiCommandBuffer::one_time_exec(
+            rhi,
+            vk::QueueFlags::COMPUTE,
+            |cmd| {
+                cmd.build_acceleration_structure(&geometry_info, std::slice::from_ref(&range_info));
+            },
+            "build-tlas",
+        );
 
         // 回收资源
         {

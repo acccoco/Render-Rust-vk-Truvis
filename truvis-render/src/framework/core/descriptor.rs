@@ -1,5 +1,4 @@
 use ash::vk;
-use itertools::Itertools;
 
 use crate::framework::rhi::Rhi;
 
@@ -43,7 +42,7 @@ pub struct RhiDescriptorSet<T>
 where
     T: RhiDescriptorBindings,
 {
-    descriptor_set: vk::DescriptorSet,
+    pub descriptor_set: vk::DescriptorSet,
     phantom_data: std::marker::PhantomData<T>,
 }
 pub enum RhiDescriptorUpdateInfo

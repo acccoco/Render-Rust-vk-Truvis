@@ -25,11 +25,18 @@ struct VsOutput
 };
 
 [[vk::binding(0, 0)]]
-cbuffer UBO
+cbuffer SceneUBO
+{
+    float3 light_pos;
+    float3 light_color;
+    float4x4 projection;
+    float4x4 view;
+};
+
+[[vk::binding(0, 1)]]
+cbuffer MeshUBO
 {
     float4x4 model;
-    float4x4 view;
-    float4x4 projection;
     float4x4 trans_inv_model;
 };
 

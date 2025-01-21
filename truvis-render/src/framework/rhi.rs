@@ -513,9 +513,9 @@ mod _impl_property
             &self.vma.as_ref().unwrap()
         }
 
-        /// 将 UBO 的尺寸和 minUBOAlign 对齐，使得得到的尺寸是 minUBOAlign 的整数倍
+        /// 将 UBO 的尺寸和 min_UBO_Offset_Align 对齐，使得得到的尺寸是 min_UBO_Offset_Align 的整数倍
         #[inline]
-        pub fn ubo_align(&self, ubo_size: vk::DeviceSize) -> vk::DeviceSize
+        pub fn ubo_offset_align(&self, ubo_size: vk::DeviceSize) -> vk::DeviceSize
         {
             let min_ubo_align = self.physical_device().properties.limits.min_uniform_buffer_offset_alignment;
             (ubo_size + min_ubo_align - 1) & !(min_ubo_align - 1)
@@ -722,7 +722,7 @@ mod _impl_tools
         }
 
         #[inline]
-        pub fn update_descriptor_sets(&self, writes: &[vk::WriteDescriptorSet])
+        pub fn write_descriptor_sets(&self, writes: &[vk::WriteDescriptorSet])
         {
             unsafe {
                 self.vk_device().update_descriptor_sets(writes, &[]);

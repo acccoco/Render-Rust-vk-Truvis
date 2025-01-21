@@ -212,7 +212,7 @@ impl ShaderToy
 
 impl App for ShaderToy
 {
-    fn update(&self, ui: &mut imgui::Ui)
+    fn udpate_ui(&self, ui: &mut imgui::Ui)
     {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");

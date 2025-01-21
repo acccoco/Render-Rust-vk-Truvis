@@ -34,10 +34,10 @@ impl RhiPhysicalDevice
             log::info!("found gpus: {:?}", gpu_name);
 
             let device_extensions = instance.enumerate_device_extension_properties(pdevice).unwrap();
-            log::info!("device supports extensions: ");
+            log::debug!("device supports extensions: ");
             for ext in &device_extensions {
                 let ext_name = CStr::from_ptr(ext.extension_name.as_ptr());
-                log::info!("\t{:?}", ext_name.to_str().unwrap());
+                log::debug!("\t{:?}", ext_name.to_str().unwrap());
             }
 
             Self {
