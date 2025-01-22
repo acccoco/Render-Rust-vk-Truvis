@@ -1,6 +1,11 @@
+pub use _impl_init::RenderContextInitInfo;
 use ash::vk;
 
 use crate::framework::{
+    basic::{
+        color::{GREEN, RED},
+        FRAME_ID_MAP,
+    },
     core::{
         command_buffer::RhiCommandBuffer,
         command_pool::RhiCommandPool,
@@ -10,6 +15,7 @@ use crate::framework::{
     },
     rhi::{Rhi, RHI},
 };
+
 
 pub struct RenderContext
 {
@@ -70,7 +76,10 @@ impl RenderContext
 
         rhi.graphics_queue_begin_label("[acquire-frame]color-attach-transfer", RED);
         {
-            let mut cmd = self.alloc_command_buffer(format!("ctx-1st-color-layout-trans-frame-{}", self.current_frame));
+            let mut cmd = self.alloc_command_buffer(format!(
+                "{}-[acquire-frame]color-attach-layout-transfer",
+                self.current_frame_prefix()
+            ));
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
             cmd.begin_label("color-attach-trasfer", RED);
             {
@@ -112,7 +121,10 @@ impl RenderContext
     /// * 在提交之前，为 image 进行 layout transition
     pub fn submit_frame(&mut self)
     {
-        let mut cmd = self.alloc_command_buffer(format!("ctx-2nd-color-layout-trans-frame-{}", self.current_frame));
+        let mut cmd = self.alloc_command_buffer(format!(
+            "{}-[submit-frame]color-attach-layout-transfer",
+            self.current_frame_prefix()
+        ));
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         cmd.begin_label("color-attach-layout-transfer", RED);
         {
@@ -150,7 +162,7 @@ impl RenderContext
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer<S: AsRef<str>>(&mut self, debug_name: S) -> RhiCommandBuffer
     {
-        let name = format!("[frame{}-{}]{}", self.current_frame, self.frame_id, debug_name.as_ref());
+        let name = format!("[frame-{}-{}]{}", FRAME_ID_MAP[self.current_frame], self.frame_id, debug_name.as_ref());
         let cmd = RhiCommandBuffer::new(self.rhi, &self.graphics_command_pools[self.current_frame], name);
 
         self.allocated_command_buffers[self.current_frame].push(cmd.clone());
@@ -159,9 +171,6 @@ impl RenderContext
     }
 }
 
-pub use _impl_init::RenderContextInitInfo;
-
-use crate::framework::basic::color::{GREEN, RED};
 
 mod _impl_init
 {
@@ -169,6 +178,7 @@ mod _impl_init
     use itertools::Itertools;
 
     use crate::framework::{
+        basic::FRAME_ID_MAP,
         core::{
             command_pool::RhiCommandPool,
             create_utils::RhiCreateInfoUtil,
@@ -215,13 +225,17 @@ mod _impl_init
                 Self::init_depth_image_and_view(rhi, &render_swapchain, &init_info.depth_format_dedicate);
 
             let create_semaphore = |name: &str| {
-                (0..init_info.frames_in_flight).map(|i| RhiSemaphore::new(rhi, format!("{name}_{i}"))).collect_vec()
+                (0..init_info.frames_in_flight)
+                    .map(|i| FRAME_ID_MAP[i])
+                    .map(|tag| RhiSemaphore::new(rhi, format!("{name}_{tag}")))
+                    .collect_vec()
             };
             let present_complete_semaphores = create_semaphore("present_complete_semaphore");
             let render_complete_semaphores = create_semaphore("render_complete_semaphores");
 
             let fence_frame_in_flight = (0..init_info.frames_in_flight)
-                .map(|i| RhiFence::new(rhi, true, format!("frame_in_flight_fence_{i}")))
+                .map(|i| FRAME_ID_MAP[i])
+                .map(|tag| RhiFence::new(rhi, true, format!("frame_in_flight_fence_{tag}")))
                 .collect();
 
             let graphics_command_pools = Self::init_command_pool(rhi, init_info);
@@ -312,6 +326,7 @@ mod _impl_property
     use ash::vk;
 
     use crate::framework::{
+        basic::FRAME_ID_MAP,
         core::synchronize::{RhiFence, RhiSemaphore},
         rendering::render_context::RenderContext,
     };
@@ -341,6 +356,13 @@ mod _impl_property
         pub fn current_frame_index(&self) -> usize
         {
             self.current_frame
+        }
+
+        /// 当前帧的 debug prefix，例如：`[frame-A-113]`
+        #[inline]
+        pub fn current_frame_prefix(&self) -> String
+        {
+            format!("[frame-{}-{}]", FRAME_ID_MAP[self.current_frame], self.frame_id)
         }
 
         #[inline]

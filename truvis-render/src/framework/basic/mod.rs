@@ -1,1 +1,3 @@
 pub mod color;
+
+pub const FRAME_ID_MAP: [char; 4] = ['A', 'B', 'C', 'D'];

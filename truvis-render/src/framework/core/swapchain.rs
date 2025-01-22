@@ -96,6 +96,7 @@ mod _impl_init
     use itertools::Itertools;
 
     use crate::framework::{
+        basic::FRAME_ID_MAP,
         core::swapchain::{RenderSwapchain, Surface},
         platform::window_system::WindowSystem,
         rhi::Rhi,
@@ -235,8 +236,8 @@ mod _impl_init
 
             // 为 images 和 image_views 设置 debug name
             for i in 0..images.len() {
-                rhi.set_debug_name(images[i], format!("swapchain-image-{}", i));
-                rhi.set_debug_name(image_views[i], format!("swapchain-image-view-{}", i));
+                rhi.set_debug_name(images[i], format!("swapchain-image-{}", FRAME_ID_MAP[i]));
+                rhi.set_debug_name(image_views[i], format!("swapchain-image-view-{}", FRAME_ID_MAP[i]));
             }
 
             (images, image_views)

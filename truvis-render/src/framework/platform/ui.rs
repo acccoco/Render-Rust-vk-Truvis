@@ -7,7 +7,7 @@ use image::EncodableLayout;
 use imgui::TextureId;
 
 use crate::framework::{
-    basic::color::RED,
+    basic::{color::RED, FRAME_ID_MAP},
     core::{
         buffer::RhiBuffer, command_buffer::RhiCommandBuffer, image::RhiImage2D, queue::RhiSubmitInfo,
         shader::RhiShaderModule, texture::RhiTexture,
@@ -104,12 +104,19 @@ impl UiMesh
             vertices.extend_from_slice(draw_list.vtx_buffer());
         }
 
-        let vertices_size = vertex_count * std::mem::size_of::<imgui::DrawVert>();
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, vertices_size, "imgui-vertex-buffer");
+        let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(
+            rhi,
+            vertices_size,
+            &format!("{}-imgui-vertex-buffer", render_ctx.current_frame_prefix()),
+        );
         {
             // FIXME destroy stage buffer
-            let mut stage_buffer =
-                RhiBuffer::new_stage_buffer(rhi, vertices_size as vk::DeviceSize, "imgui-vertex-stage-buffer");
+            let mut stage_buffer = RhiBuffer::new_stage_buffer(
+                rhi,
+                vertices_size as vk::DeviceSize,
+                &format!("{}-imgui-vertex-stage-buffer", render_ctx.current_frame_prefix()),
+            );
             stage_buffer.transfer_data_by_mem_map(&vertices);
 
             cmd.begin_label("uipass-vertex-buffer-transfer", RED);
@@ -145,11 +152,18 @@ impl UiMesh
         }
 
         let indices_size = index_count * std::mem::size_of::<imgui::DrawIdx>();
-        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, indices_size, "imgui-index-buffer");
+        let mut index_buffer = RhiBuffer::new_index_buffer(
+            rhi,
+            indices_size,
+            &format!("{}-imgui-index-buffer", render_ctx.current_frame_prefix()),
+        );
         {
             // FIXME destroy stage buffer
-            let mut stage_buffer =
-                RhiBuffer::new_stage_buffer(rhi, indices_size as vk::DeviceSize, "imgui-index-stage-buffer");
+            let mut stage_buffer = RhiBuffer::new_stage_buffer(
+                rhi,
+                indices_size as vk::DeviceSize,
+                &format!("{}-imgui-index-stage-buffer", render_ctx.current_frame_prefix()),
+            );
             stage_buffer.transfer_data_by_mem_map(&indices);
 
             cmd.begin_label("uipass-index-buffer-transfer", RED);

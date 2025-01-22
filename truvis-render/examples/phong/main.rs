@@ -5,7 +5,10 @@ use imgui::Ui;
 use itertools::Itertools;
 use truvis_render::{
     framework::{
-        basic::color::{BLUE, GREEN},
+        basic::{
+            color::{BLUE, GREEN},
+            FRAME_ID_MAP,
+        },
         core::{
             buffer::RhiBuffer,
             descriptor::{RhiDescriptorBindings, RhiDescriptorLayout, RhiDescriptorSet},
@@ -250,7 +253,7 @@ impl PhongApp
 
     fn create_vertices(rhi: &'static Rhi) -> RhiBuffer
     {
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&BOX), "vertex-buffer");
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&BOX), "phong-vertex-buffer");
         vertex_buffer.transfer_data_by_stage_buffer(&BOX, "[phong-pass][init]transfer-vertex-data");
 
         vertex_buffer
@@ -292,21 +295,28 @@ impl PhongApp
         };
 
         (0..frames_in_flight)
-            .map(|_| PhongUniformBuffer {
-                scene_uniform_buffer: RhiBuffer::new2(rhi, &scene_buffer_ci, &ubo_alloc_ci, None, "scene-ubo"),
+            .map(|idx| FRAME_ID_MAP[idx])
+            .map(|tag| PhongUniformBuffer {
+                scene_uniform_buffer: RhiBuffer::new2(
+                    rhi,
+                    &scene_buffer_ci,
+                    &ubo_alloc_ci,
+                    None,
+                    &format!("scene-ubo-{}", tag),
+                ),
                 mesh_uniform_buffer: RhiBuffer::new2(
                     rhi,
                     &mesh_buffer_ci,
                     &ubo_alloc_ci,
                     Some(*mesh_ubo_align),
-                    "mesh-ubo",
+                    &format!("mesh-ubo-{}", tag),
                 ),
                 material_uniform_buffer: RhiBuffer::new2(
                     rhi,
                     &material_buffer_ci,
                     &ubo_alloc_ci,
                     Some(*mat_ubo_align),
-                    "material-ubo",
+                    &format!("material-ubo-{}", tag),
                 ),
             })
             .collect_vec()
