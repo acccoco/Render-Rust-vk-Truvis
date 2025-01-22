@@ -41,9 +41,9 @@ impl UiMesh
                 vk::DependencyFlags::empty(),
                 &[vk::BufferMemoryBarrier2::default()
                     .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
-                    .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER | vk::PipelineStageFlags2::INDEX_INPUT)
+                    .dst_stage_mask(vk::PipelineStageFlags2::INDEX_INPUT)
                     .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
-                    .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                    .dst_access_mask(vk::AccessFlags2::INDEX_READ)
                     .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
                     .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
                     .buffer(index_buffer.handle)
@@ -55,9 +55,9 @@ impl UiMesh
                 vk::DependencyFlags::empty(),
                 &[vk::BufferMemoryBarrier2::default()
                     .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
-                    .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER | vk::PipelineStageFlags2::VERTEX_INPUT)
+                    .dst_stage_mask(vk::PipelineStageFlags2::VERTEX_INPUT)
                     .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
-                    .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                    .dst_access_mask(vk::AccessFlags2::VERTEX_ATTRIBUTE_READ)
                     .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
                     .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
                     .buffer(vertex_buffer.handle)
