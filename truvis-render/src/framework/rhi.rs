@@ -618,17 +618,21 @@ mod _impl_tools
             }
         }
 
-        // FIXME 为什么这里也有 submit
-        #[inline]
-        pub fn queue_submit(&self, queue: &RhiQueue, batches: Vec<RhiSubmitInfo>, fence: Option<RhiFence>)
-        {
-            unsafe {
-                // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
-                let batches = batches.iter().map(|b| b.to_vk_batch()).collect_vec();
-                let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();
 
+        #[inline]
+        pub fn graphics_queue_submit(&self, infos: Vec<RhiSubmitInfo>, fence: Option<RhiFence>)
+        {
+            // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
+            let batches = infos.iter().map(|b| b.to_vk_batch()).collect_vec();
+            let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();
+
+            unsafe {
                 self.vk_device()
-                    .queue_submit(queue.vk_queue, &submit_infos, fence.map_or(vk::Fence::null(), |f| f.fence))
+                    .queue_submit(
+                        self.graphics_queue().vk_queue,
+                        &submit_infos,
+                        fence.map_or(vk::Fence::null(), |f| f.fence),
+                    )
                     .unwrap();
             }
         }

@@ -5,7 +5,7 @@ use imgui::Ui;
 use itertools::Itertools;
 use truvis_render::{
     framework::{
-        basic::color::BLUE,
+        basic::color::{BLUE, GREEN},
         core::{
             buffer::RhiBuffer,
             descriptor::{RhiDescriptorBindings, RhiDescriptorLayout, RhiDescriptorSet},
@@ -381,8 +381,12 @@ impl App for PhongApp
 
     fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
     {
-        let frame_id = render_context.current_frame_index();
-        self.update_scene_uniform(rhi, render_context.current_frame_index());
+        rhi.graphics_queue_begin_label("[main-pass]update", GREEN);
+        {
+            let frame_id = render_context.current_frame_index();
+            self.update_scene_uniform(rhi, render_context.current_frame_index());
+        }
+        rhi.graphics_queue_end_label();
     }
 
     fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
@@ -399,6 +403,8 @@ impl App for PhongApp
             std::slice::from_ref(&color_attach),
             &depth_attach,
         );
+
+        rhi.graphics_queue_begin_label("[main-pass]draw", GREEN);
 
         let mut cmd = RenderContext::alloc_command_buffer(render_context, "[main-pass]render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
@@ -451,10 +457,15 @@ impl App for PhongApp
         cmd.end_label();
         cmd.end();
 
-        render_context.submit_to_graphics(RhiSubmitInfo {
-            command_buffers: vec![cmd],
-            ..Default::default()
-        });
+        rhi.graphics_queue_submit(
+            vec![RhiSubmitInfo {
+                command_buffers: vec![cmd],
+                ..Default::default()
+            }],
+            None,
+        );
+
+        rhi.graphics_queue_end_label();
     }
 
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self

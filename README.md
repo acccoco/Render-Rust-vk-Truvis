@@ -18,3 +18,8 @@ TODO
 * `image view`
 * `descriptor image info`
 * `sampler`
+
+# Debug 命名规范
+
+* object name：`[frame-A-id][pass]name`
+* queue label/cmd label：`[frame-A-id][pass]name`

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ash::vk;
 
 use crate::framework::{
-    basic::color::RED,
+    basic::color::{GREEN, RED},
     core::{queue::RhiSubmitInfo, swapchain::RenderSwapchainInitInfo},
     platform::{
         ui::{UiOptions, UI},
@@ -147,8 +147,11 @@ impl Renderer
         self.window.render_loop(&mut self.ui, |ui| {
             self.timer.update();
 
+            rhi.graphics_queue_begin_label("[acquire-frame]", GREEN);
             self.render_context.acquire_frame();
+            rhi.graphics_queue_end_label();
 
+            // TODO 优化一下这个执行顺序
             ui.platform.prepare_frame(ui.imgui.get_mut().io_mut(), self.window.window()).unwrap();
 
             let frame = ui.imgui.get_mut().new_frame();
@@ -158,6 +161,7 @@ impl Renderer
             render_func(rhi, &mut self.render_context, &self.timer, frame);
 
             // ui pass
+            rhi.graphics_queue_begin_label("[ui-pass]draw", GREEN);
             {
                 // FIXME ui cmd 需要释放
                 ui.platform.prepare_render(frame, self.window.window());
@@ -190,15 +194,21 @@ impl Renderer
                     barrier_cmd.end_label();
                     barrier_cmd.end();
 
-                    self.render_context.submit_to_graphics(RhiSubmitInfo {
-                        command_buffers: vec![ui_cmd, barrier_cmd],
-                        wait_info: Vec::new(),
-                        signal_info: Vec::new(),
-                    });
+                    rhi.graphics_queue_submit(
+                        vec![RhiSubmitInfo {
+                            command_buffers: vec![ui_cmd, barrier_cmd],
+                            wait_info: Vec::new(),
+                            signal_info: Vec::new(),
+                        }],
+                        None,
+                    );
                 }
             }
+            rhi.graphics_queue_end_label();
 
+            rhi.graphics_queue_begin_label("[submit-frame]", GREEN);
             self.render_context.submit_frame();
+            rhi.graphics_queue_end_label();
         });
     }
 }

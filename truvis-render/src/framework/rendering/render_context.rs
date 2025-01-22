@@ -28,9 +28,6 @@ pub struct RenderContext
     /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
     allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
 
-    /// 每一帧需要提交的命令
-    submit: Vec<Vec<RhiSubmitInfo>>,
-
     pub depth_format: vk::Format,
     pub depth_image: vk::Image,
     depth_image_allcation: vk_mem::Allocation,
@@ -53,7 +50,7 @@ impl RenderContext
     {
         let rhi = RHI.get().unwrap();
 
-        rhi.graphics_queue_begin_label("acquire-frame-reset", GREEN);
+        rhi.graphics_queue_begin_label("[acquire-frame]reset", GREEN);
         {
             let current_fence = &self.fence_frame_in_flight[self.current_frame];
             rhi.wait_for_fence(current_fence);
@@ -70,6 +67,8 @@ impl RenderContext
         self.swapchain_image_index =
             self.render_swapchain.acquire_next_frame(&self.present_complete_semaphores[self.current_frame], None)
                 as usize;
+
+        rhi.graphics_queue_begin_label("[acquire-frame]color-attach-transfer", RED);
         {
             let mut cmd = self.alloc_command_buffer(format!("ctx-1st-color-layout-trans-frame-{}", self.current_frame));
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
@@ -92,15 +91,19 @@ impl RenderContext
             cmd.end_label();
             cmd.end();
 
-            self.submit_to_graphics(RhiSubmitInfo {
-                command_buffers: vec![cmd],
-                wait_info: vec![(
-                    vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                    self.current_present_complete_semaphore(),
-                )],
-                ..Default::default()
-            });
+            self.rhi.graphics_queue_submit(
+                vec![RhiSubmitInfo {
+                    command_buffers: vec![cmd],
+                    wait_info: vec![(
+                        vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                        self.current_present_complete_semaphore(),
+                    )],
+                    ..Default::default()
+                }],
+                None,
+            );
         }
+        rhi.graphics_queue_end_label();
     }
 
 
@@ -124,13 +127,15 @@ impl RenderContext
         }
         cmd.end_label();
         cmd.end();
-        self.submit_to_graphics(RhiSubmitInfo {
-            command_buffers: vec![cmd],
-            signal_info: vec![self.current_render_complete_semaphore()],
-            ..Default::default()
-        });
 
-        self.submit_all_to_graphics();
+        self.rhi.graphics_queue_submit(
+            vec![RhiSubmitInfo {
+                command_buffers: vec![cmd],
+                signal_info: vec![self.current_render_complete_semaphore()],
+                ..Default::default()
+            }],
+            Some(self.fence_frame_in_flight[self.current_frame].clone()),
+        );
         self.render_swapchain.submit_frame(
             self.rhi,
             self.swapchain_image_index as u32,
@@ -151,20 +156,6 @@ impl RenderContext
         self.allocated_command_buffers[self.current_frame].push(cmd.clone());
 
         cmd
-    }
-
-    // TODO rename
-    /// 提交当前帧的命令到 graphics queue
-    pub fn submit_to_graphics(&mut self, submit_info: RhiSubmitInfo)
-    {
-        self.submit[self.current_frame].push(submit_info);
-    }
-
-    // TODO rename
-    fn submit_all_to_graphics(&mut self)
-    {
-        let submit_infos = std::mem::take(&mut self.submit[self.current_frame]);
-        self.rhi.graphics_queue().submit(self.rhi, submit_infos, Some(self.current_fence().clone()));
     }
 }
 
@@ -245,7 +236,6 @@ mod _impl_init
 
                 graphics_command_pools,
                 allocated_command_buffers: vec![Vec::new(); init_info.frames_in_flight],
-                submit: (0..init_info.frames_in_flight).into_iter().map(|_| Vec::new()).collect(),
 
                 depth_format,
                 depth_image,
