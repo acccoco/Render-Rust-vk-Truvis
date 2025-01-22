@@ -17,10 +17,10 @@ pub struct RhiQueue
 
 impl RhiQueue
 {
-    pub fn submit(&self, rhi: &Rhi, batches: Vec<RhiSubmitBatch>, fence: Option<RhiFence>)
+    // TODO 使用 queue_submit2
+    pub fn submit(&self, rhi: &Rhi, batches: Vec<RhiSubmitInfo>, fence: Option<RhiFence>)
     {
         unsafe {
-            // TODO 这里既有 RhiSubmiBatch 又有 RhiSubmitBatchVk，感觉不太好
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = batches.iter().map(|b| b.to_vk_batch()).collect_vec();
             let submit_infos = batches.iter().map(|b| b.submit_info()).collect_vec();
@@ -43,7 +43,7 @@ impl RhiQueue
 // TODO 这个封装的不怎么样
 /// RHi 关于 submitInfo 的封装，更易用
 #[derive(Default)]
-pub struct RhiSubmitBatch
+pub struct RhiSubmitInfo
 {
     pub command_buffers: Vec<RhiCommandBuffer>,
     pub wait_info: Vec<(vk::PipelineStageFlags, RhiSemaphore)>,
@@ -52,7 +52,7 @@ pub struct RhiSubmitBatch
 
 
 /// 兼容 VkSubmitInfo 的内存模式
-pub struct RhiSubmitBatchVk
+pub struct RhiSubmitInfoTemp
 {
     command_buffers: Vec<vk::CommandBuffer>,
     wait_stages: Vec<vk::PipelineStageFlags>,
@@ -61,11 +61,9 @@ pub struct RhiSubmitBatchVk
 }
 
 
-impl RhiSubmitBatchVk
+impl RhiSubmitInfoTemp
 {
-    /// # unsafe
-    /// 返回的 submitInfo 仅仅在 self 存在时有效
-    pub unsafe fn submit_info(&self) -> vk::SubmitInfo
+    pub fn submit_info(&self) -> vk::SubmitInfo
     {
         let mut info = vk::SubmitInfo::default()
             .command_buffers(&self.command_buffers)
@@ -86,12 +84,12 @@ impl RhiSubmitBatchVk
     }
 }
 
-impl RhiSubmitBatch
+impl RhiSubmitInfo
 {
     #[inline]
-    pub fn to_vk_batch(&self) -> RhiSubmitBatchVk
+    pub fn to_vk_batch(&self) -> RhiSubmitInfoTemp
     {
-        RhiSubmitBatchVk {
+        RhiSubmitInfoTemp {
             command_buffers: self.commands(),
             wait_stages: self.wait_stages(),
             wait_semaphores: self.wait_semaphores(),

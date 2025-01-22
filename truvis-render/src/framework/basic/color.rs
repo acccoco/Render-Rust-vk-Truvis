@@ -1,0 +1,11 @@
+pub const RED: glam::Vec4 = glam::vec4(1.0, 0.0, 0.0, 1.0);
+pub const GREEN: glam::Vec4 = glam::vec4(0.0, 1.0, 0.0, 1.0);
+pub const BLUE: glam::Vec4 = glam::vec4(0.0, 0.0, 1.0, 1.0);
+pub const WHITE: glam::Vec4 = glam::vec4(1.0, 1.0, 1.0, 1.0);
+pub const BLACK: glam::Vec4 = glam::vec4(0.0, 0.0, 0.0, 1.0);
+pub const YELLOW: glam::Vec4 = glam::vec4(1.0, 1.0, 0.0, 1.0);
+pub const CYAN: glam::Vec4 = glam::vec4(0.0, 1.0, 1.0, 1.0);
+pub const MAGENTA: glam::Vec4 = glam::vec4(1.0, 0.0, 1.0, 1.0);
+pub const GRAY: glam::Vec4 = glam::vec4(0.5, 0.5, 0.5, 1.0);
+pub const LIGHT_GRAY: glam::Vec4 = glam::vec4(0.75, 0.75, 0.75, 1.0);
+pub const DARK_GRAY: glam::Vec4 = glam::vec4(0.25, 0.25, 0.25, 1.0);

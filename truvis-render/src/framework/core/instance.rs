@@ -7,9 +7,6 @@ use crate::framework::core::physical_device::RhiPhysicalDevice;
 pub struct RhiInstance
 {
     pub handle: ash::Instance,
-
-    /// 当前机器上找到的所有 physical device
-    pub gpus: Vec<RhiPhysicalDevice>,
 }
 
 
@@ -59,9 +56,7 @@ mod _impl_init
 
             let handle = unsafe { vk_entry.create_instance(&instance_ci, None).unwrap() };
 
-            let gpus = Self::query_gpus(&handle);
-
-            let instance = Self { handle, gpus };
+            let instance = Self { handle };
             instance
         }
 
@@ -153,20 +148,6 @@ mod _impl_init
             }
 
             validation_layers.iter().map(|ext| ext.as_ptr()).collect_vec()
-        }
-
-
-        /// 找到机器上所有的 PhysicalDevice, 并缓存到 self.gpus 中
-        fn query_gpus(instance: &Instance) -> Vec<RhiPhysicalDevice>
-        {
-            unsafe {
-                instance
-                    .enumerate_physical_devices()
-                    .unwrap()
-                    .iter()
-                    .map(|pdevice| RhiPhysicalDevice::new(*pdevice, instance))
-                    .collect()
-            }
         }
     }
 }

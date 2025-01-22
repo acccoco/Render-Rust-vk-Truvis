@@ -5,7 +5,7 @@ use truvis_render::{
         core::{
             buffer::RhiBuffer,
             pipeline::{RhiPipeline, RhiPipelineTemplate},
-            queue::RhiSubmitBatch,
+            queue::RhiSubmitInfo,
         },
         rendering::render_context::RenderContext,
         rhi::Rhi,
@@ -128,14 +128,10 @@ impl HelloTriangle
             cmd.end_rendering();
         }
         cmd.end();
-        rhi.graphics_queue().submit(
-            rhi,
-            vec![RhiSubmitBatch {
-                command_buffers: vec![cmd],
-                ..Default::default()
-            }],
-            None,
-        );
+        render_context.submit_to_graphics(RhiSubmitInfo {
+            command_buffers: vec![cmd],
+            ..Default::default()
+        });
     }
 
     fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self

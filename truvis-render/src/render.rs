@@ -3,7 +3,8 @@ use std::sync::Arc;
 use ash::vk;
 
 use crate::framework::{
-    core::{queue::RhiSubmitBatch, swapchain::RenderSwapchainInitInfo},
+    basic::color::RED,
+    core::{queue::RhiSubmitInfo, swapchain::RenderSwapchainInitInfo},
     platform::{
         ui::{UiOptions, UI},
         window_system::{WindowCreateInfo, WindowSystem},
@@ -166,37 +167,34 @@ impl Renderer
                     // FIXME barrier cmd 也需要释放
                     let mut barrier_cmd = self.render_context.alloc_command_buffer("ui pipeline barrier");
                     barrier_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-                    barrier_cmd.image_memory_barrier(
-                        vk::DependencyFlags::empty(),
-                        &[vk::ImageMemoryBarrier2::default()
-                            .image(self.render_context.current_present_image())
-                            .old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                            .new_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                            .src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
-                            .dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
-                            .src_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
-                            .dst_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
-                            .subresource_range(
-                                vk::ImageSubresourceRange::default()
-                                    .aspect_mask(vk::ImageAspectFlags::COLOR)
-                                    .layer_count(1)
-                                    .level_count(1),
-                            )],
-                    );
+                    barrier_cmd.begin_label("[uipass]barrier", RED);
+                    {
+                        barrier_cmd.image_memory_barrier(
+                            vk::DependencyFlags::empty(),
+                            &[vk::ImageMemoryBarrier2::default()
+                                .image(self.render_context.current_present_image())
+                                .old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                                .new_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                                .src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+                                .dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+                                .src_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
+                                .dst_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
+                                .subresource_range(
+                                    vk::ImageSubresourceRange::default()
+                                        .aspect_mask(vk::ImageAspectFlags::COLOR)
+                                        .layer_count(1)
+                                        .level_count(1),
+                                )],
+                        );
+                    }
+                    barrier_cmd.end_label();
                     barrier_cmd.end();
-                    
-                    // FIXME
-                    rhi.graphics_queue().wait_idle(rhi);
 
-                    rhi.graphics_queue().submit(
-                        rhi,
-                        vec![RhiSubmitBatch {
-                            command_buffers: vec![ui_cmd, barrier_cmd],
-                            wait_info: Vec::new(),
-                            signal_info: Vec::new(),
-                        }],
-                        None,
-                    );
+                    self.render_context.submit_to_graphics(RhiSubmitInfo {
+                        command_buffers: vec![ui_cmd, barrier_cmd],
+                        wait_info: Vec::new(),
+                        signal_info: Vec::new(),
+                    });
                 }
             }
 

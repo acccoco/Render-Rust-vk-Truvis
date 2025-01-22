@@ -1,7 +1,7 @@
 use ash::vk;
 
 use crate::framework::{
-    core::{command_pool::RhiCommandPool, queue::RhiSubmitBatch},
+    core::{command_pool::RhiCommandPool, queue::RhiSubmitInfo},
     rhi::Rhi,
 };
 
@@ -65,7 +65,7 @@ impl RhiCommandBuffer
 
         queue.submit(
             rhi,
-            vec![RhiSubmitBatch {
+            vec![RhiSubmitInfo {
                 command_buffers: vec![command_buffer.clone()],
                 ..Default::default()
             }],
@@ -77,6 +77,7 @@ impl RhiCommandBuffer
         result
     }
 
+    #[inline]
     pub fn free(self)
     {
         unsafe {
@@ -84,6 +85,7 @@ impl RhiCommandBuffer
         }
     }
 
+    #[inline]
     pub fn begin(&mut self, usage_flag: vk::CommandBufferUsageFlags)
     {
         unsafe {
@@ -457,6 +459,32 @@ mod _other_cmd
                     offset,
                     data,
                 );
+            }
+        }
+
+        #[inline]
+        pub fn begin_label(&mut self, label_name: &str, label_color: glam::Vec4)
+        {
+            let name = std::ffi::CString::new(label_name).unwrap();
+            unsafe {
+                self.rhi.debug_utils.cmd_begin_debug_label(self.command_buffer, label_name, label_color);
+            }
+        }
+
+        #[inline]
+        pub fn end_label(&mut self)
+        {
+            unsafe {
+                self.rhi.debug_utils.cmd_end_debug_label(self.command_buffer);
+            }
+        }
+
+        #[inline]
+        pub fn insert_label(&mut self, label_name: &str, label_color: glam::Vec4)
+        {
+            let name = std::ffi::CString::new(label_name).unwrap();
+            unsafe {
+                self.rhi.debug_utils.cmd_insert_debug_label(self.command_buffer, label_name, label_color);
             }
         }
     }

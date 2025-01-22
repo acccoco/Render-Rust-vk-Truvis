@@ -79,5 +79,6 @@ PsOutput main(PsInput input)
 
     PsOutput output = (PsOutput)0;
     output.color = float4((diffuse_color + specular_color) * light_attenuation, 1.0f);
+    output.color = float4(0.8, 0.8, 0.8, 1.0);
     return output;
 }

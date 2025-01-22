@@ -245,9 +245,6 @@ mod _impl_init
                 }
             }
 
-            // 这个 extension 是 VK_KHR_performance_query 的前置条件，而后者是用于 stats gathering 的
-            exts.push(vk::KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_NAME);
-
             exts
         }
 
@@ -294,40 +291,40 @@ mod _impl_init
 
             // 在 device 以及 debug_utils 之前创建的 vk::Handle
             {
-                debug_utils.set_debug_name(instance.handle.handle(), "instance");
-                debug_utils.set_debug_name(pdevice.handle, "physical device");
+                debug_utils.set_object_debug_name(instance.handle.handle(), "instance");
+                debug_utils.set_object_debug_name(pdevice.handle, "physical device");
 
-                debug_utils.set_debug_name(device.device.handle(), "device");
-                debug_utils.set_debug_name(device.graphics_queue.vk_queue, "main-graphics-queue");
-                debug_utils.set_debug_name(device.compute_queue.vk_queue, "main-compute-queue");
-                debug_utils.set_debug_name(device.transfer_queue.vk_queue, "main-transfer-queue");
+                debug_utils.set_object_debug_name(device.device.handle(), "device");
+                debug_utils.set_object_debug_name(device.graphics_queue.vk_queue, "main-graphics-queue");
+                debug_utils.set_object_debug_name(device.compute_queue.vk_queue, "main-compute-queue");
+                debug_utils.set_object_debug_name(device.transfer_queue.vk_queue, "main-transfer-queue");
             }
 
             let vk_dynamic_render_pf = ash::khr::dynamic_rendering::Device::new(&instance.handle, &device.device);
             let vk_acceleration_pf = ash::khr::acceleration_structure::Device::new(&instance.handle, &device.device);
 
             let descriptor_pool = Self::init_descriptor_pool(&device);
-            debug_utils.set_debug_name(descriptor_pool, "main-descriptor-pool");
+            debug_utils.set_object_debug_name(descriptor_pool, "main-descriptor-pool");
 
             let graphics_command_pool = Self::init_command_pool(
                 &device,
                 &debug_utils,
                 vk::QueueFlags::GRAPHICS,
-                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+                vk::CommandPoolCreateFlags::empty(),
                 "rhi-graphics-command-pool",
             );
             let compute_command_pool = Self::init_command_pool(
                 &device,
                 &debug_utils,
                 vk::QueueFlags::COMPUTE,
-                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+                vk::CommandPoolCreateFlags::empty(),
                 "rhi-compute-command-pool",
             );
             let transfer_command_pool = Self::init_command_pool(
                 &device,
                 &debug_utils,
                 vk::QueueFlags::TRANSFER,
-                vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
+                vk::CommandPoolCreateFlags::empty(),
                 "rhi-transfer-command-pool",
             );
 
@@ -448,7 +445,7 @@ mod _impl_init
                     .unwrap()
             };
 
-            debug_utils.set_debug_name(pool, debug_name.clone());
+            debug_utils.set_object_debug_name(pool, debug_name.clone());
             RhiCommandPool {
                 command_pool: pool,
                 queue_family_index,
@@ -533,7 +530,7 @@ mod _impl_tools
     use crate::framework::{
         core::{
             command_pool::RhiCommandPool,
-            queue::{RhiQueue, RhiSubmitBatch},
+            queue::{RhiQueue, RhiSubmitInfo},
             synchronize::RhiFence,
         },
         rhi::Rhi,
@@ -541,22 +538,6 @@ mod _impl_tools
 
     impl Rhi
     {
-        #[inline]
-        pub(crate) fn set_debug_name<T, S>(&self, handle: T, name: S)
-        where
-            T: vk::Handle + Copy,
-            S: AsRef<str>,
-        {
-            self.debug_utils.set_debug_name(handle, name);
-        }
-
-        #[inline]
-        pub fn set_debug_label(&self)
-        {
-            todo!()
-            // self.debug_util_pf.unwrap().cmd_begin_debug_utils_label()
-        }
-
         #[inline]
         pub fn create_image<S>(
             &self,
@@ -637,8 +618,9 @@ mod _impl_tools
             }
         }
 
+        // FIXME 为什么这里也有 submit
         #[inline]
-        pub fn queue_submit(&self, queue: &RhiQueue, batches: Vec<RhiSubmitBatch>, fence: Option<RhiFence>)
+        pub fn queue_submit(&self, queue: &RhiQueue, batches: Vec<RhiSubmitInfo>, fence: Option<RhiFence>)
         {
             unsafe {
                 // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
@@ -727,6 +709,43 @@ mod _impl_tools
             unsafe {
                 self.vk_device().update_descriptor_sets(writes, &[]);
             }
+        }
+    }
+}
+
+mod _impl_debug
+{
+    use ash::vk;
+
+    use crate::framework::rhi::Rhi;
+
+    impl Rhi
+    {
+        #[inline]
+        pub fn set_debug_name<T, S>(&self, handle: T, name: S)
+        where
+            T: vk::Handle + Copy,
+            S: AsRef<str>,
+        {
+            self.debug_utils.set_object_debug_name(handle, name);
+        }
+
+        #[inline]
+        pub fn graphics_queue_begin_label(&self, label: &str, color: glam::Vec4)
+        {
+            self.debug_utils.begin_queue_label(self.device.graphics_queue.vk_queue, label, color);
+        }
+
+        #[inline]
+        pub fn graphics_queue_end_label(&self)
+        {
+            self.debug_utils.end_queue_label(self.device.graphics_queue.vk_queue);
+        }
+
+        #[inline]
+        pub fn compute_queue_begin_label(&self, label: &str, color: glam::Vec4)
+        {
+            self.debug_utils.begin_queue_label(self.device.compute_queue.vk_queue, label, color);
         }
     }
 }

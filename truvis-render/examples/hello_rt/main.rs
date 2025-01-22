@@ -8,7 +8,7 @@ use truvis_render::{
             buffer::RhiBuffer,
             descriptor::RhiDescriptorBindings,
             pipeline::{RhiPipeline, RhiPipelineTemplate},
-            queue::RhiSubmitBatch,
+            queue::RhiSubmitInfo,
         },
         platform::window_system::WindowSystem,
         rendering::{render_context, render_context::RenderContext},
@@ -236,7 +236,7 @@ impl HelloRT
         cmd.end();
         rhi.graphics_queue().submit(
             rhi,
-            vec![RhiSubmitBatch {
+            vec![RhiSubmitInfo {
                 command_buffers: vec![cmd],
                 ..Default::default()
             }],

@@ -29,13 +29,13 @@ impl RhiDebugUtils
         }
     }
 
-    pub fn set_debug_name<T, S>(&self, handle: T, name: S)
+    #[inline]
+    pub fn set_object_debug_name<T, S>(&self, handle: T, name: S)
     where
         T: vk::Handle + Copy,
         S: AsRef<str>,
     {
-        let name = if name.as_ref().is_empty() { "empty-debug-name" } else { name.as_ref() };
-        let name = CString::new(name).unwrap();
+        let name = CString::new(name.as_ref()).unwrap();
         unsafe {
             self.vk_debug_utils_device
                 .set_debug_utils_object_name(
@@ -45,35 +45,82 @@ impl RhiDebugUtils
         }
     }
 
-    pub fn cmd_begin_label<S>(&self, command_buffer: vk::CommandBuffer, name: S, color: glam::Vec4)
+    #[inline]
+    pub fn set_object_debug_tag<T>(&self, handle: T, tag: u64)
+    where
+        T: vk::Handle + Copy,
+    {
+        todo!("暂时还不知道这个有什么作用")
+    }
+
+    #[inline]
+    pub fn cmd_begin_debug_label<S>(&self, command_buffer: vk::CommandBuffer, label_name: S, label_color: glam::Vec4)
     where
         S: AsRef<str>,
     {
-        let name = CString::new(name.as_ref()).unwrap();
+        let name = CString::new(label_name.as_ref()).unwrap();
         unsafe {
             self.vk_debug_utils_device.cmd_begin_debug_utils_label(
                 command_buffer,
-                &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(color.into()),
+                &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(label_color.into()),
             );
         }
     }
 
-    pub fn cmd_end_label(&self, command_buffer: vk::CommandBuffer)
+    #[inline]
+    pub fn cmd_end_debug_label(&self, command_buffer: vk::CommandBuffer)
     {
         unsafe {
             self.vk_debug_utils_device.cmd_end_debug_utils_label(command_buffer);
         }
     }
 
-    pub fn cmd_insert_label<S>(&self, command_buffer: vk::CommandBuffer, name: S, color: glam::Vec4)
+    #[inline]
+    pub fn cmd_insert_debug_label<S>(&self, command_buffer: vk::CommandBuffer, label_name: S, label_color: glam::Vec4)
     where
         S: AsRef<str>,
     {
-        let name = CString::new(name.as_ref()).unwrap();
+        let name = CString::new(label_name.as_ref()).unwrap();
         unsafe {
             self.vk_debug_utils_device.cmd_insert_debug_utils_label(
                 command_buffer,
-                &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(color.into()),
+                &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(label_color.into()),
+            );
+        }
+    }
+
+    #[inline]
+    pub fn begin_queue_label<S>(&self, queue: vk::Queue, label_name: S, label_color: glam::Vec4)
+    where
+        S: AsRef<str>,
+    {
+        let name = CString::new(label_name.as_ref()).unwrap();
+        unsafe {
+            self.vk_debug_utils_device.queue_begin_debug_utils_label(
+                queue,
+                &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(label_color.into()),
+            );
+        }
+    }
+
+    #[inline]
+    pub fn end_queue_label(&self, queue: vk::Queue)
+    {
+        unsafe {
+            self.vk_debug_utils_device.queue_end_debug_utils_label(queue);
+        }
+    }
+
+    #[inline]
+    pub fn insert_queue_label<S>(&self, queue: vk::Queue, label_name: S, label_color: glam::Vec4)
+    where
+        S: AsRef<str>,
+    {
+        let name = CString::new(label_name.as_ref()).unwrap();
+        unsafe {
+            self.vk_debug_utils_device.queue_insert_debug_utils_label(
+                queue,
+                &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(label_color.into()),
             );
         }
     }

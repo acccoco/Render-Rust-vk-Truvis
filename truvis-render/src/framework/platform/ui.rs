@@ -7,9 +7,10 @@ use image::EncodableLayout;
 use imgui::TextureId;
 
 use crate::framework::{
+    basic::color::RED,
     core::{
-        buffer::RhiBuffer, command_buffer::RhiCommandBuffer, image::RhiImage2D, shader::RhiShaderModule,
-        texture::RhiTexture,
+        buffer::RhiBuffer, command_buffer::RhiCommandBuffer, image::RhiImage2D, queue::RhiSubmitInfo,
+        shader::RhiShaderModule, texture::RhiTexture,
     },
     rendering::render_context::RenderContext,
     rhi::Rhi,
@@ -27,10 +28,57 @@ pub struct UiMesh
 impl UiMesh
 {
     // TODO 频繁的创建和销毁 buffer，性能不好
-    pub fn from_draw_data(rhi: &'static Rhi, draw_data: &imgui::DrawData, cmd: &mut RhiCommandBuffer) -> Self
+    pub fn from_draw_data(rhi: &'static Rhi, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self
     {
-        let (vertex_buffer, vertex_cnt) = Self::create_vertices(rhi, draw_data, cmd);
-        let (index_buffer, index_cnt) = Self::create_indices(rhi, draw_data, cmd);
+        let (vertex_buffer, vertex_cnt, vertex_transfer_cmd) = Self::create_vertices(rhi, render_ctx, draw_data);
+        let (index_buffer, index_cnt, index_transfer_cmd) = Self::create_indices(rhi, render_ctx, draw_data);
+
+        let mut barrier_cmd = render_ctx.alloc_command_buffer("uipass-mesh-transfer-barrier");
+        barrier_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        barrier_cmd.begin_label("uipass-mesh-transfer-barrier", RED);
+        {
+            barrier_cmd.buffer_memory_barrier(
+                vk::DependencyFlags::empty(),
+                &[vk::BufferMemoryBarrier2::default()
+                    .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                    .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER | vk::PipelineStageFlags2::INDEX_INPUT)
+                    .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                    .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                    .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .buffer(index_buffer.handle)
+                    .offset(0)
+                    .size(vk::WHOLE_SIZE)],
+            );
+
+            barrier_cmd.buffer_memory_barrier(
+                vk::DependencyFlags::empty(),
+                &[vk::BufferMemoryBarrier2::default()
+                    .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
+                    .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER | vk::PipelineStageFlags2::VERTEX_INPUT)
+                    .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                    .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                    .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .buffer(vertex_buffer.handle)
+                    .offset(0)
+                    .size(vk::WHOLE_SIZE)],
+            );
+        }
+        barrier_cmd.end_label();
+        barrier_cmd.end();
+
+        render_ctx.submit_to_graphics(RhiSubmitInfo {
+            command_buffers: vec![vertex_transfer_cmd, index_transfer_cmd],
+            ..Default::default()
+        });
+
+        render_ctx.submit_to_graphics(RhiSubmitInfo {
+            command_buffers: vec![barrier_cmd],
+            ..Default::default()
+        });
+
+
         Self {
             vertex: vertex_buffer,
             vertex_count: vertex_cnt,
@@ -41,8 +89,11 @@ impl UiMesh
 
     /// # Return
     /// (vertices buffer, vertex count)
-    fn create_vertices(rhi: &'static Rhi, draw_data: &imgui::DrawData, cmd: &mut RhiCommandBuffer)
-        -> (RhiBuffer, usize)
+    fn create_vertices(
+        rhi: &'static Rhi,
+        render_ctx: &mut RenderContext,
+        draw_data: &imgui::DrawData,
+    ) -> (RhiBuffer, usize, RhiCommandBuffer)
     {
         let vertex_count = draw_data.total_vtx_count as usize;
         let mut vertices = Vec::with_capacity(vertex_count);
@@ -52,43 +103,39 @@ impl UiMesh
 
         let vertices_size = vertex_count * std::mem::size_of::<imgui::DrawVert>();
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, vertices_size, "imgui-vertex-buffer");
+        let mut cmd = render_ctx.alloc_command_buffer("uipass-vertex-buffer-transfer");
         {
             // FIXME destroy stage buffer
             let mut stage_buffer =
                 RhiBuffer::new_stage_buffer(rhi, vertices_size as vk::DeviceSize, "imgui-vertex-stage-buffer");
             stage_buffer.transfer_data_by_mem_map(&vertices);
 
-            cmd.copy_buffer(
-                &stage_buffer,
-                &mut vertex_buffer,
-                &[vk::BufferCopy {
-                    size: vertices_size as vk::DeviceSize,
-                    ..Default::default()
-                }],
-            );
-
-            cmd.buffer_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[vk::BufferMemoryBarrier2::default()
-                    .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
-                    .dst_stage_mask(vk::PipelineStageFlags2::VERTEX_INPUT)
-                    .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
-                    .dst_access_mask(vk::AccessFlags2::VERTEX_ATTRIBUTE_READ)
-                    .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                    .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                    .buffer(vertex_buffer.handle)
-                    .offset(0)
-                    .size(vk::WHOLE_SIZE)],
-            );
+            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+            cmd.begin_label("uipass-vertex-buffer-transfer", RED);
+            {
+                cmd.copy_buffer(
+                    &stage_buffer,
+                    &mut vertex_buffer,
+                    &[vk::BufferCopy {
+                        size: vertices_size as vk::DeviceSize,
+                        ..Default::default()
+                    }],
+                );
+            }
+            cmd.end_label();
+            cmd.end();
         }
 
-        (vertex_buffer, vertex_count)
+        (vertex_buffer, vertex_count, cmd)
     }
 
     /// # Return
     /// (index buffer, index count)
-    fn create_indices(rhi: &'static Rhi, draw_data: &imgui::DrawData, cmd: &mut RhiCommandBuffer)
-        -> (RhiBuffer, usize)
+    fn create_indices(
+        rhi: &'static Rhi,
+        render_ctx: &mut RenderContext,
+        draw_data: &imgui::DrawData,
+    ) -> (RhiBuffer, usize, RhiCommandBuffer)
     {
         let index_count = draw_data.total_idx_count as usize;
         let mut indices = Vec::with_capacity(index_count);
@@ -98,37 +145,30 @@ impl UiMesh
 
         let indices_size = index_count * std::mem::size_of::<imgui::DrawIdx>();
         let mut index_buffer = RhiBuffer::new_index_buffer(rhi, indices_size, "imgui-index-buffer");
+        let mut cmd = render_ctx.alloc_command_buffer("uipass-index-buffer-transfer");
         {
             // FIXME destroy stage buffer
             let mut stage_buffer =
                 RhiBuffer::new_stage_buffer(rhi, indices_size as vk::DeviceSize, "imgui-index-stage-buffer");
             stage_buffer.transfer_data_by_mem_map(&indices);
 
-            cmd.copy_buffer(
-                &stage_buffer,
-                &mut index_buffer,
-                &[vk::BufferCopy {
-                    size: indices_size as vk::DeviceSize,
-                    ..Default::default()
-                }],
-            );
-
-            cmd.buffer_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[vk::BufferMemoryBarrier2::default()
-                    .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
-                    .dst_stage_mask(vk::PipelineStageFlags2::VERTEX_INPUT)
-                    .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
-                    .dst_access_mask(vk::AccessFlags2::INDEX_READ)
-                    .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                    .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                    .buffer(index_buffer.handle)
-                    .offset(0)
-                    .size(vk::WHOLE_SIZE)],
-            );
+            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+            cmd.begin_label("uipass-index-buffer-transfer", RED);
+            {
+                cmd.copy_buffer(
+                    &stage_buffer,
+                    &mut index_buffer,
+                    &[vk::BufferCopy {
+                        size: indices_size as vk::DeviceSize,
+                        ..Default::default()
+                    }],
+                );
+            }
+            cmd.end_label();
+            cmd.end();
         }
 
-        (index_buffer, index_count)
+        (index_buffer, index_count, cmd)
     }
 
     fn destroy(mut self)
@@ -255,13 +295,17 @@ impl UI
         }
 
         let frame_index = render_ctx.current_frame_index();
-        let mut cmd = render_ctx.alloc_command_buffer("imgui-render");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
-        if let Some(mesh) = self.meshes[frame_index].replace(UiMesh::from_draw_data(rhi, draw_data, &mut cmd)) {
+        // TODO 这里需要标注一下名称，每个 tick 都会重新建立 vertex buffer
+        if let Some(mesh) = self.meshes[frame_index].replace(UiMesh::from_draw_data(rhi, render_ctx, draw_data)) {
             mesh.destroy()
         }
+
+        let mut cmd = render_ctx.alloc_command_buffer("uipass-render");
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        cmd.begin_label("[uipass]draw", RED);
         self.record_cmd(render_ctx, &mut cmd, self.meshes[frame_index].as_ref().unwrap(), draw_data);
+        cmd.end_label();
         cmd.end();
 
         Some(cmd)

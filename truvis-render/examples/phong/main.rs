@@ -5,11 +5,12 @@ use imgui::Ui;
 use itertools::Itertools;
 use truvis_render::{
     framework::{
+        basic::color::BLUE,
         core::{
             buffer::RhiBuffer,
             descriptor::{RhiDescriptorBindings, RhiDescriptorLayout, RhiDescriptorSet},
             pipeline::{RhiPipeline, RhiPipelineTemplate},
-            queue::RhiSubmitBatch,
+            queue::RhiSubmitInfo,
         },
         rendering::render_context::RenderContext,
         rhi::Rhi,
@@ -250,7 +251,7 @@ impl PhongApp
     fn create_vertices(rhi: &'static Rhi) -> RhiBuffer
     {
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&BOX), "vertex-buffer");
-        vertex_buffer.transfer_data_by_stage_buffer(&BOX);
+        vertex_buffer.transfer_data_by_stage_buffer(&BOX, "[phong-pass][init]transfer-vertex-data");
 
         vertex_buffer
     }
@@ -399,8 +400,9 @@ impl App for PhongApp
             &depth_attach,
         );
 
-        let mut cmd = RenderContext::alloc_command_buffer(render_context, "render");
+        let mut cmd = RenderContext::alloc_command_buffer(render_context, "[main-pass]render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        cmd.begin_label("phong-pass-draw", BLUE);
         {
             cmd.cmd_begin_rendering(&render_info);
             cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
@@ -446,15 +448,13 @@ impl App for PhongApp
 
             cmd.end_rendering();
         }
+        cmd.end_label();
         cmd.end();
-        rhi.graphics_queue().submit(
-            rhi,
-            vec![RhiSubmitBatch {
-                command_buffers: vec![cmd],
-                ..Default::default()
-            }],
-            None,
-        );
+
+        render_context.submit_to_graphics(RhiSubmitInfo {
+            command_buffers: vec![cmd],
+            ..Default::default()
+        });
     }
 
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self

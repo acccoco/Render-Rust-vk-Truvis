@@ -6,7 +6,7 @@ use truvis_render::{
         core::{
             buffer::RhiBuffer,
             pipeline::{RhiPipeline, RhiPipelineTemplate},
-            queue::RhiSubmitBatch,
+            queue::RhiSubmitInfo,
         },
         rendering::render_context::RenderContext,
         rhi::Rhi,
@@ -187,7 +187,7 @@ impl ShaderToy
         cmd.end();
         rhi.graphics_queue().submit(
             rhi,
-            vec![RhiSubmitBatch {
+            vec![RhiSubmitInfo {
                 command_buffers: vec![cmd],
                 ..Default::default()
             }],
