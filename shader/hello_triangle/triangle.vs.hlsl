@@ -1,5 +1,3 @@
-/// 结构体名称没有特殊限制
-/// 输入 semantic 是必要的
 struct VsInput
 {
     [[vk::location(0)]]
@@ -11,7 +9,6 @@ struct VsInput
 
 struct VsOutput
 {
-    /// 这个 SV_ 表示 builtin 的变量
     float4 Pos : SV_POSITION;
 
     [[vk::location(0)]]
