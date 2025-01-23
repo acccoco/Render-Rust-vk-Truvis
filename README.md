@@ -23,3 +23,17 @@ TODO
 
 * object name：`[frame-A-id][pass]name`
 * queue label/cmd label：`[frame-A-id][pass]name`
+
+# 坐标系
+
+Right-Handed, Y-Up
+
+已知 Blender 的坐标系是：Right-Handed, Z-Up
+
+从当前应用到 Blender，需要：
+
+```shell  
+x_blender = x
+y_blender = -z
+z_blender = y
+```

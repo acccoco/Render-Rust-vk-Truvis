@@ -40,6 +40,8 @@ cbuffer MeshUBO
     float4x4 trans_inv_model;
 };
 
+#include "phong.hlsl.inc"
+
 VsOutput main(VsInput input)
 {
     VsOutput output = (VsOutput)0;

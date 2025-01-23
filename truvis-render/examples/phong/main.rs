@@ -1,6 +1,6 @@
 mod data;
 
-use std::fmt::format;
+use std::{fmt::format, mem::offset_of};
 
 use ash::vk;
 use imgui::Ui;
@@ -88,11 +88,15 @@ struct PhongAppDescriptorSets
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 struct SceneUBO
 {
     light_pos: glam::Vec3,
+    light_pos_padding__: i32,
+
     light_color: glam::Vec3,
+    light_color_padding__: i32,
+
     projection: glam::Mat4,
     view: glam::Mat4,
 }
@@ -115,11 +119,15 @@ struct MaterialUBO
 
 // TODO 考虑差分为 vertex 的和 fragment 的；
 #[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, Default)]
 struct PushConstant
 {
     camera_pos: glam::Vec3,
+    camera_pos_padding__: i32,
+
     camera_dir: glam::Vec3,
+    camera_dir_padding__: i32,
+
     frame_id: u32,
     delta_time_ms: f32,
     mouse_pos: glam::Vec2,
@@ -291,6 +299,11 @@ impl PhongApp
         *mesh_ubo_align = rhi.ubo_offset_align(size_of::<MeshUBO>() as vk::DeviceSize);
         *mat_ubo_align = rhi.ubo_offset_align(size_of::<MaterialUBO>() as vk::DeviceSize);
 
+        log::info!(
+            "size of SceneUBO: {}, offset of light color: {}",
+            size_of::<SceneUBO>(),
+            offset_of!(SceneUBO, light_color)
+        );
         let scene_buffer_ci = vk::BufferCreateInfo::default()
             .size(size_of::<SceneUBO>() as vk::DeviceSize * frames_in_flight as u64)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -515,13 +528,18 @@ impl App for PhongApp
         let vertex_buffer = Self::create_vertices(rhi);
 
         let mesh_trans = [
-            glam::Mat4::from_translation(glam::vec3(10f32, 0f32, 0f32)),
-            glam::Mat4::from_translation(glam::vec3(0f32, 10f32, 0f32)),
-            glam::Mat4::from_translation(glam::vec3(0f32, 10f32, 10f32)),
+            glam::Mat4::from_translation(glam::vec3(10.0, 0.0, 0.0)),
+            glam::Mat4::from_translation(glam::vec3(0.0, 10.0, 0.0)),
+            glam::Mat4::from_translation(glam::vec3(0.0, 10.0, 10.0)),
+            glam::Mat4::from_translation(glam::vec3(0.0, 0.0, 0.0)),
         ];
 
-        let camera_pos = glam::vec3(10f32, 10f32, 10f32);
-        let camera_dir = glam::vec3(-1f32, -1f32, -1f32);
+        let camera_pos = glam::vec3(20.0, 0.0, 0.0);
+        let camera_dir = glam::vec3(-1.0, 0.0, 0.0);
+
+        // vulkan NDC 是 X-Right, Y-Up 的，framebuffer 的起点又是左上角，需要翻转 Y 轴
+        let mut projection = glam::Mat4::perspective_infinite_rh(90f32.to_radians(), 1.0, 0.1);
+        projection.y_axis.y *= -1.0;
 
         Self {
             descriptor_set_layouts: layouts,
@@ -542,10 +560,11 @@ impl App for PhongApp
                 color: glam::Vec4::new(1.0, 0.0, 0.0, 1.0),
             }],
             scene_ubo: SceneUBO {
-                light_pos: glam::vec3(20f32, 40f32, -20f32),
-                light_color: glam::vec3(1f32, 1f32, 1f32),
-                projection: glam::Mat4::perspective_infinite_rh(90f32.to_radians(), 1f32, 0.1f32),
+                light_pos: glam::vec3(20.0, 40.0, -20.0),
+                light_color: glam::vec3(0.5, 0.6, 0.8),
+                projection,
                 view: glam::Mat4::look_to_rh(camera_pos, camera_dir, glam::vec3(0.0, 1.0, 0.0)),
+                ..Default::default()
             },
             push: PushConstant {
                 camera_pos,
@@ -556,6 +575,7 @@ impl App for PhongApp
                 resolution: Default::default(),
                 time_ms: 0.0,
                 fps: 0.0,
+                ..Default::default()
             },
         }
     }
