@@ -79,9 +79,9 @@ impl Default for RhiPipelineTemplate
                 .rasterizer_discard_enable(false)
                 .polygon_mode(vk::PolygonMode::FILL)
                 .line_width(1.0)
-                .cull_mode(vk::CullModeFlags::NONE)
+                .cull_mode(vk::CullModeFlags::BACK)
                 // FIXME 背面剔除，会涉及到 vulkan 的投影矩阵
-                .front_face(vk::FrontFace::CLOCKWISE)
+                .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
                 .depth_bias_enable(false),
             msaa_sample: vk::SampleCountFlags::TYPE_1,
             enable_sample_shading: false,

@@ -26,6 +26,7 @@ TODO
 
 # 坐标系
 
+* model space: Right-Handed, Y-Up
 * world: Right-Handed, Y-Up
 * camera: 右手，Y-Up。相机朝向 -Z
 * clip：x 和相机保持一直，y 和相机相反（朝下）

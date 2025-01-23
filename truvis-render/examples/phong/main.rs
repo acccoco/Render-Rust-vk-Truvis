@@ -24,7 +24,7 @@ use truvis_render::{
     run::{run, App},
 };
 
-use crate::data::{Vertex, BOX};
+use crate::data::{ShapeBox, Vertex};
 
 struct SceneDescriptorBinding;
 impl RhiDescriptorBindings for SceneDescriptorBinding
@@ -62,7 +62,7 @@ impl RhiDescriptorBindings for MaterialDescriptorBinding
                 .binding(0)
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
                 .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT),
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
             // vk::DescriptorSetLayoutBinding::default()
             //     .binding(1)
             //     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
@@ -87,18 +87,28 @@ struct PhongAppDescriptorSets
     material_set: RhiDescriptorSet<MaterialDescriptorBinding>,
 }
 
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+struct Light
+{
+    pos: glam::Vec3,
+    pos_padding__: i32,
+
+    color: glam::Vec3,
+    color_padding__: i32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 struct SceneUBO
 {
-    light_pos: glam::Vec3,
-    light_pos_padding__: i32,
-
-    light_color: glam::Vec3,
-    light_color_padding__: i32,
-
     projection: glam::Mat4,
     view: glam::Mat4,
+
+    l1: Light,
+    l2: Light,
+    l3: Light,
 }
 
 #[repr(C)]
@@ -277,8 +287,9 @@ impl PhongApp
 
     fn create_vertices(rhi: &'static Rhi) -> RhiBuffer
     {
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&BOX), "phong-vertex-buffer");
-        vertex_buffer.transfer_data_by_stage_buffer(&BOX, "[phong-pass][init]transfer-vertex-data");
+        let mut vertex_buffer =
+            RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&ShapeBox::VERTICES), "phong-vertex-buffer");
+        vertex_buffer.transfer_data_by_stage_buffer(&ShapeBox::VERTICES, "[phong-pass][init]transfer-vertex-data");
 
         vertex_buffer
     }
@@ -299,11 +310,6 @@ impl PhongApp
         *mesh_ubo_align = rhi.ubo_offset_align(size_of::<MeshUBO>() as vk::DeviceSize);
         *mat_ubo_align = rhi.ubo_offset_align(size_of::<MaterialUBO>() as vk::DeviceSize);
 
-        log::info!(
-            "size of SceneUBO: {}, offset of light color: {}",
-            size_of::<SceneUBO>(),
-            offset_of!(SceneUBO, light_color)
-        );
         let scene_buffer_ci = vk::BufferCreateInfo::default()
             .size(size_of::<SceneUBO>() as vk::DeviceSize * frames_in_flight as u64)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -488,7 +494,7 @@ impl App for PhongApp
                     &[self.descriptor_sets[frame_id].mesh_set.descriptor_set],
                     &[(self.mesh_ubo_offset_align * mesh_idx as u64) as u32],
                 );
-                cmd.draw((BOX.len() / 8) as u32, 1, 0, 0);
+                cmd.draw(ShapeBox::VERTICES.len() as u32, 1, 0, 0);
             }
 
             cmd.end_rendering();
@@ -527,12 +533,16 @@ impl App for PhongApp
             Self::create_uniform_buffers(rhi, render_context, 3, &mut mesh_ubo_offset_align, &mut mat_ubo_offset_align);
         let vertex_buffer = Self::create_vertices(rhi);
 
+        let rot =
+            glam::Mat4::from_euler(glam::EulerRot::XYZ, 30f32.to_radians(), 40f32.to_radians(), 50f32.to_radians());
         let mesh_trans = [
-            glam::Mat4::from_translation(glam::vec3(10.0, 0.0, 0.0)),
-            glam::Mat4::from_translation(glam::vec3(0.0, 10.0, 0.0)),
-            glam::Mat4::from_translation(glam::vec3(0.0, 10.0, 10.0)),
-            glam::Mat4::from_translation(glam::vec3(0.0, 0.0, 0.0)),
+            glam::Mat4::from_translation(glam::vec3(10.0, 0.0, 0.0)) * rot,
+            glam::Mat4::from_translation(glam::vec3(0.0, 10.0, 0.0)) * rot,
+            glam::Mat4::from_translation(glam::vec3(0.0, 15.0, 10.0)),
+            glam::Mat4::from_translation(glam::vec3(0.0, 0.0, 0.0)) * rot,
+            glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
+
 
         let camera_pos = glam::vec3(20.0, 0.0, 0.0);
         let camera_dir = glam::vec3(-1.0, 0.0, 0.0);
@@ -560,10 +570,23 @@ impl App for PhongApp
                 color: glam::Vec4::new(1.0, 0.0, 0.0, 1.0),
             }],
             scene_ubo: SceneUBO {
-                light_pos: glam::vec3(20.0, 40.0, -20.0),
-                light_color: glam::vec3(0.5, 0.6, 0.8),
                 projection,
                 view: glam::Mat4::look_to_rh(camera_pos, camera_dir, glam::vec3(0.0, 1.0, 0.0)),
+                l1: Light {
+                    pos: glam::vec3(-20.0, 40.0, 0.0),
+                    color: glam::vec3(5.0, 6.0, 1.0) * 2.0,
+                    ..Default::default()
+                },
+                l2: Light {
+                    pos: glam::vec3(40.0, 40.0, -30.0),
+                    color: glam::vec3(1.0, 6.0, 7.0) * 3.0,
+                    ..Default::default()
+                },
+                l3: Light {
+                    pos: glam::vec3(40.0, 40.0, 30.0),
+                    color: glam::vec3(5.0, 1.0, 8.0) * 3.0,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             push: PushConstant {

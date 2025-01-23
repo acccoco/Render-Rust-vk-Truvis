@@ -24,13 +24,23 @@ struct VsOutput
     float2 uv : ACC_2;
 };
 
+struct Light
+{
+    float3 pos;
+    float pos_padding__;
+    float3 color;
+    float color_padding__;
+};
+
 [[vk::binding(0, 0)]]
 cbuffer SceneUBO
 {
-    float3 light_pos;
-    float3 light_color;
     float4x4 projection;
     float4x4 view;
+
+    Light light_1;
+    Light light_2;
+    Light light_3;
 };
 
 [[vk::binding(0, 1)]]
