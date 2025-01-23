@@ -26,7 +26,14 @@ TODO
 
 # 坐标系
 
-Right-Handed, Y-Up
+* world: Right-Handed, Y-Up
+* camera: 右手，Y-Up。相机朝向 -Z
+* clip：x 和相机保持一直，y 和相机相反（朝下）
+* framebuffer：顶点在左上角。深度 0-1，0 在最远处，1 在最近处
+
+![坐标系](doc/img/coords.png)
+
+注：背面剔除的时机：基于 framebuffer 中的三角形的顶点顺序。
 
 已知 Blender 的坐标系是：Right-Handed, Z-Up
 

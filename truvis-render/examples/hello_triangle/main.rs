@@ -128,10 +128,7 @@ impl HelloTriangle
             cmd.end_rendering();
         }
         cmd.end();
-        render_context.submit_to_graphics(RhiSubmitInfo {
-            command_buffers: vec![cmd],
-            ..Default::default()
-        });
+        rhi.graphics_queue_submit_cmds(vec![cmd]);
     }
 
     fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self

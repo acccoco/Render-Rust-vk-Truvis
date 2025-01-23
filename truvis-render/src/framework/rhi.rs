@@ -529,6 +529,7 @@ mod _impl_tools
 
     use crate::framework::{
         core::{
+            command_buffer::RhiCommandBuffer,
             command_pool::RhiCommandPool,
             queue::{RhiQueue, RhiSubmitInfo},
             synchronize::RhiFence,
@@ -618,6 +619,18 @@ mod _impl_tools
             }
         }
 
+
+        #[inline]
+        pub fn graphics_queue_submit_cmds(&self, infos: Vec<RhiCommandBuffer>)
+        {
+            let cmds = infos.iter().map(|c| c.command_buffer).collect_vec();
+            let submit_info = vk::SubmitInfo::default().command_buffers(&cmds);
+            unsafe {
+                self.vk_device()
+                    .queue_submit(self.graphics_queue().vk_queue, std::slice::from_ref(&submit_info), vk::Fence::null())
+                    .unwrap()
+            }
+        }
 
         #[inline]
         pub fn graphics_queue_submit(&self, infos: Vec<RhiSubmitInfo>, fence: Option<RhiFence>)
