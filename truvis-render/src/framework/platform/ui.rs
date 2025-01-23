@@ -230,8 +230,12 @@ impl UI
         let (mut imgui, platform) = Self::create_imgui(window);
 
         let descriptor_set_layout = Self::create_descriptor_set(&rhi.device.device);
+        rhi.set_debug_name(descriptor_set_layout, "[uipass]descriptor-set-layout");
         let pipeline_layout = Self::create_pipeline_layout(&rhi.device.device, descriptor_set_layout);
+        rhi.set_debug_name(pipeline_layout, "[uipass]pipeline-layout");
         let pipeline = Self::create_pipeline(rhi, render_ctx, pipeline_layout);
+        rhi.set_debug_name(pipeline, "[uipass]pipeline");
+        
 
         let fonts_texture = {
             let fonts = imgui.fonts();
@@ -265,6 +269,7 @@ impl UI
                 .descriptor_pool(descriptor_pool)
                 .set_layouts(std::slice::from_ref(&descriptor_set_layout)),
         )[0];
+        rhi.set_debug_name(descriptor_set, "[uipass]descriptor");
 
         // write
         {

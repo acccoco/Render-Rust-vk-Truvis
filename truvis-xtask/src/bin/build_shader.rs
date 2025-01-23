@@ -136,12 +136,10 @@ impl ShaderCompileEntry
         let entry_point = "main";
         let mut cmd = std::process::Command::new("dxc");
         cmd.arg("-spirv")
-            .arg("-T")
-            .arg(format!("{}_{}", shader_stage_tag, shader_model))
+            .args(["-T", format!("{}_{}", shader_stage_tag, shader_model).as_str()])
             .arg("-Zi") // 包含 debug 信息
             // .arg("-Zpc") // col-major
-            .arg("-E")
-            .arg(entry_point)
+            .args(["-E", entry_point])
             .arg(self.shader_path.as_os_str())
             .arg("-Fo")
             .arg(self.output_path.as_os_str());

@@ -24,12 +24,13 @@ impl<T> RhiDescriptorLayout<T>
 where
     T: RhiDescriptorBindings,
 {
-    pub fn new(rhi: &Rhi) -> Self
+    pub fn new(rhi: &Rhi, debug_name: &str) -> Self
     {
         let bindings = T::bindings();
         let create_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
 
         let layout = unsafe { rhi.vk_device().create_descriptor_set_layout(&create_info, None).unwrap() };
+        rhi.set_debug_name(layout, debug_name);
         Self {
             layout,
             phantom_data: std::marker::PhantomData,
@@ -54,13 +55,14 @@ impl<T> RhiDescriptorSet<T>
 where
     T: RhiDescriptorBindings,
 {
-    pub fn new(rhi: &Rhi, layout: &RhiDescriptorLayout<T>) -> Self
+    pub fn new(rhi: &Rhi, layout: &RhiDescriptorLayout<T>, debug_name: &str) -> Self
     {
         unsafe {
             let alloc_info = vk::DescriptorSetAllocateInfo::default()
                 .descriptor_pool(rhi.descriptor_pool)
                 .set_layouts(std::slice::from_ref(&layout.layout));
             let descriptor_set = rhi.vk_device().allocate_descriptor_sets(&alloc_info).unwrap()[0];
+            rhi.set_debug_name(descriptor_set, debug_name);
             Self {
                 descriptor_set,
                 phantom_data: std::marker::PhantomData,

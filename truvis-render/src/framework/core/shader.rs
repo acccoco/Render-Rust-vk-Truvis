@@ -19,6 +19,7 @@ impl RhiShaderModule
 
         unsafe {
             let shader_module = rhi.vk_device().create_shader_module(&shader_module_info, None).unwrap();
+            rhi.set_debug_name(shader_module, path.to_str().unwrap());
             Self {
                 handle: shader_module,
                 rhi,

@@ -1,5 +1,7 @@
 mod data;
 
+use std::fmt::format;
+
 use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
@@ -166,9 +168,10 @@ impl PhongApp
         frames_in_flight: usize,
     ) -> (PhongAppDescriptorSetLayouts, Vec<PhongAppDescriptorSets>)
     {
-        let scene_descriptor_set_layout = RhiDescriptorLayout::<SceneDescriptorBinding>::new(rhi);
-        let mesh_descriptor_set_layout = RhiDescriptorLayout::<MeshDescriptorBinding>::new(rhi);
-        let material_descriptor_set_layout = RhiDescriptorLayout::<MaterialDescriptorBinding>::new(rhi);
+        let scene_descriptor_set_layout = RhiDescriptorLayout::<SceneDescriptorBinding>::new(rhi, "phong-scene");
+        let mesh_descriptor_set_layout = RhiDescriptorLayout::<MeshDescriptorBinding>::new(rhi, "phong-mesh");
+        let material_descriptor_set_layout =
+            RhiDescriptorLayout::<MaterialDescriptorBinding>::new(rhi, "phong-material");
 
         let layouts = PhongAppDescriptorSetLayouts {
             scene_layout: scene_descriptor_set_layout,
@@ -177,10 +180,23 @@ impl PhongApp
         };
 
         let sets = (0..frames_in_flight)
-            .map(|_| PhongAppDescriptorSets {
-                scene_set: RhiDescriptorSet::<SceneDescriptorBinding>::new(rhi, &layouts.scene_layout),
-                mesh_set: RhiDescriptorSet::<MeshDescriptorBinding>::new(rhi, &layouts.mesh_layout),
-                material_set: RhiDescriptorSet::<MaterialDescriptorBinding>::new(rhi, &layouts.material_layout),
+            .map(|idx| FRAME_ID_MAP[idx])
+            .map(|tag| PhongAppDescriptorSets {
+                scene_set: RhiDescriptorSet::<SceneDescriptorBinding>::new(
+                    rhi,
+                    &layouts.scene_layout,
+                    &format!("phong-scene-{}", tag),
+                ),
+                mesh_set: RhiDescriptorSet::<MeshDescriptorBinding>::new(
+                    rhi,
+                    &layouts.mesh_layout,
+                    &format!("phong-mesh-{}", tag),
+                ),
+                material_set: RhiDescriptorSet::<MaterialDescriptorBinding>::new(
+                    rhi,
+                    &layouts.material_layout,
+                    &format!("phong-material-{}", tag),
+                ),
             })
             .collect_vec();
 
@@ -246,7 +262,7 @@ impl PhongApp
                 .color_write_mask(vk::ColorComponentFlags::RGBA)],
             ..Default::default()
         }
-        .create_pipeline(rhi, "");
+        .create_pipeline(rhi, "phong");
 
         pipeline
     }
