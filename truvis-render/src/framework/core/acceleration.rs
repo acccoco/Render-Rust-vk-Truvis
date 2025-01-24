@@ -164,7 +164,7 @@ impl RhiAcceleration
             std::mem::size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name),
         );
-        acceleration_instance_buffer.transfer_data_by_stage_buffer(instances, "acceleration-instance-buffer");
+        acceleration_instance_buffer.transfer_data_by_stage_buffer(instances);
 
         let geometry = vk::AccelerationStructureGeometryKHR {
             geometry_type: vk::GeometryTypeKHR::INSTANCES,

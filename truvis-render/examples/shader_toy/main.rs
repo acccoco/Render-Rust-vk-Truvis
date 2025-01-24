@@ -1,6 +1,7 @@
+use std::mem::offset_of;
+
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
-use memoffset::offset_of;
 use truvis_render::{
     framework::{
         core::{
@@ -80,7 +81,7 @@ impl ShaderToy
 {
     fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
     {
-        let mut index_buffer = RhiBuffer::new_index_buffer(rhi,size_of_val(&INDEX_DATA), "index-buffer");
+        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, size_of_val(&INDEX_DATA), "index-buffer");
         index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
 
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, size_of_val(&VERTEX_DATA), "vertex-buffer");
@@ -95,9 +96,9 @@ impl ShaderToy
         let push_constant_ranges = vec![vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::ALL,
             offset: 0,
-            size: std::mem::size_of::<PushConstants>() as u32,
+            size: size_of::<PushConstants>() as u32,
         }];
-        let pipeline = RhiPipelineTemplate {
+        RhiPipelineTemplate {
             vertex_shader_path: Some("shader/shadertoy-glsl/shadertoy.vert.spv".into()),
             fragment_shader_path: Some("shader/shadertoy-glsl/shadertoy.frag.spv".into()),
             color_formats: vec![render_context.color_format()],
@@ -136,9 +137,7 @@ impl ShaderToy
                 .color_write_mask(vk::ColorComponentFlags::RGBA)],
             ..Default::default()
         }
-        .create_pipeline(rhi, "");
-
-        pipeline
+        .create_pipeline(rhi, "shadertoy")
     }
 
     fn run(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
@@ -173,7 +172,7 @@ impl ShaderToy
         );
 
         let mut cmd = render_context.alloc_command_buffer("render");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.push_constants(&self.pipeline, vk::ShaderStageFlags::ALL, 0, bytemuck::bytes_of(&push_constants));
 
@@ -212,10 +211,15 @@ impl ShaderToy
 
 impl App for ShaderToy
 {
-    fn udpate_ui(&self, ui: &mut imgui::Ui)
+    fn udpate_ui(&mut self, ui: &mut imgui::Ui)
     {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
+    }
+
+    fn update(&mut self, _rhi: &'static Rhi, _render_context: &mut RenderContext, _timer: &Timer)
+    {
+        //
     }
 
     fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)

@@ -1,16 +1,12 @@
 mod data;
 
-use std::{fmt::format, mem::offset_of};
 
 use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
 use truvis_render::{
     framework::{
-        basic::{
-            color::{BLUE, GREEN},
-            FRAME_ID_MAP,
-        },
+        basic::{color::LabelColor, FRAME_ID_MAP},
         core::{
             buffer::RhiBuffer,
             descriptor::{RhiDescriptorBindings, RhiDescriptorLayout, RhiDescriptorSet},
@@ -228,7 +224,7 @@ impl PhongApp
     ) -> RhiPipeline
     {
         let extent = render_ctx.swapchain_extent();
-        let pipeline = RhiPipelineTemplate {
+        RhiPipelineTemplate {
             fragment_shader_path: Some("shader/phong/phong.ps.hlsl.spv".into()),
             vertex_shader_path: Some("shader/phong/phong.vs.hlsl.spv".into()),
 
@@ -237,7 +233,7 @@ impl PhongApp
             push_constant_ranges: vec![vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .offset(0)
-                .size(std::mem::size_of::<PushConstant>() as u32)],
+                .size(size_of::<PushConstant>() as u32)],
 
             color_formats: vec![render_ctx.color_format()],
             depth_format: render_ctx.depth_format(),
@@ -252,7 +248,7 @@ impl PhongApp
             scissor: Some(extent.into()),
             vertex_binding_desc: vec![vk::VertexInputBindingDescription {
                 binding: 0,
-                stride: std::mem::size_of::<Vertex>() as u32,
+                stride: size_of::<Vertex>() as u32,
                 input_rate: vk::VertexInputRate::VERTEX,
             }],
             vertex_attribute_desec: vec![
@@ -280,16 +276,14 @@ impl PhongApp
                 .color_write_mask(vk::ColorComponentFlags::RGBA)],
             ..Default::default()
         }
-        .create_pipeline(rhi, "phong");
-
-        pipeline
+        .create_pipeline(rhi, "phong")
     }
 
     fn create_vertices(rhi: &'static Rhi) -> RhiBuffer
     {
         let mut vertex_buffer =
-            RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&ShapeBox::VERTICES), "phong-vertex-buffer");
-        vertex_buffer.transfer_data_by_stage_buffer(&ShapeBox::VERTICES, "[phong-pass][init]transfer-vertex-data");
+            RhiBuffer::new_vertex_buffer(rhi, size_of_val(&ShapeBox::VERTICES), "[phong]vertex-buffer");
+        vertex_buffer.transfer_data_by_stage_buffer(&ShapeBox::VERTICES);
 
         vertex_buffer
     }
@@ -298,7 +292,6 @@ impl PhongApp
     /// material ubo 数量：32 个
     fn create_uniform_buffers(
         rhi: &'static Rhi,
-        render_ctx: &mut RenderContext,
         frames_in_flight: usize,
         mesh_ubo_align: &mut vk::DeviceSize,
         mat_ubo_align: &mut vk::DeviceSize,
@@ -424,17 +417,16 @@ impl App for PhongApp
         ui.text_wrapped("こんにちは世界！");
     }
 
-    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, _timer: &Timer)
     {
-        rhi.graphics_queue_begin_label("[main-pass]update", GREEN);
+        rhi.graphics_queue_begin_label("[main-pass]update", LabelColor::COLOR_PASS);
         {
-            let frame_id = render_context.current_frame_index();
             self.update_scene_uniform(rhi, render_context.current_frame_index());
         }
         rhi.graphics_queue_end_label();
     }
 
-    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _timer: &Timer)
     {
         let frame_id = render_context.current_frame_index();
 
@@ -449,11 +441,8 @@ impl App for PhongApp
             &depth_attach,
         );
 
-        rhi.graphics_queue_begin_label("[main-pass]draw", GREEN);
-
         let mut cmd = RenderContext::alloc_command_buffer(render_context, "[main-pass]render");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        cmd.begin_label("phong-pass-draw", BLUE);
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[phong-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);
             cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
@@ -486,7 +475,7 @@ impl App for PhongApp
             // index 和 vertex 暂且就用同一个
             cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
 
-            for (mesh_idx, mesh_ubo) in self.mesh_ubo.iter().enumerate() {
+            for (mesh_idx, _) in self.mesh_ubo.iter().enumerate() {
                 cmd.bind_descriptor_sets(
                     vk::PipelineBindPoint::GRAPHICS,
                     self.pipeline.pipeline_layout,
@@ -499,7 +488,6 @@ impl App for PhongApp
 
             cmd.end_rendering();
         }
-        cmd.end_label();
         cmd.end();
 
         rhi.graphics_queue_submit(
@@ -509,8 +497,6 @@ impl App for PhongApp
             }],
             None,
         );
-
-        rhi.graphics_queue_end_label();
     }
 
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
@@ -530,7 +516,7 @@ impl App for PhongApp
         let mut mesh_ubo_offset_align = 0;
         let mut mat_ubo_offset_align = 0;
         let uniform_buffers =
-            Self::create_uniform_buffers(rhi, render_context, 3, &mut mesh_ubo_offset_align, &mut mat_ubo_offset_align);
+            Self::create_uniform_buffers(rhi, 3, &mut mesh_ubo_offset_align, &mut mat_ubo_offset_align);
         let vertex_buffer = Self::create_vertices(rhi);
 
         let rot =
@@ -587,7 +573,6 @@ impl App for PhongApp
                     color: glam::vec3(5.0, 1.0, 8.0) * 3.0,
                     ..Default::default()
                 },
-                ..Default::default()
             },
             push: PushConstant {
                 camera_pos,

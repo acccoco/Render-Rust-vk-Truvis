@@ -50,10 +50,10 @@ impl HelloTriangle
     fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
     {
         let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA, "hello-triangle-create-index-buffer");
+        index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
 
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA, "hello-triangle-create-vertex-buffer");
+        vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }
@@ -118,7 +118,7 @@ impl HelloTriangle
         );
 
         let mut cmd = RenderContext::alloc_command_buffer(render_context, "render");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);
             cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);

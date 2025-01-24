@@ -758,11 +758,5 @@ mod _impl_debug
         {
             self.debug_utils.end_queue_label(self.device.graphics_queue.vk_queue);
         }
-
-        #[inline]
-        pub fn compute_queue_begin_label(&self, label: &str, color: glam::Vec4)
-        {
-            self.debug_utils.begin_queue_label(self.device.compute_queue.vk_queue, label, color);
-        }
     }
 }

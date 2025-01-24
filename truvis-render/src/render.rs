@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ash::vk;
 
 use crate::framework::{
-    basic::color::{GREEN, RED},
+    basic::color::LabelColor,
     core::{queue::RhiSubmitInfo, swapchain::RenderSwapchainInitInfo},
     platform::{
         ui::{UiOptions, UI},
@@ -147,9 +147,7 @@ impl Renderer
         self.window.render_loop(&mut self.ui, |ui| {
             self.timer.update();
 
-            rhi.graphics_queue_begin_label("[acquire-frame]", GREEN);
             self.render_context.acquire_frame();
-            rhi.graphics_queue_end_label();
 
             // TODO 优化一下这个执行顺序
             ui.platform.prepare_frame(ui.imgui.get_mut().io_mut(), self.window.window()).unwrap();
@@ -158,10 +156,12 @@ impl Renderer
 
             // FIXME 调整一下调用顺序
             // main pass
+            rhi.graphics_queue_begin_label("[main-pass]", LabelColor::COLOR_PASS);
             render_func(rhi, &mut self.render_context, &self.timer, frame);
+            rhi.graphics_queue_end_label();
 
             // ui pass
-            rhi.graphics_queue_begin_label("[ui-pass]draw", GREEN);
+            rhi.graphics_queue_begin_label("[ui-pass]", LabelColor::COLOR_PASS);
             {
                 // FIXME ui cmd 需要释放
                 ui.platform.prepare_render(frame, self.window.window());
@@ -170,8 +170,7 @@ impl Renderer
                 if let Some(ui_cmd) = ui_cmd {
                     // FIXME barrier cmd 也需要释放
                     let mut barrier_cmd = self.render_context.alloc_command_buffer("ui pipeline barrier");
-                    barrier_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-                    barrier_cmd.begin_label("[uipass]barrier", RED);
+                    barrier_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]color-attach-barrier");
                     {
                         barrier_cmd.image_memory_barrier(
                             vk::DependencyFlags::empty(),
@@ -191,7 +190,6 @@ impl Renderer
                                 )],
                         );
                     }
-                    barrier_cmd.end_label();
                     barrier_cmd.end();
 
                     rhi.graphics_queue_submit(
@@ -206,9 +204,7 @@ impl Renderer
             }
             rhi.graphics_queue_end_label();
 
-            rhi.graphics_queue_begin_label("[submit-frame]", GREEN);
             self.render_context.submit_frame();
-            rhi.graphics_queue_end_label();
         });
     }
 }

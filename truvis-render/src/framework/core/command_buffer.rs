@@ -1,6 +1,7 @@
 use ash::vk;
 
 use crate::framework::{
+    basic::color::LabelColor,
     core::{command_pool::RhiCommandPool, queue::RhiSubmitInfo},
     rhi::Rhi,
 };
@@ -59,7 +60,7 @@ impl RhiCommandBuffer
 
         let mut command_buffer = Self::new(rhi, pool, format!("one-time-{}", name));
 
-        command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, name);
         let result = f(&mut command_buffer);
         command_buffer.end();
 
@@ -86,7 +87,7 @@ impl RhiCommandBuffer
     }
 
     #[inline]
-    pub fn begin(&mut self, usage_flag: vk::CommandBufferUsageFlags)
+    pub fn begin(&mut self, usage_flag: vk::CommandBufferUsageFlags, label_name: &str)
     {
         unsafe {
             self.rhi
@@ -94,11 +95,13 @@ impl RhiCommandBuffer
                 .begin_command_buffer(self.command_buffer, &vk::CommandBufferBeginInfo::default().flags(usage_flag))
                 .unwrap();
         }
+        self.begin_label(label_name, LabelColor::COLOR_CMD);
     }
 
     #[inline]
     pub fn end(&mut self)
     {
+        self.end_label();
         unsafe { self.rhi.vk_device().end_command_buffer(self.command_buffer).unwrap() }
     }
 }
@@ -260,7 +263,7 @@ mod _status_cmd
     use ash::vk;
     use itertools::Itertools;
 
-    use crate::framework::core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, pipeline::RhiPipeline};
+    use crate::framework::core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer};
 
     // 状态设置命令
     impl RhiCommandBuffer
@@ -311,7 +314,7 @@ mod _status_cmd
 
 mod _sync_cmd
 {
-    use ash::{vk, vk::DependencyFlags};
+    use ash::vk;
 
     use crate::framework::core::command_buffer::RhiCommandBuffer;
 
@@ -365,7 +368,11 @@ mod _sync_cmd
         }
 
         #[inline]
-        pub fn image_memory_barrier(&mut self, dependency_flags: DependencyFlags, barriers: &[vk::ImageMemoryBarrier2])
+        pub fn image_memory_barrier(
+            &mut self,
+            dependency_flags: vk::DependencyFlags,
+            barriers: &[vk::ImageMemoryBarrier2],
+        )
         {
             let dependency_info =
                 vk::DependencyInfo::default().image_memory_barriers(barriers).dependency_flags(dependency_flags);
@@ -377,7 +384,7 @@ mod _sync_cmd
         #[inline]
         pub fn buffer_memory_barrier(
             &mut self,
-            dependency_flags: DependencyFlags,
+            dependency_flags: vk::DependencyFlags,
             barriers: &[vk::BufferMemoryBarrier2],
         )
         {
@@ -465,27 +472,19 @@ mod _other_cmd
         #[inline]
         pub fn begin_label(&mut self, label_name: &str, label_color: glam::Vec4)
         {
-            let name = std::ffi::CString::new(label_name).unwrap();
-            unsafe {
-                self.rhi.debug_utils.cmd_begin_debug_label(self.command_buffer, label_name, label_color);
-            }
+            self.rhi.debug_utils.cmd_begin_debug_label(self.command_buffer, label_name, label_color);
         }
 
         #[inline]
         pub fn end_label(&mut self)
         {
-            unsafe {
-                self.rhi.debug_utils.cmd_end_debug_label(self.command_buffer);
-            }
+            self.rhi.debug_utils.cmd_end_debug_label(self.command_buffer);
         }
 
         #[inline]
         pub fn insert_label(&mut self, label_name: &str, label_color: glam::Vec4)
         {
-            let name = std::ffi::CString::new(label_name).unwrap();
-            unsafe {
-                self.rhi.debug_utils.cmd_insert_debug_label(self.command_buffer, label_name, label_color);
-            }
+            self.rhi.debug_utils.cmd_insert_debug_label(self.command_buffer, label_name, label_color);
         }
     }
 }

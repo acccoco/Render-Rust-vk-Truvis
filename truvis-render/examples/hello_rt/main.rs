@@ -1,6 +1,6 @@
+use std::mem::offset_of;
+
 use ash::vk;
-use imgui::Ui;
-use memoffset::offset_of;
 use truvis_render::{
     framework::{
         core::{
@@ -10,11 +10,10 @@ use truvis_render::{
             pipeline::{RhiPipeline, RhiPipelineTemplate},
             queue::RhiSubmitInfo,
         },
-        platform::window_system::WindowSystem,
-        rendering::{render_context, render_context::RenderContext},
+        rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{AppInitInfo, Renderer, Timer},
+    render::{AppInitInfo, Timer},
     run::{run, App},
 };
 
@@ -94,10 +93,10 @@ impl HelloRT
 {
     fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
     {
-        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
+        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, size_of_val(&INDEX_DATA), "index-buffer");
         index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
 
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, size_of_val(&VERTEX_DATA), "vertex-buffer");
         vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
@@ -114,7 +113,7 @@ impl HelloRT
             vertex_data: vk::DeviceOrHostAddressConstKHR {
                 device_address: vertex_buffer.get_device_address(),
             },
-            vertex_stride: std::mem::size_of::<Vertex>() as u64,
+            vertex_stride: size_of::<Vertex>() as u64,
             max_vertex: VERTEX_DATA.len() as u32,
 
             index_type: vk::IndexType::UINT32,
@@ -167,7 +166,7 @@ impl HelloRT
     fn init_pipeline(rhi: &'static Rhi, render_context: &RenderContext) -> RhiPipeline
     {
         let extent = render_context.swapchain_extent();
-        let pipeline = RhiPipelineTemplate {
+        RhiPipelineTemplate {
             fragment_shader_path: Some("shader/hello_triangle/triangle.frag.spv".into()),
             vertex_shader_path: Some("shader/hello_triangle/triangle.vert.spv".into()),
             color_formats: vec![render_context.color_format()],
@@ -183,7 +182,7 @@ impl HelloRT
             scissor: Some(extent.into()),
             vertex_binding_desc: vec![vk::VertexInputBindingDescription {
                 binding: 0,
-                stride: std::mem::size_of::<Vertex>() as u32,
+                stride: size_of::<Vertex>() as u32,
                 input_rate: vk::VertexInputRate::VERTEX,
             }],
             vertex_attribute_desec: vec![
@@ -205,9 +204,7 @@ impl HelloRT
                 .color_write_mask(vk::ColorComponentFlags::RGBA)],
             ..Default::default()
         }
-        .create_pipeline(rhi, "");
-
-        pipeline
+        .create_pipeline(rhi, "rt")
     }
 
     fn run(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
@@ -224,7 +221,7 @@ impl HelloRT
         );
 
         let mut cmd = render_context.alloc_command_buffer("render");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);
             cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
@@ -264,13 +261,18 @@ impl HelloRT
 
 impl App for HelloRT
 {
-    fn udpate_ui(&self, ui: &mut Ui)
+    fn udpate_ui(&mut self, ui: &mut imgui::Ui)
     {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
     }
 
-    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    fn update(&mut self, _rhi: &'static Rhi, _render_context: &mut RenderContext, _timer: &Timer)
+    {
+        //
+    }
+
+    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _timer: &Timer)
     {
         self.run(rhi, render_context);
     }

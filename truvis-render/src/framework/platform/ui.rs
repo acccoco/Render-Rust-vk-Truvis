@@ -4,10 +4,9 @@ use std::{cell::RefCell, ffi::CString};
 
 use ash::vk;
 use image::EncodableLayout;
-use imgui::TextureId;
 
 use crate::framework::{
-    basic::{color::RED, FRAME_ID_MAP},
+    basic::color::LabelColor,
     core::{
         buffer::RhiBuffer, command_buffer::RhiCommandBuffer, image::RhiImage2D, queue::RhiSubmitInfo,
         shader::RhiShaderModule, texture::RhiTexture,
@@ -30,15 +29,14 @@ impl UiMesh
     // TODO 频繁的创建和销毁 buffer，性能不好
     pub fn from_draw_data(rhi: &'static Rhi, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self
     {
-        rhi.graphics_queue_begin_label("uipass-create-mesh", RED);
         let mut cmd = render_ctx.alloc_command_buffer("uipass-create-mesh");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]create-mesh");
 
         let (vertex_buffer, vertex_cnt) = Self::create_vertices(rhi, render_ctx, &mut cmd, draw_data);
         let (index_buffer, index_cnt) = Self::create_indices(rhi, render_ctx, &mut cmd, draw_data);
 
 
-        cmd.begin_label("uipass-mesh-transfer-barrier", RED);
+        cmd.begin_label("uipass-mesh-transfer-barrier", LabelColor::COLOR_CMD);
         {
             cmd.buffer_memory_barrier(
                 vk::DependencyFlags::empty(),
@@ -79,8 +77,6 @@ impl UiMesh
             None,
         );
 
-        rhi.graphics_queue_end_label();
-
         Self {
             vertex: vertex_buffer,
             vertex_count: vertex_cnt,
@@ -119,7 +115,7 @@ impl UiMesh
             );
             stage_buffer.transfer_data_by_mem_map(&vertices);
 
-            cmd.begin_label("uipass-vertex-buffer-transfer", RED);
+            cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
             {
                 cmd.copy_buffer(
                     &stage_buffer,
@@ -151,7 +147,7 @@ impl UiMesh
             indices.extend_from_slice(draw_list.idx_buffer());
         }
 
-        let indices_size = index_count * std::mem::size_of::<imgui::DrawIdx>();
+        let indices_size = index_count * size_of::<imgui::DrawIdx>();
         let mut index_buffer = RhiBuffer::new_index_buffer(
             rhi,
             indices_size,
@@ -166,7 +162,7 @@ impl UiMesh
             );
             stage_buffer.transfer_data_by_mem_map(&indices);
 
-            cmd.begin_label("uipass-index-buffer-transfer", RED);
+            cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);
             {
                 cmd.copy_buffer(
                     &stage_buffer,
@@ -183,7 +179,7 @@ impl UiMesh
         (index_buffer, index_count)
     }
 
-    fn destroy(mut self)
+    fn destroy(self)
     {
         self.indices.destroy();
         self.vertex.destroy();
@@ -235,7 +231,7 @@ impl UI
         rhi.set_debug_name(pipeline_layout, "[uipass]pipeline-layout");
         let pipeline = Self::create_pipeline(rhi, render_ctx, pipeline_layout);
         rhi.set_debug_name(pipeline, "[uipass]pipeline");
-        
+
 
         let fonts_texture = {
             let fonts = imgui.fonts();
@@ -314,15 +310,15 @@ impl UI
         let frame_index = render_ctx.current_frame_index();
 
         // TODO 这里需要标注一下名称，每个 tick 都会重新建立 vertex buffer
+        rhi.graphics_queue_begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
         if let Some(mesh) = self.meshes[frame_index].replace(UiMesh::from_draw_data(rhi, render_ctx, draw_data)) {
             mesh.destroy()
         }
+        rhi.graphics_queue_end_label();
 
         let mut cmd = render_ctx.alloc_command_buffer("uipass-render");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        cmd.begin_label("[uipass]draw", RED);
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]draw");
         self.record_cmd(render_ctx, &mut cmd, self.meshes[frame_index].as_ref().unwrap(), draw_data);
-        cmd.end_label();
         cmd.end();
 
         Some(cmd)
@@ -382,7 +378,7 @@ impl UI
         let mut index_offset = 0;
         let mut vertex_offset = 0;
         // 缓存之前已经加载过的 texture
-        let mut last_texture_id: Option<TextureId> = None;
+        let mut last_texture_id: Option<imgui::TextureId> = None;
         let clip_offset = draw_data.display_pos;
         let clip_scale = draw_data.framebuffer_scale;
 

@@ -223,13 +223,14 @@ impl VkApp
         // scene descriptor sets: matrices and environment maps
         // 数量和 swapchain 的 image 保持一致
         {
-            let mut descriptor_sets = (0..render_ctx.render_swapchain.image_views.len())
-                .map(|_| RhiDescriptorSet::new::<SceneDescriptorSetLayoutBinding>(rhi))
-                .collect_vec();
+            // let mut descriptor_sets = (0..render_ctx.render_swapchain.image_views.len())
+            //     .map(|_| RhiDescriptorSet::new(rhi))
+            //     .collect_vec();
 
-            for mut descriptor_set in descriptor_sets {
-                descriptor_set.write(vec![(0, RhiDescriptorUpdateInfo::Buffer(vk::DescriptorBufferInfo::default()))]);
-            }
+            // FIXME
+            // for mut descriptor_set in descriptor_sets {
+            //     descriptor_set.write(vec![(0, RhiDescriptorUpdateInfo::Buffer(vk::DescriptorBufferInfo::default()))]);
+            // }
         }
 
         // material descriptor sets
@@ -273,8 +274,14 @@ impl VkApp
 
 impl App for VkApp
 {
-    fn udpate_ui(&self, ui: &mut Ui) {
+    fn udpate_ui(&mut self, ui: &mut imgui::Ui)
+    {
         todo!()
+    }
+
+    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    {
+        //
     }
 
     fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)

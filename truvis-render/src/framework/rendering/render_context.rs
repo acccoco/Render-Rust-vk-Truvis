@@ -2,10 +2,7 @@ pub use _impl_init::RenderContextInitInfo;
 use ash::vk;
 
 use crate::framework::{
-    basic::{
-        color::{GREEN, RED},
-        FRAME_ID_MAP,
-    },
+    basic::{color::LabelColor, FRAME_ID_MAP},
     core::{
         command_buffer::RhiCommandBuffer,
         command_pool::RhiCommandPool,
@@ -15,7 +12,6 @@ use crate::framework::{
     },
     rhi::{Rhi, RHI},
 };
-
 
 pub struct RenderContext
 {
@@ -56,7 +52,7 @@ impl RenderContext
     {
         let rhi = RHI.get().unwrap();
 
-        rhi.graphics_queue_begin_label("[acquire-frame]reset", GREEN);
+        rhi.graphics_queue_begin_label("[acquire-frame]reset", LabelColor::COLOR_STAGE);
         {
             let current_fence = &self.fence_frame_in_flight[self.current_frame];
             rhi.wait_for_fence(current_fence);
@@ -74,14 +70,13 @@ impl RenderContext
             self.render_swapchain.acquire_next_frame(&self.present_complete_semaphores[self.current_frame], None)
                 as usize;
 
-        rhi.graphics_queue_begin_label("[acquire-frame]color-attach-transfer", RED);
+        rhi.graphics_queue_begin_label("[acquire-frame]color-attach-transfer", LabelColor::COLOR_STAGE);
         {
             let mut cmd = self.alloc_command_buffer(format!(
                 "{}-[acquire-frame]color-attach-layout-transfer",
                 self.current_frame_prefix()
             ));
-            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-            cmd.begin_label("color-attach-trasfer", RED);
+            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[acquire]color-attach-layout-transfer");
             {
                 // 只需要建立起执行依赖即可，确保 present 完成后，再进行 layout trans
                 // COLOR_ATTACHMENT_READ 对应 blend 等操作
@@ -97,7 +92,6 @@ impl RenderContext
                     vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                 );
             }
-            cmd.end_label();
             cmd.end();
 
             self.rhi.graphics_queue_submit(
@@ -121,33 +115,37 @@ impl RenderContext
     /// * 在提交之前，为 image 进行 layout transition
     pub fn submit_frame(&mut self)
     {
-        let mut cmd = self.alloc_command_buffer(format!(
-            "{}-[submit-frame]color-attach-layout-transfer",
-            self.current_frame_prefix()
-        ));
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        cmd.begin_label("color-attach-layout-transfer", RED);
+        self.rhi.graphics_queue_begin_label("[submit-frame]", LabelColor::COLOR_PASS);
         {
-            cmd.image_barrier(
-                (vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT, vk::AccessFlags::COLOR_ATTACHMENT_WRITE),
-                (vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty()),
-                self.current_present_image(),
-                vk::ImageAspectFlags::COLOR,
-                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                vk::ImageLayout::PRESENT_SRC_KHR,
+            let mut cmd = self.alloc_command_buffer(format!(
+                "{}-[submit-frame]color-attach-layout-transfer",
+                self.current_frame_prefix()
+            ));
+            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "color-attach-layout-transfer");
+            {
+                cmd.image_barrier(
+                    (vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT, vk::AccessFlags::COLOR_ATTACHMENT_WRITE),
+                    (vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty()),
+                    self.current_present_image(),
+                    vk::ImageAspectFlags::COLOR,
+                    vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    vk::ImageLayout::PRESENT_SRC_KHR,
+                );
+            }
+            cmd.end();
+
+            self.rhi.graphics_queue_submit(
+                vec![RhiSubmitInfo {
+                    command_buffers: vec![cmd],
+                    signal_info: vec![self.current_render_complete_semaphore()],
+                    ..Default::default()
+                }],
+                Some(self.fence_frame_in_flight[self.current_frame].clone()),
             );
         }
-        cmd.end_label();
-        cmd.end();
+        // queue label 不能跨过 submit，否则会导致 Nsight mismatch label
+        self.rhi.graphics_queue_end_label();
 
-        self.rhi.graphics_queue_submit(
-            vec![RhiSubmitInfo {
-                command_buffers: vec![cmd],
-                signal_info: vec![self.current_render_complete_semaphore()],
-                ..Default::default()
-            }],
-            Some(self.fence_frame_in_flight[self.current_frame].clone()),
-        );
         self.render_swapchain.submit_frame(
             self.rhi,
             self.swapchain_image_index as u32,

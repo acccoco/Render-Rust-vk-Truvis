@@ -224,7 +224,7 @@ impl RhiBuffer
 
     // FIXME 这个隐含同步等待，需要特殊标注一下
     /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到 self
-    pub fn transfer_data_by_stage_buffer<T>(&mut self, data: &[T], name: &str)
+    pub fn transfer_data_by_stage_buffer<T>(&mut self, data: &[T])
     where
         T: Sized + Copy,
     {
@@ -236,6 +236,7 @@ impl RhiBuffer
 
         stage_buffer.transfer_data_by_mem_map(data);
 
+        let cmd_name = format!("{}-transfer-data", &self.debug_name);
         RhiCommandBuffer::one_time_exec(
             self.rhi,
             vk::QueueFlags::TRANSFER,
@@ -249,7 +250,7 @@ impl RhiBuffer
                     }],
                 );
             },
-            name,
+            &cmd_name,
         );
 
         stage_buffer.destroy();
