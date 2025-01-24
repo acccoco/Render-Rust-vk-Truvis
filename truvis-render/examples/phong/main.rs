@@ -16,8 +16,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{AppInitInfo, Timer},
-    run::{run, App},
+    render::{App, AppInitInfo, Renderer, Timer},
 };
 
 use crate::data::{ShapeBox, Vertex};
@@ -411,7 +410,7 @@ impl PhongApp
 
 impl App for PhongApp
 {
-    fn udpate_ui(&mut self, ui: &mut Ui)
+    fn update_ui(&mut self, ui: &mut Ui)
     {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
@@ -602,5 +601,5 @@ impl App for PhongApp
 
 fn main()
 {
-    run::<PhongApp>()
+    Renderer::<PhongApp>::run();
 }

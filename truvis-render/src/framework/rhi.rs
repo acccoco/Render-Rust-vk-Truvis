@@ -128,8 +128,6 @@ mod _impl_init
         pub debug_msg_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
         pub debug_msg_type: vk::DebugUtilsMessageTypeFlagsEXT,
         pub debug_callback: vk::PFN_vkDebugUtilsMessengerCallbackEXT,
-
-        pub frames_in_flight: u32,
     }
 
 
@@ -175,8 +173,6 @@ mod _impl_init
                     vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
 
                 debug_callback: None,
-
-                frames_in_flight: 3,
             };
 
             info

@@ -106,7 +106,7 @@ impl RhiCommandBuffer
     }
 }
 
-mod _transfer_cmd
+mod _impl_transfer
 {
     use ash::vk;
 
@@ -140,11 +140,12 @@ mod _transfer_cmd
     }
 }
 
-mod _draw_cmd
+mod _impl_draw
 {
     use ash::vk;
+    use itertools::Itertools;
 
-    use crate::framework::core::command_buffer::RhiCommandBuffer;
+    use crate::framework::core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer};
 
     // 绘制类型命令
     impl RhiCommandBuffer
@@ -254,20 +255,8 @@ mod _draw_cmd
                 );
             }
         }
-    }
-}
 
 
-mod _status_cmd
-{
-    use ash::vk;
-    use itertools::Itertools;
-
-    use crate::framework::core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer};
-
-    // 状态设置命令
-    impl RhiCommandBuffer
-    {
         #[inline]
         pub fn bind_pipeline(&mut self, bind_point: vk::PipelineBindPoint, pipeline: vk::Pipeline)
         {
@@ -312,7 +301,8 @@ mod _status_cmd
     }
 }
 
-mod _sync_cmd
+
+mod _impl_sync
 {
     use ash::vk;
 
@@ -398,7 +388,7 @@ mod _sync_cmd
 }
 
 
-mod _ray_tracing_cmd
+mod _impl_ray_tracing
 {
     use ash::vk;
 
@@ -447,7 +437,7 @@ mod _ray_tracing_cmd
     }
 }
 
-mod _other_cmd
+mod _impl_others
 {
     use ash::vk;
 

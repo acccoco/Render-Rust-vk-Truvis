@@ -1,13 +1,14 @@
-pub use _impl_init::RenderContextInitInfo;
 use ash::vk;
+use itertools::Itertools;
 
 use crate::framework::{
     basic::{color::LabelColor, FRAME_ID_MAP},
     core::{
         command_buffer::RhiCommandBuffer,
         command_pool::RhiCommandPool,
+        create_utils::RhiCreateInfoUtil,
         queue::RhiSubmitInfo,
-        swapchain::RenderSwapchain,
+        swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
         synchronize::{RhiFence, RhiSemaphore},
     },
     rhi::{Rhi, RHI},
@@ -44,6 +45,111 @@ pub struct RenderContext
 
 impl RenderContext
 {
+    pub fn new(
+        rhi: &'static Rhi,
+        init_info: &RenderContextInitInfo,
+        render_swapchain_init_info: RenderSwapchainInitInfo,
+    ) -> Self
+    {
+        let render_swapchain = RenderSwapchain::new(rhi, &render_swapchain_init_info);
+        let (depth_format, depth_image, depth_image_allcation, depth_image_view) =
+            Self::init_depth_image_and_view(rhi, &render_swapchain, &init_info.depth_format_dedicate);
+
+        let create_semaphore = |name: &str| {
+            (0..init_info.frames_in_flight)
+                .map(|i| FRAME_ID_MAP[i])
+                .map(|tag| RhiSemaphore::new(rhi, format!("{name}_{tag}")))
+                .collect_vec()
+        };
+        let present_complete_semaphores = create_semaphore("present_complete_semaphore");
+        let render_complete_semaphores = create_semaphore("render_complete_semaphores");
+
+        let fence_frame_in_flight = (0..init_info.frames_in_flight)
+            .map(|i| FRAME_ID_MAP[i])
+            .map(|tag| RhiFence::new(rhi, true, format!("frame_in_flight_fence_{tag}")))
+            .collect();
+
+        let graphics_command_pools = Self::init_command_pool(rhi, init_info);
+
+        let ctx = Self {
+            render_swapchain,
+
+            swapchain_image_index: 0,
+            current_frame: 0,
+            frame_id: 0,
+            frames_cnt: init_info.frames_in_flight,
+
+            graphics_command_pools,
+            allocated_command_buffers: vec![Vec::new(); init_info.frames_in_flight],
+
+            depth_format,
+            depth_image,
+            depth_image_allcation,
+            depth_image_view,
+
+            present_complete_semaphores,
+            render_complete_semaphores,
+            fence_frame_in_flight,
+
+            rhi,
+        };
+
+        ctx
+    }
+
+
+    fn init_depth_image_and_view(
+        rhi: &Rhi,
+        swapchain: &RenderSwapchain,
+        depth_format_dedicate: &[vk::Format],
+    ) -> (vk::Format, vk::Image, vk_mem::Allocation, vk::ImageView)
+    {
+        let depth_format = rhi
+            .find_supported_format(
+                depth_format_dedicate,
+                vk::ImageTiling::OPTIMAL,
+                vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+            )
+            .first()
+            .copied()
+            .unwrap();
+
+        let (depth_image, depth_image_allocation) = {
+            let create_info = RhiCreateInfoUtil::make_image2d_create_info(
+                swapchain.extent,
+                depth_format,
+                vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+            );
+            rhi.create_image(&create_info, "depth-image")
+        };
+
+        let depth_image_view = {
+            let create_info = RhiCreateInfoUtil::make_image_view_2d_create_info(
+                depth_image,
+                depth_format,
+                vk::ImageAspectFlags::DEPTH,
+            );
+            rhi.create_image_view(&create_info, "depth-image-view")
+        };
+
+        (depth_format, depth_image, depth_image_allocation, depth_image_view)
+    }
+
+    fn init_command_pool(rhi: &Rhi, init_info: &RenderContextInitInfo) -> Vec<RhiCommandPool>
+    {
+        let graphics_command_pools = (0..init_info.frames_in_flight)
+            .map(|i| {
+                rhi.create_command_pool(
+                    vk::QueueFlags::GRAPHICS,
+                    vk::CommandPoolCreateFlags::TRANSIENT,
+                    format!("render_context_graphics_command_pool_{}", i),
+                )
+            })
+            .collect();
+
+        graphics_command_pools
+    }
+
     /// 准备好渲染当前frame 所需的资源
     ///
     /// * 通过 fence 等待当前 frame 资源释放
@@ -167,231 +273,91 @@ impl RenderContext
 
         cmd
     }
-}
 
-
-mod _impl_init
-{
-    use ash::vk;
-    use itertools::Itertools;
-
-    use crate::framework::{
-        basic::FRAME_ID_MAP,
-        core::{
-            command_pool::RhiCommandPool,
-            create_utils::RhiCreateInfoUtil,
-            swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
-            synchronize::{RhiFence, RhiSemaphore},
-        },
-        rendering::render_context::RenderContext,
-        rhi::Rhi,
-    };
-
-    pub struct RenderContextInitInfo
+    /// 直接从 swapchain 获取 extent
+    #[inline]
+    pub fn swapchain_extent(&self) -> vk::Extent2D
     {
-        frames_in_flight: usize,
-        depth_format_dedicate: Vec<vk::Format>,
+        self.render_swapchain.extent
     }
 
-    impl Default for RenderContextInitInfo
+    #[inline]
+    pub fn current_fence(&self) -> &RhiFence
     {
-        fn default() -> Self
-        {
-            Self {
-                depth_format_dedicate: vec![
-                    vk::Format::D32_SFLOAT_S8_UINT,
-                    vk::Format::D32_SFLOAT,
-                    vk::Format::D24_UNORM_S8_UINT,
-                    vk::Format::D16_UNORM_S8_UINT,
-                    vk::Format::D16_UNORM,
-                ],
-                frames_in_flight: 3,
-            }
-        }
+        &self.fence_frame_in_flight[self.current_frame]
     }
 
-    impl RenderContext
+    #[inline]
+    pub fn color_format(&self) -> vk::Format
     {
-        pub fn new(
-            rhi: &'static Rhi,
-            init_info: &RenderContextInitInfo,
-            render_swapchain_init_info: RenderSwapchainInitInfo,
-        ) -> Self
-        {
-            let render_swapchain = RenderSwapchain::new(rhi, &render_swapchain_init_info);
-            let (depth_format, depth_image, depth_image_allcation, depth_image_view) =
-                Self::init_depth_image_and_view(rhi, &render_swapchain, &init_info.depth_format_dedicate);
+        self.render_swapchain.color_format
+    }
 
-            let create_semaphore = |name: &str| {
-                (0..init_info.frames_in_flight)
-                    .map(|i| FRAME_ID_MAP[i])
-                    .map(|tag| RhiSemaphore::new(rhi, format!("{name}_{tag}")))
-                    .collect_vec()
-            };
-            let present_complete_semaphores = create_semaphore("present_complete_semaphore");
-            let render_complete_semaphores = create_semaphore("render_complete_semaphores");
+    #[inline]
+    pub fn current_frame_index(&self) -> usize
+    {
+        self.current_frame
+    }
 
-            let fence_frame_in_flight = (0..init_info.frames_in_flight)
-                .map(|i| FRAME_ID_MAP[i])
-                .map(|tag| RhiFence::new(rhi, true, format!("frame_in_flight_fence_{tag}")))
-                .collect();
+    /// 当前帧的 debug prefix，例如：`[frame-A-113]`
+    #[inline]
+    pub fn current_frame_prefix(&self) -> String
+    {
+        format!("[frame-{}-{}]", FRAME_ID_MAP[self.current_frame], self.frame_id)
+    }
 
-            let graphics_command_pools = Self::init_command_pool(rhi, init_info);
+    #[inline]
+    pub fn depth_format(&self) -> vk::Format
+    {
+        self.depth_format
+    }
 
-            let ctx = Self {
-                render_swapchain,
+    #[inline]
+    pub fn current_render_complete_semaphore(&self) -> RhiSemaphore
+    {
+        self.render_complete_semaphores[self.current_frame]
+    }
 
-                swapchain_image_index: 0,
-                current_frame: 0,
-                frame_id: 0,
-                frames_cnt: init_info.frames_in_flight,
+    #[inline]
+    pub fn current_present_complete_semaphore(&self) -> RhiSemaphore
+    {
+        self.present_complete_semaphores[self.current_frame]
+    }
 
-                graphics_command_pools,
-                allocated_command_buffers: vec![Vec::new(); init_info.frames_in_flight],
+    /// 当前帧从 swapchain 获取到的用于 present 的 image
+    #[inline]
+    pub fn current_present_image(&self) -> vk::Image
+    {
+        self.render_swapchain.images[self.swapchain_image_index]
+    }
 
-                depth_format,
-                depth_image,
-                depth_image_allcation,
-                depth_image_view,
-
-                present_complete_semaphores,
-                render_complete_semaphores,
-                fence_frame_in_flight,
-
-                rhi,
-            };
-
-            ctx
-        }
-
-
-        fn init_depth_image_and_view(
-            rhi: &Rhi,
-            swapchain: &RenderSwapchain,
-            depth_format_dedicate: &[vk::Format],
-        ) -> (vk::Format, vk::Image, vk_mem::Allocation, vk::ImageView)
-        {
-            let depth_format = rhi
-                .find_supported_format(
-                    depth_format_dedicate,
-                    vk::ImageTiling::OPTIMAL,
-                    vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
-                )
-                .first()
-                .copied()
-                .unwrap();
-
-            let (depth_image, depth_image_allocation) = {
-                let create_info = RhiCreateInfoUtil::make_image2d_create_info(
-                    swapchain.extent,
-                    depth_format,
-                    vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-                );
-                rhi.create_image(&create_info, "depth-image")
-            };
-
-            let depth_image_view = {
-                let create_info = RhiCreateInfoUtil::make_image_view_2d_create_info(
-                    depth_image,
-                    depth_format,
-                    vk::ImageAspectFlags::DEPTH,
-                );
-                rhi.create_image_view(&create_info, "depth-image-view")
-            };
-
-            (depth_format, depth_image, depth_image_allocation, depth_image_view)
-        }
-
-        fn init_command_pool(rhi: &Rhi, init_info: &RenderContextInitInfo) -> Vec<RhiCommandPool>
-        {
-            let graphics_command_pools = (0..init_info.frames_in_flight)
-                .map(|i| {
-                    rhi.create_command_pool(
-                        vk::QueueFlags::GRAPHICS,
-                        vk::CommandPoolCreateFlags::TRANSIENT,
-                        format!("render_context_graphics_command_pool_{}", i),
-                    )
-                })
-                .collect();
-
-            graphics_command_pools
-        }
+    #[inline]
+    pub fn current_present_image_view(&self) -> vk::ImageView
+    {
+        self.render_swapchain.image_views[self.swapchain_image_index]
     }
 }
 
-mod _impl_property
+
+pub struct RenderContextInitInfo
 {
-    use ash::vk;
+    frames_in_flight: usize,
+    depth_format_dedicate: Vec<vk::Format>,
+}
 
-    use crate::framework::{
-        basic::FRAME_ID_MAP,
-        core::synchronize::{RhiFence, RhiSemaphore},
-        rendering::render_context::RenderContext,
-    };
-
-    impl RenderContext
+impl Default for RenderContextInitInfo
+{
+    fn default() -> Self
     {
-        /// 直接从 swapchain 获取 extent
-        #[inline]
-        pub fn swapchain_extent(&self) -> vk::Extent2D
-        {
-            self.render_swapchain.extent
-        }
-
-        #[inline]
-        pub fn current_fence(&self) -> &RhiFence
-        {
-            &self.fence_frame_in_flight[self.current_frame]
-        }
-
-        #[inline]
-        pub fn color_format(&self) -> vk::Format
-        {
-            self.render_swapchain.color_format
-        }
-
-        #[inline]
-        pub fn current_frame_index(&self) -> usize
-        {
-            self.current_frame
-        }
-
-        /// 当前帧的 debug prefix，例如：`[frame-A-113]`
-        #[inline]
-        pub fn current_frame_prefix(&self) -> String
-        {
-            format!("[frame-{}-{}]", FRAME_ID_MAP[self.current_frame], self.frame_id)
-        }
-
-        #[inline]
-        pub fn depth_format(&self) -> vk::Format
-        {
-            self.depth_format
-        }
-
-        #[inline]
-        pub fn current_render_complete_semaphore(&self) -> RhiSemaphore
-        {
-            self.render_complete_semaphores[self.current_frame]
-        }
-
-        #[inline]
-        pub fn current_present_complete_semaphore(&self) -> RhiSemaphore
-        {
-            self.present_complete_semaphores[self.current_frame]
-        }
-
-        /// 当前帧从 swapchain 获取到的用于 present 的 image
-        #[inline]
-        pub fn current_present_image(&self) -> vk::Image
-        {
-            self.render_swapchain.images[self.swapchain_image_index]
-        }
-
-        #[inline]
-        pub fn current_present_image_view(&self) -> vk::ImageView
-        {
-            self.render_swapchain.image_views[self.swapchain_image_index]
+        Self {
+            depth_format_dedicate: vec![
+                vk::Format::D32_SFLOAT_S8_UINT,
+                vk::Format::D32_SFLOAT,
+                vk::Format::D24_UNORM_S8_UINT,
+                vk::Format::D16_UNORM_S8_UINT,
+                vk::Format::D16_UNORM,
+            ],
+            frames_in_flight: 3,
         }
     }
 }

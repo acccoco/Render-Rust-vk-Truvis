@@ -299,6 +299,21 @@ impl UI
         }
     }
 
+    pub fn prepare_frame(&self, window: &winit::window::Window)
+    {
+        let mut imgui = self.imgui.borrow_mut();
+        self.platform.prepare_frame(imgui.io_mut(), window).unwrap();
+    }
+
+    // FIXME 这些 new frame，prepare frame 的顺序到底是什么?
+    pub fn new_frame(&mut self, window: &winit::window::Window) -> &mut imgui::Ui
+    {
+        let frame = self.imgui.get_mut().new_frame();
+        self.platform.prepare_render(&frame, window);
+
+        frame
+    }
+
     pub fn draw(&mut self, rhi: &'static Rhi, render_ctx: &mut RenderContext) -> Option<RhiCommandBuffer>
     {
         let mut temp_imgui = self.imgui.borrow_mut();
