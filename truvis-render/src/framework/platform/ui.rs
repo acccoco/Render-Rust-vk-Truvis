@@ -309,14 +309,36 @@ impl UI
     pub fn new_frame(&mut self, window: &winit::window::Window) -> &mut imgui::Ui
     {
         let frame = self.imgui.get_mut().new_frame();
-        self.platform.prepare_render(&frame, window);
+        // self.platform.prepare_render(&frame, window);
 
         frame
     }
 
-    pub fn draw(&mut self, rhi: &'static Rhi, render_ctx: &mut RenderContext) -> Option<RhiCommandBuffer>
+    pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>)
     {
+        self.platform.handle_event(self.imgui.get_mut().io_mut(), window, event);
+    }
+
+
+    // platform::prepare_frame()
+    // imgui.new_frame()
+    // 自定义：app::update_ui()
+    // paltform::prepare_render()
+    // imgui.render()
+    pub fn draw(
+        &mut self,
+        rhi: &'static Rhi,
+        render_ctx: &mut RenderContext,
+        window: &winit::window::Window,
+        f: impl FnOnce(&mut imgui::Ui),
+    ) -> Option<RhiCommandBuffer>
+    {
+        self.platform.prepare_frame(self.imgui.borrow_mut().io_mut(), window).unwrap();
+
         let mut temp_imgui = self.imgui.borrow_mut();
+        let mut frame = temp_imgui.new_frame();
+        f(&mut frame);
+        self.platform.prepare_render(frame, window);
         let draw_data = temp_imgui.render();
         if draw_data.total_vtx_count == 0 {
             return None;

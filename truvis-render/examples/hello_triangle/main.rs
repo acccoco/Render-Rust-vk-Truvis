@@ -42,6 +42,8 @@ struct HelloTriangle
     vertex_buffer: RhiBuffer,
     index_buffer: RhiBuffer,
     pipeline: RhiPipeline,
+
+    frame_id: u64,
 }
 
 impl HelloTriangle
@@ -138,6 +140,8 @@ impl HelloTriangle
             vertex_buffer,
             index_buffer,
             pipeline,
+
+            frame_id: 0,
         }
     }
 }
@@ -148,6 +152,7 @@ impl App for HelloTriangle
     {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
+        ui.text_wrapped(format!("Frame ID: {}", self.frame_id));
         let choices = ["test test this is 1", "test test this is 2"];
         let mut value = 0;
 
@@ -162,7 +167,10 @@ impl App for HelloTriangle
         ui.text(format!("Mouse Position: ({:.1},{:.1})", mouse_pos[0], mouse_pos[1]));
     }
 
-    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer) {}
+    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    {
+        self.frame_id = render_context.frame_id;
+    }
 
     fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _: &Timer)
     {

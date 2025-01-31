@@ -1,4 +1,8 @@
-use std::{sync::Arc, todo};
+use std::{
+    cell::OnceCell,
+    sync::{Arc, OnceLock},
+    todo,
+};
 
 use ash::vk;
 use winit::{
@@ -22,6 +26,7 @@ pub struct Timer
 {
     pub start_time: std::time::SystemTime,
     pub last_time: std::time::SystemTime,
+    // FIXME 改成 Duration
     pub delta_time: f32,
     pub total_time: f32,
     pub total_frame: i32,
@@ -251,10 +256,10 @@ impl<A: App> Renderer<A>
     fn tick(&mut self)
     {
         self.timer.update();
+        let duration = std::time::Duration::from_secs_f32(self.timer.delta_time);
+        self.ui.as_ref().unwrap().imgui.borrow_mut().io_mut().update_delta_time(duration);
 
         self.render_context.as_mut().unwrap().acquire_frame();
-
-        self.ui.as_ref().unwrap().prepare_frame(self.window.as_mut().unwrap().window());
 
         let rhi = Self::get_rhi();
 
@@ -271,11 +276,15 @@ impl<A: App> Renderer<A>
         // ui pass
         rhi.graphics_queue_begin_label("[ui-pass]", LabelColor::COLOR_PASS);
         {
-            let frame = self.ui.as_mut().unwrap().new_frame(self.window.as_ref().unwrap().window());
-            self.inner_app.as_mut().unwrap().update_ui(frame);
-
             // FIXME ui cmd 需要释放
-            let ui_cmd = self.ui.as_mut().unwrap().draw(rhi, self.render_context.as_mut().unwrap());
+            let ui_cmd = self.ui.as_mut().unwrap().draw(
+                rhi,
+                self.render_context.as_mut().unwrap(),
+                self.window.as_ref().unwrap().window(),
+                |ui| {
+                    self.inner_app.as_mut().unwrap().update_ui(ui);
+                },
+            );
 
             if let Some(ui_cmd) = ui_cmd {
                 // FIXME barrier cmd 也需要释放
@@ -330,17 +339,30 @@ impl<A: App> winit::application::ApplicationHandler<UserEvent> for Renderer<A>
     // TODO 测试一下这个事件的发送时机：是否会在每个键盘事件之前发送？还是每一帧发送一次
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause)
     {
-        // self.ui.as_mut().unwrap().imgui.get_mut().io_mut().update_delta_time();
+        // TODO 下面的调用是否有用
     }
 
-    // FIXME 这个是什么时候调用呢？
     fn resumed(&mut self, event_loop: &ActiveEventLoop)
     {
-        self.init(event_loop);
+        static init_flag: OnceLock<bool> = OnceLock::new();
+        if let Some(_) = init_flag.get() {
+            panic!("Renderer::resumed called more than once");
+        } else {
+            log::info!("winit event: resumed");
+            self.init(event_loop);
+            init_flag.get_or_init(|| true);
+        }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent)
     {
+        self.ui.as_mut().unwrap().handle_event::<UserEvent>(
+            self.window.as_ref().unwrap().window(),
+            &winit::event::Event::WindowEvent {
+                window_id,
+                event: event.clone(),
+            },
+        );
         match event {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
@@ -358,7 +380,7 @@ impl<A: App> winit::application::ApplicationHandler<UserEvent> for Renderer<A>
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop)
     {
-        // FIXME 似乎不应该使用这个事件，应该使用 redraw 来驱动绘制
+        self.window.as_ref().unwrap().window().request_redraw();
     }
 
     fn exiting(&mut self, event_loop: &ActiveEventLoop)
