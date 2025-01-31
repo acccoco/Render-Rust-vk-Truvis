@@ -7,13 +7,12 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{AppInitInfo, Timer},
-    run::{run, App},
+    render::{App, AppInitInfo, Renderer, Timer},
 };
 
 fn main()
 {
-    run::<VkApp>()
+    Renderer::<VkApp>::run();
 }
 
 struct InitInfo
@@ -274,7 +273,7 @@ impl VkApp
 
 impl App for VkApp
 {
-    fn udpate_ui(&mut self, ui: &mut imgui::Ui)
+    fn update_ui(&mut self, ui: &mut Ui)
     {
         todo!()
     }

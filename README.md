@@ -11,6 +11,7 @@ TODO
 - [x] (optional)在 app 内配置 `vulkan` 的各种 `layer` 参数
 - [x] 不要 static，减少函数理解的心智负担
 - [x] 不要 option，减少调用开销。
+- [ ] 支持 窗口 resize
 
 `Texture` 的实现思路：`texture` 应该包含如下内容：
 

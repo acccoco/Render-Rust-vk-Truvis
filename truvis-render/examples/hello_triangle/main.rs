@@ -10,8 +10,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{AppInitInfo, Timer},
-    run::{run, App},
+    render::{App, AppInitInfo, Renderer, Timer},
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -145,7 +144,7 @@ impl HelloTriangle
 
 impl App for HelloTriangle
 {
-    fn udpate_ui(&mut self, ui: &mut Ui)
+    fn update_ui(&mut self, ui: &mut Ui)
     {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
@@ -189,5 +188,5 @@ impl App for HelloTriangle
 
 fn main()
 {
-    run::<HelloTriangle>();
+    Renderer::<HelloTriangle>::run();
 }

@@ -1,6 +1,7 @@
 use std::mem::offset_of;
 
 use ash::vk;
+use imgui::Ui;
 use truvis_render::{
     framework::{
         core::{
@@ -13,8 +14,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{AppInitInfo, Timer},
-    run::{run, App},
+    render::{App, AppInitInfo, Renderer, Timer},
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -261,12 +261,6 @@ impl HelloRT
 
 impl App for HelloRT
 {
-    fn udpate_ui(&mut self, ui: &mut imgui::Ui)
-    {
-        ui.text_wrapped("Hello world!");
-        ui.text_wrapped("こんにちは世界！");
-    }
-
     fn update(&mut self, _rhi: &'static Rhi, _render_context: &mut RenderContext, _timer: &Timer)
     {
         //
@@ -291,10 +285,16 @@ impl App for HelloRT
             enable_validation: true,
         }
     }
+
+    fn update_ui(&mut self, ui: &mut Ui)
+    {
+        ui.text_wrapped("Hello world!");
+        ui.text_wrapped("こんにちは世界！");
+    }
 }
 
 
 fn main()
 {
-    run::<HelloRT>();
+    Renderer::<HelloRT>::run();
 }

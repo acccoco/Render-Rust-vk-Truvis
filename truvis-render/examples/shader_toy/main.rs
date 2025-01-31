@@ -2,6 +2,7 @@ use std::mem::offset_of;
 
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
+use imgui::Ui;
 use truvis_render::{
     framework::{
         core::{
@@ -12,8 +13,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{AppInitInfo, Timer},
-    run::{run, App},
+    render::{App, AppInitInfo, Renderer, Timer},
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -211,7 +211,7 @@ impl ShaderToy
 
 impl App for ShaderToy
 {
-    fn udpate_ui(&mut self, ui: &mut imgui::Ui)
+    fn update_ui(&mut self, ui: &mut Ui)
     {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
@@ -245,5 +245,5 @@ impl App for ShaderToy
 
 fn main()
 {
-    run::<ShaderToy>();
+    Renderer::<ShaderToy>::run();
 }
