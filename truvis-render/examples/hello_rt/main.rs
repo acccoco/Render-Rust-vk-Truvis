@@ -14,7 +14,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{App, AppInitInfo, Renderer, Timer},
+    render::{App, AppCtx, AppInitInfo, Renderer, Timer},
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -261,14 +261,14 @@ impl HelloRT
 
 impl App for HelloRT
 {
-    fn update(&mut self, _rhi: &'static Rhi, _render_context: &mut RenderContext, _timer: &Timer)
+    fn update(&mut self, app_ctx: &mut AppCtx)
     {
         //
     }
 
-    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _timer: &Timer)
+    fn draw(&self, app_ctx: &mut AppCtx)
     {
-        self.run(rhi, render_context);
+        self.run(app_ctx.rhi, app_ctx.render_context);
     }
 
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self

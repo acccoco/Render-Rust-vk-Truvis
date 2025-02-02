@@ -10,7 +10,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{App, AppInitInfo, Renderer, Timer},
+    render::{App, AppCtx, AppInitInfo, Renderer, Timer},
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -167,14 +167,14 @@ impl App for HelloTriangle
         ui.text(format!("Mouse Position: ({:.1},{:.1})", mouse_pos[0], mouse_pos[1]));
     }
 
-    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    fn update(&mut self, app_ctx: &mut AppCtx)
     {
-        self.frame_id = render_context.frame_id;
+        self.frame_id = app_ctx.render_context.frame_id;
     }
 
-    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _: &Timer)
+    fn draw(&self, app_ctx: &mut AppCtx)
     {
-        self.my_update(rhi, render_context);
+        self.my_update(app_ctx.rhi, app_ctx.render_context);
     }
 
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self

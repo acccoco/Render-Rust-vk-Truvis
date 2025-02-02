@@ -71,6 +71,14 @@ impl Timer
 }
 
 
+pub struct InputState
+{
+    pub crt_mouse_pos: (f64, f64),
+    pub last_mouse_pos: (f64, f64),
+    pub right_button_pressed: bool,
+}
+
+
 /// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
 pub struct Renderer<A: App>
 {
@@ -79,8 +87,19 @@ pub struct Renderer<A: App>
     pub render_context: Option<RenderContext>,
     pub ui: Option<UI>,
     pub inner_app: Option<Box<A>>,
+
+    pub input_state: InputState,
 }
 
+
+/// 传递给 App 的上下文，用于 App 和 Renderer 之间的交互
+pub struct AppCtx<'a>
+{
+    pub rhi: &'static Rhi,
+    pub render_context: &'a mut RenderContext,
+    pub timer: &'a Timer,
+    pub input_state: &'a InputState,
+}
 
 pub struct AppInitInfo
 {
@@ -98,10 +117,10 @@ pub trait App
 {
     fn update_ui(&mut self, ui: &mut imgui::Ui);
 
-    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer);
+    fn update(&mut self, app_ctx: &mut AppCtx);
 
     /// 发生于 acquire_frame 之后，submit_frame 之前
-    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer);
+    fn draw(&self, app_ctx: &mut AppCtx);
 
 
     fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self;
@@ -192,6 +211,12 @@ impl<A: App> Renderer<A>
             render_context: None,
             ui: None,
             inner_app: None,
+
+            input_state: InputState {
+                crt_mouse_pos: (0.0, 0.0),
+                last_mouse_pos: (0.0, 0.0),
+                right_button_pressed: false,
+            },
         }
     }
 
@@ -267,9 +292,16 @@ impl<A: App> Renderer<A>
         // main pass
         rhi.graphics_queue_begin_label("[main-pass]", LabelColor::COLOR_PASS);
         {
+            let mut app_ctx = AppCtx {
+                rhi,
+                render_context: self.render_context.as_mut().unwrap(),
+                timer: &self.timer,
+                input_state: &self.input_state,
+            };
+
             let app = self.inner_app.as_mut().unwrap();
-            app.update(Self::get_rhi(), self.render_context.as_mut().unwrap(), &self.timer);
-            app.draw(Self::get_rhi(), self.render_context.as_mut().unwrap(), &self.timer);
+            app.update(&mut app_ctx);
+            app.draw(&mut app_ctx);
         }
         rhi.graphics_queue_end_label();
 
@@ -324,6 +356,8 @@ impl<A: App> Renderer<A>
         rhi.graphics_queue_end_label();
 
         self.render_context.as_mut().unwrap().submit_frame();
+
+        self.input_state.last_mouse_pos = self.input_state.crt_mouse_pos;
     }
 
 
@@ -372,6 +406,9 @@ impl<A: App> winit::application::ApplicationHandler<UserEvent> for Renderer<A>
             }
             WindowEvent::RedrawRequested => {
                 self.tick();
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.input_state.crt_mouse_pos = (position.x, position.y);
             }
 
             _ => {}

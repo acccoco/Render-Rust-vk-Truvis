@@ -7,7 +7,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{App, AppInitInfo, Renderer, Timer},
+    render::{App, AppCtx, AppInitInfo, Renderer, Timer},
 };
 
 fn main()
@@ -278,12 +278,12 @@ impl App for VkApp
         todo!()
     }
 
-    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    fn update(&mut self, app_ctx: &mut AppCtx)
     {
         //
     }
 
-    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    fn draw(&self, app_ctx: &mut AppCtx)
     {
         todo!()
     }
