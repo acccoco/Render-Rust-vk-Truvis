@@ -16,7 +16,7 @@ use truvis_render::{
         rendering::render_context::RenderContext,
         rhi::Rhi,
     },
-    render::{App, AppInitInfo, Renderer, Timer},
+    render::{App, AppCtx, AppInitInfo, Renderer},
 };
 
 use crate::data::{ShapeBox, Vertex};
@@ -416,31 +416,31 @@ impl App for PhongApp
         ui.text_wrapped("こんにちは世界！");
     }
 
-    fn update(&mut self, rhi: &'static Rhi, render_context: &mut RenderContext, _timer: &Timer)
+    fn update(&mut self, app_ctx: &mut AppCtx)
     {
-        rhi.graphics_queue_begin_label("[main-pass]update", LabelColor::COLOR_PASS);
+        app_ctx.rhi.graphics_queue_begin_label("[main-pass]update", LabelColor::COLOR_PASS);
         {
-            self.update_scene_uniform(rhi, render_context.current_frame_index());
+            self.update_scene_uniform(app_ctx.rhi, app_ctx.render_context.current_frame_index());
         }
-        rhi.graphics_queue_end_label();
+        app_ctx.rhi.graphics_queue_end_label();
     }
 
-    fn draw(&self, rhi: &'static Rhi, render_context: &mut RenderContext, _timer: &Timer)
+    fn draw(&self, app_ctx: &mut AppCtx)
     {
-        let frame_id = render_context.current_frame_index();
+        let frame_id = app_ctx.render_context.current_frame_index();
 
-        let color_attach = <Self as App>::get_color_attachment(render_context.current_present_image_view());
-        let depth_attach = <Self as App>::get_depth_attachment(render_context.depth_image_view);
+        let color_attach = <Self as App>::get_color_attachment(app_ctx.render_context.current_present_image_view());
+        let depth_attach = <Self as App>::get_depth_attachment(app_ctx.render_context.depth_image_view);
         let render_info = <Self as App>::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
-                extent: render_context.swapchain_extent(),
+                extent: app_ctx.render_context.swapchain_extent(),
             },
             std::slice::from_ref(&color_attach),
             &depth_attach,
         );
 
-        let mut cmd = RenderContext::alloc_command_buffer(render_context, "[main-pass]render");
+        let mut cmd = RenderContext::alloc_command_buffer(app_ctx.render_context, "[main-pass]render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[phong-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);
@@ -489,7 +489,7 @@ impl App for PhongApp
         }
         cmd.end();
 
-        rhi.graphics_queue_submit(
+        app_ctx.rhi.graphics_queue_submit(
             vec![RhiSubmitInfo {
                 command_buffers: vec![cmd],
                 ..Default::default()
