@@ -136,6 +136,7 @@ impl ShaderCompileEntry
         let entry_point = "main";
         let mut cmd = std::process::Command::new("dxc");
         cmd.arg("-spirv")
+            .arg("-fspv-debug=vulkan-with-source") // SPIR-V NonSemantic Shader DebugInfo Instructions，用于 Nsight 调试
             .args(["-T", format!("{}_{}", shader_stage_tag, shader_model).as_str()])
             .arg("-Zi") // 包含 debug 信息
             // .arg("-Zpc") // col-major
