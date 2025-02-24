@@ -1,17 +1,17 @@
 use ash::vk;
 
-use crate::framework::{core::image::RhiImage2D, rhi::Rhi};
+use crate::framework::{core::image::Image2D, render_core::Core};
 
-pub struct RhiTexture
+pub struct Texture
 {
-    pub image: RhiImage2D,
+    pub image: Image2D,
     pub sampler: vk::Sampler,
     pub image_view: vk::ImageView,
 }
 
-impl RhiTexture
+impl Texture
 {
-    pub fn new(rhi: &Rhi, image: RhiImage2D, name: &str) -> Self
+    pub fn new(rhi: &Core, image: Image2D, name: &str) -> Self
     {
         let sampler = {
             let sampler_info = vk::SamplerCreateInfo::default()

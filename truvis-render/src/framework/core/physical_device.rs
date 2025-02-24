@@ -2,10 +2,9 @@ use std::ffi::CStr;
 
 use ash::vk;
 
-use crate::framework::core::instance::RhiInstance;
 
 /// 表示一张物理显卡
-pub struct RhiPhysicalDevice
+pub struct PhysicalDevice
 {
     pub handle: vk::PhysicalDevice,
 
@@ -21,7 +20,7 @@ pub struct RhiPhysicalDevice
     pub queue_family_properties: Vec<vk::QueueFamilyProperties>,
 }
 
-impl RhiPhysicalDevice
+impl PhysicalDevice
 {
     pub fn new(pdevice: vk::PhysicalDevice, instance: &ash::Instance) -> Self
     {

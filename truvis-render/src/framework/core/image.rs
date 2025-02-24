@@ -2,11 +2,11 @@ use ash::vk;
 use vk_mem::Alloc;
 
 use crate::framework::{
-    core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer},
-    rhi::Rhi,
+    core::{buffer::Buffer, command_buffer::CommandBuffer},
+    render_core::Core,
 };
 
-pub struct RhiImage2DInfo
+pub struct Image2DInfo
 {
     format: vk::Format,
     extent: vk::Extent2D,
@@ -15,7 +15,7 @@ pub struct RhiImage2DInfo
     samples: vk::SampleCountFlags,
 }
 
-impl From<vk::ImageCreateInfo<'static>> for RhiImage2DInfo
+impl From<vk::ImageCreateInfo<'static>> for Image2DInfo
 {
     fn from(value: vk::ImageCreateInfo) -> Self
     {
@@ -32,7 +32,7 @@ impl From<vk::ImageCreateInfo<'static>> for RhiImage2DInfo
     }
 }
 
-pub struct RhiImage2D
+pub struct Image2D
 {
     name: String,
 
@@ -40,16 +40,16 @@ pub struct RhiImage2D
 
     alloc: vk_mem::Allocation,
 
-    image_info: RhiImage2DInfo,
+    image_info: Image2DInfo,
 
-    rhi: &'static Rhi,
+    rhi: &'static Core,
 }
 
 
-impl RhiImage2D
+impl Image2D
 {
     pub fn new(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         // FIXME 声明周期问题
         image_info: &vk::ImageCreateInfo<'static>,
         alloc_info: &vk_mem::AllocationCreateInfo,
@@ -84,7 +84,7 @@ impl RhiImage2D
     }
 
     /// 根据 RGBA8_UNORM 的 data 创建 image
-    pub fn from_rgba8(rhi: &'static Rhi, width: u32, height: u32, data: &[u8], name: &str) -> Self
+    pub fn from_rgba8(rhi: &'static Core, width: u32, height: u32, data: &[u8], name: &str) -> Self
     {
         let mut image = Self::new(
             rhi,
@@ -111,19 +111,19 @@ impl RhiImage2D
         );
 
         let stage_buffer =
-            RhiCommandBuffer::one_time_exec(rhi, vk::QueueFlags::GRAPHICS, |cmd| image.transfer_data(cmd, data), name);
+            CommandBuffer::one_time_exec(rhi, vk::QueueFlags::GRAPHICS, |cmd| image.transfer_data(cmd, data), name);
         stage_buffer.destroy();
 
         image
     }
 
-    pub fn transfer_data(&mut self, command_buffer: &mut RhiCommandBuffer, data: &[u8]) -> RhiBuffer
+    pub fn transfer_data(&mut self, command_buffer: &mut CommandBuffer, data: &[u8]) -> Buffer
     {
         let pixels_cnt = self.image_info.extent.width * self.image_info.extent.height;
         assert_eq!(data.len(), Self::format_byte_count(self.image_info.format) * pixels_cnt as usize);
 
         let mut stage_buffer =
-            RhiBuffer::new_stage_buffer(self.rhi, std::mem::size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
+            Buffer::new_stage_buffer(self.rhi, std::mem::size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
         stage_buffer.transfer_data_by_mem_map(data);
 
         // 1. transition the image layout

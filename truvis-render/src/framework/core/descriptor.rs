@@ -1,9 +1,9 @@
 use ash::vk;
 
-use crate::framework::rhi::Rhi;
+use crate::framework::render_core::Core;
 
 /// 将 descriptor set layout 的 bindings 抽象为一个 trait，通过类型系统来保证 bindings 的正确性
-pub trait RhiDescriptorBindings
+pub trait DescriptorBindings
 {
     // FIXME 这个声明周期还是感觉不太安全
     fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>;
@@ -13,18 +13,18 @@ pub trait RhiDescriptorBindings
 ///
 /// 注：为什么要使用 <T>
 /// 这样可以在每种 struct 内部存放一个 static 的 DescriptorSetLayout
-pub struct RhiDescriptorLayout<T>
+pub struct DescriptorSetLayout<T>
 where
-    T: RhiDescriptorBindings,
+    T: DescriptorBindings,
 {
     pub layout: vk::DescriptorSetLayout,
     phantom_data: std::marker::PhantomData<T>,
 }
-impl<T> RhiDescriptorLayout<T>
+impl<T> DescriptorSetLayout<T>
 where
-    T: RhiDescriptorBindings,
+    T: DescriptorBindings,
 {
-    pub fn new(rhi: &Rhi, debug_name: &str) -> Self
+    pub fn new(rhi: &Core, debug_name: &str) -> Self
     {
         let bindings = T::bindings();
         let create_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
@@ -39,9 +39,9 @@ where
 }
 
 
-pub struct RhiDescriptorSet<T>
+pub struct DescriptorSet<T>
 where
-    T: RhiDescriptorBindings,
+    T: DescriptorBindings,
 {
     pub descriptor_set: vk::DescriptorSet,
     phantom_data: std::marker::PhantomData<T>,
@@ -51,11 +51,11 @@ pub enum RhiDescriptorUpdateInfo
     Image(vk::DescriptorImageInfo),
     Buffer(vk::DescriptorBufferInfo),
 }
-impl<T> RhiDescriptorSet<T>
+impl<T> DescriptorSet<T>
 where
-    T: RhiDescriptorBindings,
+    T: DescriptorBindings,
 {
-    pub fn new(rhi: &Rhi, layout: &RhiDescriptorLayout<T>, debug_name: &str) -> Self
+    pub fn new(rhi: &Core, layout: &DescriptorSetLayout<T>, debug_name: &str) -> Self
     {
         unsafe {
             let alloc_info = vk::DescriptorSetAllocateInfo::default()

@@ -1,8 +1,4 @@
-use std::{
-    cell::OnceCell,
-    sync::{Arc, OnceLock},
-    todo,
-};
+use std::sync::{Arc, OnceLock};
 
 use ash::vk;
 use winit::{
@@ -13,13 +9,13 @@ use winit::{
 
 use crate::framework::{
     basic::color::LabelColor,
-    core::{queue::RhiSubmitInfo, swapchain::RenderSwapchainInitInfo},
+    core::{queue::SubmitInfo, swapchain::SwapchainInitInfo},
     platform::{
         ui::{UiOptions, UI},
         window_system::{WindowCreateInfo, WindowSystem},
     },
+    render_core::{vk_debug_callback, Core, InitInfo, CORE},
     rendering::render_context::{RenderContext, RenderContextInitInfo},
-    rhi::{vk_debug_callback, Rhi, RhiInitInfo, RHI},
 };
 
 pub struct Timer
@@ -95,7 +91,7 @@ pub struct Renderer<A: App>
 /// 传递给 App 的上下文，用于 App 和 Renderer 之间的交互
 pub struct AppCtx<'a>
 {
-    pub rhi: &'static Rhi,
+    pub rhi: &'static Core,
     pub render_context: &'a mut RenderContext,
     pub timer: &'a Timer,
     pub input_state: &'a InputState,
@@ -123,7 +119,7 @@ pub trait App
     fn draw(&self, app_ctx: &mut AppCtx);
 
 
-    fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self;
+    fn init(rhi: &'static Core, render_context: &mut RenderContext) -> Self;
 
     /// 由 App 提供的，用于初始化 Rhi
     fn get_render_init_info() -> AppInitInfo;
@@ -240,19 +236,19 @@ impl<A: App> Renderer<A>
 
         // rhi
         {
-            let mut rhi_init_info = RhiInitInfo::init_basic(
+            let mut rhi_init_info = InitInfo::init_basic(
                 render_init_info.app_name.clone(),
                 self.window.as_ref().unwrap().clone(),
                 render_init_info.enable_validation,
             );
             rhi_init_info.set_debug_callback(Some(vk_debug_callback));
-            RHI.get_or_init(|| Rhi::new(rhi_init_info));
+            CORE.get_or_init(|| Core::new(rhi_init_info));
         }
-        let rhi = RHI.get().unwrap();
+        let rhi = CORE.get().unwrap();
 
         // render context
         {
-            let render_swapchain_init_info = RenderSwapchainInitInfo {
+            let render_swapchain_init_info = SwapchainInitInfo {
                 window: Some(self.window.as_ref().unwrap().clone()),
                 ..Default::default()
             };
@@ -344,7 +340,7 @@ impl<A: App> Renderer<A>
                 barrier_cmd.end();
 
                 rhi.graphics_queue_submit(
-                    vec![RhiSubmitInfo {
+                    vec![SubmitInfo {
                         command_buffers: vec![ui_cmd, barrier_cmd],
                         wait_info: Vec::new(),
                         signal_info: Vec::new(),
@@ -361,9 +357,9 @@ impl<A: App> Renderer<A>
     }
 
 
-    pub fn get_rhi() -> &'static Rhi
+    pub fn get_rhi() -> &'static Core
     {
-        RHI.get().unwrap()
+        CORE.get().unwrap()
     }
 }
 

@@ -3,15 +3,11 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use anyhow::Context;
 use ash::vk;
 
-use crate::framework::{
-    core::{
-        command_pool::RhiCommandPool, debug::RhiDebugUtils, device::RhiDevice, instance::RhiInstance,
-        physical_device::RhiPhysicalDevice,
-    },
-    platform::window_system::WindowSystem,
+use crate::framework::core::{
+    command_pool::CommandPool, debug_utils::DebugUtils, device::Device, instance::Instance,
+    physical_device::PhysicalDevice,
 };
 
 /// # Safety
@@ -55,17 +51,17 @@ pub unsafe extern "system" fn vk_debug_callback(
 }
 
 
-pub static RHI: OnceLock<Rhi> = OnceLock::new();
+pub static CORE: OnceLock<Core> = OnceLock::new();
 
 
 /// Rhi 只需要做到能够创建各种资源的程度就行了
 ///
 /// 与 VulkanSamples 的 VulkanSamle 及 ApiVulkanSample 作用类似
-pub struct Rhi
+pub struct Core
 {
     /// vk 基础函数的接口
     pub vk_pf: ash::Entry,
-    instance: RhiInstance,
+    instance: Instance,
     // vk_instance: Option<Instance>,
 
     // vk_debug_util_pf: Option<ash::extensions::ext::DebugUtils>,
@@ -73,18 +69,18 @@ pub struct Rhi
     pub vk_acceleration_struct_pf: ash::khr::acceleration_structure::Device,
 
     // vk_debug_util_messenger: Option<vk::DebugUtilsMessengerEXT>,
-    physical_device: Arc<RhiPhysicalDevice>,
-    pub device: RhiDevice,
+    physical_device: Arc<PhysicalDevice>,
+    pub device: Device,
 
     pub vma: Option<vk_mem::Allocator>,
 
     pub descriptor_pool: vk::DescriptorPool,
 
-    pub graphics_command_pool: RhiCommandPool,
-    pub transfer_command_pool: RhiCommandPool,
-    pub compute_command_pool: RhiCommandPool,
+    pub graphics_command_pool: CommandPool,
+    pub transfer_command_pool: CommandPool,
+    pub compute_command_pool: CommandPool,
 
-    pub debug_utils: RhiDebugUtils,
+    pub debug_utils: DebugUtils,
 }
 
 
@@ -94,19 +90,17 @@ mod _impl_init
 
     use ash::vk;
     use itertools::Itertools;
-    // FIXME
-    use raw_window_handle::HasRawDisplayHandle;
-
+    use raw_window_handle::{HasDisplayHandle, HasRawDisplayHandle};
     use crate::framework::{
         core::{
-            command_pool::RhiCommandPool, debug::RhiDebugUtils, device::RhiDevice, instance::RhiInstance,
-            physical_device::RhiPhysicalDevice,
+            command_pool::CommandPool, debug_utils::DebugUtils, device::Device, instance::Instance,
+            physical_device::PhysicalDevice,
         },
         platform::window_system::WindowSystem,
-        rhi::Rhi,
+        render_core::Core,
     };
 
-    pub struct RhiInitInfo
+    pub struct InitInfo
     {
         pub app_name: String,
         pub engine_name: String,
@@ -131,7 +125,7 @@ mod _impl_init
     }
 
 
-    impl RhiInitInfo
+    impl InitInfo
     {
         pub fn init_basic(app_name: String, window: Arc<WindowSystem>, enable_validation: bool) -> Self
         {
@@ -269,21 +263,21 @@ mod _impl_init
     }
 
 
-    impl Rhi
+    impl Core
     {
         const MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
         const MAX_MATERIAL_CNT: u32 = 256;
 
-        pub fn new(mut init_info: RhiInitInfo) -> Self
+        pub fn new(mut init_info: InitInfo) -> Self
         {
             let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");
 
-            let instance = RhiInstance::new(&vk_pf, &init_info);
+            let instance = Instance::new(&vk_pf, &init_info);
 
             let pdevice = Arc::new(Self::init_pdevice(&instance.handle));
-            let device = RhiDevice::new(&mut init_info, &instance, pdevice.clone());
+            let device = Device::new(&mut init_info, &instance, pdevice.clone());
 
-            let debug_utils = RhiDebugUtils::new(&vk_pf, &instance.handle, &device.device, &init_info);
+            let debug_utils = DebugUtils::new(&vk_pf, &instance.handle, &device.device, &init_info);
 
             // 在 device 以及 debug_utils 之前创建的 vk::Handle
             {
@@ -345,7 +339,7 @@ mod _impl_init
             rhi
         }
 
-        fn init_descriptor_pool(device: &RhiDevice) -> vk::DescriptorPool
+        fn init_descriptor_pool(device: &Device) -> vk::DescriptorPool
         {
             let pool_size = [
                 vk::DescriptorPoolSize {
@@ -388,16 +382,16 @@ mod _impl_init
             }
         }
 
-        fn init_pdevice(instance: &ash::Instance) -> RhiPhysicalDevice
+        fn init_pdevice(instance: &ash::Instance) -> PhysicalDevice
         {
             let pdevice = unsafe {
                 instance
                     .enumerate_physical_devices()
                     .unwrap()
                     .iter()
-                    .map(|pdevice| RhiPhysicalDevice::new(*pdevice, instance))
+                    .map(|pdevice| PhysicalDevice::new(*pdevice, instance))
                     // 优先使用独立显卡
-                    .find_or_first(RhiPhysicalDevice::is_descrete_gpu)
+                    .find_or_first(PhysicalDevice::is_descrete_gpu)
                     .unwrap()
             };
 
@@ -406,7 +400,7 @@ mod _impl_init
 
         /// 由于 vma 恶心的生命周期设定：需要引用 Instance 以及 Device，并确保在其声明周期之内这两个的引用是有效的
         /// 因此需要在 Rhi 的其他部分都初始化完成后再初始化 vma，确保 Instance 和 Device 是 pin 的
-        fn init_vma(&mut self, init_info: &RhiInitInfo)
+        fn init_vma(&mut self, init_info: &InitInfo)
         {
             let mut vma_ci = vk_mem::AllocatorCreateInfo::new(
                 &self.instance.handle,
@@ -422,12 +416,12 @@ mod _impl_init
 
         /// 仅在初始化阶段使用的一个函数
         pub(super) fn init_command_pool<S: AsRef<str> + Clone>(
-            device: &RhiDevice,
-            debug_utils: &RhiDebugUtils,
+            device: &Device,
+            debug_utils: &DebugUtils,
             queue_flags: vk::QueueFlags,
             flags: vk::CommandPoolCreateFlags,
             debug_name: S,
-        ) -> RhiCommandPool
+        ) -> CommandPool
         {
             let queue_family_index = device.pdevice.find_queue_family_index(queue_flags).unwrap();
 
@@ -442,7 +436,7 @@ mod _impl_init
             };
 
             debug_utils.set_object_debug_name(pool, debug_name.clone());
-            RhiCommandPool {
+            CommandPool {
                 command_pool: pool,
                 queue_family_index,
             }
@@ -450,7 +444,7 @@ mod _impl_init
     }
 }
 
-pub use _impl_init::RhiInitInfo;
+pub use _impl_init::InitInfo;
 
 
 mod _impl_property
@@ -458,11 +452,11 @@ mod _impl_property
     use ash::vk;
 
     use crate::framework::{
-        core::{physical_device::RhiPhysicalDevice, queue::RhiQueue},
-        rhi::Rhi,
+        core::{physical_device::PhysicalDevice, queue::Queue},
+        render_core::Core,
     };
 
-    impl Rhi
+    impl Core
     {
         #[inline]
         pub(crate) fn vk_instance(&self) -> &ash::Instance
@@ -477,25 +471,25 @@ mod _impl_property
         }
 
         #[inline]
-        pub(crate) fn physical_device(&self) -> &RhiPhysicalDevice
+        pub(crate) fn physical_device(&self) -> &PhysicalDevice
         {
             &self.physical_device
         }
 
         #[inline]
-        pub fn compute_queue(&self) -> &RhiQueue
+        pub fn compute_queue(&self) -> &Queue
         {
             &self.device.compute_queue
         }
 
         #[inline]
-        pub fn graphics_queue(&self) -> &RhiQueue
+        pub fn graphics_queue(&self) -> &Queue
         {
             &self.device.graphics_queue
         }
 
         #[inline]
-        pub fn transfer_queue(&self) -> &RhiQueue
+        pub fn transfer_queue(&self) -> &Queue
         {
             &self.device.transfer_queue
         }
@@ -524,16 +518,11 @@ mod _impl_tools
     use vk_mem::Alloc;
 
     use crate::framework::{
-        core::{
-            command_buffer::RhiCommandBuffer,
-            command_pool::RhiCommandPool,
-            queue::{RhiQueue, RhiSubmitInfo},
-            synchronize::RhiFence,
-        },
-        rhi::Rhi,
+        core::{command_buffer::CommandBuffer, command_pool::CommandPool, queue::SubmitInfo, synchronize::Fence},
+        render_core::Core,
     };
 
-    impl Rhi
+    impl Core
     {
         #[inline]
         pub fn create_image<S>(
@@ -590,7 +579,7 @@ mod _impl_tools
         }
 
         #[inline]
-        pub fn reset_command_pool(&self, command_pool: &mut RhiCommandPool)
+        pub fn reset_command_pool(&self, command_pool: &mut CommandPool)
         {
             unsafe {
                 self.vk_device()
@@ -600,7 +589,7 @@ mod _impl_tools
         }
 
         #[inline]
-        pub fn wait_for_fence(&self, fence: &RhiFence)
+        pub fn wait_for_fence(&self, fence: &Fence)
         {
             unsafe {
                 self.vk_device().wait_for_fences(std::slice::from_ref(&fence.fence), true, u64::MAX).unwrap();
@@ -608,7 +597,7 @@ mod _impl_tools
         }
 
         #[inline]
-        pub fn reset_fence(&self, fence: &RhiFence)
+        pub fn reset_fence(&self, fence: &Fence)
         {
             unsafe {
                 self.vk_device().reset_fences(std::slice::from_ref(&fence.fence)).unwrap();
@@ -617,7 +606,7 @@ mod _impl_tools
 
 
         #[inline]
-        pub fn graphics_queue_submit_cmds(&self, infos: Vec<RhiCommandBuffer>)
+        pub fn graphics_queue_submit_cmds(&self, infos: Vec<CommandBuffer>)
         {
             let cmds = infos.iter().map(|c| c.command_buffer).collect_vec();
             let submit_info = vk::SubmitInfo::default().command_buffers(&cmds);
@@ -629,7 +618,7 @@ mod _impl_tools
         }
 
         #[inline]
-        pub fn graphics_queue_submit(&self, infos: Vec<RhiSubmitInfo>, fence: Option<RhiFence>)
+        pub fn graphics_queue_submit(&self, infos: Vec<SubmitInfo>, fence: Option<Fence>)
         {
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = infos.iter().map(|b| b.to_vk_batch()).collect_vec();
@@ -685,7 +674,7 @@ mod _impl_tools
             queue_flags: vk::QueueFlags,
             flags: vk::CommandPoolCreateFlags,
             debug_name: S,
-        ) -> RhiCommandPool
+        ) -> CommandPool
         {
             Self::init_command_pool(&self.device, &self.debug_utils, queue_flags, flags, debug_name)
         }
@@ -730,9 +719,9 @@ mod _impl_debug
 {
     use ash::vk;
 
-    use crate::framework::rhi::Rhi;
+    use crate::framework::render_core::Core;
 
-    impl Rhi
+    impl Core
     {
         #[inline]
         pub fn set_debug_name<T, S>(&self, handle: T, name: S)

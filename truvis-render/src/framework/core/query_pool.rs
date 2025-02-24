@@ -1,8 +1,8 @@
 use ash::vk;
 
-use crate::framework::rhi::Rhi;
+use crate::framework::render_core::Core;
 
-pub struct RhiQueryPool
+pub struct QueryPool
 {
     pub(crate) handle: vk::QueryPool,
     pub(crate) query_type: vk::QueryType,
@@ -10,13 +10,13 @@ pub struct RhiQueryPool
     /// pool 的容量
     pub(crate) cnt: u32,
 
-    rhi: &'static Rhi,
+    rhi: &'static Core,
 }
 
-impl RhiQueryPool
+impl QueryPool
 {
     #[inline]
-    pub fn new(rhi: &'static Rhi, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self
+    pub fn new(rhi: &'static Core, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self
     {
         let create_info = vk::QueryPoolCreateInfo {
             query_type: ty,

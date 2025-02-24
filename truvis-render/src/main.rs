@@ -3,9 +3,9 @@ use imgui::Ui;
 use itertools::Itertools;
 use truvis_render::{
     framework::{
-        core::descriptor::{RhiDescriptorBindings, RhiDescriptorSet, RhiDescriptorUpdateInfo},
+        core::descriptor::{DescriptorBindings, DescriptorSet, RhiDescriptorUpdateInfo},
         rendering::render_context::RenderContext,
-        rhi::Rhi,
+        render_core::Core,
     },
     render::{App, AppCtx, AppInitInfo, Renderer, Timer},
 };
@@ -41,7 +41,7 @@ struct VkApp
 }
 
 struct SceneDescriptorSetLayoutBinding;
-impl RhiDescriptorBindings for SceneDescriptorSetLayoutBinding
+impl DescriptorBindings for SceneDescriptorSetLayoutBinding
 {
     fn bindings() -> Vec<DescriptorSetLayoutBinding<'static>>
     {
@@ -78,7 +78,7 @@ impl RhiDescriptorBindings for SceneDescriptorSetLayoutBinding
 
 impl VkApp
 {
-    fn prepare_render_pass(rhi: &Rhi, render_ctx: &RenderContext) -> vk::RenderPass
+    fn prepare_render_pass(rhi: &Core, render_ctx: &RenderContext) -> vk::RenderPass
     {
         // attachment
         let attachments = vec![
@@ -142,7 +142,7 @@ impl VkApp
         render_pass
     }
 
-    fn setup_depth_stencil(rhi: &Rhi, render_ctx: &RenderContext, init_info: &InitInfo) -> DepthStencil
+    fn setup_depth_stencil(rhi: &Core, render_ctx: &RenderContext, init_info: &InitInfo) -> DepthStencil
     {
         // TODO 使用 vkmem
 
@@ -190,7 +190,7 @@ impl VkApp
     }
 
     fn setup_frame_buffer(
-        rhi: &Rhi,
+        rhi: &Core,
         render_context: &RenderContext,
         render_pass: vk::RenderPass,
         init_info: &InitInfo,
@@ -217,7 +217,7 @@ impl VkApp
     }
 
     // TODO
-    fn setup_desriptors(rhi: &'static Rhi, render_ctx: &RenderContext)
+    fn setup_desriptors(rhi: &'static Core, render_ctx: &RenderContext)
     {
         // scene descriptor sets: matrices and environment maps
         // 数量和 swapchain 的 image 保持一致
@@ -240,7 +240,7 @@ impl VkApp
 
     fn setup_pipelines() {}
 
-    fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    fn new(rhi: &'static Core, render_context: &mut RenderContext) -> Self
     {
         let init_info = InitInfo {
             width: 800,
@@ -288,7 +288,7 @@ impl App for VkApp
         todo!()
     }
 
-    fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    fn init(rhi: &'static Core, render_context: &mut RenderContext) -> Self
     {
         VkApp::new(rhi, render_context)
     }

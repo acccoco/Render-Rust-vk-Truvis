@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::framework::rhi::Rhi;
+use crate::framework::render_core::Core;
 
 pub struct VulkanResource<Handle: vk::Handle + Copy>
 {
@@ -19,7 +19,7 @@ impl<Handle: vk::Handle + Copy> VulkanResource<Handle>
         }
     }
 
-    pub fn set_debug_name(&mut self, rhi: &Rhi, name: String)
+    pub fn set_debug_name(&mut self, rhi: &Core, name: String)
     {
         self.debug_name = name;
 

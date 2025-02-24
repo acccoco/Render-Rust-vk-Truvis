@@ -6,12 +6,12 @@ use imgui::Ui;
 use truvis_render::{
     framework::{
         core::{
-            buffer::RhiBuffer,
-            pipeline::{RhiPipeline, RhiPipelineTemplate},
-            queue::RhiSubmitInfo,
+            buffer::Buffer,
+            pipeline::{Pipeline, PipelineTemplate},
+            queue::SubmitInfo,
         },
         rendering::render_context::RenderContext,
-        rhi::Rhi,
+        render_core::Core,
     },
     render::{App, AppCtx, AppInitInfo, Renderer, Timer},
 };
@@ -72,25 +72,25 @@ pub struct PushConstants
 
 struct ShaderToy
 {
-    vertex_buffer: RhiBuffer,
-    index_buffer: RhiBuffer,
-    pipeline: RhiPipeline,
+    vertex_buffer: Buffer,
+    index_buffer: Buffer,
+    pipeline: Pipeline,
 }
 
 impl ShaderToy
 {
-    fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
+    fn init_buffer(rhi: &'static Core) -> (Buffer, Buffer)
     {
-        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, size_of_val(&INDEX_DATA), "index-buffer");
+        let mut index_buffer = Buffer::new_index_buffer(rhi, size_of_val(&INDEX_DATA), "index-buffer");
         index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
 
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, size_of_val(&VERTEX_DATA), "vertex-buffer");
+        let mut vertex_buffer = Buffer::new_vertex_buffer(rhi, size_of_val(&VERTEX_DATA), "vertex-buffer");
         vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }
 
-    fn init_pipeline(rhi: &'static Rhi, render_context: &RenderContext) -> RhiPipeline
+    fn init_pipeline(rhi: &'static Core, render_context: &RenderContext) -> Pipeline
     {
         let extent = render_context.swapchain_extent();
         let push_constant_ranges = vec![vk::PushConstantRange {
@@ -98,7 +98,7 @@ impl ShaderToy
             offset: 0,
             size: size_of::<PushConstants>() as u32,
         }];
-        RhiPipelineTemplate {
+        PipelineTemplate {
             vertex_shader_path: Some("shader/shadertoy-glsl/shadertoy.vert.spv".into()),
             fragment_shader_path: Some("shader/shadertoy-glsl/shadertoy.frag.spv".into()),
             color_formats: vec![render_context.color_format()],
@@ -140,7 +140,7 @@ impl ShaderToy
         .create_pipeline(rhi, "shadertoy")
     }
 
-    fn run(&self, rhi: &'static Rhi, render_context: &mut RenderContext, timer: &Timer)
+    fn run(&self, rhi: &'static Core, render_context: &mut RenderContext, timer: &Timer)
     {
         let push_constants = PushConstants {
             time: timer.total_time,
@@ -186,7 +186,7 @@ impl ShaderToy
         cmd.end();
         rhi.graphics_queue().submit(
             rhi,
-            vec![RhiSubmitInfo {
+            vec![SubmitInfo {
                 command_buffers: vec![cmd],
                 ..Default::default()
             }],
@@ -194,7 +194,7 @@ impl ShaderToy
         );
     }
 
-    fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    fn new(rhi: &'static Core, render_context: &mut RenderContext) -> Self
     {
         log::info!("start.");
 
@@ -227,7 +227,7 @@ impl App for ShaderToy
         self.run(app_ctx.rhi, app_ctx.render_context, app_ctx.timer)
     }
 
-    fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    fn init(rhi: &'static Core, render_context: &mut RenderContext) -> Self
     {
         ShaderToy::new(rhi, render_context)
     }

@@ -4,25 +4,25 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::framework::{
-    core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, query_pool::RhiQueryPool},
-    rhi::Rhi,
+    core::{buffer::Buffer, command_buffer::CommandBuffer, query_pool::QueryPool},
+    render_core::Core,
 };
 
-pub struct RhiAcceleration
+pub struct Acceleration
 {
     acceleration_structure: vk::AccelerationStructureKHR,
-    buffer: RhiBuffer,
+    buffer: Buffer,
 
-    rhi: &'static Rhi,
+    rhi: &'static Core,
 }
 
 
-impl RhiAcceleration
+impl Acceleration
 {
     /// 需要指定每个 geometry 的信息，以及每个 geometry 拥有的 max primitives 数量
     /// 会自动添加 compact 和 trace 的 flag
     pub fn build_blas(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         data: Vec<(vk::AccelerationStructureGeometryTrianglesDataKHR, u32)>,
         flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: &str,
@@ -80,7 +80,7 @@ impl RhiAcceleration
             &format!("{}-uncompact-blas", debug_name),
         );
 
-        let scratch_buffer = RhiBuffer::new_accleration_scratch_buffer(
+        let scratch_buffer = Buffer::new_accleration_scratch_buffer(
             rhi,
             size_info.build_scratch_size,
             &format!("{}-blas-scratch-buffer", debug_name),
@@ -93,11 +93,11 @@ impl RhiAcceleration
         };
 
         // 创建一个 QueryPool，用于查询 compact size
-        let mut query_pool = RhiQueryPool::new(rhi, vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, 1, "");
+        let mut query_pool = QueryPool::new(rhi, vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, 1, "");
         query_pool.reset(0, 1);
 
         // 等待初步 build 完成
-        RhiCommandBuffer::one_time_exec(
+        CommandBuffer::one_time_exec(
             rhi,
             vk::QueueFlags::COMPUTE,
             |cmd| {
@@ -127,7 +127,7 @@ impl RhiAcceleration
             &format!("{}-compact-blas", debug_name),
         );
 
-        RhiCommandBuffer::one_time_exec(
+        CommandBuffer::one_time_exec(
             rhi,
             vk::QueueFlags::COMPUTE,
             |cmd| {
@@ -153,13 +153,13 @@ impl RhiAcceleration
     }
 
     pub fn build_tlas(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         instances: &[vk::AccelerationStructureInstanceKHR],
         flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: &str,
     ) -> Self
     {
-        let mut acceleration_instance_buffer = RhiBuffer::new_acceleration_instance_buffer(
+        let mut acceleration_instance_buffer = Buffer::new_acceleration_instance_buffer(
             rhi,
             std::mem::size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name),
@@ -211,7 +211,7 @@ impl RhiAcceleration
             &format!("{}-tlas", debug_name),
         );
 
-        let scratch_buffer = RhiBuffer::new_accleration_scratch_buffer(
+        let scratch_buffer = Buffer::new_accleration_scratch_buffer(
             rhi,
             size_info.build_scratch_size,
             format!("{}-tlas-scratch-buffer", debug_name),
@@ -228,7 +228,7 @@ impl RhiAcceleration
         };
 
         // 正式构建 TLAS
-        RhiCommandBuffer::one_time_exec(
+        CommandBuffer::one_time_exec(
             rhi,
             vk::QueueFlags::COMPUTE,
             |cmd| {
@@ -247,9 +247,9 @@ impl RhiAcceleration
     }
 
     /// 创建 AccelerationStructure 以及 buffer    
-    fn new(rhi: &'static Rhi, size: vk::DeviceSize, ty: vk::AccelerationStructureTypeKHR, debug_name: &str) -> Self
+    fn new(rhi: &'static Core, size: vk::DeviceSize, ty: vk::AccelerationStructureTypeKHR, debug_name: &str) -> Self
     {
-        let buffer = RhiBuffer::new_accleration_buffer(rhi, size as usize, debug_name);
+        let buffer = Buffer::new_accleration_buffer(rhi, size as usize, debug_name);
 
         let create_info = vk::AccelerationStructureCreateInfoKHR {
             ty,

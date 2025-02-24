@@ -4,24 +4,24 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::framework::{
-    core::{debug::RhiDebugUtils, instance::RhiInstance, physical_device::RhiPhysicalDevice, queue::RhiQueue},
-    rhi::RhiInitInfo,
+    core::{instance::Instance, physical_device::PhysicalDevice, queue::Queue},
+    render_core::InitInfo,
 };
 
-pub struct RhiDevice
+pub struct Device
 {
     pub device: ash::Device,
 
-    pub graphics_queue: RhiQueue,
-    pub transfer_queue: RhiQueue,
-    pub compute_queue: RhiQueue,
+    pub graphics_queue: Queue,
+    pub transfer_queue: Queue,
+    pub compute_queue: Queue,
 
-    pub pdevice: Arc<RhiPhysicalDevice>,
+    pub pdevice: Arc<PhysicalDevice>,
 }
 
-impl RhiDevice
+impl Device
 {
-    pub fn new(init_info: &mut RhiInitInfo, instance: &RhiInstance, pdevice: Arc<RhiPhysicalDevice>) -> Self
+    pub fn new(init_info: &mut InitInfo, instance: &Instance, pdevice: Arc<PhysicalDevice>) -> Self
     {
         let graphics_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::GRAPHICS).unwrap();
         let compute_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::COMPUTE).unwrap();
@@ -87,15 +87,15 @@ impl RhiDevice
             Self {
                 device,
                 pdevice,
-                graphics_queue: RhiQueue {
+                graphics_queue: Queue {
                     vk_queue: graphics_queue,
                     queue_family_index: graphics_queue_family_index,
                 },
-                transfer_queue: RhiQueue {
+                transfer_queue: Queue {
                     vk_queue: transfer_queue,
                     queue_family_index: transfer_queue_family_index,
                 },
-                compute_queue: RhiQueue {
+                compute_queue: Queue {
                     vk_queue: compute_queue,
                     queue_family_index: compute_queue_family_index,
                 },

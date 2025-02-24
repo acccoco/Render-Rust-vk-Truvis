@@ -1,8 +1,8 @@
 use ash::vk;
 
-use crate::framework::rhi::Rhi;
+use crate::framework::render_core::Core;
 
-pub struct RhiSampler
+pub struct Sampler
 {
     min_filter: vk::Filter,
     mag_filter: vk::Filter,
@@ -11,12 +11,12 @@ pub struct RhiSampler
     wrap_v: vk::SamplerAddressMode,
 
     handle: vk::Sampler,
-    rhi: &'static Rhi,
+    rhi: &'static Core,
 }
 
-impl RhiSampler
+impl Sampler
 {
-    pub fn new(rhi: &'static Rhi, info: &vk::SamplerCreateInfo, debug_name: &str) -> Self
+    pub fn new(rhi: &'static Core, info: &vk::SamplerCreateInfo, debug_name: &str) -> Self
     {
         let handle = unsafe { rhi.vk_device().create_sampler(info, None).unwrap() };
         rhi.set_debug_name(handle, debug_name);

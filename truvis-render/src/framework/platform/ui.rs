@@ -8,26 +8,26 @@ use image::EncodableLayout;
 use crate::framework::{
     basic::color::LabelColor,
     core::{
-        buffer::RhiBuffer, command_buffer::RhiCommandBuffer, image::RhiImage2D, queue::RhiSubmitInfo,
-        shader::RhiShaderModule, texture::RhiTexture,
+        buffer::Buffer, command_buffer::CommandBuffer, image::Image2D, queue::SubmitInfo,
+        shader::ShaderModule, texture::Texture,
     },
     rendering::render_context::RenderContext,
-    rhi::Rhi,
+    render_core::Core,
 };
 
 pub struct UiMesh
 {
-    pub vertex: RhiBuffer,
+    pub vertex: Buffer,
     vertex_count: usize,
 
-    pub indices: RhiBuffer,
+    pub indices: Buffer,
     index_count: usize,
 }
 
 impl UiMesh
 {
     // TODO 频繁的创建和销毁 buffer，性能不好
-    pub fn from_draw_data(rhi: &'static Rhi, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self
+    pub fn from_draw_data(rhi: &'static Core, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self
     {
         let mut cmd = render_ctx.alloc_command_buffer("uipass-create-mesh");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]create-mesh");
@@ -70,7 +70,7 @@ impl UiMesh
         cmd.end();
 
         rhi.graphics_queue_submit(
-            vec![RhiSubmitInfo {
+            vec![SubmitInfo {
                 command_buffers: vec![cmd],
                 ..Default::default()
             }],
@@ -88,11 +88,11 @@ impl UiMesh
     /// # Return
     /// (vertices buffer, vertex count)
     fn create_vertices(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         render_ctx: &mut RenderContext,
-        cmd: &mut RhiCommandBuffer,
+        cmd: &mut CommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (RhiBuffer, usize)
+    ) -> (Buffer, usize)
     {
         let vertex_count = draw_data.total_vtx_count as usize;
         let mut vertices = Vec::with_capacity(vertex_count);
@@ -101,14 +101,14 @@ impl UiMesh
         }
 
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(
+        let mut vertex_buffer = Buffer::new_vertex_buffer(
             rhi,
             vertices_size,
             &format!("{}-imgui-vertex-buffer", render_ctx.current_frame_prefix()),
         );
         {
             // FIXME destroy stage buffer
-            let mut stage_buffer = RhiBuffer::new_stage_buffer(
+            let mut stage_buffer = Buffer::new_stage_buffer(
                 rhi,
                 vertices_size as vk::DeviceSize,
                 &format!("{}-imgui-vertex-stage-buffer", render_ctx.current_frame_prefix()),
@@ -135,11 +135,11 @@ impl UiMesh
     /// # Return
     /// (index buffer, index count)
     fn create_indices(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         render_ctx: &mut RenderContext,
-        cmd: &mut RhiCommandBuffer,
+        cmd: &mut CommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (RhiBuffer, usize)
+    ) -> (Buffer, usize)
     {
         let index_count = draw_data.total_idx_count as usize;
         let mut indices = Vec::with_capacity(index_count);
@@ -148,14 +148,14 @@ impl UiMesh
         }
 
         let indices_size = index_count * size_of::<imgui::DrawIdx>();
-        let mut index_buffer = RhiBuffer::new_index_buffer(
+        let mut index_buffer = Buffer::new_index_buffer(
             rhi,
             indices_size,
             &format!("{}-imgui-index-buffer", render_ctx.current_frame_prefix()),
         );
         {
             // FIXME destroy stage buffer
-            let mut stage_buffer = RhiBuffer::new_stage_buffer(
+            let mut stage_buffer = Buffer::new_stage_buffer(
                 rhi,
                 indices_size as vk::DeviceSize,
                 &format!("{}-imgui-index-stage-buffer", render_ctx.current_frame_prefix()),
@@ -198,7 +198,7 @@ pub struct UI
 
     descriptor_pool: vk::DescriptorPool,
 
-    fonts_texture: RhiTexture,
+    fonts_texture: Texture,
     font_descriptor_set: vk::DescriptorSet,
 
     meshes: Vec<Option<UiMesh>>,
@@ -217,7 +217,7 @@ impl UI
 
 
     pub fn new(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         render_ctx: &RenderContext,
         window: &winit::window::Window,
         options: &UiOptions,
@@ -237,14 +237,14 @@ impl UI
             let fonts = imgui.fonts();
             let atlas_texture = fonts.build_rgba32_texture();
 
-            let image = RhiImage2D::from_rgba8(
+            let image = Image2D::from_rgba8(
                 rhi,
                 atlas_texture.width,
                 atlas_texture.height,
                 atlas_texture.data,
                 "imgui-fonts-image",
             );
-            RhiTexture::new(rhi, image, "imgui-fonts-texture")
+            Texture::new(rhi, image, "imgui-fonts-texture")
         };
 
         let fonts = imgui.fonts();
@@ -327,11 +327,11 @@ impl UI
     // imgui.render()
     pub fn draw(
         &mut self,
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         render_ctx: &mut RenderContext,
         window: &winit::window::Window,
         f: impl FnOnce(&mut imgui::Ui),
-    ) -> Option<RhiCommandBuffer>
+    ) -> Option<CommandBuffer>
     {
         self.platform.prepare_frame(self.imgui.borrow_mut().io_mut(), window).unwrap();
 
@@ -375,7 +375,7 @@ impl UI
     fn record_cmd(
         &self,
         render_ctx: &mut RenderContext,
-        cmd: &mut RhiCommandBuffer,
+        cmd: &mut CommandBuffer,
         mesh: &UiMesh,
         draw_data: &imgui::DrawData,
     )
@@ -552,15 +552,15 @@ impl UI
     }
 
     fn create_pipeline(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         render_ctx: &RenderContext,
         pipeline_layout: vk::PipelineLayout,
     ) -> vk::Pipeline
     {
         let entry_point_name = CString::new("main").unwrap();
 
-        let vert_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.vs.hlsl.spv"));
-        let frag_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.ps.hlsl.spv"));
+        let vert_shader_module = ShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.vs.hlsl.spv"));
+        let frag_shader_module = ShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.ps.hlsl.spv"));
 
         let shader_states_infos = [
             vk::PipelineShaderStageCreateInfo::default()

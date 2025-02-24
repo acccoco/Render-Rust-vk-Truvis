@@ -1,16 +1,16 @@
 use ash::vk;
 
-use crate::framework::rhi::Rhi;
+use crate::framework::render_core::Core;
 
-pub struct RhiCommandPool
+pub struct CommandPool
 {
     pub command_pool: vk::CommandPool,
     pub queue_family_index: u32,
 }
 
-impl RhiCommandPool
+impl CommandPool
 {
-    pub fn reset(&mut self, rhi: &Rhi)
+    pub fn reset(&mut self, rhi: &Core)
     {
         unsafe {
             rhi.vk_device().reset_command_pool(self.command_pool, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();

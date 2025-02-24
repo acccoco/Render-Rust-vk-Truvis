@@ -2,18 +2,18 @@
 
 use ash::vk;
 
-use crate::framework::rhi::Rhi;
+use crate::framework::render_core::Core;
 
 #[derive(Clone)]
-pub struct RhiFence
+pub struct Fence
 {
     pub(crate) fence: vk::Fence,
-    rhi: &'static Rhi,
+    rhi: &'static Core,
 }
 
-impl RhiFence
+impl Fence
 {
-    pub fn new<S>(rhi: &'static Rhi, signaled: bool, debug_name: S) -> Self
+    pub fn new<S>(rhi: &'static Core, signaled: bool, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {
@@ -49,15 +49,15 @@ impl RhiFence
 }
 
 #[derive(Copy, Clone)]
-pub struct RhiSemaphore
+pub struct Semaphore
 {
     pub(crate) semaphore: vk::Semaphore,
-    rhi: &'static Rhi,
+    rhi: &'static Core,
 }
 
-impl RhiSemaphore
+impl Semaphore
 {
-    pub fn new<S>(rhi: &'static Rhi, debug_name: S) -> Self
+    pub fn new<S>(rhi: &'static Core, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {
@@ -76,6 +76,6 @@ impl RhiSemaphore
 }
 
 
-pub struct RhiPipelineBarrier {}
+pub struct PipelineBarrier {}
 
-impl RhiPipelineBarrier {}
+impl PipelineBarrier {}

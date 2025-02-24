@@ -3,12 +3,12 @@ use imgui::Ui;
 use truvis_render::{
     framework::{
         core::{
-            buffer::RhiBuffer,
-            pipeline::{RhiPipeline, RhiPipelineTemplate},
-            queue::RhiSubmitInfo,
+            buffer::Buffer,
+            pipeline::{Pipeline, PipelineTemplate},
+            queue::SubmitInfo,
         },
         rendering::render_context::RenderContext,
-        rhi::Rhi,
+        render_core::Core,
     },
     render::{App, AppCtx, AppInitInfo, Renderer, Timer},
 };
@@ -39,30 +39,30 @@ const VERTEX_DATA: [Vertex; 3] = [
 
 struct HelloTriangle
 {
-    vertex_buffer: RhiBuffer,
-    index_buffer: RhiBuffer,
-    pipeline: RhiPipeline,
+    vertex_buffer: Buffer,
+    index_buffer: Buffer,
+    pipeline: Pipeline,
 
     frame_id: u64,
 }
 
 impl HelloTriangle
 {
-    fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
+    fn init_buffer(rhi: &'static Core) -> (Buffer, Buffer)
     {
-        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
+        let mut index_buffer = Buffer::new_index_buffer(rhi, std::mem::size_of_val(&INDEX_DATA), "index-buffer");
         index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
 
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
+        let mut vertex_buffer = Buffer::new_vertex_buffer(rhi, std::mem::size_of_val(&VERTEX_DATA), "vertex-buffer");
         vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }
 
-    fn init_pipeline(rhi: &'static Rhi, render_context: &mut RenderContext) -> RhiPipeline
+    fn init_pipeline(rhi: &'static Core, render_context: &mut RenderContext) -> Pipeline
     {
         let extent = render_context.swapchain_extent();
-        let pipeline = RhiPipelineTemplate {
+        let pipeline = PipelineTemplate {
             fragment_shader_path: Some("shader/hello_triangle/triangle.ps.hlsl.spv".into()),
             vertex_shader_path: Some("shader/hello_triangle/triangle.vs.hlsl.spv".into()),
             color_formats: vec![render_context.color_format()],
@@ -105,7 +105,7 @@ impl HelloTriangle
         pipeline
     }
 
-    fn my_update(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
+    fn my_update(&self, rhi: &'static Core, render_context: &mut RenderContext)
     {
         let color_attach = <Self as App>::get_color_attachment(render_context.current_present_image_view());
         let depth_attach = <Self as App>::get_depth_attachment(render_context.depth_image_view);
@@ -132,7 +132,7 @@ impl HelloTriangle
         rhi.graphics_queue_submit_cmds(vec![cmd]);
     }
 
-    fn new(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    fn new(rhi: &'static Core, render_context: &mut RenderContext) -> Self
     {
         let pipeline = HelloTriangle::init_pipeline(rhi, render_context);
         let (vertex_buffer, index_buffer) = HelloTriangle::init_buffer(rhi);
@@ -177,7 +177,7 @@ impl App for HelloTriangle
         self.my_update(app_ctx.rhi, app_ctx.render_context);
     }
 
-    fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    fn init(rhi: &'static Core, render_context: &mut RenderContext) -> Self
     {
         log::info!("start.");
         HelloTriangle::new(rhi, render_context)

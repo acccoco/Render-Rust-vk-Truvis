@@ -3,22 +3,22 @@ use itertools::Itertools;
 
 use crate::framework::{
     core::{
-        command_buffer::RhiCommandBuffer,
-        synchronize::{RhiFence, RhiSemaphore},
+        command_buffer::CommandBuffer,
+        synchronize::{Fence, Semaphore},
     },
-    rhi::Rhi,
+    render_core::Core,
 };
 
-pub struct RhiQueue
+pub struct Queue
 {
     pub vk_queue: vk::Queue,
     pub queue_family_index: u32,
 }
 
-impl RhiQueue
+impl Queue
 {
     // TODO 使用 queue_submit2
-    pub fn submit(&self, rhi: &Rhi, batches: Vec<RhiSubmitInfo>, fence: Option<RhiFence>)
+    pub fn submit(&self, rhi: &Core, batches: Vec<SubmitInfo>, fence: Option<Fence>)
     {
         unsafe {
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
@@ -33,7 +33,7 @@ impl RhiQueue
 
     /// 根据 specification，vkQueueWaitIdle 应该和 Fence 效率相同
     #[inline]
-    pub fn wait_idle(&self, rhi: &Rhi)
+    pub fn wait_idle(&self, rhi: &Core)
     {
         unsafe { rhi.vk_device().queue_wait_idle(self.vk_queue).unwrap() }
     }
@@ -43,16 +43,16 @@ impl RhiQueue
 // TODO 这个封装的不怎么样
 /// RHi 关于 submitInfo 的封装，更易用
 #[derive(Default)]
-pub struct RhiSubmitInfo
+pub struct SubmitInfo
 {
-    pub command_buffers: Vec<RhiCommandBuffer>,
-    pub wait_info: Vec<(vk::PipelineStageFlags, RhiSemaphore)>,
-    pub signal_info: Vec<RhiSemaphore>,
+    pub command_buffers: Vec<CommandBuffer>,
+    pub wait_info: Vec<(vk::PipelineStageFlags, Semaphore)>,
+    pub signal_info: Vec<Semaphore>,
 }
 
 
 /// 兼容 VkSubmitInfo 的内存模式
-pub struct RhiSubmitInfoTemp
+pub struct SubmitInfoTemp
 {
     command_buffers: Vec<vk::CommandBuffer>,
     wait_stages: Vec<vk::PipelineStageFlags>,
@@ -61,7 +61,7 @@ pub struct RhiSubmitInfoTemp
 }
 
 
-impl RhiSubmitInfoTemp
+impl SubmitInfoTemp
 {
     pub fn submit_info(&self) -> vk::SubmitInfo
     {
@@ -84,12 +84,12 @@ impl RhiSubmitInfoTemp
     }
 }
 
-impl RhiSubmitInfo
+impl SubmitInfo
 {
     #[inline]
-    pub fn to_vk_batch(&self) -> RhiSubmitInfoTemp
+    pub fn to_vk_batch(&self) -> SubmitInfoTemp
     {
-        RhiSubmitInfoTemp {
+        SubmitInfoTemp {
             command_buffers: self.commands(),
             wait_stages: self.wait_stages(),
             wait_semaphores: self.wait_semaphores(),

@@ -2,18 +2,18 @@ use std::ffi::CString;
 
 use ash::vk;
 
-use crate::framework::rhi::RhiInitInfo;
+use crate::framework::render_core::InitInfo;
 
-pub struct RhiDebugUtils
+pub struct DebugUtils
 {
     pub vk_debug_utils_instance: ash::ext::debug_utils::Instance,
     pub vk_debug_utils_device: ash::ext::debug_utils::Device,
     pub vk_debug_utils_messenger: vk::DebugUtilsMessengerEXT,
 }
 
-impl RhiDebugUtils
+impl DebugUtils
 {
-    pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, device: &ash::Device, init_info: &RhiInitInfo) -> Self
+    pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, device: &ash::Device, init_info: &InitInfo) -> Self
     {
         let loader = ash::ext::debug_utils::Instance::new(vk_pf, instance);
 

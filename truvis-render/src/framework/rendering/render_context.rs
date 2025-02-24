@@ -4,19 +4,19 @@ use itertools::Itertools;
 use crate::framework::{
     basic::{color::LabelColor, FRAME_ID_MAP},
     core::{
-        command_buffer::RhiCommandBuffer,
-        command_pool::RhiCommandPool,
-        create_utils::RhiCreateInfoUtil,
-        queue::RhiSubmitInfo,
-        swapchain::{RenderSwapchain, RenderSwapchainInitInfo},
-        synchronize::{RhiFence, RhiSemaphore},
+        command_buffer::CommandBuffer,
+        command_pool::CommandPool,
+        create_utils::CreateUtils,
+        queue::SubmitInfo,
+        swapchain::{Swapchain, SwapchainInitInfo},
+        synchronize::{Fence, Semaphore},
     },
-    rhi::{Rhi, RHI},
+    render_core::{Core, CORE},
 };
 
 pub struct RenderContext
 {
-    pub render_swapchain: RenderSwapchain,
+    pub render_swapchain: Swapchain,
 
     swapchain_image_index: usize,
 
@@ -26,39 +26,39 @@ pub struct RenderContext
     pub frame_id: u64,
 
     /// 为每个 frame 分配一个 command pool
-    graphics_command_pools: Vec<RhiCommandPool>,
+    graphics_command_pools: Vec<CommandPool>,
 
     /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
-    allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
+    allocated_command_buffers: Vec<Vec<CommandBuffer>>,
 
     pub depth_format: vk::Format,
     pub depth_image: vk::Image,
     depth_image_allcation: vk_mem::Allocation,
     pub depth_image_view: vk::ImageView,
 
-    present_complete_semaphores: Vec<RhiSemaphore>,
-    render_complete_semaphores: Vec<RhiSemaphore>,
-    fence_frame_in_flight: Vec<RhiFence>,
+    present_complete_semaphores: Vec<Semaphore>,
+    render_complete_semaphores: Vec<Semaphore>,
+    fence_frame_in_flight: Vec<Fence>,
 
-    rhi: &'static Rhi,
+    rhi: &'static Core,
 }
 
 impl RenderContext
 {
     pub fn new(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         init_info: &RenderContextInitInfo,
-        render_swapchain_init_info: RenderSwapchainInitInfo,
+        render_swapchain_init_info: SwapchainInitInfo,
     ) -> Self
     {
-        let render_swapchain = RenderSwapchain::new(rhi, &render_swapchain_init_info);
+        let render_swapchain = Swapchain::new(rhi, &render_swapchain_init_info);
         let (depth_format, depth_image, depth_image_allcation, depth_image_view) =
             Self::init_depth_image_and_view(rhi, &render_swapchain, &init_info.depth_format_dedicate);
 
         let create_semaphore = |name: &str| {
             (0..init_info.frames_in_flight)
                 .map(|i| FRAME_ID_MAP[i])
-                .map(|tag| RhiSemaphore::new(rhi, format!("{name}_{tag}")))
+                .map(|tag| Semaphore::new(rhi, format!("{name}_{tag}")))
                 .collect_vec()
         };
         let present_complete_semaphores = create_semaphore("present_complete_semaphore");
@@ -66,7 +66,7 @@ impl RenderContext
 
         let fence_frame_in_flight = (0..init_info.frames_in_flight)
             .map(|i| FRAME_ID_MAP[i])
-            .map(|tag| RhiFence::new(rhi, true, format!("frame_in_flight_fence_{tag}")))
+            .map(|tag| Fence::new(rhi, true, format!("frame_in_flight_fence_{tag}")))
             .collect();
 
         let graphics_command_pools = Self::init_command_pool(rhi, init_info);
@@ -99,8 +99,8 @@ impl RenderContext
 
 
     fn init_depth_image_and_view(
-        rhi: &Rhi,
-        swapchain: &RenderSwapchain,
+        rhi: &Core,
+        swapchain: &Swapchain,
         depth_format_dedicate: &[vk::Format],
     ) -> (vk::Format, vk::Image, vk_mem::Allocation, vk::ImageView)
     {
@@ -115,7 +115,7 @@ impl RenderContext
             .unwrap();
 
         let (depth_image, depth_image_allocation) = {
-            let create_info = RhiCreateInfoUtil::make_image2d_create_info(
+            let create_info = CreateUtils::make_image2d_create_info(
                 swapchain.extent,
                 depth_format,
                 vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
@@ -124,7 +124,7 @@ impl RenderContext
         };
 
         let depth_image_view = {
-            let create_info = RhiCreateInfoUtil::make_image_view_2d_create_info(
+            let create_info = CreateUtils::make_image_view_2d_create_info(
                 depth_image,
                 depth_format,
                 vk::ImageAspectFlags::DEPTH,
@@ -135,7 +135,7 @@ impl RenderContext
         (depth_format, depth_image, depth_image_allocation, depth_image_view)
     }
 
-    fn init_command_pool(rhi: &Rhi, init_info: &RenderContextInitInfo) -> Vec<RhiCommandPool>
+    fn init_command_pool(rhi: &Core, init_info: &RenderContextInitInfo) -> Vec<CommandPool>
     {
         let graphics_command_pools = (0..init_info.frames_in_flight)
             .map(|i| {
@@ -156,7 +156,7 @@ impl RenderContext
     /// * 为 image 进行 layout transition 的操作
     pub fn acquire_frame(&mut self)
     {
-        let rhi = RHI.get().unwrap();
+        let rhi = CORE.get().unwrap();
 
         rhi.graphics_queue_begin_label("[acquire-frame]reset", LabelColor::COLOR_STAGE);
         {
@@ -201,7 +201,7 @@ impl RenderContext
             cmd.end();
 
             self.rhi.graphics_queue_submit(
-                vec![RhiSubmitInfo {
+                vec![SubmitInfo {
                     command_buffers: vec![cmd],
                     wait_info: vec![(
                         vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
@@ -241,7 +241,7 @@ impl RenderContext
             cmd.end();
 
             self.rhi.graphics_queue_submit(
-                vec![RhiSubmitInfo {
+                vec![SubmitInfo {
                     command_buffers: vec![cmd],
                     signal_info: vec![self.current_render_complete_semaphore()],
                     ..Default::default()
@@ -264,10 +264,10 @@ impl RenderContext
 
 
     /// 分配 command buffer，在当前 frame 使用
-    pub fn alloc_command_buffer<S: AsRef<str>>(&mut self, debug_name: S) -> RhiCommandBuffer
+    pub fn alloc_command_buffer<S: AsRef<str>>(&mut self, debug_name: S) -> CommandBuffer
     {
         let name = format!("[frame-{}-{}]{}", FRAME_ID_MAP[self.current_frame], self.frame_id, debug_name.as_ref());
-        let cmd = RhiCommandBuffer::new(self.rhi, &self.graphics_command_pools[self.current_frame], name);
+        let cmd = CommandBuffer::new(self.rhi, &self.graphics_command_pools[self.current_frame], name);
 
         self.allocated_command_buffers[self.current_frame].push(cmd.clone());
 
@@ -282,7 +282,7 @@ impl RenderContext
     }
 
     #[inline]
-    pub fn current_fence(&self) -> &RhiFence
+    pub fn current_fence(&self) -> &Fence
     {
         &self.fence_frame_in_flight[self.current_frame]
     }
@@ -313,13 +313,13 @@ impl RenderContext
     }
 
     #[inline]
-    pub fn current_render_complete_semaphore(&self) -> RhiSemaphore
+    pub fn current_render_complete_semaphore(&self) -> Semaphore
     {
         self.render_complete_semaphores[self.current_frame]
     }
 
     #[inline]
-    pub fn current_present_complete_semaphore(&self) -> RhiSemaphore
+    pub fn current_present_complete_semaphore(&self) -> Semaphore
     {
         self.present_complete_semaphores[self.current_frame]
     }

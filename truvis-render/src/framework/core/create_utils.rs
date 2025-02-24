@@ -1,9 +1,9 @@
 use ash::vk;
 
 /// 可以快速创建出 vuklan 所需的各种 CreateInfo
-pub struct RhiCreateInfoUtil;
+pub struct CreateUtils;
 
-impl RhiCreateInfoUtil
+impl CreateUtils
 {
     // FIXME 这个声明周期还是感觉不太安全
     /// 返回值的声明周期来自于 queue_family_indices

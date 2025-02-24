@@ -3,9 +3,9 @@ use std::ffi::c_void;
 use ash::vk;
 use vk_mem::Alloc;
 
-use crate::framework::{core::command_buffer::RhiCommandBuffer, rhi::Rhi};
+use crate::framework::{core::command_buffer::CommandBuffer, render_core::Core};
 
-pub struct RhiBuffer
+pub struct Buffer
 {
     pub handle: vk::Buffer,
     allocation: vk_mem::Allocation,
@@ -15,13 +15,13 @@ pub struct RhiBuffer
 
     debug_name: String,
 
-    rhi: &'static Rhi,
+    rhi: &'static Core,
 }
 
-impl RhiBuffer
+impl Buffer
 {
     pub fn new2(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         buffer_ci: &vk::BufferCreateInfo,
         alloc_ci: &vk_mem::AllocationCreateInfo,
         align: Option<vk::DeviceSize>,
@@ -49,7 +49,7 @@ impl RhiBuffer
 
     /// @param min_align 对 memory 的 offset align 限制
     pub fn new(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         size: vk::DeviceSize,
         buffer_usage: vk::BufferUsageFlags,
         mem_usage: vk_mem::MemoryUsage,
@@ -74,7 +74,7 @@ impl RhiBuffer
 
     #[inline]
     pub fn new_device_buffer(
-        rhi: &'static Rhi,
+        rhi: &'static Core,
         size: vk::DeviceSize,
         flags: vk::BufferUsageFlags,
         debug_name: &str,
@@ -92,7 +92,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_acceleration_instance_buffer<S>(rhi: &'static Rhi, size: vk::DeviceSize, debug_name: S) -> Self
+    pub fn new_acceleration_instance_buffer<S>(rhi: &'static Core, size: vk::DeviceSize, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {
@@ -107,7 +107,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_stage_buffer<S>(rhi: &'static Rhi, size: vk::DeviceSize, debug_name: S) -> Self
+    pub fn new_stage_buffer<S>(rhi: &'static Core, size: vk::DeviceSize, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {
@@ -123,7 +123,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_index_buffer(rhi: &'static Rhi, size: usize, debug_name: &str) -> Self
+    pub fn new_index_buffer(rhi: &'static Core, size: usize, debug_name: &str) -> Self
     {
         Self::new_device_buffer(
             rhi,
@@ -137,7 +137,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_vertex_buffer(rhi: &'static Rhi, size: usize, debug_name: &str) -> Self
+    pub fn new_vertex_buffer(rhi: &'static Core, size: usize, debug_name: &str) -> Self
     {
         Self::new_device_buffer(
             rhi,
@@ -151,7 +151,7 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_accleration_buffer<S: AsRef<str>>(rhi: &'static Rhi, size: usize, debug_name: S) -> Self
+    pub fn new_accleration_buffer<S: AsRef<str>>(rhi: &'static Core, size: usize, debug_name: S) -> Self
     {
         Self::new_device_buffer(
             rhi,
@@ -162,8 +162,8 @@ impl RhiBuffer
     }
 
     #[inline]
-    pub fn new_accleration_scratch_buffer<S: AsRef<str>>(rhi: &'static Rhi, size: vk::DeviceSize, debug_name: S)
-        -> Self
+    pub fn new_accleration_scratch_buffer<S: AsRef<str>>(rhi: &'static Core, size: vk::DeviceSize, debug_name: S)
+                                                         -> Self
     {
         Self::new_device_buffer(
             rhi,
@@ -237,7 +237,7 @@ impl RhiBuffer
         stage_buffer.transfer_data_by_mem_map(data);
 
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
-        RhiCommandBuffer::one_time_exec(
+        CommandBuffer::one_time_exec(
             self.rhi,
             vk::QueueFlags::TRANSFER,
             |cmd| {

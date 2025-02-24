@@ -6,18 +6,18 @@ use std::{
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::rhi::RhiInitInfo;
+use crate::framework::render_core::InitInfo;
 
-pub struct RhiInstance
+pub struct Instance
 {
     pub handle: ash::Instance,
 }
 
 
-impl RhiInstance
+impl Instance
 {
     /// 设置所需的 layers 和 extensions，创建 vk instance
-    pub fn new(vk_entry: &ash::Entry, init_info: &RhiInitInfo) -> Self
+    pub fn new(vk_entry: &ash::Entry, init_info: &InitInfo) -> Self
     {
         let app_name = CString::new(init_info.app_name.as_str()).unwrap();
         let engine_name = CString::new(init_info.engine_name.as_str()).unwrap();
@@ -90,7 +90,7 @@ impl RhiInstance
     ///
     /// # return
     /// instance 所需的，且受支持的 extension
-    fn get_extensions(vk_entry: &ash::Entry, init_info: &RhiInitInfo) -> Vec<*const c_char>
+    fn get_extensions(vk_entry: &ash::Entry, init_info: &InitInfo) -> Vec<*const c_char>
     {
         let all_ext_props = unsafe { vk_entry.enumerate_instance_extension_properties(None).unwrap() };
         let mut enabled_extensions: HashSet<&'static CStr> = HashSet::new();
@@ -115,7 +115,7 @@ impl RhiInstance
     }
 
     /// instance 所需的所有 layers
-    fn get_layers(vk_entry: &ash::Entry, init_info: &RhiInitInfo) -> Vec<*const c_char>
+    fn get_layers(vk_entry: &ash::Entry, init_info: &InitInfo) -> Vec<*const c_char>
     {
         let all_layer_props = unsafe { vk_entry.enumerate_instance_layer_properties().unwrap() };
 

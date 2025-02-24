@@ -6,9 +6,9 @@ use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
 use crate::framework::{
     basic::FRAME_ID_MAP,
-    core::synchronize::{RhiFence, RhiSemaphore},
+    core::synchronize::{Fence, Semaphore},
     platform::window_system::WindowSystem,
-    rhi::Rhi,
+    render_core::Core,
 };
 
 
@@ -18,7 +18,7 @@ struct Surface
     pf: ash::khr::surface::Instance,
 }
 
-pub struct RenderSwapchain
+pub struct Swapchain
 {
     swapchain_pf: ash::khr::swapchain::Device,
     swapchain_handle: vk::SwapchainKHR,
@@ -35,9 +35,9 @@ pub struct RenderSwapchain
 }
 
 
-impl RenderSwapchain
+impl Swapchain
 {
-    pub fn new(rhi: &Rhi, init_info: &RenderSwapchainInitInfo) -> Self
+    pub fn new(rhi: &Core, init_info: &SwapchainInitInfo) -> Self
     {
         let pdevice = rhi.physical_device().handle;
         let surface = Self::create_surface(rhi, init_info.window.as_ref().unwrap());
@@ -72,7 +72,7 @@ impl RenderSwapchain
 
 
     fn init_handle(
-        rhi: &Rhi,
+        rhi: &Core,
         surface: &Surface,
         surface_capabilities: &vk::SurfaceCapabilitiesKHR,
         format: vk::Format,
@@ -114,7 +114,7 @@ impl RenderSwapchain
     }
 
     fn init_images_and_views(
-        rhi: &Rhi,
+        rhi: &Core,
         swapchain_handle: vk::SwapchainKHR,
         swapchain_pf: &ash::khr::swapchain::Device,
         format: vk::Format,
@@ -156,7 +156,7 @@ impl RenderSwapchain
     /// @param present_mode: 优先使用的 present mode
     ///
     /// 可以是：immediate, mailbox, fifo, fifo_relaxed
-    fn init_present_mode2(rhi: &Rhi, surface: &Surface, present_mode: vk::PresentModeKHR) -> vk::PresentModeKHR
+    fn init_present_mode2(rhi: &Core, surface: &Surface, present_mode: vk::PresentModeKHR) -> vk::PresentModeKHR
     {
         unsafe {
             surface
@@ -177,7 +177,7 @@ impl RenderSwapchain
     ///
     /// panic: 如果没有找到，就 panic
     fn init_format_and_colorspace(
-        rhi: &Rhi,
+        rhi: &Core,
         surface: &Surface,
         format: vk::SurfaceFormatKHR,
     ) -> (vk::Format, vk::ColorSpaceKHR)
@@ -196,7 +196,7 @@ impl RenderSwapchain
     }
 
     #[inline]
-    pub fn acquire_next_frame(&self, semaphore: &RhiSemaphore, fence: Option<&RhiFence>) -> u32
+    pub fn acquire_next_frame(&self, semaphore: &Semaphore, fence: Option<&Fence>) -> u32
     {
         // TODO 处理 optimal 的情况
         let (image_index, _is_optimal) = unsafe {
@@ -214,7 +214,7 @@ impl RenderSwapchain
     }
 
     #[inline]
-    pub fn submit_frame(&self, rhi: &Rhi, image_index: u32, wait_semaphores: &[vk::Semaphore])
+    pub fn submit_frame(&self, rhi: &Core, image_index: u32, wait_semaphores: &[vk::Semaphore])
     {
         let present_info = vk::PresentInfoKHR::default()
             .wait_semaphores(wait_semaphores)
@@ -225,7 +225,7 @@ impl RenderSwapchain
     }
 
 
-    fn create_surface(rhi: &Rhi, window: &WindowSystem) -> Surface
+    fn create_surface(rhi: &Core, window: &WindowSystem) -> Surface
     {
         let surface_pf = ash::khr::surface::Instance::new(&rhi.vk_pf, rhi.vk_instance());
 
@@ -249,7 +249,7 @@ impl RenderSwapchain
 }
 
 
-pub struct RenderSwapchainInitInfo
+pub struct SwapchainInitInfo
 {
     pub format: vk::SurfaceFormatKHR,
     pub swapchain_present_mode: vk::PresentModeKHR,
@@ -257,7 +257,7 @@ pub struct RenderSwapchainInitInfo
     pub window: Option<Arc<WindowSystem>>, // TODO 移除这个 Option，增加理解负担
 }
 
-impl Default for RenderSwapchainInitInfo
+impl Default for SwapchainInitInfo
 {
     fn default() -> Self
     {

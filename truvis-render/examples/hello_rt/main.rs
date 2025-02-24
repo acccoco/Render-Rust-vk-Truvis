@@ -5,14 +5,14 @@ use imgui::Ui;
 use truvis_render::{
     framework::{
         core::{
-            acceleration::RhiAcceleration,
-            buffer::RhiBuffer,
-            descriptor::RhiDescriptorBindings,
-            pipeline::{RhiPipeline, RhiPipelineTemplate},
-            queue::RhiSubmitInfo,
+            acceleration::Acceleration,
+            buffer::Buffer,
+            descriptor::DescriptorBindings,
+            pipeline::{Pipeline, PipelineTemplate},
+            queue::SubmitInfo,
         },
         rendering::render_context::RenderContext,
-        rhi::Rhi,
+        render_core::Core,
     },
     render::{App, AppCtx, AppInitInfo, Renderer, Timer},
 };
@@ -52,7 +52,7 @@ const VERTEX_DATA: [Vertex; 4] = [
 
 
 pub struct RayTracingBindings;
-impl RhiDescriptorBindings for RayTracingBindings
+impl DescriptorBindings for RayTracingBindings
 {
     // FIXME
     fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
@@ -81,32 +81,32 @@ impl RhiDescriptorBindings for RayTracingBindings
 
 struct HelloRT
 {
-    vertex_buffer: RhiBuffer,
-    index_buffer: RhiBuffer,
-    pipeline: RhiPipeline,
-    blas: RhiAcceleration, // 可以有多个
-    tlas: RhiAcceleration, // 只能由一个
+    vertex_buffer: Buffer,
+    index_buffer: Buffer,
+    pipeline: Pipeline,
+    blas: Acceleration, // 可以有多个
+    tlas: Acceleration, // 只能由一个
 }
 
 
 impl HelloRT
 {
-    fn init_buffer(rhi: &'static Rhi) -> (RhiBuffer, RhiBuffer)
+    fn init_buffer(rhi: &'static Core) -> (Buffer, Buffer)
     {
-        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, size_of_val(&INDEX_DATA), "index-buffer");
+        let mut index_buffer = Buffer::new_index_buffer(rhi, size_of_val(&INDEX_DATA), "index-buffer");
         index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
 
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, size_of_val(&VERTEX_DATA), "vertex-buffer");
+        let mut vertex_buffer = Buffer::new_vertex_buffer(rhi, size_of_val(&VERTEX_DATA), "vertex-buffer");
         vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }
 
     fn init_acceleration(
-        rhi: &'static Rhi,
-        vertex_buffer: &RhiBuffer,
-        index_buffer: &RhiBuffer,
-    ) -> (RhiAcceleration, RhiAcceleration)
+        rhi: &'static Core,
+        vertex_buffer: &Buffer,
+        index_buffer: &Buffer,
+    ) -> (Acceleration, Acceleration)
     {
         let triangles_data = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
@@ -125,7 +125,7 @@ impl HelloRT
         };
 
         // 构建 BLAS
-        let blas = RhiAcceleration::build_blas(
+        let blas = Acceleration::build_blas(
             rhi,
             vec![(triangles_data, INDEX_DATA.len() as u32 / 3)],
             vk::BuildAccelerationStructureFlagsKHR::empty(),
@@ -157,16 +157,16 @@ impl HelloRT
         }];
 
         let tlas =
-            RhiAcceleration::build_tlas(rhi, &instances, vk::BuildAccelerationStructureFlagsKHR::empty(), "hello");
+            Acceleration::build_tlas(rhi, &instances, vk::BuildAccelerationStructureFlagsKHR::empty(), "hello");
 
 
         (tlas, blas)
     }
 
-    fn init_pipeline(rhi: &'static Rhi, render_context: &RenderContext) -> RhiPipeline
+    fn init_pipeline(rhi: &'static Core, render_context: &RenderContext) -> Pipeline
     {
         let extent = render_context.swapchain_extent();
-        RhiPipelineTemplate {
+        PipelineTemplate {
             fragment_shader_path: Some("shader/hello_triangle/triangle.frag.spv".into()),
             vertex_shader_path: Some("shader/hello_triangle/triangle.vert.spv".into()),
             color_formats: vec![render_context.color_format()],
@@ -207,7 +207,7 @@ impl HelloRT
         .create_pipeline(rhi, "rt")
     }
 
-    fn run(&self, rhi: &'static Rhi, render_context: &mut RenderContext)
+    fn run(&self, rhi: &'static Core, render_context: &mut RenderContext)
     {
         let depth_attach_info = <Self as App>::get_depth_attachment(render_context.depth_image_view);
         let color_attach_info = <Self as App>::get_color_attachment(render_context.current_present_image_view());
@@ -233,7 +233,7 @@ impl HelloRT
         cmd.end();
         rhi.graphics_queue().submit(
             rhi,
-            vec![RhiSubmitInfo {
+            vec![SubmitInfo {
                 command_buffers: vec![cmd],
                 ..Default::default()
             }],
@@ -242,7 +242,7 @@ impl HelloRT
     }
 
 
-    fn new(rhi: &'static Rhi, render_context: &RenderContext) -> Self
+    fn new(rhi: &'static Core, render_context: &RenderContext) -> Self
     {
         log::info!("start.");
         let (vertex_buffer, index_buffer) = Self::init_buffer(rhi);
@@ -271,7 +271,7 @@ impl App for HelloRT
         self.run(app_ctx.rhi, app_ctx.render_context);
     }
 
-    fn init(rhi: &'static Rhi, render_context: &mut RenderContext) -> Self
+    fn init(rhi: &'static Core, render_context: &mut RenderContext) -> Self
     {
         HelloRT::new(rhi, render_context)
     }

@@ -2,22 +2,22 @@ use ash::vk;
 
 use crate::framework::{
     basic::color::LabelColor,
-    core::{command_pool::RhiCommandPool, queue::RhiSubmitInfo},
-    rhi::Rhi,
+    core::{command_pool::CommandPool, queue::SubmitInfo},
+    render_core::Core,
 };
 
 #[derive(Clone)]
-pub struct RhiCommandBuffer
+pub struct CommandBuffer
 {
     pub(crate) command_buffer: vk::CommandBuffer,
     pub(crate) command_pool: vk::CommandPool,
 
-    rhi: &'static Rhi,
+    rhi: &'static Core,
 }
 
-impl RhiCommandBuffer
+impl CommandBuffer
 {
-    pub fn new<S>(rhi: &'static Rhi, pool: &RhiCommandPool, debug_name: S) -> Self
+    pub fn new<S>(rhi: &'static Core, pool: &CommandPool, debug_name: S) -> Self
     where
         S: AsRef<str>,
     {
@@ -36,9 +36,9 @@ impl RhiCommandBuffer
     }
 
     /// 从 Rhi 中的 command pool 分配 command buffer 进行执行
-    pub fn one_time_exec<F, R>(rhi: &'static Rhi, ty: vk::QueueFlags, f: F, name: &str) -> R
+    pub fn one_time_exec<F, R>(rhi: &'static Core, ty: vk::QueueFlags, f: F, name: &str) -> R
     where
-        F: FnOnce(&mut RhiCommandBuffer) -> R,
+        F: FnOnce(&mut CommandBuffer) -> R,
     {
         let pool;
         let queue;
@@ -66,7 +66,7 @@ impl RhiCommandBuffer
 
         queue.submit(
             rhi,
-            vec![RhiSubmitInfo {
+            vec![SubmitInfo {
                 command_buffers: vec![command_buffer.clone()],
                 ..Default::default()
             }],
@@ -110,13 +110,13 @@ mod _impl_transfer
 {
     use ash::vk;
 
-    use crate::framework::core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer};
+    use crate::framework::core::{buffer::Buffer, command_buffer::CommandBuffer};
 
     // transfer 类型的命令
-    impl RhiCommandBuffer
+    impl CommandBuffer
     {
         #[inline]
-        pub fn copy_buffer(&mut self, src: &RhiBuffer, dst: &mut RhiBuffer, regions: &[vk::BufferCopy])
+        pub fn copy_buffer(&mut self, src: &Buffer, dst: &mut Buffer, regions: &[vk::BufferCopy])
         {
             unsafe {
                 self.rhi.vk_device().cmd_copy_buffer(self.command_buffer, src.handle, dst.handle, regions);
@@ -145,10 +145,10 @@ mod _impl_draw
     use ash::vk;
     use itertools::Itertools;
 
-    use crate::framework::core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer};
+    use crate::framework::core::{buffer::Buffer, command_buffer::CommandBuffer};
 
     // 绘制类型命令
-    impl RhiCommandBuffer
+    impl CommandBuffer
     {
         #[inline]
         pub fn cmd_begin_rendering(&mut self, render_info: &vk::RenderingInfo)
@@ -267,7 +267,7 @@ mod _impl_draw
 
         /// buffers 每个 vertex buffer 以及 offset
         #[inline]
-        pub fn bind_vertex_buffer(&mut self, first_bind: u32, buffers: &[RhiBuffer], offsets: &[vk::DeviceSize])
+        pub fn bind_vertex_buffer(&mut self, first_bind: u32, buffers: &[Buffer], offsets: &[vk::DeviceSize])
         {
             unsafe {
                 let buffers = buffers.iter().map(|b| b.handle).collect_vec();
@@ -276,7 +276,7 @@ mod _impl_draw
         }
 
         #[inline]
-        pub fn bind_index_buffer(&mut self, buffer: &RhiBuffer, offset: vk::DeviceSize, index_type: vk::IndexType)
+        pub fn bind_index_buffer(&mut self, buffer: &Buffer, offset: vk::DeviceSize, index_type: vk::IndexType)
         {
             unsafe {
                 self.rhi.vk_device().cmd_bind_index_buffer(self.command_buffer, buffer.handle, offset, index_type);
@@ -306,10 +306,10 @@ mod _impl_sync
 {
     use ash::vk;
 
-    use crate::framework::core::command_buffer::RhiCommandBuffer;
+    use crate::framework::core::command_buffer::CommandBuffer;
 
     // 同步命令
-    impl RhiCommandBuffer
+    impl CommandBuffer
     {
         // TODO 临时的，修改下
         #[inline]
@@ -392,10 +392,10 @@ mod _impl_ray_tracing
 {
     use ash::vk;
 
-    use crate::framework::core::{command_buffer::RhiCommandBuffer, query_pool::RhiQueryPool};
+    use crate::framework::core::{command_buffer::CommandBuffer, query_pool::QueryPool};
 
     // RayTracing 相关的命令
-    impl RhiCommandBuffer
+    impl CommandBuffer
     {
         /// 注：仅支持 compute queue
         #[inline]
@@ -419,7 +419,7 @@ mod _impl_ray_tracing
         #[inline]
         pub fn write_acceleration_structure_properties(
             &mut self,
-            query_pool: &mut RhiQueryPool,
+            query_pool: &mut QueryPool,
             first_query: u32,
             acceleration_structures: &[vk::AccelerationStructureKHR],
         )
@@ -441,12 +441,12 @@ mod _impl_others
 {
     use ash::vk;
 
-    use crate::framework::core::{command_buffer::RhiCommandBuffer, pipeline::RhiPipeline};
+    use crate::framework::core::{command_buffer::CommandBuffer, pipeline::Pipeline};
 
     // 其他命令
-    impl RhiCommandBuffer
+    impl CommandBuffer
     {
-        pub fn push_constants(&mut self, pipeline: &RhiPipeline, stage: vk::ShaderStageFlags, offset: u32, data: &[u8])
+        pub fn push_constants(&mut self, pipeline: &Pipeline, stage: vk::ShaderStageFlags, offset: u32, data: &[u8])
         {
             unsafe {
                 self.rhi.vk_device().cmd_push_constants(
