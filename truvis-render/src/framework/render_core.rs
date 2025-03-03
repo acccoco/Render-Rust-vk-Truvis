@@ -91,6 +91,7 @@ mod _impl_init
     use ash::vk;
     use itertools::Itertools;
     use raw_window_handle::{HasDisplayHandle, HasRawDisplayHandle};
+
     use crate::framework::{
         core::{
             command_pool::CommandPool, debug_utils::DebugUtils, device::Device, instance::Instance,
@@ -106,8 +107,6 @@ mod _impl_init
         pub engine_name: String,
 
         pub enable_validation: bool,
-
-        pub window: Arc<WindowSystem>,
 
         pub vk_version: u32,
 
@@ -127,7 +126,7 @@ mod _impl_init
 
     impl InitInfo
     {
-        pub fn init_basic(app_name: String, window: Arc<WindowSystem>, enable_validation: bool) -> Self
+        pub fn init_basic(app_name: String, enable_validation: bool) -> Self
         {
             let core_features = vk::PhysicalDeviceFeatures::default()
                 .sampler_anisotropy(true)
@@ -148,8 +147,6 @@ mod _impl_init
                 engine_name: "DruvisIII".to_string(), // 槲寄生
 
                 enable_validation,
-
-                window: window.clone(),
 
                 // 版本过低时，有些函数无法正确加载
                 vk_version: vk::API_VERSION_1_3,
@@ -238,6 +235,7 @@ mod _impl_init
             exts
         }
 
+        // TODO 将这个改成 static，里面的参数也改成 static 的
         pub fn get_debug_utils_messenger_ci(&self) -> vk::DebugUtilsMessengerCreateInfoEXT
         {
             vk::DebugUtilsMessengerCreateInfoEXT::default()

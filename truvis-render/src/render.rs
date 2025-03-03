@@ -1,6 +1,7 @@
 use std::sync::{Arc, OnceLock};
 
 use ash::vk;
+use raw_window_handle::HasRawDisplayHandle;
 use winit::{
     event::{StartCause, WindowEvent},
     event_loop::ActiveEventLoop,
@@ -236,11 +237,10 @@ impl<A: App> Renderer<A>
 
         // rhi
         {
-            let mut rhi_init_info = InitInfo::init_basic(
-                render_init_info.app_name.clone(),
-                self.window.as_ref().unwrap().clone(),
-                render_init_info.enable_validation,
-            );
+            let instance_ext =
+                ash_window::enumerate_required_extensions(event_loop.raw_display_handle().unwrap()).unwrap();
+            let mut rhi_init_info =
+                InitInfo::init_basic(render_init_info.app_name.clone(), render_init_info.enable_validation);
             rhi_init_info.set_debug_callback(Some(vk_debug_callback));
             CORE.get_or_init(|| Core::new(rhi_init_info));
         }
