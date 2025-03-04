@@ -1,12 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, ffi::CStr, sync::Arc};
 
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::{
-    core::{instance::Instance, physical_device::PhysicalDevice, queue::Queue},
-    render_core::InitInfo,
-};
+use crate::framework::core::{instance::Instance, physical_device::PhysicalDevice, queue::Queue};
 
 pub struct Device
 {
@@ -21,7 +18,7 @@ pub struct Device
 
 impl Device
 {
-    pub fn new(init_info: &mut InitInfo, instance: &Instance, pdevice: Arc<PhysicalDevice>) -> Self
+    pub fn new(instance: &Instance, pdevice: Arc<PhysicalDevice>) -> Self
     {
         let graphics_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::GRAPHICS).unwrap();
         let compute_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::COMPUTE).unwrap();
@@ -61,11 +58,15 @@ impl Device
             })
             .collect_vec();
 
-        let device_exts = init_info.device_extensions.iter().map(|e| e.as_ptr()).collect_vec();
+        let device_exts = Self::basic_device_exts().iter().map(|e| e.as_ptr()).collect_vec();
+        log::info!("device exts:");
+        for ext in &device_exts {
+            log::info!("\t{:?}", unsafe { CStr::from_ptr(*ext) });
+        }
 
-        let mut features = vk::PhysicalDeviceFeatures2::default().features(init_info.core_features);
+        let mut features = vk::PhysicalDeviceFeatures2::default().features(Self::basic_gpu_core_features());
         unsafe {
-            init_info.ext_features.iter_mut().for_each(|f| {
+            Self::basic_gpu_ext_features().iter_mut().for_each(|f| {
                 let ptr = <*mut dyn vk::ExtendsPhysicalDeviceFeatures2>::cast::<vk::BaseOutStructure>(f.as_mut());
                 (*ptr).p_next = features.p_next as _;
                 features.p_next = ptr as _;
@@ -101,5 +102,57 @@ impl Device
                 },
             }
         }
+    }
+
+    /// 必要的 physical device core features
+    fn basic_gpu_core_features() -> vk::PhysicalDeviceFeatures
+    {
+        vk::PhysicalDeviceFeatures::default()
+            .sampler_anisotropy(true)
+            .fragment_stores_and_atomics(true)
+            .independent_blend(true)
+    }
+
+    /// 必要的 physical device extension features
+    fn basic_gpu_ext_features() -> Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>>
+    {
+        vec![
+            Box::new(vk::PhysicalDeviceDynamicRenderingFeatures::default().dynamic_rendering(true)),
+            Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::default().buffer_device_address(true)),
+            Box::new(vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::default().ray_tracing_pipeline(true)),
+            Box::new(vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default().acceleration_structure(true)),
+            Box::new(vk::PhysicalDeviceHostQueryResetFeatures::default().host_query_reset(true)),
+            Box::new(vk::PhysicalDeviceSynchronization2Features::default().synchronization2(true)),
+        ]
+    }
+
+    /// 必要的 device extensions
+    fn basic_device_exts() -> Vec<&'static CStr>
+    {
+        let mut exts = vec![];
+
+        // swapchain
+        exts.push(ash::khr::swapchain::NAME);
+
+        // dynamic rendering
+        exts.append(&mut vec![
+            ash::khr::depth_stencil_resolve::NAME,
+            ash::khr::create_renderpass2::NAME,
+            ash::khr::dynamic_rendering::NAME,
+        ]);
+
+
+        // RayTracing 相关的
+        exts.append(&mut vec![
+            ash::khr::acceleration_structure::NAME, // 主要的 ext
+            ash::ext::descriptor_indexing::NAME,
+            ash::khr::buffer_device_address::NAME,
+            ash::khr::ray_tracing_pipeline::NAME, // 主要的 ext
+            ash::khr::deferred_host_operations::NAME,
+            ash::khr::spirv_1_4::NAME,
+            ash::khr::shader_float_controls::NAME,
+        ]);
+
+        exts
     }
 }

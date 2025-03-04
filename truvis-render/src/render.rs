@@ -1,4 +1,7 @@
-use std::sync::{Arc, OnceLock};
+use std::{
+    ffi::CStr,
+    sync::{Arc, OnceLock},
+};
 
 use ash::vk;
 use raw_window_handle::HasRawDisplayHandle;
@@ -15,7 +18,7 @@ use crate::framework::{
         ui::{UiOptions, UI},
         window_system::{WindowCreateInfo, WindowSystem},
     },
-    render_core::{vk_debug_callback, Core, InitInfo, CORE},
+    render_core::{Core, CORE},
     rendering::render_context::{RenderContext, RenderContextInitInfo},
 };
 
@@ -80,9 +83,20 @@ pub struct InputState
 pub struct Renderer<A: App>
 {
     pub timer: Timer,
+
+    /// window 需要在 event loop 中创建，因此使用 option 包装
     pub window: Option<Arc<WindowSystem>>,
+
+    /// render context 需要在 event loop 中创建，因此使用 option 包装
+    ///
+    /// 依赖于 window
     pub render_context: Option<RenderContext>,
+
+    /// ui 只能在 event loop 中创建，因此使用 option 包装
+    ///
+    /// 依赖于 RenderContext 和 Core
     pub ui: Option<UI>,
+
     pub inner_app: Option<Box<A>>,
 
     pub input_state: InputState,
@@ -237,12 +251,15 @@ impl<A: App> Renderer<A>
 
         // rhi
         {
-            let instance_ext =
-                ash_window::enumerate_required_extensions(event_loop.raw_display_handle().unwrap()).unwrap();
-            let mut rhi_init_info =
-                InitInfo::init_basic(render_init_info.app_name.clone(), render_init_info.enable_validation);
-            rhi_init_info.set_debug_callback(Some(vk_debug_callback));
-            CORE.get_or_init(|| Core::new(rhi_init_info));
+            // 追加 window system 需要的 extension，在 windows 下也就是 khr::Surface
+            let extra_instance_ext = ash_window::enumerate_required_extensions(
+                self.window.as_ref().unwrap().window().raw_display_handle().unwrap(),
+            )
+            .unwrap()
+            .iter()
+            .map(|ext| unsafe { CStr::from_ptr(*ext) })
+            .collect();
+            CORE.get_or_init(|| Core::new(render_init_info.app_name.clone(), extra_instance_ext));
         }
         let rhi = CORE.get().unwrap();
 

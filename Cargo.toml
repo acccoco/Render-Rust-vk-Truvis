@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "truvis-render",
-    "truvis-xtask",
+    "xtask",
 ]
 
 resolver = "2"
