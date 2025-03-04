@@ -158,24 +158,23 @@ impl Instance
     /// 必须要开启的 instance layers
     fn basic_instance_layers() -> Vec<&'static CStr>
     {
-        let mut layers = Vec::new();
-        if true {
-            layers.push(cstr::cstr!("VK_LAYER_KHRONOS_validation"))
-        }
-        layers
+        // 无需开启 validation layer，使用 vulkan configurator 控制 validation layer 的开启
+        // layers.push(cstr::cstr!("VK_LAYER_KHRONOS_validation"))
+
+        Vec::new()
     }
 
     /// 必须要开启的 instance extensions
     fn basic_instance_exts() -> Vec<&'static CStr>
     {
-        let mut exts = Vec::new();
-
-        // 这个 extension 可以单独使用，提供以下功能：
-        // 1. debug messenger
-        // 2. 为 vulkan object 设置 debug name
-        // 2. 使用 label 标记 queue 或者 command buffer 中的一个一个 section
-        // 这个 extension 可以和 validation layer 配合使用，提供更详细的信息
-        exts.push(vk::EXT_DEBUG_UTILS_NAME);
+        let exts = vec![
+            // 这个 extension 可以单独使用，提供以下功能：
+            // 1. debug messenger
+            // 2. 为 vulkan object 设置 debug name
+            // 2. 使用 label 标记 queue 或者 command buffer 中的一个一个 section
+            // 这个 extension 可以和 validation layer 配合使用，提供更详细的信息
+            vk::EXT_DEBUG_UTILS_NAME,
+        ];
 
         exts
     }

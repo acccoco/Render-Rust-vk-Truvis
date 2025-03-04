@@ -65,8 +65,9 @@ impl Device
         }
 
         let mut features = vk::PhysicalDeviceFeatures2::default().features(Self::basic_gpu_core_features());
+        let mut gpu_ext_features = Self::basic_gpu_ext_features();
         unsafe {
-            Self::basic_gpu_ext_features().iter_mut().for_each(|f| {
+            gpu_ext_features.iter_mut().for_each(|f| {
                 let ptr = <*mut dyn vk::ExtendsPhysicalDeviceFeatures2>::cast::<vk::BaseOutStructure>(f.as_mut());
                 (*ptr).p_next = features.p_next as _;
                 features.p_next = ptr as _;

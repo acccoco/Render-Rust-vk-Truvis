@@ -13,6 +13,47 @@ pub struct DebugUtils
 static mut DEBUG_MSG_TYPE: vk::DebugUtilsMessageTypeFlagsEXT = vk::DebugUtilsMessageTypeFlagsEXT::empty();
 static mut DEBUG_MSG_SEVERITY: vk::DebugUtilsMessageSeverityFlagsEXT = vk::DebugUtilsMessageSeverityFlagsEXT::empty();
 
+/// debug messenger 的回调函数
+/// # Safety
+unsafe extern "system" fn vk_debug_callback(
+    message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
+    message_type: vk::DebugUtilsMessageTypeFlagsEXT,
+    p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
+    _user_data: *mut std::os::raw::c_void,
+) -> vk::Bool32
+{
+    let callback_data = *p_callback_data;
+
+    let msg = if callback_data.p_message.is_null() {
+        std::borrow::Cow::from("")
+    } else {
+        CStr::from_ptr(callback_data.p_message).to_string_lossy()
+    };
+
+
+    // 按照 | 切分 msg 字符串，并在中间插入换行符
+    // let msg = msg.split('|').collect::<Vec<&str>>().join("\n\t");
+    // let msg = msg.split(" ] ").collect::<Vec<&str>>().join(" ]\n\t ");
+    let format_msg = format!("[{:?}]\n{}\n", message_type, msg);
+
+    match message_severity {
+        vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
+            log::error!("{}", format_msg);
+        }
+        vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {
+            log::warn!("{}", format_msg);
+        }
+        vk::DebugUtilsMessageSeverityFlagsEXT::INFO => {
+            log::info!("{}", format_msg);
+        }
+        _ => log::info!("{}", format_msg),
+    };
+
+    // 只有 layer developer 才需要返回 True
+    vk::FALSE
+}
+
+
 impl DebugUtils
 {
     pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, device: &ash::Device) -> Self
@@ -53,52 +94,13 @@ impl DebugUtils
         }
     }
 
-    /// debug messenger 的回调函数
-    /// # Safety
-    unsafe extern "system" fn vk_debug_callback(
-        message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
-        message_type: vk::DebugUtilsMessageTypeFlagsEXT,
-        p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
-        _user_data: *mut std::os::raw::c_void,
-    ) -> vk::Bool32
-    {
-        let callback_data = *p_callback_data;
-
-        let msg = if callback_data.p_message.is_null() {
-            std::borrow::Cow::from("")
-        } else {
-            CStr::from_ptr(callback_data.p_message).to_string_lossy()
-        };
-
-
-        // 按照 | 切分 msg 字符串，并在中间插入换行符
-        // let msg = msg.split('|').collect::<Vec<&str>>().join("\n\t");
-        // let msg = msg.split(" ] ").collect::<Vec<&str>>().join(" ]\n\t ");
-        let format_msg = format!("[{:?}]\n{}\n", message_type, msg);
-
-        match message_severity {
-            vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
-                log::error!("{}", format_msg);
-            }
-            vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {
-                log::warn!("{}", format_msg);
-            }
-            vk::DebugUtilsMessageSeverityFlagsEXT::INFO => {
-                log::info!("{}", format_msg);
-            }
-            _ => log::info!("{}", format_msg),
-        };
-
-        // 只有 layer developer 才需要返回 True
-        vk::FALSE
-    }
 
     pub fn get_debug_utils_messenger_ci() -> vk::DebugUtilsMessengerCreateInfoEXT<'static>
     {
         vk::DebugUtilsMessengerCreateInfoEXT::default()
             .message_severity(Self::get_debug_msg_severity())
             .message_type(Self::get_debug_msg_type())
-            .pfn_user_callback(Some(Self::vk_debug_callback))
+            .pfn_user_callback(Some(vk_debug_callback))
     }
 
     #[inline]
