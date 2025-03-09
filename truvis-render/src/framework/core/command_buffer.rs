@@ -18,9 +18,7 @@ pub struct CommandBuffer
 
 impl CommandBuffer
 {
-    pub fn new<S>(rhi: &'static Core, pool: &CommandPool, debug_name: S) -> Self
-    where
-        S: AsRef<str>,
+    pub fn new<S: AsRef<str>>(rhi: &'static Core, pool: &CommandPool, debug_name: S) -> Self
     {
         let info = vk::CommandBufferAllocateInfo::default()
             .command_pool(pool.command_pool)

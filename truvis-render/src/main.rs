@@ -4,8 +4,8 @@ use itertools::Itertools;
 use truvis_render::{
     framework::{
         core::descriptor::{DescriptorBindings, DescriptorSet, RhiDescriptorUpdateInfo},
-        rendering::render_context::RenderContext,
         render_core::Core,
+        rendering::render_context::RenderContext,
     },
     render::{App, AppCtx, AppInitInfo, Renderer, Timer},
 };

@@ -109,6 +109,10 @@ impl ShaderCompileEntry
     /// 使用 dxc 编译 hlsl 文件，dxc 在 vulkan sdk 中附带
     ///
     /// ref: https://docs.vulkan.org/guide/latest/hlsl.html
+    ///
+    /// Nsight 使用时：
+    ///
+    /// https://docs.nvidia.com/nsight-graphics/UserGuide/index.html#configuring-your-application-shaders
     fn build_hlsl(&self)
     {
         // shader model 6.3 支持 ray tracing
@@ -121,14 +125,12 @@ impl ShaderCompileEntry
             ShaderStage::Geometry => "gs",
             ShaderStage::Fragment => "ps",
             ShaderStage::Compute => "cs",
-
             ShaderStage::RayGen |
             ShaderStage::AnyHit |
             ShaderStage::ClosestHit |
             ShaderStage::Miss |
             ShaderStage::Intersection |
             ShaderStage::RayCallable => "lib",
-
             ShaderStage::Task => "as",
             ShaderStage::Mesh => "ms",
         };
@@ -136,14 +138,14 @@ impl ShaderCompileEntry
         let entry_point = "main";
         let mut cmd = std::process::Command::new("dxc");
         cmd.arg("-spirv")
-            .arg("-fspv-debug=vulkan-with-source") // SPIR-V NonSemantic Shader DebugInfo Instructions，用于 Nsight 调试
             .args(["-T", format!("{}_{}", shader_stage_tag, shader_model).as_str()])
-            .arg("-Zi") // 包含 debug 信息
             // .arg("-Zpc") // col-major
             .args(["-E", entry_point])
             .arg(self.shader_path.as_os_str())
             .arg("-Fo")
-            .arg(self.output_path.as_os_str());
+            .arg(self.output_path.as_os_str())
+            .arg("-fspv-debug=vulkan-with-source") // SPIR-V NonSemantic Shader DebugInfo Instructions，用于 Nsight 调试
+            .arg("-Zi"); // 包含 debug 信息
         let output = cmd.output().unwrap();
         if !output.status.success() {
             log::info!("stdout: \n{stdout}", stdout = String::from_utf8_lossy(&output.stdout));

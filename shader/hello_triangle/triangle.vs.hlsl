@@ -4,7 +4,7 @@ struct VsInput
     float4 Position : POSITION;
 
     [[vk::location(1)]]
-    float3 Color : COLOR0;
+    float4 Color : COLOR0;
 };
 
 struct VsOutput
@@ -12,7 +12,7 @@ struct VsOutput
     float4 Pos : SV_POSITION;
 
     [[vk::location(0)]]
-    float3 Color : COLOR0;
+    float4 Color : COLOR0;
 
     [[vk::location(1)]]
     float2 UV : TEXCOORD0;
