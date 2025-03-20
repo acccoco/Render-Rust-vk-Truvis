@@ -13,14 +13,16 @@ struct PsOutput
     float4 color : SV_TARGET0;
 };
 
-// combined image sampler 就因该这样写
-[[vk::combinedImageSampler]]
-[[vk::binding(0, 0)]]
-Texture2D<float4> fontTexture;
+#define ParamBlock_Font(name, set)                 \
+    [[vk::combinedImageSampler]]   \
+    [[vk::binding(0, set)]]          \
+    Texture2D<float4> name##Texture; \
+                                   \
+    [[vk::combinedImageSampler]]   \
+    [[vk::binding(0, set)]]          \
+    SamplerState name##Sampler;
 
-[[vk::combinedImageSampler]]
-[[vk::binding(0, 0)]]
-SamplerState fontSampler;
+ParamBlock_Font(font, 0)
 
 PsOutput main(PsInput input)
 {
