@@ -1,6 +1,12 @@
+use std::marker::PhantomData;
+
 use ash::vk;
 
-use crate::framework::{core::descriptor::RhiDescriptorUpdateInfo, render_core::Core};
+use crate::framework::{
+    basic::DataUtils,
+    core::{command_buffer::CommandBuffer, descriptor::RhiDescriptorUpdateInfo},
+    render_core::Core,
+};
 
 pub struct Binding
 {
@@ -16,6 +22,20 @@ pub trait ShaderCursor
     fn get_type() -> vk::DescriptorType;
 
     fn write(&self, rhi: &Core, update_info: RhiDescriptorUpdateInfo);
+}
+
+
+pub struct BufferCursor<S: Sized>
+{
+    _phantom: PhantomData<S>,
+}
+
+impl<S: Sized> BufferCursor<S>
+{
+    fn write(cmd: &mut CommandBuffer, buffer: vk::Buffer, data: &S)
+    {
+        cmd.cmd_update_buffer(buffer, size_of::<S>() as vk::DeviceSize, DataUtils::transform_u8(&data))
+    }
 }
 
 pub struct Texture2DCursor

@@ -131,6 +131,17 @@ impl CommandBuffer
     {
         unsafe { self.rhi.vk_device().cmd_copy_buffer_to_image2(self.command_buffer, copy_info) }
     }
+
+    /// 将 data 传输到 buffer 中，大小限制：65536Bytes
+    ///
+    /// 首先将 data copy 到 cmd buffer 中，然后再 transfer 到指定 buffer 中，这是一个  transfer op
+    ///
+    /// 需要在 render pass 之外进行，注意同步
+    #[inline]
+    pub fn cmd_update_buffer(&mut self, buffer: vk::Buffer, offset: vk::DeviceSize, data: &[u8])
+    {
+        unsafe { self.rhi.vk_device().cmd_update_buffer(self.command_buffer, buffer, offset, data) }
+    }
 }
 
 // 绘制类型命令
