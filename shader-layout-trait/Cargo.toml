@@ -1,0 +1,11 @@
+[package]
+name = "shader-layout-trait"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+anyhow = { workspace = true }
+simplelog = { workspace = true }
+log = { workspace = true }
+ash = { workspace = true }

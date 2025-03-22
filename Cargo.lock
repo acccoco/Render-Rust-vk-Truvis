@@ -1817,6 +1817,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "shader-layout-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote 1.0.38",
+ "shader-layout-trait",
+ "syn 2.0.95",
+]
+
+[[package]]
+name = "shader-layout-trait"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ash",
+ "log",
+ "simplelog",
+]
+
+[[package]]
 name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
