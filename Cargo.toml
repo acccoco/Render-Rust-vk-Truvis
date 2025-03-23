@@ -7,9 +7,9 @@ members = [
     # 渲染库
     "truvis-render",
     # 构建工具
-    "xtask",
+    "xtask/build-shader",
     # 用于生成 shader 代码的工具
-    "shader-gen",
+    "xtask/shader-gen",
 ]
 
 resolver = "2"

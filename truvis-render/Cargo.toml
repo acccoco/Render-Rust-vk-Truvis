@@ -41,3 +41,6 @@ bitflags = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true }
 simplelog = { workspace = true }
+
+shader-layout-macro = { path = "../shader-layout-macro" }
+shader-layout-trait = { path = "../shader-layout-trait" }

@@ -9,7 +9,6 @@
 .idea
 .vs_code
 
-
 # Nsignt
 *.ngfx-proj
 *.ngfx-gputrace
@@ -21,3 +20,6 @@ imgui.ini
 # drawio
 *.drawio.bkp
 *.drawio.dtmp
+
+# generated
+shader/generated/*

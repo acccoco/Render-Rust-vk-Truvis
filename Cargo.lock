@@ -209,6 +209,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "build-shader"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "log",
+ "simplelog",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2118,8 +2127,6 @@ dependencies = [
  "anyhow",
  "serde",
  "serde_yaml",
- "shader-layout-macro",
- "shader-layout-trait",
  "tera",
 ]
 
@@ -2532,6 +2539,8 @@ dependencies = [
  "raw-window-handle",
  "serde",
  "serde_json",
+ "shader-layout-macro",
+ "shader-layout-trait",
  "simplelog",
  "static_init",
  "tobj",
@@ -3233,15 +3242,6 @@ name = "xkeysym"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9cc00251562a284751c9973bace760d86c0276c471b4be569fe6b068ee97a56"
-
-[[package]]
-name = "xtask"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "log",
- "simplelog",
-]
 
 [[package]]
 name = "zerocopy"

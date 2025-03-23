@@ -21,3 +21,7 @@
       type_: uniform_buffer
       rust_type: PostProcessSettings
       hlsl_type: PostProcessBuffer
+
+    - name: test
+      binding: 1
+      type_: uniform_buffer

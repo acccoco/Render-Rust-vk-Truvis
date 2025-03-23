@@ -8,6 +8,8 @@ use crate::framework::{
     render_core::Core,
 };
 
+pub mod shaders;
+
 pub struct Binding
 {
     pub set: u32,
@@ -76,3 +78,4 @@ struct MaterialSet
 {
     params: Texture2DCursor,
 }
+
