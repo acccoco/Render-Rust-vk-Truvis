@@ -1,0 +1,14 @@
+[package]
+name = "shader-gen"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tera = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+anyhow = "1.0"
+
+[dependencies]
+shader-layout-macro = { path = "../shader-layout-macro" }
+shader-layout-trait = { path = "../shader-layout-trait" }
