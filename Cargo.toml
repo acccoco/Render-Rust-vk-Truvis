@@ -8,8 +8,8 @@ members = [
     "truvis-render",
     # 构建工具
     "xtask/build-shader",
-    # 用于生成 shader 代码的工具
-    "xtask/shader-gen",
+    # 用于生成 shader 代码的工具，暂时不使用
+    # "xtask/shader-gen",
 ]
 
 resolver = "2"
