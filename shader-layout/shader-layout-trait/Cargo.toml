@@ -2,6 +2,7 @@
 name = "shader-layout-trait"
 version = "0.1.0"
 edition = "2021"
+description = "为 shader-layout-macro 提供 trait 定义"
 
 
 [dependencies]
