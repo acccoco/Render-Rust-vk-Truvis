@@ -1,7 +1,7 @@
 [![Lines of Code](https://tokei.rs/b1/github/acccoco/Render-Rust-vk-Truvis)](https://github.com/acccoco/Render-Rust-vk-Truvis)
 [![CI Status](https://github.com/acccoco/Render-Rust-vk-Truvis/workflows/Rust/badge.svg)](https://github.com/acccoco/Render-Rust-vk-Truvis/actions)
 
-TODO
+# TODO
 
 - [ ] 多种材质系统，多种渲染流程(forward, deferred, etc)
 - [ ] 使用 `hlsl` 而不是 `glsl`
@@ -19,6 +19,14 @@ TODO
 * `image view`
 * `descriptor image info`
 * `sampler`
+
+# 设计原则
+
+不应该使用 Rust 的生命周期和引用跟踪来确保 GPU 资源的合法性，因为 handle 之类的本就是 GPU 上的资源。
+
+借助 Rust 反而会减少灵活性，引入不必要的开销。
+
+尽量保证 Handle 都是可 copy 的就好
 
 # Debug 命名规范
 

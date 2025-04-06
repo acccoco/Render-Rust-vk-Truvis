@@ -1,5 +1,6 @@
 mod data;
 
+use std::rc::Rc;
 
 use ash::vk;
 use imgui::Ui;
@@ -8,13 +9,13 @@ use truvis_render::{
     framework::{
         basic::{color::LabelColor, FRAME_ID_MAP},
         core::{
-            buffer::Buffer,
-            descriptor::{DescriptorBindings, DescriptorSetLayout, DescriptorSet},
+            buffer::{RhiBuffer, RhiBufferCreateInfo},
+            command_queue::RhiSubmitInfo,
+            descriptor::{DescriptorBindings, DescriptorSet, DescriptorSetLayout},
             pipeline::{Pipeline, PipelineTemplate},
-            queue::SubmitInfo,
         },
+        render_core::Rhi,
         rendering::render_context::RenderContext,
-        render_core::Core,
     },
     render::{App, AppCtx, AppInitInfo, Renderer},
 };
@@ -143,9 +144,9 @@ struct PushConstant
 
 struct PhongUniformBuffer
 {
-    scene_uniform_buffer: Buffer,
-    mesh_uniform_buffer: Buffer,
-    material_uniform_buffer: Buffer,
+    scene_uniform_buffer: RhiBuffer,
+    mesh_uniform_buffer: RhiBuffer,
+    material_uniform_buffer: RhiBuffer,
 }
 
 
@@ -158,7 +159,7 @@ struct PhongApp
     pipeline: Pipeline,
 
     /// BOX
-    vertex_buffer: Buffer,
+    vertex_buffer: RhiBuffer,
 
     /// 每帧独立的 uniform buffer
     uniform_buffers: Vec<PhongUniformBuffer>,
@@ -177,7 +178,7 @@ struct PhongApp
 impl PhongApp
 {
     fn create_descriptor_sets(
-        rhi: &Core,
+        rhi: &Rhi,
         frames_in_flight: usize,
     ) -> (PhongAppDescriptorSetLayouts, Vec<PhongAppDescriptorSets>)
     {
@@ -217,7 +218,7 @@ impl PhongApp
     }
 
     fn create_pipeline(
-        rhi: &'static Core,
+        rhi: &Rhi,
         render_ctx: &mut RenderContext,
         descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
     ) -> Pipeline
@@ -278,11 +279,11 @@ impl PhongApp
         .create_pipeline(rhi, "phong")
     }
 
-    fn create_vertices(rhi: &'static Core) -> Buffer
+    fn create_vertices(rhi: &Rhi) -> RhiBuffer
     {
         let mut vertex_buffer =
-            Buffer::new_vertex_buffer(rhi, size_of_val(&ShapeBox::VERTICES), "[phong]vertex-buffer");
-        vertex_buffer.transfer_data_by_stage_buffer(&ShapeBox::VERTICES);
+            RhiBuffer::new_vertex_buffer(rhi, size_of_val(&ShapeBox::VERTICES), "[phong]vertex-buffer");
+        vertex_buffer.transfer_data_by_stage_buffer(rhi, &ShapeBox::VERTICES);
 
         vertex_buffer
     }
@@ -290,7 +291,7 @@ impl PhongApp
     /// mesh ubo 数量：32 个
     /// material ubo 数量：32 个
     fn create_uniform_buffers(
-        rhi: &'static Core,
+        rhi: &Rhi,
         frames_in_flight: usize,
         mesh_ubo_align: &mut vk::DeviceSize,
         mat_ubo_align: &mut vk::DeviceSize,
@@ -302,46 +303,46 @@ impl PhongApp
         *mesh_ubo_align = rhi.ubo_offset_align(size_of::<MeshUBO>() as vk::DeviceSize);
         *mat_ubo_align = rhi.ubo_offset_align(size_of::<MaterialUBO>() as vk::DeviceSize);
 
-        let scene_buffer_ci = vk::BufferCreateInfo::default()
-            .size(size_of::<SceneUBO>() as vk::DeviceSize * frames_in_flight as u64)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE)
-            .usage(vk::BufferUsageFlags::UNIFORM_BUFFER);
-        let mesh_buffer_ci = vk::BufferCreateInfo::default()
-            .size(*mesh_ubo_align * mesh_instance_count * frames_in_flight as u64)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE)
-            .usage(vk::BufferUsageFlags::UNIFORM_BUFFER);
-        let material_buffer_ci = vk::BufferCreateInfo::default()
-            .size(*mat_ubo_align * material_instance_count * frames_in_flight as u64)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE)
-            .usage(vk::BufferUsageFlags::UNIFORM_BUFFER);
+        let scene_buffer_ci = Rc::new(RhiBufferCreateInfo::new(
+            size_of::<SceneUBO>() as vk::DeviceSize * frames_in_flight as u64,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+        ));
+        let mesh_buffer_ci = Rc::new(RhiBufferCreateInfo::new(
+            *mesh_ubo_align * mesh_instance_count * frames_in_flight as u64,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+        ));
+        let material_buffer_ci = Rc::new(RhiBufferCreateInfo::new(
+            *mat_ubo_align * material_instance_count * frames_in_flight as u64,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+        ));
 
-        let ubo_alloc_ci = vk_mem::AllocationCreateInfo {
+        let ubo_alloc_ci = Rc::new(vk_mem::AllocationCreateInfo {
             flags: vk_mem::AllocationCreateFlags::HOST_ACCESS_SEQUENTIAL_WRITE,
             usage: vk_mem::MemoryUsage::AutoPreferDevice,
             ..Default::default()
-        };
+        });
 
         (0..frames_in_flight)
             .map(|idx| FRAME_ID_MAP[idx])
             .map(|tag| PhongUniformBuffer {
-                scene_uniform_buffer: Buffer::new2(
+                scene_uniform_buffer: RhiBuffer::new(
                     rhi,
-                    &scene_buffer_ci,
-                    &ubo_alloc_ci,
+                    scene_buffer_ci.clone(),
+                    ubo_alloc_ci.clone(),
                     None,
                     &format!("scene-ubo-{}", tag),
                 ),
-                mesh_uniform_buffer: Buffer::new2(
+                mesh_uniform_buffer: RhiBuffer::new(
                     rhi,
-                    &mesh_buffer_ci,
-                    &ubo_alloc_ci,
+                    mesh_buffer_ci.clone(),
+                    ubo_alloc_ci.clone(),
                     Some(*mesh_ubo_align),
                     &format!("mesh-ubo-{}", tag),
                 ),
-                material_uniform_buffer: Buffer::new2(
+                material_uniform_buffer: RhiBuffer::new(
                     rhi,
-                    &material_buffer_ci,
-                    &ubo_alloc_ci,
+                    material_buffer_ci.clone(),
+                    ubo_alloc_ci.clone(),
                     Some(*mat_ubo_align),
                     &format!("material-ubo-{}", tag),
                 ),
@@ -350,7 +351,7 @@ impl PhongApp
     }
 
     /// 将场景的信息更新到 uniform buffer 中去，并且和 descriptor set 绑定起来
-    fn update_scene_uniform(&mut self, rhi: &Core, frame_index: usize)
+    fn update_scene_uniform(&mut self, rhi: &Rhi, frame_index: usize)
     {
         let PhongUniformBuffer {
             scene_uniform_buffer,
@@ -369,7 +370,7 @@ impl PhongApp
         } = &mut self.descriptor_sets[frame_index];
 
         let scene_ubo_info = vk::DescriptorBufferInfo::default()
-            .buffer(scene_uniform_buffer.handle)
+            .buffer(scene_uniform_buffer.handle())
             .offset(0)
             .range(size_of::<SceneUBO>() as vk::DeviceSize);
         let scene_write = vk::WriteDescriptorSet::default()
@@ -381,7 +382,7 @@ impl PhongApp
             .buffer_info(std::slice::from_ref(&scene_ubo_info));
 
         let mesh_ubo_info = vk::DescriptorBufferInfo::default()
-            .buffer(mesh_uniform_buffer.handle)
+            .buffer(mesh_uniform_buffer.handle())
             .offset(0)
             .range(size_of::<MeshUBO>() as vk::DeviceSize);
         let mesh_write = vk::WriteDescriptorSet::default()
@@ -393,7 +394,7 @@ impl PhongApp
             .buffer_info(std::slice::from_ref(&mesh_ubo_info));
 
         let mat_ubo_info = vk::DescriptorBufferInfo::default()
-            .buffer(material_uniform_buffer.handle)
+            .buffer(material_uniform_buffer.handle())
             .offset(0)
             .range(size_of::<MaterialUBO>() as vk::DeviceSize);
         let mat_write = vk::WriteDescriptorSet::default()
@@ -418,11 +419,15 @@ impl App for PhongApp
 
     fn update(&mut self, app_ctx: &mut AppCtx)
     {
-        app_ctx.rhi.graphics_queue_begin_label("[main-pass]update", LabelColor::COLOR_PASS);
+        app_ctx.rhi.debug_utils.begin_queue_label(
+            app_ctx.rhi.graphics_queue.handle,
+            "[main-pass]update",
+            LabelColor::COLOR_PASS,
+        );
         {
             self.update_scene_uniform(app_ctx.rhi, app_ctx.render_context.current_frame_index());
         }
-        app_ctx.rhi.graphics_queue_end_label();
+        app_ctx.rhi.debug_utils.end_queue_label(app_ctx.rhi.graphics_queue.handle);
     }
 
     fn draw(&self, app_ctx: &mut AppCtx)
@@ -430,7 +435,7 @@ impl App for PhongApp
         let frame_id = app_ctx.render_context.current_frame_index();
 
         let color_attach = <Self as App>::get_color_attachment(app_ctx.render_context.current_present_image_view());
-        let depth_attach = <Self as App>::get_depth_attachment(app_ctx.render_context.depth_image_view);
+        let depth_attach = <Self as App>::get_depth_attachment(app_ctx.render_context.depth_view.handle());
         let render_info = <Self as App>::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
@@ -440,11 +445,11 @@ impl App for PhongApp
             &depth_attach,
         );
 
-        let mut cmd = RenderContext::alloc_command_buffer(app_ctx.render_context, "[main-pass]render");
+        let cmd = RenderContext::alloc_command_buffer(app_ctx.render_context, "[main-pass]render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[phong-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);
-            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
+            cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
             cmd.cmd_push_constants(
                 self.pipeline.pipeline_layout,
                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
@@ -472,7 +477,7 @@ impl App for PhongApp
             );
 
             // index 和 vertex 暂且就用同一个
-            cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
+            cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
 
             for (mesh_idx, _) in self.mesh_ubo.iter().enumerate() {
                 cmd.bind_descriptor_sets(
@@ -482,23 +487,17 @@ impl App for PhongApp
                     &[self.descriptor_sets[frame_id].mesh_set.descriptor_set],
                     &[(self.mesh_ubo_offset_align * mesh_idx as u64) as u32],
                 );
-                cmd.draw(ShapeBox::VERTICES.len() as u32, 1, 0, 0);
+                cmd.cmd_draw(ShapeBox::VERTICES.len() as u32, 1, 0, 0);
             }
 
             cmd.end_rendering();
         }
         cmd.end();
 
-        app_ctx.rhi.graphics_queue_submit(
-            vec![SubmitInfo {
-                command_buffers: vec![cmd],
-                ..Default::default()
-            }],
-            None,
-        );
+        app_ctx.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
-    fn init(rhi: &'static Core, render_context: &mut RenderContext) -> Self
+    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self
     {
         // TODO 通过其他方式获取到 frames in flight
         let (layouts, sets) = Self::create_descriptor_sets(rhi, 3);

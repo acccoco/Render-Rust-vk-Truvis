@@ -6,6 +6,7 @@ members = [
     "shader-layout/shader-layout-trait",
     # 渲染库
     "truvis-render",
+    # "truvis-rhi",
     # 构建工具
     "xtask/build-shader",
     # 用于生成 shader 代码的工具，暂时不使用
@@ -16,6 +17,12 @@ resolver = "2"
 
 
 [workspace.dependencies]
+shader-layout-macro = { path = "shader-layout/shader-layout-macro" }
+shader-layout-trait = { path = "shader-layout/shader-layout-trait" }
+truvis-render = { path = "truvis-render" }
+# truvis-rhi = { path = "truvis-rhi" }
+
+
 ash = "0.38.0"
 ash-window = "0.13.0"
 
@@ -89,7 +96,3 @@ anyhow = "1.0.84"
 
 # 计时器
 chrono = "0.4.38"
-
-shader-layout-macro = { path = "shader-layout/shader-layout-macro" }
-shader-layout-trait = { path = "shader-layout/shader-layout-trait" }
-truvis-render = { path = "truvis-render" }

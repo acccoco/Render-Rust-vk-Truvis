@@ -4,8 +4,8 @@ use ash::vk;
 
 use crate::framework::{
     basic::DataUtils,
-    core::{command_buffer::CommandBuffer, descriptor::RhiDescriptorUpdateInfo},
-    render_core::Core,
+    core::{command_buffer::RhiCommandBuffer, descriptor::RhiDescriptorUpdateInfo},
+    render_core::Rhi,
 };
 
 pub struct Binding
@@ -21,7 +21,7 @@ pub trait ShaderCursor
 
     fn get_type() -> vk::DescriptorType;
 
-    fn write(&self, rhi: &Core, update_info: RhiDescriptorUpdateInfo);
+    fn write(&self, rhi: &Rhi, update_info: RhiDescriptorUpdateInfo);
 }
 
 
@@ -32,7 +32,7 @@ pub struct BufferCursor<S: Sized>
 
 impl<S: Sized> BufferCursor<S>
 {
-    fn write(cmd: &mut CommandBuffer, buffer: vk::Buffer, data: &S)
+    fn write(cmd: &mut RhiCommandBuffer, buffer: vk::Buffer, data: &S)
     {
         cmd.cmd_update_buffer(buffer, size_of::<S>() as vk::DeviceSize, DataUtils::transform_u8(&data))
     }
@@ -65,7 +65,7 @@ impl ShaderCursor for Texture2DCursor
         vk::DescriptorType::COMBINED_IMAGE_SAMPLER
     }
 
-    fn write(&self, rhi: &Core, update_info: RhiDescriptorUpdateInfo)
+    fn write(&self, rhi: &Rhi, update_info: RhiDescriptorUpdateInfo)
     {
         todo!()
     }

@@ -1,22 +1,26 @@
+use std::rc::Rc;
+
 use ash::vk;
 use itertools::Itertools;
 
 use crate::framework::{
     basic::{color::LabelColor, FRAME_ID_MAP},
     core::{
-        command_buffer::CommandBuffer,
-        command_pool::CommandPool,
-        create_utils::CreateUtils,
-        queue::SubmitInfo,
-        swapchain::{Swapchain, SwapchainInitInfo},
-        synchronize::{Fence, Semaphore},
+        command_buffer::RhiCommandBuffer,
+        command_pool::RhiCommandPool,
+        command_queue::{RhiQueue, RhiSubmitInfo},
+        debug_utils::RhiDebugUtils,
+        device::RhiDevice,
+        image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
+        swapchain::{RhiSwapchain, RhiSwapchainInitInfo},
+        synchronize::{RhiFence, RhiImageBarrier, RhiSemaphore},
     },
-    render_core::{Core, CORE},
+    render_core::Rhi,
 };
 
 pub struct RenderContext
 {
-    pub render_swapchain: Swapchain,
+    pub render_swapchain: RhiSwapchain,
 
     swapchain_image_index: usize,
 
@@ -26,39 +30,38 @@ pub struct RenderContext
     pub frame_id: u64,
 
     /// 为每个 frame 分配一个 command pool
-    graphics_command_pools: Vec<CommandPool>,
+    graphics_command_pools: Vec<Rc<RhiCommandPool>>,
 
     /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
-    allocated_command_buffers: Vec<Vec<CommandBuffer>>,
+    allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
 
     pub depth_format: vk::Format,
-    pub depth_image: vk::Image,
-    depth_image_allcation: vk_mem::Allocation,
-    pub depth_image_view: vk::ImageView,
+    pub depth_image: Rc<RhiImage2D>,
+    pub depth_view: Rc<RhiImage2DView>,
 
-    present_complete_semaphores: Vec<Semaphore>,
-    render_complete_semaphores: Vec<Semaphore>,
-    fence_frame_in_flight: Vec<Fence>,
+    present_complete_semaphores: Vec<RhiSemaphore>,
+    render_complete_semaphores: Vec<RhiSemaphore>,
+    fence_frame_in_flight: Vec<RhiFence>,
 
-    rhi: &'static Core,
+    device: Rc<RhiDevice>,
+    debug_utils: Rc<RhiDebugUtils>,
+    graphics_queue: Rc<RhiQueue>,
+    command_queue: Rc<RhiQueue>,
+    transfer_queue: Rc<RhiQueue>,
 }
 
 impl RenderContext
 {
-    pub fn new(
-        rhi: &'static Core,
-        init_info: &RenderContextInitInfo,
-        render_swapchain_init_info: SwapchainInitInfo,
-    ) -> Self
+    pub fn new(rhi: &Rhi, init_info: &RenderContextInitInfo, render_swapchain_init_info: RhiSwapchainInitInfo) -> Self
     {
-        let render_swapchain = Swapchain::new(rhi, &render_swapchain_init_info);
-        let (depth_format, depth_image, depth_image_allcation, depth_image_view) =
-            Self::init_depth_image_and_view(rhi, &render_swapchain, &init_info.depth_format_dedicate);
+        let render_swapchain = RhiSwapchain::new(rhi, &render_swapchain_init_info);
+        let (depth_format, depth_image, depth_image_view) =
+            Self::create_depth_image_and_view(rhi, &render_swapchain, &init_info.depth_format_dedicate);
 
         let create_semaphore = |name: &str| {
             (0..init_info.frames_in_flight)
                 .map(|i| FRAME_ID_MAP[i])
-                .map(|tag| Semaphore::new(rhi, format!("{name}_{tag}")))
+                .map(|tag| RhiSemaphore::new(rhi, &format!("{name}_{tag}")))
                 .collect_vec()
         };
         let present_complete_semaphores = create_semaphore("present_complete_semaphore");
@@ -66,7 +69,7 @@ impl RenderContext
 
         let fence_frame_in_flight = (0..init_info.frames_in_flight)
             .map(|i| FRAME_ID_MAP[i])
-            .map(|tag| Fence::new(rhi, true, format!("frame_in_flight_fence_{tag}")))
+            .map(|tag| RhiFence::new(rhi, true, &format!("frame_in_flight_fence_{tag}")))
             .collect();
 
         let graphics_command_pools = Self::init_command_pool(rhi, init_info);
@@ -84,25 +87,28 @@ impl RenderContext
 
             depth_format,
             depth_image,
-            depth_image_allcation,
-            depth_image_view,
+            depth_view: depth_image_view,
 
             present_complete_semaphores,
             render_complete_semaphores,
             fence_frame_in_flight,
 
-            rhi,
+            device: rhi.device.clone(),
+            debug_utils: rhi.debug_utils.clone(),
+            graphics_queue: rhi.graphics_queue.clone(),
+            command_queue: rhi.compute_queue.clone(),
+            transfer_queue: rhi.transfer_queue.clone(),
         };
 
         ctx
     }
 
 
-    fn init_depth_image_and_view(
-        rhi: &Core,
-        swapchain: &Swapchain,
+    fn create_depth_image_and_view(
+        rhi: &Rhi,
+        swapchain: &RhiSwapchain,
         depth_format_dedicate: &[vk::Format],
-    ) -> (vk::Format, vk::Image, vk_mem::Allocation, vk::ImageView)
+    ) -> (vk::Format, Rc<RhiImage2D>, Rc<RhiImage2DView>)
     {
         let depth_format = rhi
             .find_supported_format(
@@ -114,36 +120,40 @@ impl RenderContext
             .copied()
             .unwrap();
 
-        let (depth_image, depth_image_allocation) = {
-            let create_info = CreateUtils::make_image2d_create_info(
+        let depth_image = Rc::new(RhiImage2D::new(
+            rhi,
+            Rc::new(RhiImageCreateInfo::new_image_2d_info(
                 swapchain.extent,
                 depth_format,
                 vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-            );
-            rhi.create_image(&create_info, "depth-image")
-        };
+            )),
+            &vk_mem::AllocationCreateInfo {
+                usage: vk_mem::MemoryUsage::AutoPreferDevice,
+                ..Default::default()
+            },
+            "depth-image",
+        ));
 
-        let depth_image_view = {
-            let create_info = CreateUtils::make_image_view_2d_create_info(
-                depth_image,
-                depth_format,
-                vk::ImageAspectFlags::DEPTH,
-            );
-            rhi.create_image_view(&create_info, "depth-image-view")
-        };
+        let depth_image_view = RhiImage2DView::new(
+            rhi,
+            depth_image.clone(),
+            RhiImageViewCreateInfo::new_image_view_2d_info(depth_format, vk::ImageAspectFlags::DEPTH),
+            "depth-image-view".to_string(),
+        );
 
-        (depth_format, depth_image, depth_image_allocation, depth_image_view)
+        (depth_format, depth_image, Rc::new(depth_image_view))
     }
 
-    fn init_command_pool(rhi: &Core, init_info: &RenderContextInitInfo) -> Vec<CommandPool>
+    fn init_command_pool(rhi: &Rhi, init_info: &RenderContextInitInfo) -> Vec<Rc<RhiCommandPool>>
     {
         let graphics_command_pools = (0..init_info.frames_in_flight)
             .map(|i| {
-                rhi.create_command_pool(
-                    vk::QueueFlags::GRAPHICS,
+                Rc::new(RhiCommandPool::new(
+                    rhi,
+                    rhi.device.graphics_queue_family_index,
                     vk::CommandPoolCreateFlags::TRANSIENT,
-                    format!("render_context_graphics_command_pool_{}", i),
-                )
+                    &format!("render_context_graphics_command_pool_{}", i),
+                ))
             })
             .collect();
 
@@ -156,29 +166,33 @@ impl RenderContext
     /// * 为 image 进行 layout transition 的操作
     pub fn acquire_frame(&mut self)
     {
-        let rhi = CORE.get().unwrap();
-
-        rhi.graphics_queue_begin_label("[acquire-frame]reset", LabelColor::COLOR_STAGE);
+        self.debug_utils.begin_queue_label(self.graphics_queue.handle, "[acquire-frame]", LabelColor::COLOR_STAGE);
         {
             let current_fence = &self.fence_frame_in_flight[self.current_frame];
-            rhi.wait_for_fence(current_fence);
-            rhi.reset_fence(current_fence);
+            current_fence.wait();
+            current_fence.reset();
 
             // 释放当前 frame 的 command buffer 的资源
-            std::mem::take(&mut self.allocated_command_buffers[self.current_frame]).into_iter().for_each(|c| c.free());
+            std::mem::take(&mut self.allocated_command_buffers[self.current_frame]) //
+                .into_iter()
+                .for_each(|c| c.free());
 
             // 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
-            rhi.reset_command_pool(&mut self.graphics_command_pools[self.current_frame]);
+            self.graphics_command_pools[self.current_frame].reset();
         }
-        rhi.graphics_queue_end_label();
+        self.debug_utils.end_queue_label(self.graphics_queue.handle);
 
         self.swapchain_image_index =
             self.render_swapchain.acquire_next_frame(&self.present_complete_semaphores[self.current_frame], None)
                 as usize;
 
-        rhi.graphics_queue_begin_label("[acquire-frame]color-attach-transfer", LabelColor::COLOR_STAGE);
+        self.debug_utils.begin_queue_label(
+            self.graphics_queue.handle,
+            "[acquire-frame]color-attach-transfer",
+            LabelColor::COLOR_STAGE,
+        );
         {
-            let mut cmd = self.alloc_command_buffer(format!(
+            let cmd = self.alloc_command_buffer(&format!(
                 "{}-[acquire-frame]color-attach-layout-transfer",
                 self.current_frame_prefix()
             ));
@@ -186,33 +200,28 @@ impl RenderContext
             {
                 // 只需要建立起执行依赖即可，确保 present 完成后，再进行 layout trans
                 // COLOR_ATTACHMENT_READ 对应 blend 等操作
-                cmd.image_barrier(
-                    (vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty()),
-                    (
-                        vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                        vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::COLOR_ATTACHMENT_READ,
-                    ),
-                    self.current_present_image(),
-                    vk::ImageAspectFlags::COLOR,
-                    vk::ImageLayout::UNDEFINED,
-                    vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                );
+                let image_barrier = RhiImageBarrier::new()
+                    .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
+                    .dst_mask(
+                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                        vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
+                    )
+                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .image(self.current_present_image());
+                cmd.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));
             }
             cmd.end();
 
-            self.rhi.graphics_queue_submit(
-                vec![SubmitInfo {
-                    command_buffers: vec![cmd],
-                    wait_info: vec![(
-                        vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                        self.current_present_complete_semaphore(),
-                    )],
-                    ..Default::default()
-                }],
+            self.graphics_queue.submit(
+                vec![RhiSubmitInfo::new(&[cmd]).wait_infos(&[(
+                    self.current_present_complete_semaphore(),
+                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                )])],
                 None,
             );
         }
-        rhi.graphics_queue_end_label();
+        self.debug_utils.end_queue_label(self.graphics_queue.handle);
     }
 
 
@@ -221,41 +230,42 @@ impl RenderContext
     /// * 在提交之前，为 image 进行 layout transition
     pub fn submit_frame(&mut self)
     {
-        self.rhi.graphics_queue_begin_label("[submit-frame]", LabelColor::COLOR_PASS);
+        self.debug_utils.begin_queue_label(self.graphics_queue.handle, "[submit-frame]", LabelColor::COLOR_PASS);
         {
-            let mut cmd = self.alloc_command_buffer(format!(
+            let cmd = self.alloc_command_buffer(&format!(
                 "{}-[submit-frame]color-attach-layout-transfer",
                 self.current_frame_prefix()
             ));
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "color-attach-layout-transfer");
             {
-                cmd.image_barrier(
-                    (vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT, vk::AccessFlags::COLOR_ATTACHMENT_WRITE),
-                    (vk::PipelineStageFlags::BOTTOM_OF_PIPE, vk::AccessFlags::empty()),
-                    self.current_present_image(),
-                    vk::ImageAspectFlags::COLOR,
-                    vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                    vk::ImageLayout::PRESENT_SRC_KHR,
-                );
+                let image_barrier = RhiImageBarrier::new()
+                    .src_mask(
+                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                        vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                    )
+                    .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
+                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
+                    .image(self.current_present_image());
+                cmd.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));
             }
             cmd.end();
 
-            self.rhi.graphics_queue_submit(
-                vec![SubmitInfo {
-                    command_buffers: vec![cmd],
-                    signal_info: vec![self.current_render_complete_semaphore()],
-                    ..Default::default()
-                }],
+            self.graphics_queue.submit(
+                vec![RhiSubmitInfo::new(&[cmd]).signal_infos(&[(
+                    self.current_render_complete_semaphore(),
+                    vk::PipelineStageFlags2::BOTTOM_OF_PIPE, /*TODO 需要确认 signal 的 stage*/
+                )])],
                 Some(self.fence_frame_in_flight[self.current_frame].clone()),
             );
         }
         // queue label 不能跨过 submit，否则会导致 Nsight mismatch label
-        self.rhi.graphics_queue_end_label();
+        self.debug_utils.end_queue_label(self.graphics_queue.handle);
 
         self.render_swapchain.submit_frame(
-            self.rhi,
+            &self.graphics_queue,
             self.swapchain_image_index as u32,
-            &[self.current_render_complete_semaphore().semaphore],
+            &[self.current_render_complete_semaphore()],
         );
 
         self.current_frame = (self.current_frame + 1) % self.frames_cnt;
@@ -264,10 +274,15 @@ impl RenderContext
 
 
     /// 分配 command buffer，在当前 frame 使用
-    pub fn alloc_command_buffer<S: AsRef<str>>(&mut self, debug_name: S) -> CommandBuffer
+    pub fn alloc_command_buffer(&mut self, debug_name: &str) -> RhiCommandBuffer
     {
-        let name = format!("[frame-{}-{}]{}", FRAME_ID_MAP[self.current_frame], self.frame_id, debug_name.as_ref());
-        let cmd = CommandBuffer::new(self.rhi, &self.graphics_command_pools[self.current_frame], name);
+        let name = format!("[frame-{}-{}]{}", FRAME_ID_MAP[self.current_frame], self.frame_id, debug_name);
+        let cmd = RhiCommandBuffer::new(
+            self.device.clone(),
+            self.debug_utils.clone(),
+            self.graphics_command_pools[self.current_frame].clone(),
+            &name,
+        );
 
         self.allocated_command_buffers[self.current_frame].push(cmd.clone());
 
@@ -282,7 +297,7 @@ impl RenderContext
     }
 
     #[inline]
-    pub fn current_fence(&self) -> &Fence
+    pub fn current_fence(&self) -> &RhiFence
     {
         &self.fence_frame_in_flight[self.current_frame]
     }
@@ -313,15 +328,15 @@ impl RenderContext
     }
 
     #[inline]
-    pub fn current_render_complete_semaphore(&self) -> Semaphore
+    pub fn current_render_complete_semaphore(&self) -> RhiSemaphore
     {
-        self.render_complete_semaphores[self.current_frame]
+        self.render_complete_semaphores[self.current_frame].clone()
     }
 
     #[inline]
-    pub fn current_present_complete_semaphore(&self) -> Semaphore
+    pub fn current_present_complete_semaphore(&self) -> RhiSemaphore
     {
-        self.present_complete_semaphores[self.current_frame]
+        self.present_complete_semaphores[self.current_frame].clone()
     }
 
     /// 当前帧从 swapchain 获取到的用于 present 的 image

@@ -6,13 +6,13 @@ use truvis_render::{
     framework::{
         core::{
             acceleration::Acceleration,
-            buffer::Buffer,
+            buffer::RhiBuffer,
+            command_queue::RhiSubmitInfo,
             descriptor::DescriptorBindings,
             pipeline::{Pipeline, PipelineTemplate},
-            queue::SubmitInfo,
         },
+        render_core::Rhi,
         rendering::render_context::RenderContext,
-        render_core::Core,
     },
     render::{App, AppCtx, AppInitInfo, Renderer, Timer},
 };
@@ -81,8 +81,8 @@ impl DescriptorBindings for RayTracingBindings
 
 struct HelloRT
 {
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
+    vertex_buffer: RhiBuffer,
+    index_buffer: RhiBuffer,
     pipeline: Pipeline,
     blas: Acceleration, // 可以有多个
     tlas: Acceleration, // 只能由一个
@@ -91,22 +91,19 @@ struct HelloRT
 
 impl HelloRT
 {
-    fn init_buffer(rhi: &'static Core) -> (Buffer, Buffer)
+    fn init_buffer(rhi: &Rhi) -> (RhiBuffer, RhiBuffer)
     {
-        let mut index_buffer = Buffer::new_index_buffer(rhi, size_of_val(&INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data_by_stage_buffer(&INDEX_DATA);
+        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, size_of_val(&INDEX_DATA), "index-buffer");
+        index_buffer.transfer_data_by_stage_buffer(rhi, &INDEX_DATA);
 
-        let mut vertex_buffer = Buffer::new_vertex_buffer(rhi, size_of_val(&VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data_by_stage_buffer(&VERTEX_DATA);
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, size_of_val(&VERTEX_DATA), "vertex-buffer");
+        vertex_buffer.transfer_data_by_stage_buffer(rhi, &VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }
 
-    fn init_acceleration(
-        rhi: &'static Core,
-        vertex_buffer: &Buffer,
-        index_buffer: &Buffer,
-    ) -> (Acceleration, Acceleration)
+    fn init_acceleration(rhi: &Rhi, vertex_buffer: &RhiBuffer, index_buffer: &RhiBuffer)
+        -> (Acceleration, Acceleration)
     {
         let triangles_data = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
@@ -156,14 +153,13 @@ impl HelloRT
             },
         }];
 
-        let tlas =
-            Acceleration::build_tlas(rhi, &instances, vk::BuildAccelerationStructureFlagsKHR::empty(), "hello");
+        let tlas = Acceleration::build_tlas(rhi, &instances, vk::BuildAccelerationStructureFlagsKHR::empty(), "hello");
 
 
         (tlas, blas)
     }
 
-    fn init_pipeline(rhi: &'static Core, render_context: &RenderContext) -> Pipeline
+    fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> Pipeline
     {
         let extent = render_context.swapchain_extent();
         PipelineTemplate {
@@ -207,9 +203,9 @@ impl HelloRT
         .create_pipeline(rhi, "rt")
     }
 
-    fn run(&self, rhi: &'static Core, render_context: &mut RenderContext)
+    fn run(&self, rhi: &Rhi, render_context: &mut RenderContext)
     {
-        let depth_attach_info = <Self as App>::get_depth_attachment(render_context.depth_image_view);
+        let depth_attach_info = <Self as App>::get_depth_attachment(render_context.depth_view.handle());
         let color_attach_info = <Self as App>::get_color_attachment(render_context.current_present_image_view());
         let render_info = <Self as App>::get_render_info(
             vk::Rect2D {
@@ -224,25 +220,18 @@ impl HelloRT
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);
-            cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
-            cmd.bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
-            cmd.bind_vertex_buffer(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
-            cmd.draw_indexed((INDEX_DATA.len() as u32, 0), (1, 0), 0);
+            cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
+            cmd.cmd_bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
+            cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
+            cmd.draw_indexed(INDEX_DATA.len() as u32, 0, 1, 0, 0);
             cmd.end_rendering();
         }
         cmd.end();
-        rhi.graphics_queue().submit(
-            rhi,
-            vec![SubmitInfo {
-                command_buffers: vec![cmd],
-                ..Default::default()
-            }],
-            None,
-        );
+        rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
 
-    fn new(rhi: &'static Core, render_context: &RenderContext) -> Self
+    fn new(rhi: &Rhi, render_context: &RenderContext) -> Self
     {
         log::info!("start.");
         let (vertex_buffer, index_buffer) = Self::init_buffer(rhi);
@@ -261,6 +250,12 @@ impl HelloRT
 
 impl App for HelloRT
 {
+    fn update_ui(&mut self, ui: &mut Ui)
+    {
+        ui.text_wrapped("Hello world!");
+        ui.text_wrapped("こんにちは世界！");
+    }
+
     fn update(&mut self, app_ctx: &mut AppCtx)
     {
         //
@@ -271,7 +266,7 @@ impl App for HelloRT
         self.run(app_ctx.rhi, app_ctx.render_context);
     }
 
-    fn init(rhi: &'static Core, render_context: &mut RenderContext) -> Self
+    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self
     {
         HelloRT::new(rhi, render_context)
     }
@@ -284,12 +279,6 @@ impl App for HelloRT
             app_name: "hello-triangle".to_string(),
             enable_validation: true,
         }
-    }
-
-    fn update_ui(&mut self, ui: &mut Ui)
-    {
-        ui.text_wrapped("Hello world!");
-        ui.text_wrapped("こんにちは世界！");
     }
 }
 

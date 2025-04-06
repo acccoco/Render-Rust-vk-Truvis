@@ -1,6 +1,6 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use std::{cell::RefCell, ffi::CString};
+use std::{cell::RefCell, ffi::CString, rc::Rc};
 
 use ash::vk;
 use image::EncodableLayout;
@@ -8,32 +8,37 @@ use image::EncodableLayout;
 use crate::framework::{
     basic::color::LabelColor,
     core::{
-        buffer::Buffer, command_buffer::CommandBuffer, image::Image2D, queue::SubmitInfo,
-        shader::ShaderModule, texture::Texture,
+        buffer::RhiBuffer,
+        command_buffer::RhiCommandBuffer,
+        command_queue::RhiSubmitInfo,
+        descriptor::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo},
+        image::RhiImage2D,
+        shader::ShaderModule,
+        texture::RhiTexture2D,
     },
+    render_core::Rhi,
     rendering::render_context::RenderContext,
-    render_core::Core,
 };
 
 pub struct UiMesh
 {
-    pub vertex: Buffer,
+    pub vertex: RhiBuffer,
     vertex_count: usize,
 
-    pub indices: Buffer,
+    pub indices: RhiBuffer,
     index_count: usize,
 }
 
 impl UiMesh
 {
     // TODO 频繁的创建和销毁 buffer，性能不好
-    pub fn from_draw_data(rhi: &'static Core, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self
+    pub fn from_draw_data(rhi: &Rhi, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self
     {
-        let mut cmd = render_ctx.alloc_command_buffer("uipass-create-mesh");
+        let cmd = render_ctx.alloc_command_buffer("uipass-create-mesh");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]create-mesh");
 
-        let (vertex_buffer, vertex_cnt) = Self::create_vertices(rhi, render_ctx, &mut cmd, draw_data);
-        let (index_buffer, index_cnt) = Self::create_indices(rhi, render_ctx, &mut cmd, draw_data);
+        let (vertex_buffer, vertex_cnt) = Self::create_vertices(rhi, render_ctx, &cmd, draw_data);
+        let (index_buffer, index_cnt) = Self::create_indices(rhi, render_ctx, &cmd, draw_data);
 
 
         cmd.begin_label("uipass-mesh-transfer-barrier", LabelColor::COLOR_CMD);
@@ -47,7 +52,7 @@ impl UiMesh
                     .dst_access_mask(vk::AccessFlags2::INDEX_READ)
                     .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
                     .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                    .buffer(index_buffer.handle)
+                    .buffer(index_buffer.handle())
                     .offset(0)
                     .size(vk::WHOLE_SIZE)],
             );
@@ -61,7 +66,7 @@ impl UiMesh
                     .dst_access_mask(vk::AccessFlags2::VERTEX_ATTRIBUTE_READ)
                     .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
                     .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                    .buffer(vertex_buffer.handle)
+                    .buffer(vertex_buffer.handle())
                     .offset(0)
                     .size(vk::WHOLE_SIZE)],
             );
@@ -69,13 +74,7 @@ impl UiMesh
         cmd.end_label();
         cmd.end();
 
-        rhi.graphics_queue_submit(
-            vec![SubmitInfo {
-                command_buffers: vec![cmd],
-                ..Default::default()
-            }],
-            None,
-        );
+        rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
 
         Self {
             vertex: vertex_buffer,
@@ -88,11 +87,11 @@ impl UiMesh
     /// # Return
     /// (vertices buffer, vertex count)
     fn create_vertices(
-        rhi: &'static Core,
+        rhi: &Rhi,
         render_ctx: &mut RenderContext,
-        cmd: &mut CommandBuffer,
+        cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (Buffer, usize)
+    ) -> (RhiBuffer, usize)
     {
         let vertex_count = draw_data.total_vtx_count as usize;
         let mut vertices = Vec::with_capacity(vertex_count);
@@ -101,14 +100,14 @@ impl UiMesh
         }
 
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
-        let mut vertex_buffer = Buffer::new_vertex_buffer(
+        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(
             rhi,
             vertices_size,
             &format!("{}-imgui-vertex-buffer", render_ctx.current_frame_prefix()),
         );
         {
             // FIXME destroy stage buffer
-            let mut stage_buffer = Buffer::new_stage_buffer(
+            let mut stage_buffer = RhiBuffer::new_stage_buffer(
                 rhi,
                 vertices_size as vk::DeviceSize,
                 &format!("{}-imgui-vertex-stage-buffer", render_ctx.current_frame_prefix()),
@@ -117,7 +116,7 @@ impl UiMesh
 
             cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
             {
-                cmd.copy_buffer(
+                cmd.cmd_copy_buffer(
                     &stage_buffer,
                     &mut vertex_buffer,
                     &[vk::BufferCopy {
@@ -135,11 +134,11 @@ impl UiMesh
     /// # Return
     /// (index buffer, index count)
     fn create_indices(
-        rhi: &'static Core,
+        rhi: &Rhi,
         render_ctx: &mut RenderContext,
-        cmd: &mut CommandBuffer,
+        cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (Buffer, usize)
+    ) -> (RhiBuffer, usize)
     {
         let index_count = draw_data.total_idx_count as usize;
         let mut indices = Vec::with_capacity(index_count);
@@ -148,14 +147,14 @@ impl UiMesh
         }
 
         let indices_size = index_count * size_of::<imgui::DrawIdx>();
-        let mut index_buffer = Buffer::new_index_buffer(
+        let mut index_buffer = RhiBuffer::new_index_buffer(
             rhi,
             indices_size,
             &format!("{}-imgui-index-buffer", render_ctx.current_frame_prefix()),
         );
         {
             // FIXME destroy stage buffer
-            let mut stage_buffer = Buffer::new_stage_buffer(
+            let mut stage_buffer = RhiBuffer::new_stage_buffer(
                 rhi,
                 indices_size as vk::DeviceSize,
                 &format!("{}-imgui-index-stage-buffer", render_ctx.current_frame_prefix()),
@@ -164,7 +163,7 @@ impl UiMesh
 
             cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);
             {
-                cmd.copy_buffer(
+                cmd.cmd_copy_buffer(
                     &stage_buffer,
                     &mut index_buffer,
                     &[vk::BufferCopy {
@@ -196,9 +195,9 @@ pub struct UI
     pipeline_layout: vk::PipelineLayout,
     descriptor_set_layout: vk::DescriptorSetLayout,
 
-    descriptor_pool: vk::DescriptorPool,
+    descriptor_pool: Rc<RhiDescriptorPool>,
 
-    fonts_texture: Texture,
+    fonts_texture: RhiTexture2D,
     font_descriptor_set: vk::DescriptorSet,
 
     meshes: Vec<Option<UiMesh>>,
@@ -216,18 +215,13 @@ impl UI
     const FONT_TEX_ID: usize = usize::MAX;
 
 
-    pub fn new(
-        rhi: &'static Core,
-        render_ctx: &RenderContext,
-        window: &winit::window::Window,
-        options: &UiOptions,
-    ) -> Self
+    pub fn new(rhi: &Rhi, render_ctx: &RenderContext, window: &winit::window::Window, options: &UiOptions) -> Self
     {
         let (mut imgui, platform) = Self::create_imgui(window);
 
-        let descriptor_set_layout = Self::create_descriptor_set(&rhi.device.device);
+        let descriptor_set_layout = Self::create_descriptor_set(&rhi.device.handle);
         rhi.set_debug_name(descriptor_set_layout, "[uipass]descriptor-set-layout");
-        let pipeline_layout = Self::create_pipeline_layout(&rhi.device.device, descriptor_set_layout);
+        let pipeline_layout = Self::create_pipeline_layout(&rhi.device.handle, descriptor_set_layout);
         rhi.set_debug_name(pipeline_layout, "[uipass]pipeline-layout");
         let pipeline = Self::create_pipeline(rhi, render_ctx, pipeline_layout);
         rhi.set_debug_name(pipeline, "[uipass]pipeline");
@@ -237,32 +231,34 @@ impl UI
             let fonts = imgui.fonts();
             let atlas_texture = fonts.build_rgba32_texture();
 
-            let image = Image2D::from_rgba8(
+            let image = Rc::new(RhiImage2D::from_rgba8(
                 rhi,
                 atlas_texture.width,
                 atlas_texture.height,
                 atlas_texture.data,
                 "imgui-fonts-image",
-            );
-            Texture::new(rhi, image, "imgui-fonts-texture")
+            ));
+            RhiTexture2D::new(rhi, image, "imgui-fonts-texture")
         };
 
         let fonts = imgui.fonts();
         fonts.tex_id = imgui::TextureId::from(Self::FONT_TEX_ID);
 
-        let pool_sizes =
-            [vk::DescriptorPoolSize::default().descriptor_count(1).ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)];
-        let descriptor_pool = rhi.create_descriptor_pool(
-            &vk::DescriptorPoolCreateInfo::default()
-                .pool_sizes(&pool_sizes)
-                .max_sets(1)
-                .flags(vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET),
+        let descriptor_pool = Rc::new(RhiDescriptorPool::new(
+            rhi,
+            Rc::new(RhiDescriptorPoolCreateInfo::new(
+                vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET,
+                1,
+                vec![vk::DescriptorPoolSize::default()
+                    .descriptor_count(1)
+                    .ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)],
+            )),
             "imgui-descriptor-pool",
-        );
+        ));
 
         let descriptor_set = rhi.allocate_descriptor_sets(
             &vk::DescriptorSetAllocateInfo::default()
-                .descriptor_pool(descriptor_pool)
+                .descriptor_pool(descriptor_pool.handle())
                 .set_layouts(std::slice::from_ref(&descriptor_set_layout)),
         )[0];
         rhi.set_debug_name(descriptor_set, "[uipass]descriptor");
@@ -270,8 +266,8 @@ impl UI
         // write
         {
             let image_info = vk::DescriptorImageInfo::default()
-                .sampler(fonts_texture.sampler)
-                .image_view(fonts_texture.image_view)
+                .sampler(fonts_texture.sampler.handle())
+                .image_view(fonts_texture.image_view.handle())
                 .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
             let writes = vk::WriteDescriptorSet::default()
                 .dst_set(descriptor_set)
@@ -306,7 +302,7 @@ impl UI
     }
 
     // FIXME 这些 new frame，prepare frame 的顺序到底是什么?
-    pub fn new_frame(&mut self, window: &winit::window::Window) -> &mut imgui::Ui
+    pub fn new_frame(&mut self, _window: &winit::window::Window) -> &mut imgui::Ui
     {
         let frame = self.imgui.get_mut().new_frame();
         // self.platform.prepare_render(&frame, window);
@@ -327,11 +323,11 @@ impl UI
     // imgui.render()
     pub fn draw(
         &mut self,
-        rhi: &'static Core,
+        rhi: &Rhi,
         render_ctx: &mut RenderContext,
         window: &winit::window::Window,
         f: impl FnOnce(&mut imgui::Ui),
-    ) -> Option<CommandBuffer>
+    ) -> Option<RhiCommandBuffer>
     {
         self.platform.prepare_frame(self.imgui.borrow_mut().io_mut(), window).unwrap();
 
@@ -347,11 +343,11 @@ impl UI
         let frame_index = render_ctx.current_frame_index();
 
         // TODO 这里需要标注一下名称，每个 tick 都会重新建立 vertex buffer
-        rhi.graphics_queue_begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
+        rhi.debug_utils.begin_queue_label(rhi.graphics_queue.handle, "[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
         if let Some(mesh) = self.meshes[frame_index].replace(UiMesh::from_draw_data(rhi, render_ctx, draw_data)) {
             mesh.destroy()
         }
-        rhi.graphics_queue_end_label();
+        rhi.debug_utils.end_queue_label(rhi.graphics_queue.handle);
 
         let mut cmd = render_ctx.alloc_command_buffer("uipass-render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]draw");
@@ -375,7 +371,7 @@ impl UI
     fn record_cmd(
         &self,
         render_ctx: &mut RenderContext,
-        cmd: &mut CommandBuffer,
+        cmd: &mut RhiCommandBuffer,
         mesh: &UiMesh,
         draw_data: &imgui::DrawData,
     )
@@ -386,7 +382,7 @@ impl UI
             .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);
         let depth_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(render_ctx.depth_image_view)
+            .image_view(render_ctx.depth_view.handle())
             .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
             .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);
@@ -404,13 +400,13 @@ impl UI
         };
 
         cmd.cmd_begin_rendering(&render_info);
-        cmd.bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+        cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline);
         cmd.cmd_set_viewport(0, std::slice::from_ref(&viewport));
         let projection =
             glam::Mat4::orthographic_rh(0.0, draw_data.display_size[0], 0.0, draw_data.display_size[1], -1.0, 1.0);
         cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::VERTEX, 0, projection.as_ref().as_bytes());
-        cmd.bind_index_buffer(&mesh.indices, 0, vk::IndexType::UINT16);
-        cmd.bind_vertex_buffer(0, std::slice::from_ref(&mesh.vertex), &[0]);
+        cmd.cmd_bind_index_buffer(&mesh.indices, 0, vk::IndexType::UINT16);
+        cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&mesh.vertex), &[0]);
 
         let mut index_offset = 0;
         let mut vertex_offset = 0;
@@ -462,12 +458,12 @@ impl UI
                             last_texture_id = Some(texture_id);
                         }
 
-                        cmd.draw_indexed2(
+                        cmd.draw_indexed(
                             count as u32,
-                            1,
                             index_offset + idx_offset as u32,
-                            vertex_offset + vtx_offset as i32,
+                            1,
                             0,
+                            vertex_offset + vtx_offset as i32,
                         );
                     }
                     imgui::DrawCmd::ResetRenderState => {
@@ -551,11 +547,7 @@ impl UI
         pipeline_layout
     }
 
-    fn create_pipeline(
-        rhi: &'static Core,
-        render_ctx: &RenderContext,
-        pipeline_layout: vk::PipelineLayout,
-    ) -> vk::Pipeline
+    fn create_pipeline(rhi: &Rhi, render_ctx: &RenderContext, pipeline_layout: vk::PipelineLayout) -> vk::Pipeline
     {
         let entry_point_name = CString::new("main").unwrap();
 
@@ -679,7 +671,7 @@ impl UI
 
         let pipeline = unsafe {
             rhi.device
-                .device
+                .handle
                 .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
                 .unwrap()[0]
         };

@@ -6,15 +6,15 @@ use std::{
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::core::debug_utils::DebugUtils;
+use crate::framework::core::debug_utils::RhiDebugUtils;
 
-pub struct Instance
+pub struct RhiInstance
 {
     pub handle: ash::Instance,
 }
 
 
-impl Instance
+impl RhiInstance
 {
     /// 设置所需的 layers 和 extensions，创建 vk instance
     pub fn new(
@@ -52,7 +52,7 @@ impl Instance
             .enabled_layer_names(&enabled_layers);
 
         // 为 instance info 添加 debug messenger
-        let mut debug_utils_messenger_ci = DebugUtils::get_debug_utils_messenger_ci();
+        let mut debug_utils_messenger_ci = RhiDebugUtils::debug_utils_messenger_ci();
         instance_ci = instance_ci.push_next(&mut debug_utils_messenger_ci);
 
         let handle = unsafe { vk_entry.create_instance(&instance_ci, None).unwrap() };

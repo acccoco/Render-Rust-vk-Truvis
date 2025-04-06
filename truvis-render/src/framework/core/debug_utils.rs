@@ -3,15 +3,13 @@ use std::ffi::{CStr, CString};
 use ash::vk;
 
 
-pub struct DebugUtils
+pub struct RhiDebugUtils
 {
     pub vk_debug_utils_instance: ash::ext::debug_utils::Instance,
     pub vk_debug_utils_device: ash::ext::debug_utils::Device,
     pub vk_debug_utils_messenger: vk::DebugUtilsMessengerEXT,
 }
 
-static mut DEBUG_MSG_TYPE: vk::DebugUtilsMessageTypeFlagsEXT = vk::DebugUtilsMessageTypeFlagsEXT::empty();
-static mut DEBUG_MSG_SEVERITY: vk::DebugUtilsMessageSeverityFlagsEXT = vk::DebugUtilsMessageSeverityFlagsEXT::empty();
 
 /// debug messenger 的回调函数
 /// # Safety
@@ -54,13 +52,13 @@ unsafe extern "system" fn vk_debug_callback(
 }
 
 
-impl DebugUtils
+impl RhiDebugUtils
 {
     pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, device: &ash::Device) -> Self
     {
         let loader = ash::ext::debug_utils::Instance::new(vk_pf, instance);
 
-        let create_info = Self::get_debug_utils_messenger_ci();
+        let create_info = Self::debug_utils_messenger_ci();
         let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None).unwrap() };
 
         let debug_utils = ash::ext::debug_utils::Device::new(instance, device);
@@ -72,8 +70,10 @@ impl DebugUtils
         }
     }
 
-    pub fn get_debug_msg_type() -> vk::DebugUtilsMessageTypeFlagsEXT
+    /// 存放 msg 参数，用于初始化 debug messenger
+    pub fn debug_msg_type() -> vk::DebugUtilsMessageTypeFlagsEXT
     {
+        static mut DEBUG_MSG_TYPE: vk::DebugUtilsMessageTypeFlagsEXT = vk::DebugUtilsMessageTypeFlagsEXT::empty();
         unsafe {
             if vk::DebugUtilsMessageTypeFlagsEXT::empty() == DEBUG_MSG_TYPE {
                 DEBUG_MSG_TYPE =
@@ -83,8 +83,11 @@ impl DebugUtils
         }
     }
 
-    pub fn get_debug_msg_severity() -> vk::DebugUtilsMessageSeverityFlagsEXT
+    /// 存放 msg 参数，用于初始化 debug messenger
+    pub fn debug_msg_severity() -> vk::DebugUtilsMessageSeverityFlagsEXT
     {
+        static mut DEBUG_MSG_SEVERITY: vk::DebugUtilsMessageSeverityFlagsEXT =
+            vk::DebugUtilsMessageSeverityFlagsEXT::empty();
         unsafe {
             if vk::DebugUtilsMessageSeverityFlagsEXT::empty() == DEBUG_MSG_SEVERITY {
                 DEBUG_MSG_SEVERITY =
@@ -95,11 +98,12 @@ impl DebugUtils
     }
 
 
-    pub fn get_debug_utils_messenger_ci() -> vk::DebugUtilsMessengerCreateInfoEXT<'static>
+    /// 用于创建 debug messenger 的结构体
+    pub fn debug_utils_messenger_ci() -> vk::DebugUtilsMessengerCreateInfoEXT<'static>
     {
         vk::DebugUtilsMessengerCreateInfoEXT::default()
-            .message_severity(Self::get_debug_msg_severity())
-            .message_type(Self::get_debug_msg_type())
+            .message_severity(Self::debug_msg_severity())
+            .message_type(Self::debug_msg_type())
             .pfn_user_callback(Some(vk_debug_callback))
     }
 
@@ -120,7 +124,7 @@ impl DebugUtils
     }
 
     #[inline]
-    pub fn set_object_debug_tag<T>(&self, handle: T, tag: u64)
+    pub fn set_object_debug_tag<T>(&self, _handle: T, _tag: u64)
     where
         T: vk::Handle + Copy,
     {

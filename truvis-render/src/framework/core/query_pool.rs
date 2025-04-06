@@ -1,6 +1,8 @@
+use std::rc::Rc;
+
 use ash::vk;
 
-use crate::framework::render_core::Core;
+use crate::framework::{core::device::RhiDevice, render_core::Rhi};
 
 pub struct QueryPool
 {
@@ -10,13 +12,13 @@ pub struct QueryPool
     /// pool 的容量
     pub(crate) cnt: u32,
 
-    rhi: &'static Core,
+    device: Rc<RhiDevice>,
 }
 
 impl QueryPool
 {
     #[inline]
-    pub fn new(rhi: &'static Core, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self
+    pub fn new(rhi: &Rhi, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self
     {
         let create_info = vk::QueryPoolCreateInfo {
             query_type: ty,
@@ -24,16 +26,15 @@ impl QueryPool
             ..Default::default()
         };
 
-
         unsafe {
-            let handle = rhi.vk_device().create_query_pool(&create_info, None).unwrap();
+            let handle = rhi.device.create_query_pool(&create_info, None).unwrap();
             rhi.set_debug_name(handle, debug_name);
 
             Self {
+                device: rhi.device.clone(),
                 handle,
                 query_type: ty,
                 cnt,
-                rhi,
             }
         }
     }
@@ -45,10 +46,7 @@ impl QueryPool
     {
         unsafe {
             let mut res = vec![Default::default(); query_cnt as usize];
-            self.rhi
-                .vk_device()
-                .get_query_pool_results(self.handle, first_index, &mut res, vk::QueryResultFlags::WAIT)
-                .unwrap();
+            self.device.get_query_pool_results(self.handle, first_index, &mut res, vk::QueryResultFlags::WAIT).unwrap();
             res
         }
     }
@@ -57,7 +55,7 @@ impl QueryPool
     pub fn reset(&mut self, first_query: u32, query_cnt: u32)
     {
         unsafe {
-            self.rhi.vk_device().reset_query_pool(self.handle, first_query, query_cnt);
+            self.device.reset_query_pool(self.handle, first_query, query_cnt);
         }
     }
 
@@ -65,7 +63,7 @@ impl QueryPool
     pub fn destroy(self)
     {
         unsafe {
-            self.rhi.vk_device().destroy_query_pool(self.handle, None);
+            self.device.destroy_query_pool(self.handle, None);
         }
     }
 }

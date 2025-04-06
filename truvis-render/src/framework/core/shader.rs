@@ -1,16 +1,21 @@
+use std::rc::Rc;
+
 use ash::vk;
 
-use crate::framework::render_core::Core;
+use crate::framework::{core::device::RhiDevice, render_core::Rhi};
 
 pub struct ShaderModule
 {
-    pub(crate) handle: vk::ShaderModule,
-    rhi: &'static Core,
+    pub handle: vk::ShaderModule,
+
+    device: Rc<RhiDevice>,
 }
 
 impl ShaderModule
 {
-    pub fn new(rhi: &'static Core, path: &std::path::Path) -> Self
+    /// # param
+    /// * path - spv shader 文件路径
+    pub fn new(rhi: &Rhi, path: &std::path::Path) -> Self
     {
         let mut file = std::fs::File::open(path).unwrap();
         let shader_code = ash::util::read_spv(&mut file).unwrap();
@@ -22,7 +27,7 @@ impl ShaderModule
             rhi.set_debug_name(shader_module, path.to_str().unwrap());
             Self {
                 handle: shader_module,
-                rhi,
+                device: rhi.device.clone(),
             }
         }
     }
@@ -30,7 +35,7 @@ impl ShaderModule
     pub fn destroy(self)
     {
         unsafe {
-            self.rhi.vk_device().destroy_shader_module(self.handle, None);
+            self.device.destroy_shader_module(self.handle, None);
         }
     }
 }

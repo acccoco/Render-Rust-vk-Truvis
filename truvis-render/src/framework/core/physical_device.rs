@@ -4,7 +4,7 @@ use ash::vk;
 
 
 /// 表示一张物理显卡
-pub struct PhysicalDevice
+pub struct RhiGpu
 {
     pub handle: vk::PhysicalDevice,
 
@@ -20,7 +20,7 @@ pub struct PhysicalDevice
     pub queue_family_properties: Vec<vk::QueueFamilyProperties>,
 }
 
-impl PhysicalDevice
+impl RhiGpu
 {
     pub fn new(pdevice: vk::PhysicalDevice, instance: &ash::Instance) -> Self
     {

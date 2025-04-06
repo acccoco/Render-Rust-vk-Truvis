@@ -1,54 +1,76 @@
-use std::{collections::HashMap, ffi::CStr, sync::Arc};
+use std::{collections::HashMap, ffi::CStr, ops::Deref, rc::Rc};
 
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::core::{instance::Instance, physical_device::PhysicalDevice, queue::Queue};
+use crate::framework::core::{command_queue::RhiQueue, instance::RhiInstance, physical_device::RhiGpu};
 
-pub struct Device
+pub struct RhiDevice
 {
-    pub device: ash::Device,
+    pub handle: ash::Device,
 
-    pub graphics_queue: Queue,
-    pub transfer_queue: Queue,
-    pub compute_queue: Queue,
+    pub pdevice: Rc<RhiGpu>,
 
-    pub pdevice: Arc<PhysicalDevice>,
+    pub graphics_queue_family_index: u32,
+    pub compute_queue_family_index: u32,
+    pub transfer_queue_family_index: u32,
+
+    pub vk_dynamic_render_pf: Rc<ash::khr::dynamic_rendering::Device>,
+    pub vk_acceleration_struct_pf: Rc<ash::khr::acceleration_structure::Device>,
 }
 
-impl Device
+impl Deref for RhiDevice
 {
-    pub fn new(instance: &Instance, pdevice: Arc<PhysicalDevice>) -> Self
+    type Target = ash::Device;
+
+    fn deref(&self) -> &Self::Target
+    {
+        &self.handle
+    }
+}
+
+impl RhiDevice
+{
+    /// # return
+    /// * (device, graphics queue, compute queue, transfer queue)
+    pub fn new(
+        instance: &RhiInstance,
+        pdevice: Rc<RhiGpu>,
+    ) -> (Rc<RhiDevice>, Rc<RhiQueue>, Rc<RhiQueue>, Rc<RhiQueue>)
     {
         let graphics_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::GRAPHICS).unwrap();
         let compute_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::COMPUTE).unwrap();
         let transfer_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::TRANSFER).unwrap();
 
+        // 记录每个 queue family index 应该创建多少个 queue
+        // queue family index <-> queue num
+        // hash map 会自动去重
         let mut queues = HashMap::from([
             (graphics_queue_family_index, 0),
             (compute_queue_family_index, 0),
             (transfer_queue_family_index, 0),
         ]);
 
-        // num 表示 “号码”
-        let mut graphics_queue_num = 0;
-        let mut compute_queue_num = 0;
-        let mut transfer_queue_num = 0;
+        // 计算得到每个 queue 在同类 queue family 中的 index，用于从 device 中取出 queue
+        let mut graphics_queue_index = 0;
+        let mut compute_queue_index = 0;
+        let mut transfer_queue_index = 0;
         queues.entry(graphics_queue_family_index).and_modify(|num| {
-            graphics_queue_num = *num;
+            graphics_queue_index = *num;
             *num += 1;
         });
         queues.entry(compute_queue_family_index).and_modify(|num| {
-            compute_queue_num = *num;
+            compute_queue_index = *num;
             *num += 1;
         });
         queues.entry(transfer_queue_family_index).and_modify(|num| {
-            transfer_queue_num = *num;
+            transfer_queue_index = *num;
             *num += 1;
         });
 
-        // 每个 queue family 的 queue 数量通过 priority 数组的长度指定
-        let queue_priorities = queues.values().map(|count| vec![1.0; *count as usize]).collect_vec();
+        // 每个 queue family 的 queue 数量和 priority 数组长度保持一直
+        let queue_priorities =
+            queues.values().map(|count| vec![1.0 /* priority = 1.0 */; *count as usize]).collect_vec();
         let queue_create_infos = queues
             .keys()
             .map(|index| {
@@ -82,26 +104,44 @@ impl Device
         unsafe {
             let device = instance.handle.create_device(pdevice.handle, &device_create_info, None).unwrap();
 
-            let graphics_queue = device.get_device_queue(graphics_queue_family_index, graphics_queue_num);
-            let compute_queue = device.get_device_queue(compute_queue_family_index, compute_queue_num);
-            let transfer_queue = device.get_device_queue(transfer_queue_family_index, transfer_queue_num);
+            let vk_dynamic_render_pf = Rc::new(ash::khr::dynamic_rendering::Device::new(&instance.handle, &device));
+            let vk_acceleration_struct_pf =
+                Rc::new(ash::khr::acceleration_structure::Device::new(&instance.handle, &device));
 
-            Self {
-                device,
-                pdevice,
-                graphics_queue: Queue {
-                    vk_queue: graphics_queue,
+            let device = Rc::new(Self {
+                handle: device,
+                pdevice: pdevice.clone(),
+
+                graphics_queue_family_index,
+                compute_queue_family_index,
+                transfer_queue_family_index,
+
+                vk_dynamic_render_pf,
+                vk_acceleration_struct_pf,
+            });
+
+            let graphics_queue = device.get_device_queue(graphics_queue_family_index, graphics_queue_index);
+            let compute_queue = device.get_device_queue(compute_queue_family_index, compute_queue_index);
+            let transfer_queue = device.get_device_queue(transfer_queue_family_index, transfer_queue_index);
+
+            (
+                device.clone(),
+                Rc::new(RhiQueue {
+                    handle: graphics_queue,
                     queue_family_index: graphics_queue_family_index,
-                },
-                transfer_queue: Queue {
-                    vk_queue: transfer_queue,
-                    queue_family_index: transfer_queue_family_index,
-                },
-                compute_queue: Queue {
-                    vk_queue: compute_queue,
+                    device: device.clone(),
+                }),
+                Rc::new(RhiQueue {
+                    handle: compute_queue,
                     queue_family_index: compute_queue_family_index,
-                },
-            }
+                    device: device.clone(),
+                }),
+                Rc::new(RhiQueue {
+                    handle: transfer_queue,
+                    queue_family_index: transfer_queue_family_index,
+                    device: device.clone(),
+                }),
+            )
         }
     }
 

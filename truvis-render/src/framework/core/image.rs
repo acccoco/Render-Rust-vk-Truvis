@@ -1,38 +1,113 @@
+use std::rc::Rc;
+
 use ash::vk;
 use vk_mem::Alloc;
 
 use crate::framework::{
-    core::{buffer::Buffer, command_buffer::CommandBuffer},
-    render_core::Core,
+    core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, synchronize::RhiImageBarrier},
+    render_core::Rhi,
 };
 
-pub struct Image2DInfo
+pub struct RhiImageCreateInfo
 {
-    format: vk::Format,
-    extent: vk::Extent2D,
-    usage: vk::ImageUsageFlags,
-    tiling: vk::ImageTiling,
-    samples: vk::SampleCountFlags,
+    inner: vk::ImageCreateInfo<'static>,
+
+    queue_family_indices: Vec<u32>,
 }
 
-impl From<vk::ImageCreateInfo<'static>> for Image2DInfo
+impl RhiImageCreateInfo
 {
-    fn from(value: vk::ImageCreateInfo) -> Self
+    #[inline]
+    pub fn new_image_2d_info(extent: vk::Extent2D, format: vk::Format, usage: vk::ImageUsageFlags) -> Self
     {
         Self {
-            format: value.format,
-            extent: vk::Extent2D {
-                width: value.extent.width,
-                height: value.extent.height,
+            inner: vk::ImageCreateInfo {
+                image_type: vk::ImageType::TYPE_2D,
+                format,
+                extent: extent.into(),
+                mip_levels: 1,
+                array_layers: 1,
+                samples: vk::SampleCountFlags::TYPE_1,
+                tiling: vk::ImageTiling::OPTIMAL,
+                usage,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                initial_layout: vk::ImageLayout::UNDEFINED,
+                ..Default::default()
             },
-            usage: value.usage,
-            tiling: value.tiling,
-            samples: value.samples,
+            queue_family_indices: Vec::new(),
         }
+    }
+
+    #[inline]
+    pub fn creat_info(&self) -> &vk::ImageCreateInfo
+    {
+        &self.inner
+    }
+
+    /// getter
+    #[inline]
+    pub fn extent(&self) -> &vk::Extent3D
+    {
+        &self.inner.extent
+    }
+
+    /// getter
+    #[inline]
+    pub fn format(&self) -> vk::Format
+    {
+        self.inner.format
+    }
+
+
+    /// builder
+    #[inline]
+    pub fn queue_family_indices(mut self, queue_family_indices: &[u32]) -> Self
+    {
+        self.inner.sharing_mode = vk::SharingMode::CONCURRENT;
+        self.queue_family_indices = queue_family_indices.into();
+
+        self.inner.queue_family_index_count = self.queue_family_indices.len() as u32;
+        self.inner.p_queue_family_indices = self.queue_family_indices.as_ptr();
+        self
     }
 }
 
-pub struct Image2D
+pub struct RhiImageViewCreateInfo
+{
+    inner: vk::ImageViewCreateInfo<'static>,
+}
+
+
+impl RhiImageViewCreateInfo
+{
+    #[inline]
+    pub fn new_image_view_2d_info(format: vk::Format, aspect: vk::ImageAspectFlags) -> Self
+    {
+        Self {
+            inner: vk::ImageViewCreateInfo {
+                format,
+                view_type: vk::ImageViewType::TYPE_2D,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: aspect,
+                    level_count: 1,
+                    layer_count: 1,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        }
+    }
+
+
+    #[inline]
+    pub fn inner(&self) -> &vk::ImageViewCreateInfo
+    {
+        &self.inner
+    }
+}
+
+
+pub struct RhiImage2D
 {
     name: String,
 
@@ -40,23 +115,20 @@ pub struct Image2D
 
     alloc: vk_mem::Allocation,
 
-    image_info: Image2DInfo,
-
-    rhi: &'static Core,
+    image_info: Rc<RhiImageCreateInfo>,
 }
 
 
-impl Image2D
+impl RhiImage2D
 {
     pub fn new(
-        rhi: &'static Core,
-        // FIXME 声明周期问题
-        image_info: &vk::ImageCreateInfo<'static>,
+        rhi: &Rhi,
+        image_info: Rc<RhiImageCreateInfo>,
         alloc_info: &vk_mem::AllocationCreateInfo,
         debug_name: &str,
     ) -> Self
     {
-        let (image, alloc) = unsafe { rhi.vma().create_image(image_info, alloc_info).unwrap() };
+        let (image, alloc) = unsafe { rhi.allocator.create_image(image_info.creat_info(), alloc_info).unwrap() };
 
         rhi.set_debug_name(image, debug_name);
 
@@ -66,43 +138,32 @@ impl Image2D
             handle: image,
             alloc,
 
-            image_info: (*image_info).into(),
-            rhi,
+            image_info,
         }
     }
 
     #[inline]
     pub fn width(&self) -> u32
     {
-        self.image_info.extent.width
+        self.image_info.extent().width
     }
 
     #[inline]
     pub fn height(&self) -> u32
     {
-        self.image_info.extent.height
+        self.image_info.extent().height
     }
 
     /// 根据 RGBA8_UNORM 的 data 创建 image
-    pub fn from_rgba8(rhi: &'static Core, width: u32, height: u32, data: &[u8], name: &str) -> Self
+    pub fn from_rgba8(rhi: &Rhi, width: u32, height: u32, data: &[u8], name: &str) -> Self
     {
-        let mut image = Self::new(
+        let image = Self::new(
             rhi,
-            &vk::ImageCreateInfo::default()
-                .image_type(vk::ImageType::TYPE_2D)
-                .format(vk::Format::R8G8B8A8_UNORM)
-                .extent(vk::Extent3D {
-                    width,
-                    height,
-                    depth: 1,
-                })
-                .mip_levels(1)
-                .array_layers(1)
-                .samples(vk::SampleCountFlags::TYPE_1)
-                .tiling(vk::ImageTiling::OPTIMAL)
-                .usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED)
-                .sharing_mode(vk::SharingMode::EXCLUSIVE)
-                .initial_layout(vk::ImageLayout::UNDEFINED),
+            Rc::new(RhiImageCreateInfo::new_image_2d_info(
+                vk::Extent2D { width, height },
+                vk::Format::R8G8B8A8_UNORM,
+                vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
+            )),
             &vk_mem::AllocationCreateInfo {
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
@@ -110,43 +171,37 @@ impl Image2D
             name,
         );
 
-        let stage_buffer =
-            CommandBuffer::one_time_exec(rhi, vk::QueueFlags::GRAPHICS, |cmd| image.transfer_data(cmd, data), name);
+        let stage_buffer = RhiCommandBuffer::one_time_exec(
+            rhi,
+            rhi.graphics_command_pool.clone(),
+            &rhi.graphics_queue,
+            |cmd| image.transfer_data(rhi, cmd, data),
+            name,
+        );
         stage_buffer.destroy();
 
         image
     }
 
-    pub fn transfer_data(&mut self, command_buffer: &mut CommandBuffer, data: &[u8]) -> Buffer
+    pub fn transfer_data(&self, rhi: &Rhi, command_buffer: &RhiCommandBuffer, data: &[u8]) -> RhiBuffer
     {
-        let pixels_cnt = self.image_info.extent.width * self.image_info.extent.height;
-        assert_eq!(data.len(), Self::format_byte_count(self.image_info.format) * pixels_cnt as usize);
+        let pixels_cnt = self.width() * self.height();
+        assert_eq!(data.len(), Self::format_byte_count(self.image_info.format()) * pixels_cnt as usize);
 
         let mut stage_buffer =
-            Buffer::new_stage_buffer(self.rhi, std::mem::size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
+            RhiBuffer::new_stage_buffer(rhi, size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
         stage_buffer.transfer_data_by_mem_map(data);
 
         // 1. transition the image layout
         // 2. copy the buffer into the image
         // 3. transition the layout 为了让 fragment shader 可读
         {
-            let image_barrier = vk::ImageMemoryBarrier2::default()
-                .src_stage_mask(vk::PipelineStageFlags2::TOP_OF_PIPE)
-                .dst_stage_mask(vk::PipelineStageFlags2::TRANSFER)
-                .src_access_mask(vk::AccessFlags2::empty())
-                .dst_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
-                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                .old_layout(vk::ImageLayout::UNDEFINED)
-                .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+            let image_barrier = RhiImageBarrier::new()
                 .image(self.handle)
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                });
+                .src_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())
+                .dst_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
+                .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                .image_aspect_flag(vk::ImageAspectFlags::COLOR);
             command_buffer.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));
 
             let buffer_image_copy = vk::BufferImageCopy2::default()
@@ -167,28 +222,25 @@ impl Image2D
                 });
             command_buffer.cmd_copy_buffer_to_image(
                 &vk::CopyBufferToImageInfo2::default()
-                    .src_buffer(stage_buffer.handle)
+                    .src_buffer(stage_buffer.handle())
                     .dst_image(self.handle)
                     .dst_image_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
                     .regions(std::slice::from_ref(&buffer_image_copy)),
             );
 
-            let image_barrier = vk::ImageMemoryBarrier2 {
-                old_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                src_access_mask: vk::AccessFlags2::TRANSFER_WRITE,
-                dst_access_mask: vk::AccessFlags2::SHADER_READ,
-                src_stage_mask: vk::PipelineStageFlags2::TRANSFER,
-                dst_stage_mask: vk::PipelineStageFlags2::FRAGMENT_SHADER,
-                ..image_barrier
-            };
+            let image_barrier = RhiImageBarrier::new()
+                .image(self.handle)
+                .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
+                .dst_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ)
+                .layout_transfer(vk::ImageLayout::TRANSFER_DST_OPTIMAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                .image_aspect_flag(vk::ImageAspectFlags::COLOR);
             command_buffer.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));
         }
 
         stage_buffer
     }
 
-    /// 某种格式的像素需要的字节数
+    /// 计算某种 format 的一个像素需要的存储空间
     fn format_byte_count(format: vk::Format) -> usize
     {
         // 根据 vulkan specification 得到的 format 顺序
@@ -211,5 +263,36 @@ impl Image2D
             f if is_in_format_region(f, &BYTE_8_FORMAT) => 8,
             _ => panic!("unsupported format."),
         }
+    }
+}
+
+pub struct RhiImage2DView
+{
+    handle: vk::ImageView,
+    image: Rc<RhiImage2D>,
+    info: Rc<RhiImageViewCreateInfo>,
+    name: String,
+}
+
+impl RhiImage2DView
+{
+    pub fn new(rhi: &Rhi, image: Rc<RhiImage2D>, mut info: RhiImageViewCreateInfo, name: String) -> Self
+    {
+        info.inner.image = image.handle;
+        let handle = unsafe { rhi.device.create_image_view(&info.inner, None).unwrap() };
+        rhi.debug_utils.set_object_debug_name(handle, &name);
+        Self {
+            handle,
+            image,
+            info: Rc::new(info),
+            name,
+        }
+    }
+
+    /// getter
+    #[inline]
+    pub fn handle(&self) -> vk::ImageView
+    {
+        self.handle
     }
 }

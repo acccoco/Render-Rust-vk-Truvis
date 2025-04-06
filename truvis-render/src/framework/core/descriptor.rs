@@ -1,6 +1,8 @@
+use std::rc::Rc;
+
 use ash::vk;
 
-use crate::framework::render_core::Core;
+use crate::framework::render_core::Rhi;
 
 /// 将 descriptor set layout 的 bindings 抽象为一个 trait，通过类型系统来保证 bindings 的正确性
 pub trait DescriptorBindings
@@ -24,7 +26,7 @@ impl<T> DescriptorSetLayout<T>
 where
     T: DescriptorBindings,
 {
-    pub fn new(rhi: &Core, debug_name: &str) -> Self
+    pub fn new(rhi: &Rhi, debug_name: &str) -> Self
     {
         let bindings = T::bindings();
         let create_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
@@ -55,7 +57,7 @@ impl<T> DescriptorSet<T>
 where
     T: DescriptorBindings,
 {
-    pub fn new(rhi: &Core, layout: &DescriptorSetLayout<T>, debug_name: &str) -> Self
+    pub fn new(rhi: &Rhi, layout: &DescriptorSetLayout<T>, debug_name: &str) -> Self
     {
         unsafe {
             let alloc_info = vk::DescriptorSetAllocateInfo::default()
@@ -68,5 +70,53 @@ where
                 phantom_data: std::marker::PhantomData,
             }
         }
+    }
+}
+
+pub struct RhiDescriptorPoolCreateInfo
+{
+    inner: vk::DescriptorPoolCreateInfo<'static>,
+    pool_sizes: Vec<vk::DescriptorPoolSize>,
+}
+
+impl RhiDescriptorPoolCreateInfo
+{
+    #[inline]
+    pub fn new(flags: vk::DescriptorPoolCreateFlags, max_sets: u32, pool_sizes: Vec<vk::DescriptorPoolSize>) -> Self
+    {
+        let inner = vk::DescriptorPoolCreateInfo {
+            flags,
+            max_sets,
+            pool_size_count: pool_sizes.len() as u32,
+            p_pool_sizes: pool_sizes.as_ptr(),
+            ..Default::default()
+        };
+        Self { inner, pool_sizes }
+    }
+}
+
+pub struct RhiDescriptorPool
+{
+    handle: vk::DescriptorPool,
+
+    info: Rc<RhiDescriptorPoolCreateInfo>,
+}
+
+impl RhiDescriptorPool
+{
+    #[inline]
+    pub fn new(rhi: &Rhi, ci: Rc<RhiDescriptorPoolCreateInfo>, name: &str) -> Self
+    {
+        let pool = unsafe { rhi.device.create_descriptor_pool(&ci.inner, None).unwrap() };
+        rhi.debug_utils.set_object_debug_name(pool, name);
+
+        Self { handle: pool, info: ci }
+    }
+
+    /// getter
+    #[inline]
+    pub fn handle(&self) -> vk::DescriptorPool
+    {
+        self.handle
     }
 }

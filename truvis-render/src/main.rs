@@ -1,10 +1,15 @@
+use std::rc::Rc;
+
 use ash::{vk, vk::DescriptorSetLayoutBinding};
 use imgui::Ui;
 use itertools::Itertools;
 use truvis_render::{
     framework::{
-        core::descriptor::{DescriptorBindings, DescriptorSet, RhiDescriptorUpdateInfo},
-        render_core::Core,
+        core::{
+            descriptor::{DescriptorBindings, DescriptorSet, RhiDescriptorUpdateInfo},
+            image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
+        },
+        render_core::Rhi,
         rendering::render_context::RenderContext,
     },
     render::{App, AppCtx, AppInitInfo, Renderer, Timer},
@@ -23,9 +28,8 @@ struct InitInfo
 
 struct DepthStencil
 {
-    image: vk::Image,
-    mem: vk_mem::Allocation,
-    view: vk::ImageView,
+    image: Rc<RhiImage2D>,
+    view: Rc<RhiImage2DView>,
 }
 
 struct VkApp
@@ -78,7 +82,7 @@ impl DescriptorBindings for SceneDescriptorSetLayoutBinding
 
 impl VkApp
 {
-    fn prepare_render_pass(rhi: &Core, render_ctx: &RenderContext) -> vk::RenderPass
+    fn prepare_render_pass(rhi: &Rhi, render_ctx: &RenderContext) -> vk::RenderPass
     {
         // attachment
         let attachments = vec![
@@ -142,7 +146,7 @@ impl VkApp
         render_pass
     }
 
-    fn setup_depth_stencil(rhi: &Core, render_ctx: &RenderContext, init_info: &InitInfo) -> DepthStencil
+    fn setup_depth_stencil(rhi: &Rhi, render_ctx: &RenderContext, init_info: &InitInfo) -> DepthStencil
     {
         // TODO 使用 vkmem
 
@@ -150,47 +154,41 @@ impl VkApp
         let depth_format = render_ctx.depth_format;
 
         // depth image
-        let image_ci = vk::ImageCreateInfo::default()
-            .image_type(vk::ImageType::TYPE_2D)
-            .format(depth_format)
-            .extent(vk::Extent3D {
-                width: init_info.width,
-                height: init_info.height,
-                depth: 1,
-            })
-            .mip_levels(1)
-            .array_layers(1)
-            .samples(vk::SampleCountFlags::TYPE_1)
-            .tiling(vk::ImageTiling::OPTIMAL)
-            .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC)
-            .flags(vk::ImageCreateFlags::empty());
+        let depth_image = Rc::new(RhiImage2D::new(
+            rhi,
+            Rc::new(RhiImageCreateInfo::new_image_2d_info(
+                vk::Extent2D {
+                    width: init_info.width,
+                    height: init_info.height,
+                },
+                depth_format,
+                vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
+            )),
+            &vk_mem::AllocationCreateInfo {
+                usage: vk_mem::MemoryUsage::AutoPreferDevice,
+                ..Default::default()
+            },
+            "depth_image",
+        ));
 
-        let (depth_image, depth_alloc) = rhi.create_image(&image_ci, "depth_buffer");
-
-        let depth_stencil_view_ci = vk::ImageViewCreateInfo::default()
-            .view_type(vk::ImageViewType::TYPE_2D)
-            .format(depth_format)
-            .flags(vk::ImageViewCreateFlags::empty())
-            .subresource_range(vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            })
-            .image(depth_image);
-
-        let depth_image_view = rhi.create_image_view(&depth_stencil_view_ci, "depth view");
+        let depth_image_view = Rc::new(RhiImage2DView::new(
+            rhi,
+            depth_image.clone(),
+            RhiImageViewCreateInfo::new_image_view_2d_info(
+                depth_format,
+                vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL,
+            ),
+            "depth-image-view".to_string(),
+        ));
 
         DepthStencil {
             image: depth_image,
-            mem: depth_alloc,
             view: depth_image_view,
         }
     }
 
     fn setup_frame_buffer(
-        rhi: &Core,
+        rhi: &Rhi,
         render_context: &RenderContext,
         render_pass: vk::RenderPass,
         init_info: &InitInfo,
@@ -202,7 +200,7 @@ impl VkApp
             .image_views
             .iter()
             .map(|image_view| {
-                let attachments = [*image_view, depth_stencil.view];
+                let attachments = [*image_view, depth_stencil.view.handle()];
                 let frame_buffer_ci = vk::FramebufferCreateInfo::default()
                     .render_pass(render_pass)
                     .attachments(&attachments)
@@ -217,7 +215,7 @@ impl VkApp
     }
 
     // TODO
-    fn setup_desriptors(rhi: &'static Core, render_ctx: &RenderContext)
+    fn setup_desriptors(rhi: &Rhi, render_ctx: &RenderContext)
     {
         // scene descriptor sets: matrices and environment maps
         // 数量和 swapchain 的 image 保持一致
@@ -240,7 +238,7 @@ impl VkApp
 
     fn setup_pipelines() {}
 
-    fn new(rhi: &'static Core, render_context: &mut RenderContext) -> Self
+    fn new(rhi: &Rhi, render_context: &mut RenderContext) -> Self
     {
         let init_info = InitInfo {
             width: 800,
@@ -288,7 +286,7 @@ impl App for VkApp
         todo!()
     }
 
-    fn init(rhi: &'static Core, render_context: &mut RenderContext) -> Self
+    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self
     {
         VkApp::new(rhi, render_context)
     }

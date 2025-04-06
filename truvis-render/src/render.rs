@@ -13,12 +13,12 @@ use winit::{
 
 use crate::framework::{
     basic::color::LabelColor,
-    core::{queue::SubmitInfo, swapchain::SwapchainInitInfo},
+    core::{command_queue::RhiSubmitInfo, swapchain::RhiSwapchainInitInfo, synchronize::RhiImageBarrier},
     platform::{
         ui::{UiOptions, UI},
         window_system::{WindowCreateInfo, WindowSystem},
     },
-    render_core::{Core, CORE},
+    render_core::Rhi,
     rendering::render_context::{RenderContext, RenderContextInitInfo},
 };
 
@@ -87,6 +87,9 @@ pub struct Renderer<A: App>
     /// window 需要在 event loop 中创建，因此使用 option 包装
     pub window: Option<Arc<WindowSystem>>,
 
+    /// Rhi 需要在 window 之后创建，因为需要获取 window 相关的 extension
+    pub rhi: Option<Arc<Rhi>>,
+
     /// render context 需要在 event loop 中创建，因此使用 option 包装
     ///
     /// 依赖于 window
@@ -106,7 +109,7 @@ pub struct Renderer<A: App>
 /// 传递给 App 的上下文，用于 App 和 Renderer 之间的交互
 pub struct AppCtx<'a>
 {
-    pub rhi: &'static Core,
+    pub rhi: &'a Rhi,
     pub render_context: &'a mut RenderContext,
     pub timer: &'a Timer,
     pub input_state: &'a InputState,
@@ -134,7 +137,7 @@ pub trait App
     fn draw(&self, app_ctx: &mut AppCtx);
 
 
-    fn init(rhi: &'static Core, render_context: &mut RenderContext) -> Self;
+    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self;
 
     /// 由 App 提供的，用于初始化 Rhi
     fn get_render_init_info() -> AppInitInfo;
@@ -222,6 +225,7 @@ impl<A: App> Renderer<A>
             render_context: None,
             ui: None,
             inner_app: None,
+            rhi: None,
 
             input_state: InputState {
                 crt_mouse_pos: (0.0, 0.0),
@@ -229,6 +233,13 @@ impl<A: App> Renderer<A>
                 right_button_pressed: false,
             },
         }
+    }
+
+    /// getter
+    #[inline]
+    pub fn rhi(&self) -> &Rhi
+    {
+        self.rhi.as_ref().unwrap()
     }
 
     /// event loop 的 resume 中调用
@@ -259,25 +270,21 @@ impl<A: App> Renderer<A>
             .iter()
             .map(|ext| unsafe { CStr::from_ptr(*ext) })
             .collect();
-            CORE.get_or_init(|| Core::new(render_init_info.app_name.clone(), extra_instance_ext));
+            self.rhi = Some(Arc::new(Rhi::new(render_init_info.app_name.clone(), extra_instance_ext)));
         }
-        let rhi = CORE.get().unwrap();
 
         // render context
         {
-            let render_swapchain_init_info = SwapchainInitInfo {
-                window: Some(self.window.as_ref().unwrap().clone()),
-                ..Default::default()
-            };
+            let render_swapchain_init_info = RhiSwapchainInitInfo::new(self.window.as_ref().unwrap().clone());
 
             let render_context_init_info = RenderContextInitInfo::default();
-            let render_context = RenderContext::new(rhi, &render_context_init_info, render_swapchain_init_info);
+            let render_context = RenderContext::new(self.rhi(), &render_context_init_info, render_swapchain_init_info);
             self.render_context = Some(render_context);
         }
 
         // ui
         self.ui = Some(UI::new(
-            rhi,
+            self.rhi(),
             &self.render_context.as_ref().unwrap(),
             self.window.as_ref().unwrap().window(),
             &UiOptions {
@@ -288,7 +295,7 @@ impl<A: App> Renderer<A>
 
 
         // application
-        self.inner_app = Some(Box::new(A::init(Self::get_rhi(), self.render_context.as_mut().unwrap())));
+        self.inner_app = Some(Box::new(A::init(self.rhi.as_ref().unwrap(), self.render_context.as_mut().unwrap())));
     }
 
     fn tick(&mut self)
@@ -299,14 +306,16 @@ impl<A: App> Renderer<A>
 
         self.render_context.as_mut().unwrap().acquire_frame();
 
-        let rhi = Self::get_rhi();
-
         // FIXME 调整一下调用顺序
         // main pass
-        rhi.graphics_queue_begin_label("[main-pass]", LabelColor::COLOR_PASS);
+        self.rhi().debug_utils.begin_queue_label(
+            self.rhi().graphics_queue.handle,
+            "[main-pass]",
+            LabelColor::COLOR_PASS,
+        );
         {
             let mut app_ctx = AppCtx {
-                rhi,
+                rhi: self.rhi.as_ref().unwrap(),
                 render_context: self.render_context.as_mut().unwrap(),
                 timer: &self.timer,
                 input_state: &self.input_state,
@@ -316,14 +325,14 @@ impl<A: App> Renderer<A>
             app.update(&mut app_ctx);
             app.draw(&mut app_ctx);
         }
-        rhi.graphics_queue_end_label();
+        self.rhi().debug_utils.end_queue_label(self.rhi().graphics_queue.handle);
 
         // ui pass
-        rhi.graphics_queue_begin_label("[ui-pass]", LabelColor::COLOR_PASS);
+        self.rhi().debug_utils.begin_queue_label(self.rhi().graphics_queue.handle, "[ui-pass]", LabelColor::COLOR_PASS);
         {
             // FIXME ui cmd 需要释放
             let ui_cmd = self.ui.as_mut().unwrap().draw(
-                rhi,
+                self.rhi.as_ref().unwrap(),
                 self.render_context.as_mut().unwrap(),
                 self.window.as_ref().unwrap().window(),
                 |ui| {
@@ -338,45 +347,33 @@ impl<A: App> Renderer<A>
                 {
                     barrier_cmd.image_memory_barrier(
                         vk::DependencyFlags::empty(),
-                        &[vk::ImageMemoryBarrier2::default()
+                        &[RhiImageBarrier::new()
                             .image(self.render_context.as_ref().unwrap().current_present_image())
-                            .old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                            .new_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                            .src_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
-                            .dst_stage_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
-                            .src_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
-                            .dst_access_mask(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
-                            .subresource_range(
-                                vk::ImageSubresourceRange::default()
-                                    .aspect_mask(vk::ImageAspectFlags::COLOR)
-                                    .layer_count(1)
-                                    .level_count(1),
-                            )],
+                            .layout_transfer(
+                                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                            )
+                            .src_mask(
+                                vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                                vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                            )
+                            .dst_mask(
+                                vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                                vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                            )
+                            .image_aspect_flag(vk::ImageAspectFlags::COLOR)],
                     );
                 }
                 barrier_cmd.end();
 
-                rhi.graphics_queue_submit(
-                    vec![SubmitInfo {
-                        command_buffers: vec![ui_cmd, barrier_cmd],
-                        wait_info: Vec::new(),
-                        signal_info: Vec::new(),
-                    }],
-                    None,
-                );
+                self.rhi().graphics_queue.submit(vec![RhiSubmitInfo::new(&[ui_cmd, barrier_cmd])], None);
             }
         }
-        rhi.graphics_queue_end_label();
+        self.rhi().debug_utils.end_queue_label(self.rhi().graphics_queue.handle);
 
         self.render_context.as_mut().unwrap().submit_frame();
 
         self.input_state.last_mouse_pos = self.input_state.crt_mouse_pos;
-    }
-
-
-    pub fn get_rhi() -> &'static Core
-    {
-        CORE.get().unwrap()
     }
 }
 

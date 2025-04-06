@@ -1,13 +1,11 @@
 use ash::vk;
 
-use crate::framework::{core::shader::ShaderModule, render_core::Core};
+use crate::framework::{core::shader::ShaderModule, render_core::Rhi};
 
 pub struct Pipeline
 {
     pub pipeline: vk::Pipeline,
     pub pipeline_layout: vk::PipelineLayout,
-
-    rhi: &'static Core,
 }
 
 impl Pipeline {}
@@ -102,7 +100,7 @@ impl Default for PipelineTemplate
 
 impl PipelineTemplate
 {
-    pub fn create_pipeline<S: AsRef<str> + Clone>(&self, rhi: &'static Core, debug_name: S) -> Pipeline
+    pub fn create_pipeline(&self, rhi: &Rhi, debug_name: &str) -> Pipeline
     {
         // dynamic rendering 需要的 framebuffer 信息
         let mut attach_info = vk::PipelineRenderingCreateInfo::default()
@@ -188,7 +186,6 @@ impl PipelineTemplate
         Pipeline {
             pipeline,
             pipeline_layout,
-            rhi,
         }
     }
 }

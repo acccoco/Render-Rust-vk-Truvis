@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+shader-layout-macro = { workspace = true }
+shader-layout-trait = { workspace = true }
+# truvis-rhi = { workspace = true }
+
+
 # 默认 features：
 # - debug 表示 vulkan 结构体实现了 Debut Trait
 # - loader 表示在运行时动态搜索 vulkan，体现在 Entry 对象的创建上
@@ -41,6 +46,3 @@ bitflags = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true }
 simplelog = { workspace = true }
-
-shader-layout-macro = { workspace = true }
-shader-layout-trait = { workspace = true }
