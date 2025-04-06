@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::framework::{
+use crate::{
     core::{
         image::{RhiImage2D, RhiImage2DView, RhiImageViewCreateInfo},
         sampler::{RhiSampler, RhiSamplerCreateInfo},

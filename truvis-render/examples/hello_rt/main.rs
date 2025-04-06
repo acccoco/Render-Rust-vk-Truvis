@@ -3,18 +3,18 @@ use std::mem::offset_of;
 use ash::vk;
 use imgui::Ui;
 use truvis_render::{
-    framework::{
-        core::{
-            acceleration::Acceleration,
-            buffer::RhiBuffer,
-            command_queue::RhiSubmitInfo,
-            descriptor::DescriptorBindings,
-            pipeline::{Pipeline, PipelineTemplate},
-        },
-        render_core::Rhi,
-        rendering::render_context::RenderContext,
+    framework::rendering::render_context::RenderContext,
+    render::{App, AppCtx, AppInitInfo, Renderer},
+};
+use truvis_rhi::{
+    core::{
+        acceleration::RhiAcceleration,
+        buffer::RhiBuffer,
+        command_queue::RhiSubmitInfo,
+        descriptor::DescriptorBindings,
+        pipeline::{RhiPipeline, RhiPipelineTemplate},
     },
-    render::{App, AppCtx, AppInitInfo, Renderer, Timer},
+    render_core::Rhi,
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -83,9 +83,9 @@ struct HelloRT
 {
     vertex_buffer: RhiBuffer,
     index_buffer: RhiBuffer,
-    pipeline: Pipeline,
-    blas: Acceleration, // 可以有多个
-    tlas: Acceleration, // 只能由一个
+    pipeline: RhiPipeline,
+    blas: RhiAcceleration, // 可以有多个
+    tlas: RhiAcceleration, // 只能由一个
 }
 
 
@@ -102,8 +102,11 @@ impl HelloRT
         (vertex_buffer, index_buffer)
     }
 
-    fn init_acceleration(rhi: &Rhi, vertex_buffer: &RhiBuffer, index_buffer: &RhiBuffer)
-        -> (Acceleration, Acceleration)
+    fn init_acceleration(
+        rhi: &Rhi,
+        vertex_buffer: &RhiBuffer,
+        index_buffer: &RhiBuffer,
+    ) -> (RhiAcceleration, RhiAcceleration)
     {
         let triangles_data = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
@@ -122,7 +125,7 @@ impl HelloRT
         };
 
         // 构建 BLAS
-        let blas = Acceleration::build_blas(
+        let blas = RhiAcceleration::build_blas(
             rhi,
             vec![(triangles_data, INDEX_DATA.len() as u32 / 3)],
             vk::BuildAccelerationStructureFlagsKHR::empty(),
@@ -153,16 +156,17 @@ impl HelloRT
             },
         }];
 
-        let tlas = Acceleration::build_tlas(rhi, &instances, vk::BuildAccelerationStructureFlagsKHR::empty(), "hello");
+        let tlas =
+            RhiAcceleration::build_tlas(rhi, &instances, vk::BuildAccelerationStructureFlagsKHR::empty(), "hello");
 
 
         (tlas, blas)
     }
 
-    fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> Pipeline
+    fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> RhiPipeline
     {
         let extent = render_context.swapchain_extent();
-        PipelineTemplate {
+        RhiPipelineTemplate {
             fragment_shader_path: Some("shader/hello_triangle/triangle.frag.spv".into()),
             vertex_shader_path: Some("shader/hello_triangle/triangle.vert.spv".into()),
             color_formats: vec![render_context.color_format()],
@@ -256,7 +260,7 @@ impl App for HelloRT
         ui.text_wrapped("こんにちは世界！");
     }
 
-    fn update(&mut self, app_ctx: &mut AppCtx)
+    fn update(&mut self, _app_ctx: &mut AppCtx)
     {
         //
     }

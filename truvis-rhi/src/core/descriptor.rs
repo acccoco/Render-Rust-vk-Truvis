@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::framework::render_core::Rhi;
+use crate::render_core::Rhi;
 
 /// 将 descriptor set layout 的 bindings 抽象为一个 trait，通过类型系统来保证 bindings 的正确性
 pub trait DescriptorBindings
@@ -15,14 +15,14 @@ pub trait DescriptorBindings
 ///
 /// 注：为什么要使用 <T>
 /// 这样可以在每种 struct 内部存放一个 static 的 DescriptorSetLayout
-pub struct DescriptorSetLayout<T>
+pub struct RhiDescriptorSetLayout<T>
 where
     T: DescriptorBindings,
 {
     pub layout: vk::DescriptorSetLayout,
     phantom_data: std::marker::PhantomData<T>,
 }
-impl<T> DescriptorSetLayout<T>
+impl<T> RhiDescriptorSetLayout<T>
 where
     T: DescriptorBindings,
 {
@@ -41,7 +41,7 @@ where
 }
 
 
-pub struct DescriptorSet<T>
+pub struct RhiDescriptorSet<T>
 where
     T: DescriptorBindings,
 {
@@ -53,11 +53,11 @@ pub enum RhiDescriptorUpdateInfo
     Image(vk::DescriptorImageInfo),
     Buffer(vk::DescriptorBufferInfo),
 }
-impl<T> DescriptorSet<T>
+impl<T> RhiDescriptorSet<T>
 where
     T: DescriptorBindings,
 {
-    pub fn new(rhi: &Rhi, layout: &DescriptorSetLayout<T>, debug_name: &str) -> Self
+    pub fn new(rhi: &Rhi, layout: &RhiDescriptorSetLayout<T>, debug_name: &str) -> Self
     {
         unsafe {
             let alloc_info = vk::DescriptorSetAllocateInfo::default()

@@ -2,7 +2,7 @@ use std::{ops::Deref, rc::Rc};
 
 use ash::vk;
 
-use crate::framework::core::{device::RhiDevice, instance::RhiInstance, physical_device::RhiGpu};
+use crate::core::{device::RhiDevice, instance::RhiInstance, physical_device::RhiGpu};
 
 pub struct RhiAllocator
 {

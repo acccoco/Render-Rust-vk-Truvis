@@ -5,12 +5,12 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::{
+use crate::{
     core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, device::RhiDevice, query_pool::QueryPool},
     render_core::Rhi,
 };
 
-pub struct Acceleration
+pub struct RhiAcceleration
 {
     acceleration_structure: vk::AccelerationStructureKHR,
     buffer: RhiBuffer,
@@ -19,7 +19,7 @@ pub struct Acceleration
 }
 
 
-impl Acceleration
+impl RhiAcceleration
 {
     /// 需要指定每个 geometry 的信息，以及每个 geometry 拥有的 max primitives 数量
     /// 会自动添加 compact 和 trace 的 flag

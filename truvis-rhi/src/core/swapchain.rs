@@ -4,13 +4,13 @@ use ash::vk;
 use itertools::Itertools;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
-use crate::framework::{
+use crate::{
     basic::FRAME_ID_MAP,
     core::{
         command_queue::RhiQueue,
         synchronize::{RhiFence, RhiSemaphore},
+        window_system::WindowSystem,
     },
-    platform::window_system::WindowSystem,
     render_core::Rhi,
 };
 

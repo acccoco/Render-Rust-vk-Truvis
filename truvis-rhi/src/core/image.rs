@@ -3,7 +3,7 @@ use std::rc::Rc;
 use ash::vk;
 use vk_mem::Alloc;
 
-use crate::framework::{
+use crate::{
     core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, synchronize::RhiImageBarrier},
     render_core::Rhi,
 };

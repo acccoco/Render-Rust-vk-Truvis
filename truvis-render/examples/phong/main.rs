@@ -6,18 +6,18 @@ use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
 use truvis_render::{
-    framework::{
-        basic::{color::LabelColor, FRAME_ID_MAP},
-        core::{
-            buffer::{RhiBuffer, RhiBufferCreateInfo},
-            command_queue::RhiSubmitInfo,
-            descriptor::{DescriptorBindings, DescriptorSet, DescriptorSetLayout},
-            pipeline::{Pipeline, PipelineTemplate},
-        },
-        render_core::Rhi,
-        rendering::render_context::RenderContext,
-    },
+    framework::rendering::render_context::RenderContext,
     render::{App, AppCtx, AppInitInfo, Renderer},
+};
+use truvis_rhi::{
+    basic::{color::LabelColor, FRAME_ID_MAP},
+    core::{
+        buffer::{RhiBuffer, RhiBufferCreateInfo},
+        command_queue::RhiSubmitInfo,
+        descriptor::{DescriptorBindings, RhiDescriptorSet, RhiDescriptorSetLayout},
+        pipeline::{RhiPipeline, RhiPipelineTemplate},
+    },
+    render_core::Rhi,
 };
 
 use crate::data::{ShapeBox, Vertex};
@@ -71,16 +71,16 @@ impl DescriptorBindings for MaterialDescriptorBinding
 
 struct PhongAppDescriptorSetLayouts
 {
-    scene_layout: DescriptorSetLayout<SceneDescriptorBinding>,
-    mesh_layout: DescriptorSetLayout<MeshDescriptorBinding>,
-    material_layout: DescriptorSetLayout<MaterialDescriptorBinding>,
+    scene_layout: RhiDescriptorSetLayout<SceneDescriptorBinding>,
+    mesh_layout: RhiDescriptorSetLayout<MeshDescriptorBinding>,
+    material_layout: RhiDescriptorSetLayout<MaterialDescriptorBinding>,
 }
 
 struct PhongAppDescriptorSets
 {
-    scene_set: DescriptorSet<SceneDescriptorBinding>,
-    mesh_set: DescriptorSet<MeshDescriptorBinding>,
-    material_set: DescriptorSet<MaterialDescriptorBinding>,
+    scene_set: RhiDescriptorSet<SceneDescriptorBinding>,
+    mesh_set: RhiDescriptorSet<MeshDescriptorBinding>,
+    material_set: RhiDescriptorSet<MaterialDescriptorBinding>,
 }
 
 
@@ -156,7 +156,7 @@ struct PhongApp
 
     /// 每帧独立的 descriptor set
     descriptor_sets: Vec<PhongAppDescriptorSets>,
-    pipeline: Pipeline,
+    pipeline: RhiPipeline,
 
     /// BOX
     vertex_buffer: RhiBuffer,
@@ -182,10 +182,10 @@ impl PhongApp
         frames_in_flight: usize,
     ) -> (PhongAppDescriptorSetLayouts, Vec<PhongAppDescriptorSets>)
     {
-        let scene_descriptor_set_layout = DescriptorSetLayout::<SceneDescriptorBinding>::new(rhi, "phong-scene");
-        let mesh_descriptor_set_layout = DescriptorSetLayout::<MeshDescriptorBinding>::new(rhi, "phong-mesh");
+        let scene_descriptor_set_layout = RhiDescriptorSetLayout::<SceneDescriptorBinding>::new(rhi, "phong-scene");
+        let mesh_descriptor_set_layout = RhiDescriptorSetLayout::<MeshDescriptorBinding>::new(rhi, "phong-mesh");
         let material_descriptor_set_layout =
-            DescriptorSetLayout::<MaterialDescriptorBinding>::new(rhi, "phong-material");
+            RhiDescriptorSetLayout::<MaterialDescriptorBinding>::new(rhi, "phong-material");
 
         let layouts = PhongAppDescriptorSetLayouts {
             scene_layout: scene_descriptor_set_layout,
@@ -196,17 +196,17 @@ impl PhongApp
         let sets = (0..frames_in_flight)
             .map(|idx| FRAME_ID_MAP[idx])
             .map(|tag| PhongAppDescriptorSets {
-                scene_set: DescriptorSet::<SceneDescriptorBinding>::new(
+                scene_set: RhiDescriptorSet::<SceneDescriptorBinding>::new(
                     rhi,
                     &layouts.scene_layout,
                     &format!("phong-scene-{}", tag),
                 ),
-                mesh_set: DescriptorSet::<MeshDescriptorBinding>::new(
+                mesh_set: RhiDescriptorSet::<MeshDescriptorBinding>::new(
                     rhi,
                     &layouts.mesh_layout,
                     &format!("phong-mesh-{}", tag),
                 ),
-                material_set: DescriptorSet::<MaterialDescriptorBinding>::new(
+                material_set: RhiDescriptorSet::<MaterialDescriptorBinding>::new(
                     rhi,
                     &layouts.material_layout,
                     &format!("phong-material-{}", tag),
@@ -221,10 +221,10 @@ impl PhongApp
         rhi: &Rhi,
         render_ctx: &mut RenderContext,
         descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
-    ) -> Pipeline
+    ) -> RhiPipeline
     {
         let extent = render_ctx.swapchain_extent();
-        PipelineTemplate {
+        RhiPipelineTemplate {
             fragment_shader_path: Some("shader/phong/phong.ps.hlsl.spv".into()),
             vertex_shader_path: Some("shader/phong/phong.vs.hlsl.spv".into()),
 

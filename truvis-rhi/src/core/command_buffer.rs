@@ -3,7 +3,7 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::{
+use crate::{
     basic::color::LabelColor,
     core::{
         buffer::RhiBuffer,

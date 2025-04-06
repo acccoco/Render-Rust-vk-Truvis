@@ -33,7 +33,7 @@ impl WindowSystem
 {
     pub fn new(event_loop: &ActiveEventLoop, create_info: WindowCreateInfo) -> Self
     {
-        let icon = load_icon(include_bytes!("../../../../data/DruvisIII.png"));
+        let icon = load_icon(include_bytes!("../../../data/DruvisIII.png"));
         let window_attr = Window::default_attributes()
             .with_title(create_info.title.clone())
             .with_window_icon(Some(icon.clone()))

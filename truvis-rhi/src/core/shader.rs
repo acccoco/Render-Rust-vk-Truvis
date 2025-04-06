@@ -2,16 +2,16 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::framework::{core::device::RhiDevice, render_core::Rhi};
+use crate::{core::device::RhiDevice, render_core::Rhi};
 
-pub struct ShaderModule
+pub struct RhiShaderModule
 {
     pub handle: vk::ShaderModule,
 
     device: Rc<RhiDevice>,
 }
 
-impl ShaderModule
+impl RhiShaderModule
 {
     /// # param
     /// * path - spv shader 文件路径

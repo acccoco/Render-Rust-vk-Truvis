@@ -1,18 +1,18 @@
 use std::rc::Rc;
 
-use ash::{vk, vk::DescriptorSetLayoutBinding};
+use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
 use truvis_render::{
-    framework::{
-        core::{
-            descriptor::{DescriptorBindings, DescriptorSet, RhiDescriptorUpdateInfo},
-            image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
-        },
-        render_core::Rhi,
-        rendering::render_context::RenderContext,
+    framework::rendering::render_context::RenderContext,
+    render::{App, AppCtx, AppInitInfo, Renderer},
+};
+use truvis_rhi::{
+    core::{
+        descriptor::DescriptorBindings,
+        image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
     },
-    render::{App, AppCtx, AppInitInfo, Renderer, Timer},
+    render_core::Rhi,
 };
 
 fn main()
@@ -47,7 +47,7 @@ struct VkApp
 struct SceneDescriptorSetLayoutBinding;
 impl DescriptorBindings for SceneDescriptorSetLayoutBinding
 {
-    fn bindings() -> Vec<DescriptorSetLayoutBinding<'static>>
+    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
     {
         let set_layout_bindins = vec![
             vk::DescriptorSetLayoutBinding::default()
@@ -215,7 +215,7 @@ impl VkApp
     }
 
     // TODO
-    fn setup_desriptors(rhi: &Rhi, render_ctx: &RenderContext)
+    fn setup_desriptors(_rhi: &Rhi, _render_ctx: &RenderContext)
     {
         // scene descriptor sets: matrices and environment maps
         // 数量和 swapchain 的 image 保持一致
@@ -271,17 +271,17 @@ impl VkApp
 
 impl App for VkApp
 {
-    fn update_ui(&mut self, ui: &mut Ui)
+    fn update_ui(&mut self, _ui: &mut Ui)
     {
         todo!()
     }
 
-    fn update(&mut self, app_ctx: &mut AppCtx)
+    fn update(&mut self, _app_ctx: &mut AppCtx)
     {
         //
     }
 
-    fn draw(&self, app_ctx: &mut AppCtx)
+    fn draw(&self, _app_ctx: &mut AppCtx)
     {
         todo!()
     }

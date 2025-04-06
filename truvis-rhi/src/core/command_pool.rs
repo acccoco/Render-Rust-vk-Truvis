@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::framework::{
+use crate::{
     core::{debug_utils::RhiDebugUtils, device::RhiDevice},
     render_core::Rhi,
 };

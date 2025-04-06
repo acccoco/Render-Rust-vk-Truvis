@@ -3,7 +3,7 @@ use std::{collections::HashMap, ffi::CStr, ops::Deref, rc::Rc};
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::core::{command_queue::RhiQueue, instance::RhiInstance, physical_device::RhiGpu};
+use crate::core::{command_queue::RhiQueue, instance::RhiInstance, physical_device::RhiGpu};
 
 pub struct RhiDevice
 {

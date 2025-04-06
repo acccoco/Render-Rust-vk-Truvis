@@ -1,0 +1,26 @@
+[package]
+name = "truvis-rhi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+shader-layout-macro = { path = "../shader-layout/shader-layout-macro" }
+shader-layout-trait = { path = "../shader-layout/shader-layout-trait" }
+
+
+# 默认 features：
+# - debug 表示 vulkan 结构体实现了 Debut Trait
+# - loader 表示在运行时动态搜索 vulkan，体现在 Entry 对象的创建上
+ash = { workspace = true }
+ash-window = { workspace = true }
+winit = { workspace = true }
+raw-window-handle = { workspace = true }
+derive-getters = { workspace = true }
+# graphics math
+# bytemuck：可以转换为 bytes slices
+glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
+itertools = { workspace = true }
+cstr = { workspace = true }
+vk-mem = { workspace = true }
+log = { workspace = true }
+image = { workspace = true }

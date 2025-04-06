@@ -6,7 +6,7 @@ use std::{
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::core::debug_utils::RhiDebugUtils;
+use crate::core::debug_utils::RhiDebugUtils;
 
 pub struct RhiInstance
 {

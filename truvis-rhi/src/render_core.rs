@@ -3,7 +3,7 @@ use std::{ffi::CStr, rc::Rc};
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::core::{
+use crate::core::{
     allocator::RhiAllocator, command_pool::RhiCommandPool, command_queue::RhiQueue, debug_utils::RhiDebugUtils,
     device::RhiDevice, instance::RhiInstance, physical_device::RhiGpu,
 };

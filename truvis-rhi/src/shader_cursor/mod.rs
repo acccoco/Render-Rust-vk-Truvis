@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use ash::vk;
 
-use crate::framework::{
+use crate::{
     basic::DataUtils,
     core::{command_buffer::RhiCommandBuffer, descriptor::RhiDescriptorUpdateInfo},
     render_core::Rhi,
@@ -65,7 +65,7 @@ impl ShaderCursor for Texture2DCursor
         vk::DescriptorType::COMBINED_IMAGE_SAMPLER
     }
 
-    fn write(&self, rhi: &Rhi, update_info: RhiDescriptorUpdateInfo)
+    fn write(&self, _rhi: &Rhi, _update_info: RhiDescriptorUpdateInfo)
     {
         todo!()
     }

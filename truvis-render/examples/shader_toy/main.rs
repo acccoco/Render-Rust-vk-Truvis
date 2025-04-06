@@ -4,16 +4,16 @@ use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use imgui::Ui;
 use truvis_render::{
-    framework::{
-        core::{
-            buffer::RhiBuffer,
-            command_queue::RhiSubmitInfo,
-            pipeline::{Pipeline, PipelineTemplate},
-        },
-        render_core::Rhi,
-        rendering::render_context::RenderContext,
-    },
+    framework::rendering::render_context::RenderContext,
     render::{App, AppCtx, AppInitInfo, Renderer, Timer},
+};
+use truvis_rhi::{
+    core::{
+        buffer::RhiBuffer,
+        command_queue::RhiSubmitInfo,
+        pipeline::{RhiPipeline, RhiPipelineTemplate},
+    },
+    render_core::Rhi,
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -74,7 +74,7 @@ struct ShaderToy
 {
     vertex_buffer: RhiBuffer,
     index_buffer: RhiBuffer,
-    pipeline: Pipeline,
+    pipeline: RhiPipeline,
 }
 
 impl ShaderToy
@@ -90,7 +90,7 @@ impl ShaderToy
         (vertex_buffer, index_buffer)
     }
 
-    fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> Pipeline
+    fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> RhiPipeline
     {
         let extent = render_context.swapchain_extent();
         let push_constant_ranges = vec![vk::PushConstantRange {
@@ -98,7 +98,7 @@ impl ShaderToy
             offset: 0,
             size: size_of::<PushConstants>() as u32,
         }];
-        PipelineTemplate {
+        RhiPipelineTemplate {
             vertex_shader_path: Some("shader/shadertoy-glsl/shadertoy.vert.spv".into()),
             fragment_shader_path: Some("shader/shadertoy-glsl/shadertoy.frag.spv".into()),
             color_formats: vec![render_context.color_format()],
@@ -171,7 +171,7 @@ impl ShaderToy
             &depth_attach_info,
         );
 
-        let mut cmd = render_context.alloc_command_buffer("render");
+        let cmd = render_context.alloc_command_buffer("render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.cmd_push_constants(
@@ -215,7 +215,7 @@ impl App for ShaderToy
         ui.text_wrapped("こんにちは世界！");
     }
 
-    fn update(&mut self, app_ctx: &mut AppCtx)
+    fn update(&mut self, _app_ctx: &mut AppCtx)
     {
         //
     }

@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::framework::render_core::Rhi;
+use crate::render_core::Rhi;
 
 pub struct RhiSamplerCreateInfo
 {

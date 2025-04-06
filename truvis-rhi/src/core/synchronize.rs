@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::framework::{core::device::RhiDevice, render_core::Rhi};
+use crate::{core::device::RhiDevice, render_core::Rhi};
 
 #[derive(Clone)]
 pub struct RhiFence
@@ -86,6 +86,14 @@ impl RhiSemaphore
 pub struct RhiImageBarrier
 {
     inner: vk::ImageMemoryBarrier2<'static>,
+}
+
+impl Default for RhiImageBarrier
+{
+    fn default() -> Self
+    {
+        Self::new()
+    }
 }
 
 impl RhiImageBarrier

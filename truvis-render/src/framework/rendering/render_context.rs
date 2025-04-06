@@ -2,8 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 use itertools::Itertools;
-
-use crate::framework::{
+use truvis_rhi::{
     basic::{color::LabelColor, FRAME_ID_MAP},
     core::{
         command_buffer::RhiCommandBuffer,

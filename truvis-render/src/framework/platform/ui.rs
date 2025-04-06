@@ -4,8 +4,7 @@ use std::{cell::RefCell, ffi::CString, rc::Rc};
 
 use ash::vk;
 use image::EncodableLayout;
-
-use crate::framework::{
+use truvis_rhi::{
     basic::color::LabelColor,
     core::{
         buffer::RhiBuffer,
@@ -13,12 +12,13 @@ use crate::framework::{
         command_queue::RhiSubmitInfo,
         descriptor::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo},
         image::RhiImage2D,
-        shader::ShaderModule,
+        shader::RhiShaderModule,
         texture::RhiTexture2D,
     },
     render_core::Rhi,
-    rendering::render_context::RenderContext,
 };
+
+use crate::framework::rendering::render_context::RenderContext;
 
 pub struct UiMesh
 {
@@ -551,8 +551,8 @@ impl UI
     {
         let entry_point_name = CString::new("main").unwrap();
 
-        let vert_shader_module = ShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.vs.hlsl.spv"));
-        let frag_shader_module = ShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.ps.hlsl.spv"));
+        let vert_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.vs.hlsl.spv"));
+        let frag_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.ps.hlsl.spv"));
 
         let shader_states_infos = [
             vk::PipelineShaderStageCreateInfo::default()

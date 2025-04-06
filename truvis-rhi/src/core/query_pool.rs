@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::framework::{core::device::RhiDevice, render_core::Rhi};
+use crate::{core::device::RhiDevice, render_core::Rhi};
 
 pub struct QueryPool
 {

@@ -3,7 +3,7 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
-use crate::framework::core::{
+use crate::core::{
     command_buffer::RhiCommandBuffer,
     device::RhiDevice,
     synchronize::{RhiFence, RhiSemaphore},

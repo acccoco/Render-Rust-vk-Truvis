@@ -2,8 +2,7 @@
 
 
 use ash::vk;
-
-use crate::framework::core::descriptor::DescriptorBindings;
+use truvis_rhi::core::descriptor::DescriptorBindings;
 
 struct UnlitMatBindings;
 

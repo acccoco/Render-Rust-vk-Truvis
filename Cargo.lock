@@ -2176,11 +2176,29 @@ dependencies = [
  "raw-window-handle",
  "serde",
  "serde_json",
- "shader-layout-macro",
- "shader-layout-trait",
  "simplelog",
  "static_init",
  "tobj",
+ "truvis-rhi",
+ "vk-mem",
+ "winit",
+]
+
+[[package]]
+name = "truvis-rhi"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "ash-window",
+ "cstr",
+ "derive-getters",
+ "glam",
+ "image 0.24.9",
+ "itertools",
+ "log",
+ "raw-window-handle",
+ "shader-layout-macro",
+ "shader-layout-trait",
  "vk-mem",
  "winit",
 ]

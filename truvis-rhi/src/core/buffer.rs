@@ -3,7 +3,7 @@ use std::{ffi::c_void, rc::Rc};
 use ash::vk;
 use vk_mem::Alloc;
 
-use crate::framework::{
+use crate::{
     core::{allocator::RhiAllocator, command_buffer::RhiCommandBuffer, device::RhiDevice},
     render_core::Rhi,
 };

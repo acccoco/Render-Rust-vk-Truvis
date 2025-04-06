@@ -1,16 +1,16 @@
 use ash::vk;
 use imgui::Ui;
 use truvis_render::{
-    framework::{
-        core::{
-            buffer::RhiBuffer,
-            command_queue::RhiSubmitInfo,
-            pipeline::{Pipeline, PipelineTemplate},
-        },
-        render_core::Rhi,
-        rendering::render_context::RenderContext,
-    },
+    framework::rendering::render_context::RenderContext,
     render::{App, AppCtx, AppInitInfo, Renderer},
+};
+use truvis_rhi::{
+    core::{
+        buffer::RhiBuffer,
+        command_queue::RhiSubmitInfo,
+        pipeline::{RhiPipeline, RhiPipelineTemplate},
+    },
+    render_core::Rhi,
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -41,7 +41,7 @@ struct HelloTriangle
 {
     vertex_buffer: RhiBuffer,
     index_buffer: RhiBuffer,
-    pipeline: Pipeline,
+    pipeline: RhiPipeline,
 
     frame_id: u64,
 }
@@ -59,10 +59,10 @@ impl HelloTriangle
         (vertex_buffer, index_buffer)
     }
 
-    fn init_pipeline(rhi: &Rhi, render_context: &mut RenderContext) -> Pipeline
+    fn init_pipeline(rhi: &Rhi, render_context: &mut RenderContext) -> RhiPipeline
     {
         let extent = render_context.swapchain_extent();
-        let pipeline = PipelineTemplate {
+        let pipeline = RhiPipelineTemplate {
             fragment_shader_path: Some("shader/hello_triangle/triangle.ps.hlsl.spv".into()),
             vertex_shader_path: Some("shader/hello_triangle/triangle.vs.hlsl.spv".into()),
             color_formats: vec![render_context.color_format()],
@@ -118,7 +118,7 @@ impl HelloTriangle
             &depth_attach,
         );
 
-        let mut cmd = RenderContext::alloc_command_buffer(render_context, "render");
+        let cmd = RenderContext::alloc_command_buffer(render_context, "render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);

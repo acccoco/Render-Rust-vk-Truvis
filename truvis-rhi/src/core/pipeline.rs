@@ -1,18 +1,18 @@
 use ash::vk;
 
-use crate::framework::{core::shader::ShaderModule, render_core::Rhi};
+use crate::{core::shader::RhiShaderModule, render_core::Rhi};
 
-pub struct Pipeline
+pub struct RhiPipeline
 {
     pub pipeline: vk::Pipeline,
     pub pipeline_layout: vk::PipelineLayout,
 }
 
-impl Pipeline {}
+impl RhiPipeline {}
 
 
 #[derive(Clone)]
-pub struct PipelineTemplate
+pub struct RhiPipelineTemplate
 {
     pub descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
 
@@ -47,7 +47,7 @@ pub struct PipelineTemplate
     pub dynamic_states: Vec<vk::DynamicState>,
 }
 
-impl Default for PipelineTemplate
+impl Default for RhiPipelineTemplate
 {
     fn default() -> Self
     {
@@ -98,9 +98,9 @@ impl Default for PipelineTemplate
     }
 }
 
-impl PipelineTemplate
+impl RhiPipelineTemplate
 {
-    pub fn create_pipeline(&self, rhi: &Rhi, debug_name: &str) -> Pipeline
+    pub fn create_pipeline(&self, rhi: &Rhi, debug_name: &str) -> RhiPipeline
     {
         // dynamic rendering 需要的 framebuffer 信息
         let mut attach_info = vk::PipelineRenderingCreateInfo::default()
@@ -117,8 +117,8 @@ impl PipelineTemplate
         rhi.set_debug_name(pipeline_layout, debug_name.clone());
 
         // vertex shader 和 fragment shader 是必须的，入口都是 main
-        let vertex_shader_module = ShaderModule::new(rhi, self.vertex_shader_path.as_ref().unwrap());
-        let fragment_shader_module = ShaderModule::new(rhi, self.fragment_shader_path.as_ref().unwrap());
+        let vertex_shader_module = RhiShaderModule::new(rhi, self.vertex_shader_path.as_ref().unwrap());
+        let fragment_shader_module = RhiShaderModule::new(rhi, self.fragment_shader_path.as_ref().unwrap());
         let shader_stages_info = [
             vk::PipelineShaderStageCreateInfo::default()
                 .stage(vk::ShaderStageFlags::VERTEX)
@@ -178,12 +178,12 @@ impl PipelineTemplate
                 .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
                 .unwrap()[0]
         };
-        rhi.set_debug_name(pipeline, debug_name.clone());
+        rhi.set_debug_name(pipeline, debug_name);
 
         vertex_shader_module.destroy();
         fragment_shader_module.destroy();
 
-        Pipeline {
+        RhiPipeline {
             pipeline,
             pipeline_layout,
         }
