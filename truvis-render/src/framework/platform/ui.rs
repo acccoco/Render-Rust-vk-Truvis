@@ -10,7 +10,7 @@ use truvis_rhi::{
         buffer::RhiBuffer,
         command_buffer::RhiCommandBuffer,
         command_queue::RhiSubmitInfo,
-        descriptor::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo},
+        descriptor_pool::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo},
         image::RhiImage2D,
         shader::RhiShaderModule,
         texture::RhiTexture2D,

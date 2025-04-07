@@ -8,6 +8,17 @@ use crate::{
     render_core::Rhi,
 };
 
+/// 游标类型
+///
+/// 用于描述游标类型，游标类型决定了描述符的类型。
+pub enum ShaderCursorType
+{
+    Buffer,
+    Image,
+    Sampler,
+}
+
+
 pub struct Binding
 {
     pub set: u32,

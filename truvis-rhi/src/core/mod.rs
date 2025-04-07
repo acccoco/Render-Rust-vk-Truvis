@@ -6,6 +6,7 @@ pub mod command_pool;
 pub mod command_queue;
 pub mod debug_utils;
 pub mod descriptor;
+pub mod descriptor_pool;
 pub mod device;
 pub mod image;
 pub mod instance;

@@ -13,7 +13,6 @@ use truvis_rhi::{
         command_pool::RhiCommandPool,
         command_queue::{RhiQueue, RhiSubmitInfo},
         debug_utils::RhiDebugUtils,
-        descriptor::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo},
         device::RhiDevice,
         image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
         shader::RhiShaderModule,
@@ -395,20 +394,20 @@ impl<A: App> Renderer<A>
 impl<A: App> winit::application::ApplicationHandler<UserEvent> for Renderer<A>
 {
     // TODO 测试一下这个事件的发送时机：是否会在每个键盘事件之前发送？还是每一帧发送一次
-    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause)
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: StartCause)
     {
         // TODO 下面的调用是否有用
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop)
     {
-        static init_flag: OnceLock<bool> = OnceLock::new();
-        if let Some(_) = init_flag.get() {
+        static INIT_FLAG: OnceLock<bool> = OnceLock::new();
+        if let Some(_) = INIT_FLAG.get() {
             panic!("Renderer::resumed called more than once");
         } else {
             log::info!("winit event: resumed");
             self.init(event_loop);
-            init_flag.get_or_init(|| true);
+            INIT_FLAG.get_or_init(|| true);
         }
     }
 
@@ -439,12 +438,12 @@ impl<A: App> winit::application::ApplicationHandler<UserEvent> for Renderer<A>
         }
     }
 
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop)
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop)
     {
         self.window.as_ref().unwrap().window().request_redraw();
     }
 
-    fn exiting(&mut self, event_loop: &ActiveEventLoop)
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop)
     {
         log::info!("loop exiting");
     }

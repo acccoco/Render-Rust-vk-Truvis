@@ -3,16 +3,15 @@ use std::rc::Rc;
 use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
+use shader_layout_macro::ShaderLayout;
 use truvis_render::{
     framework::rendering::render_context::RenderContext,
     render::{App, AppCtx, AppInitInfo, Renderer},
 };
 use truvis_rhi::{
-    core::{
-        descriptor::DescriptorBindings,
-        image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
-    },
+    core::image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
     render_core::Rhi,
+    shader_cursor::ShaderCursorType,
 };
 
 fn main()
@@ -44,41 +43,37 @@ struct VkApp
     pipeline_cache: vk::PipelineCache,
 }
 
-struct SceneDescriptorSetLayoutBinding;
-impl DescriptorBindings for SceneDescriptorSetLayoutBinding
+#[derive(ShaderLayout)]
+struct SceneShaderBindings
 {
-    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
-    {
-        let set_layout_bindins = vec![
-            vk::DescriptorSetLayoutBinding::default()
-                .binding(0)
-                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-                .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT),
-            vk::DescriptorSetLayoutBinding::default()
-                .binding(1)
-                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-                .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
-            vk::DescriptorSetLayoutBinding::default()
-                .binding(2)
-                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
-            vk::DescriptorSetLayoutBinding::default()
-                .binding(3)
-                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
-            vk::DescriptorSetLayoutBinding::default()
-                .binding(4)
-                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
-        ];
-        set_layout_bindins
-    }
+    #[binding = 0]
+    #[stage = "VERTEX | FRAGMENT"]
+    #[descriptor_type = "UNIFORM_BUFFER"]
+    filed_0: ShaderCursorType,
+    
+    acc: vk::DescriptorType,
+
+    #[binding = 1]
+    #[stage = "FRAGMENT"]
+    #[descriptor_type = "UNIFORM_BUFFER"]
+    filed_1: ShaderCursorType,
+
+    #[binding = 2]
+    #[stage = "FRAGMENT"]
+    #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
+    filed_2: ShaderCursorType,
+
+    #[binding = 3]
+    #[stage = "FRAGMENT"]
+    #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
+    filed_3: ShaderCursorType,
+
+    #[binding = 4]
+    #[stage = "FRAGMENT"]
+    #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
+    filed_4: ShaderCursorType,
 }
+
 
 impl VkApp
 {

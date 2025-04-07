@@ -1,26 +1,50 @@
+use ash::vk;
 use shader_layout_macro::ShaderLayout;
+use shader_layout_trait::ShaderBindingLayout;
 
+
+/// 示例：使用 ShaderLayout 派生宏定义着色器布局
+///
+/// 这个结构体定义了着色器需要的所有资源绑定：
+/// - 统一缓冲区 (Uniform Buffer)
+/// - 纹理采样器 (Combined Image Sampler)
+/// - 独立采样器 (Sampler)
 #[derive(ShaderLayout)]
-struct MyShader {
+struct MyShader
+{
+    /// 统一缓冲区，绑定到绑定点 0
+    /// 用于顶点和片段着色器
     #[binding = 0]
+    #[descriptor_type = "UNIFORM_BUFFER"]
+    #[count = 1]
+    #[stage = "VERTEX | FRAGMENT"]
     uniform_buffer: Buffer,
 
+    /// 纹理采样器，绑定到绑定点 1
+    /// 仅用于片段着色器
     #[binding = 1]
+    #[descriptor_type = "UNIFORM_BUFFER_DYNAMIC"]
+    #[count = 1]
+    #[stage = "FRAGMENT"]
     texture: Texture,
 
+    /// 独立采样器，绑定到绑定点 2
+    /// 仅用于片段着色器
     #[binding = 2]
+    #[descriptor_type = "SAMPLER"]
+    #[count = 1]
+    #[stage = "FRAGMENT"]
     sampler: Sampler,
 }
 
-// 模拟类型
+// 模拟类型，实际使用时需要替换为具体的资源类型
 struct Buffer;
 struct Texture;
 struct Sampler;
 
-fn main() {
-    // 获取所有绑定信息
-    let bindings = MyShader::get_shader_bindings();
-
-    // 输出: [("uniform_buffer", 0), ("texture", 1), ("sampler", 2)]
-    println!("Shader bindings: {:?}", bindings);
+fn main()
+{
+    // 获取完整的绑定信息，包括描述符类型、数量和着色器阶段
+    let binding_items = <MyShader as ShaderBindingLayout>::get_shader_bindings();
+    println!("Shader binding items: {:?}", binding_items);
 }

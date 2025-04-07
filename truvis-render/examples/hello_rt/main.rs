@@ -2,6 +2,7 @@ use std::mem::offset_of;
 
 use ash::vk;
 use imgui::Ui;
+use shader_layout_macro::ShaderLayout;
 use truvis_render::{
     framework::rendering::render_context::RenderContext,
     render::{App, AppCtx, AppInitInfo, Renderer},
@@ -11,10 +12,10 @@ use truvis_rhi::{
         acceleration::RhiAcceleration,
         buffer::RhiBuffer,
         command_queue::RhiSubmitInfo,
-        descriptor::DescriptorBindings,
         pipeline::{RhiPipeline, RhiPipelineTemplate},
     },
     render_core::Rhi,
+    shader_cursor::ShaderCursorType,
 };
 
 #[derive(Clone, Debug, Copy)]
@@ -51,31 +52,18 @@ const VERTEX_DATA: [Vertex; 4] = [
 ];
 
 
-pub struct RayTracingBindings;
-impl DescriptorBindings for RayTracingBindings
+#[derive(ShaderLayout)]
+struct RTShaderBindings
 {
-    // FIXME
-    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
-    {
-        vec![
-            vk::DescriptorSetLayoutBinding {
-                // TLAS
-                binding: 0,
-                descriptor_type: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::RAYGEN_KHR,
-                ..Default::default()
-            },
-            vk::DescriptorSetLayoutBinding {
-                // Output image
-                binding: 0,
-                descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::RAYGEN_KHR,
-                ..Default::default()
-            },
-        ]
-    }
+    #[binding = 0]
+    #[stage = "RAYGEN_KHR"]
+    #[descriptor_type = "ACCELERATION_STRUCTURE_KHR"]
+    tlas: ShaderCursorType,
+
+    #[binding = 1]
+    #[stage = "RAYGEN_KHR"]
+    #[descriptor_type = "STORAGE_IMAGE"]
+    output_image: ShaderCursorType,
 }
 
 

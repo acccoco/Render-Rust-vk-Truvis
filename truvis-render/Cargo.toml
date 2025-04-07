@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 truvis-rhi = { path = "../truvis-rhi" }
+shader-layout-trait = { path = "../shader-layout/shader-layout-trait" }
+shader-layout-macro = { path = "../shader-layout/shader-layout-macro" }
 
 # 默认 features：
 # - debug 表示 vulkan 结构体实现了 Debut Trait

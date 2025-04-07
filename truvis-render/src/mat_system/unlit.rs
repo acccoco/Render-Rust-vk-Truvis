@@ -2,34 +2,21 @@
 
 
 use ash::vk;
-use truvis_rhi::core::descriptor::DescriptorBindings;
+use shader_layout_macro::ShaderLayout;
+use truvis_rhi::shader_cursor::ShaderCursorType;
 
-struct UnlitMatBindings;
-
-impl DescriptorBindings for UnlitMatBindings
+#[derive(ShaderLayout)]
+struct UnlitMatBindings
 {
-    // FIXME
-    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
-    {
-        vec![
-            // color texture
-            vk::DescriptorSetLayoutBinding {
-                binding: 0,
-                descriptor_type: vk::DescriptorType::SAMPLED_IMAGE,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                ..Default::default()
-            },
-            // material params
-            vk::DescriptorSetLayoutBinding {
-                binding: 1,
-                descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                ..Default::default()
-            },
-        ]
-    }
+    #[binding = 0]
+    #[stage = "FRAGMENT"]
+    #[descriptor_type = "SAMPLED_IMAGE"]
+    color_texture: ShaderCursorType,
+
+    #[binding = 1]
+    #[stage = "FRAGMENT"]
+    #[descriptor_type = "STORAGE_BUFFER"]
+    mateiral_params: ShaderCursorType,
 }
 
 

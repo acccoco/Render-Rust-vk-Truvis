@@ -5,6 +5,7 @@ use std::rc::Rc;
 use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
+use shader_layout_macro::ShaderLayout;
 use truvis_render::{
     framework::rendering::render_context::RenderContext,
     render::{App, AppCtx, AppInitInfo, Renderer},
@@ -14,73 +15,56 @@ use truvis_rhi::{
     core::{
         buffer::{RhiBuffer, RhiBufferCreateInfo},
         command_queue::RhiSubmitInfo,
-        descriptor::{DescriptorBindings, RhiDescriptorSet, RhiDescriptorSetLayout},
+        descriptor::{RhiDescriptorSet, RhiDescriptorSetLayout},
         pipeline::{RhiPipeline, RhiPipelineTemplate},
     },
     render_core::Rhi,
+    shader_cursor::ShaderCursorType,
 };
 
 use crate::data::{ShapeBox, Vertex};
 
-struct SceneDescriptorBinding;
-impl DescriptorBindings for SceneDescriptorBinding
+
+#[derive(ShaderLayout)]
+struct SceneShaderBindings
 {
-    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
-    {
-        vec![vk::DescriptorSetLayoutBinding::default()
-            .binding(0)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
-            .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)]
-    }
+    #[binding = 0]
+    #[descriptor_type = "UNIFORM_BUFFER_DYNAMIC"]
+    #[stage = "VERTEX | FRAGMENT"]
+    _scene: ShaderCursorType,
 }
 
-struct MeshDescriptorBinding;
-impl DescriptorBindings for MeshDescriptorBinding
+
+#[derive(ShaderLayout)]
+struct MeshShaderBindings
 {
-    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
-    {
-        vec![vk::DescriptorSetLayoutBinding::default()
-            .binding(0)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
-            .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)]
-    }
+    #[binding = 0]
+    #[descriptor_type = "UNIFORM_BUFFER_DYNAMIC"]
+    #[stage = "VERTEX | FRAGMENT"]
+    _mesh: ShaderCursorType,
 }
 
-struct MaterialDescriptorBinding;
-impl DescriptorBindings for MaterialDescriptorBinding
+#[derive(ShaderLayout)]
+struct MaterialShaderBindings
 {
-    fn bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>>
-    {
-        vec![
-            vk::DescriptorSetLayoutBinding::default()
-                .binding(0)
-                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
-                .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::FRAGMENT),
-            // vk::DescriptorSetLayoutBinding::default()
-            //     .binding(1)
-            //     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            //     .descriptor_count(1)
-            //     .stage_flags(vk::ShaderStageFlags::FRAGMENT),
-        ]
-    }
+    #[binding = 0]
+    #[descriptor_type = "UNIFORM_BUFFER_DYNAMIC"]
+    #[stage = "FRAGMENT"]
+    _mat: ShaderCursorType,
 }
-
 
 struct PhongAppDescriptorSetLayouts
 {
-    scene_layout: RhiDescriptorSetLayout<SceneDescriptorBinding>,
-    mesh_layout: RhiDescriptorSetLayout<MeshDescriptorBinding>,
-    material_layout: RhiDescriptorSetLayout<MaterialDescriptorBinding>,
+    scene_layout: RhiDescriptorSetLayout<SceneShaderBindings>,
+    mesh_layout: RhiDescriptorSetLayout<MeshShaderBindings>,
+    material_layout: RhiDescriptorSetLayout<MaterialShaderBindings>,
 }
 
 struct PhongAppDescriptorSets
 {
-    scene_set: RhiDescriptorSet<SceneDescriptorBinding>,
-    mesh_set: RhiDescriptorSet<MeshDescriptorBinding>,
-    material_set: RhiDescriptorSet<MaterialDescriptorBinding>,
+    scene_set: RhiDescriptorSet<SceneShaderBindings>,
+    mesh_set: RhiDescriptorSet<MeshShaderBindings>,
+    material_set: RhiDescriptorSet<MaterialShaderBindings>,
 }
 
 
@@ -182,10 +166,10 @@ impl PhongApp
         frames_in_flight: usize,
     ) -> (PhongAppDescriptorSetLayouts, Vec<PhongAppDescriptorSets>)
     {
-        let scene_descriptor_set_layout = RhiDescriptorSetLayout::<SceneDescriptorBinding>::new(rhi, "phong-scene");
-        let mesh_descriptor_set_layout = RhiDescriptorSetLayout::<MeshDescriptorBinding>::new(rhi, "phong-mesh");
+        let scene_descriptor_set_layout = RhiDescriptorSetLayout::<SceneShaderBindings>::new(rhi, "phong-scene");
+        let mesh_descriptor_set_layout = RhiDescriptorSetLayout::<MeshShaderBindings>::new(rhi, "phong-mesh");
         let material_descriptor_set_layout =
-            RhiDescriptorSetLayout::<MaterialDescriptorBinding>::new(rhi, "phong-material");
+            RhiDescriptorSetLayout::<MaterialShaderBindings>::new(rhi, "phong-material");
 
         let layouts = PhongAppDescriptorSetLayouts {
             scene_layout: scene_descriptor_set_layout,
@@ -196,17 +180,17 @@ impl PhongApp
         let sets = (0..frames_in_flight)
             .map(|idx| FRAME_ID_MAP[idx])
             .map(|tag| PhongAppDescriptorSets {
-                scene_set: RhiDescriptorSet::<SceneDescriptorBinding>::new(
+                scene_set: RhiDescriptorSet::<SceneShaderBindings>::new(
                     rhi,
                     &layouts.scene_layout,
                     &format!("phong-scene-{}", tag),
                 ),
-                mesh_set: RhiDescriptorSet::<MeshDescriptorBinding>::new(
+                mesh_set: RhiDescriptorSet::<MeshShaderBindings>::new(
                     rhi,
                     &layouts.mesh_layout,
                     &format!("phong-mesh-{}", tag),
                 ),
-                material_set: RhiDescriptorSet::<MaterialDescriptorBinding>::new(
+                material_set: RhiDescriptorSet::<MaterialShaderBindings>::new(
                     rhi,
                     &layouts.material_layout,
                     &format!("phong-material-{}", tag),

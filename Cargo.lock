@@ -1829,6 +1829,7 @@ dependencies = [
 name = "shader-layout-macro"
 version = "0.1.0"
 dependencies = [
+ "ash",
  "proc-macro2",
  "quote 1.0.38",
  "shader-layout-trait",
@@ -2176,6 +2177,8 @@ dependencies = [
  "raw-window-handle",
  "serde",
  "serde_json",
+ "shader-layout-macro",
+ "shader-layout-trait",
  "simplelog",
  "static_init",
  "tobj",
