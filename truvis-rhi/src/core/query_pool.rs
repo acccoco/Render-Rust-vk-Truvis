@@ -2,24 +2,21 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::{core::device::RhiDevice, render_core::Rhi};
+use crate::{core::device::RhiDevice, rhi::Rhi};
 
-pub struct QueryPool
-{
+pub struct QueryPool {
     pub(crate) handle: vk::QueryPool,
     pub(crate) query_type: vk::QueryType,
 
     /// pool 的容量
-    pub(crate) cnt: u32,
+    _cnt: u32,
 
     device: Rc<RhiDevice>,
 }
 
-impl QueryPool
-{
+impl QueryPool {
     #[inline]
-    pub fn new(rhi: &Rhi, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self
-    {
+    pub fn new(rhi: &Rhi, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self {
         let create_info = vk::QueryPoolCreateInfo {
             query_type: ty,
             query_count: cnt,
@@ -28,13 +25,13 @@ impl QueryPool
 
         unsafe {
             let handle = rhi.device.create_query_pool(&create_info, None).unwrap();
-            rhi.set_debug_name(handle, debug_name);
+            rhi.device.debug_utils.set_object_debug_name(handle, debug_name);
 
             Self {
                 device: rhi.device.clone(),
                 handle,
                 query_type: ty,
-                cnt,
+                _cnt: cnt,
             }
         }
     }
@@ -52,16 +49,14 @@ impl QueryPool
     }
 
     #[inline]
-    pub fn reset(&mut self, first_query: u32, query_cnt: u32)
-    {
+    pub fn reset(&mut self, first_query: u32, query_cnt: u32) {
         unsafe {
             self.device.reset_query_pool(self.handle, first_query, query_cnt);
         }
     }
 
     #[inline]
-    pub fn destroy(self)
-    {
+    pub fn destroy(self) {
         unsafe {
             self.device.destroy_query_pool(self.handle, None);
         }

@@ -1,5 +1,5 @@
 pub mod core;
-pub mod render_core;
+pub mod rhi;
 pub mod shader_cursor;
 
 pub mod basic;

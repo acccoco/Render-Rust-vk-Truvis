@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
+use super::device::RhiDevice;
+use crate::core::descriptor_pool::RhiDescriptorPool;
+use crate::rhi::Rhi;
 use ash::vk;
 use shader_layout_trait::ShaderBindingLayout;
-
-use super::device::RhiDevice;
-use crate::render_core::Rhi;
 
 /// 描述符集布局
 ///
@@ -27,7 +27,7 @@ where
     /// 用于在编译时关联泛型参数 T
     phantom_data: std::marker::PhantomData<T>,
 
-    device: Rc<RhiDevice>,
+    _device: Rc<RhiDevice>,
 }
 
 impl<T> RhiDescriptorSetLayout<T>
@@ -42,19 +42,18 @@ where
     ///
     /// # 返回值
     /// 新的描述符集布局实例
-    pub fn new(rhi: &Rhi, debug_name: &str) -> Self
-    {
+    pub fn new(rhi: &Rhi, debug_name: &str) -> Self {
         // 从类型 T 获取绑定信息
         let bindings = T::get_bindings();
         let create_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
 
         // 创建 Vulkan 描述符集布局
-        let layout = unsafe { rhi.vk_device().create_descriptor_set_layout(&create_info, None).unwrap() };
-        rhi.set_debug_name(layout, debug_name);
+        let layout = unsafe { rhi.device().create_descriptor_set_layout(&create_info, None).unwrap() };
+        rhi.device.debug_utils.set_object_debug_name(layout, debug_name);
         Self {
             layout,
             phantom_data: std::marker::PhantomData,
-            device: rhi.device.clone(),
+            _device: rhi.device.clone(),
         }
     }
 }
@@ -81,8 +80,7 @@ where
 /// 用于更新描述符集的内容，可以是：
 /// - 图像描述符：用于纹理和采样器
 /// - 缓冲区描述符：用于统一缓冲区和存储缓冲区
-pub enum RhiDescriptorUpdateInfo
-{
+pub enum RhiDescriptorUpdateInfo {
     /// 图像描述符信息
     Image(vk::DescriptorImageInfo),
     /// 缓冲区描述符信息
@@ -102,19 +100,21 @@ where
     ///
     /// # 返回值
     /// 新的描述符集实例
-    pub fn new(rhi: &Rhi, layout: &RhiDescriptorSetLayout<T>, debug_name: &str) -> Self
-    {
-        unsafe {
-            // 分配描述符集
-            let alloc_info = vk::DescriptorSetAllocateInfo::default()
-                .descriptor_pool(rhi.descriptor_pool)
-                .set_layouts(std::slice::from_ref(&layout.layout));
-            let descriptor_set = rhi.vk_device().allocate_descriptor_sets(&alloc_info).unwrap()[0];
-            rhi.set_debug_name(descriptor_set, debug_name);
-            Self {
-                handle: descriptor_set,
-                phantom_data: std::marker::PhantomData,
-            }
+    pub fn new(
+        rhi: &Rhi,
+        descriptor_pool: &RhiDescriptorPool,
+        layout: &RhiDescriptorSetLayout<T>,
+        debug_name: &str,
+    ) -> Self {
+        // 分配描述符集
+        let alloc_info = vk::DescriptorSetAllocateInfo::default()
+            .descriptor_pool(descriptor_pool.handle())
+            .set_layouts(std::slice::from_ref(&layout.layout));
+        let descriptor_set = unsafe { rhi.device.allocate_descriptor_sets(&alloc_info).unwrap()[0] };
+        rhi.device.debug_utils.set_object_debug_name(descriptor_set, debug_name);
+        Self {
+            handle: descriptor_set,
+            phantom_data: std::marker::PhantomData,
         }
     }
 }

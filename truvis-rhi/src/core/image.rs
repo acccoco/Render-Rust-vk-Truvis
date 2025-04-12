@@ -5,21 +5,18 @@ use vk_mem::Alloc;
 
 use crate::{
     core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, synchronize::RhiImageBarrier},
-    render_core::Rhi,
+    rhi::Rhi,
 };
 
-pub struct RhiImageCreateInfo
-{
+pub struct RhiImageCreateInfo {
     inner: vk::ImageCreateInfo<'static>,
 
     queue_family_indices: Vec<u32>,
 }
 
-impl RhiImageCreateInfo
-{
+impl RhiImageCreateInfo {
     #[inline]
-    pub fn new_image_2d_info(extent: vk::Extent2D, format: vk::Format, usage: vk::ImageUsageFlags) -> Self
-    {
+    pub fn new_image_2d_info(extent: vk::Extent2D, format: vk::Format, usage: vk::ImageUsageFlags) -> Self {
         Self {
             inner: vk::ImageCreateInfo {
                 image_type: vk::ImageType::TYPE_2D,
@@ -39,30 +36,25 @@ impl RhiImageCreateInfo
     }
 
     #[inline]
-    pub fn creat_info(&self) -> &vk::ImageCreateInfo
-    {
+    pub fn creat_info(&self) -> &vk::ImageCreateInfo {
         &self.inner
     }
 
     /// getter
     #[inline]
-    pub fn extent(&self) -> &vk::Extent3D
-    {
+    pub fn extent(&self) -> &vk::Extent3D {
         &self.inner.extent
     }
 
     /// getter
     #[inline]
-    pub fn format(&self) -> vk::Format
-    {
+    pub fn format(&self) -> vk::Format {
         self.inner.format
     }
 
-
     /// builder
     #[inline]
-    pub fn queue_family_indices(mut self, queue_family_indices: &[u32]) -> Self
-    {
+    pub fn queue_family_indices(mut self, queue_family_indices: &[u32]) -> Self {
         self.inner.sharing_mode = vk::SharingMode::CONCURRENT;
         self.queue_family_indices = queue_family_indices.into();
 
@@ -72,17 +64,13 @@ impl RhiImageCreateInfo
     }
 }
 
-pub struct RhiImageViewCreateInfo
-{
+pub struct RhiImageViewCreateInfo {
     inner: vk::ImageViewCreateInfo<'static>,
 }
 
-
-impl RhiImageViewCreateInfo
-{
+impl RhiImageViewCreateInfo {
     #[inline]
-    pub fn new_image_view_2d_info(format: vk::Format, aspect: vk::ImageAspectFlags) -> Self
-    {
+    pub fn new_image_view_2d_info(format: vk::Format, aspect: vk::ImageAspectFlags) -> Self {
         Self {
             inner: vk::ImageViewCreateInfo {
                 format,
@@ -98,65 +86,54 @@ impl RhiImageViewCreateInfo
         }
     }
 
-
     #[inline]
-    pub fn inner(&self) -> &vk::ImageViewCreateInfo
-    {
+    pub fn inner(&self) -> &vk::ImageViewCreateInfo {
         &self.inner
     }
 }
 
-
-pub struct RhiImage2D
-{
-    name: String,
-
+pub struct RhiImage2D {
     pub handle: vk::Image,
 
-    alloc: vk_mem::Allocation,
+    _alloc: vk_mem::Allocation,
 
+    _name: String,
     image_info: Rc<RhiImageCreateInfo>,
 }
 
-
-impl RhiImage2D
-{
+impl RhiImage2D {
     pub fn new(
         rhi: &Rhi,
         image_info: Rc<RhiImageCreateInfo>,
         alloc_info: &vk_mem::AllocationCreateInfo,
         debug_name: &str,
-    ) -> Self
-    {
+    ) -> Self {
         let (image, alloc) = unsafe { rhi.allocator.create_image(image_info.creat_info(), alloc_info).unwrap() };
 
-        rhi.set_debug_name(image, debug_name);
+        rhi.device.debug_utils.set_object_debug_name(image, debug_name);
 
         Self {
-            name: debug_name.to_string(),
+            _name: debug_name.to_string(),
 
             handle: image,
-            alloc,
+            _alloc: alloc,
 
             image_info,
         }
     }
 
     #[inline]
-    pub fn width(&self) -> u32
-    {
+    pub fn width(&self) -> u32 {
         self.image_info.extent().width
     }
 
     #[inline]
-    pub fn height(&self) -> u32
-    {
+    pub fn height(&self) -> u32 {
         self.image_info.extent().height
     }
 
     /// 根据 RGBA8_UNORM 的 data 创建 image
-    pub fn from_rgba8(rhi: &Rhi, width: u32, height: u32, data: &[u8], name: &str) -> Self
-    {
+    pub fn from_rgba8(rhi: &Rhi, width: u32, height: u32, data: &[u8], name: &str) -> Self {
         let image = Self::new(
             rhi,
             Rc::new(RhiImageCreateInfo::new_image_2d_info(
@@ -183,8 +160,7 @@ impl RhiImage2D
         image
     }
 
-    pub fn transfer_data(&self, rhi: &Rhi, command_buffer: &RhiCommandBuffer, data: &[u8]) -> RhiBuffer
-    {
+    pub fn transfer_data(&self, rhi: &Rhi, command_buffer: &RhiCommandBuffer, data: &[u8]) -> RhiBuffer {
         let pixels_cnt = self.width() * self.height();
         assert_eq!(data.len(), Self::format_byte_count(self.image_info.format()) * pixels_cnt as usize);
 
@@ -241,8 +217,7 @@ impl RhiImage2D
     }
 
     /// 计算某种 format 的一个像素需要的存储空间
-    fn format_byte_count(format: vk::Format) -> usize
-    {
+    fn format_byte_count(format: vk::Format) -> usize {
         // 根据 vulkan specification 得到的 format 顺序
         const BYTE_3_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8_UNORM, vk::Format::B8G8R8_SRGB)];
         const BYTE_4_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8A8_UNORM, vk::Format::B8G8R8A8_SRGB)];
@@ -266,33 +241,30 @@ impl RhiImage2D
     }
 }
 
-pub struct RhiImage2DView
-{
+pub struct RhiImage2DView {
     handle: vk::ImageView,
-    image: Rc<RhiImage2D>,
-    info: Rc<RhiImageViewCreateInfo>,
-    name: String,
+
+    _image: Rc<RhiImage2D>,
+    _info: Rc<RhiImageViewCreateInfo>,
+    _name: String,
 }
 
-impl RhiImage2DView
-{
-    pub fn new(rhi: &Rhi, image: Rc<RhiImage2D>, mut info: RhiImageViewCreateInfo, name: String) -> Self
-    {
+impl RhiImage2DView {
+    pub fn new(rhi: &Rhi, image: Rc<RhiImage2D>, mut info: RhiImageViewCreateInfo, name: String) -> Self {
         info.inner.image = image.handle;
         let handle = unsafe { rhi.device.create_image_view(&info.inner, None).unwrap() };
-        rhi.debug_utils.set_object_debug_name(handle, &name);
+        rhi.device.debug_utils.set_object_debug_name(handle, &name);
         Self {
             handle,
-            image,
-            info: Rc::new(info),
-            name,
+            _image: image,
+            _info: Rc::new(info),
+            _name: name,
         }
     }
 
     /// getter
     #[inline]
-    pub fn handle(&self) -> vk::ImageView
-    {
+    pub fn handle(&self) -> vk::ImageView {
         self.handle
     }
 }

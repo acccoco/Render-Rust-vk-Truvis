@@ -1,16 +1,15 @@
-mod data;
-
 use std::rc::Rc;
 
-use crate::data::{ShapeBox, Vertex};
 use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
 use shader_layout_macro::ShaderLayout;
+use truvis_render::resource::shape::vertex_pnu::VertexPNUAoS;
 use truvis_render::{
     framework::rendering::render_context::RenderContext,
     render::{App, AppCtx, AppInitInfo, Renderer},
 };
+use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::shader_cursor::ShaderCursor;
 use truvis_rhi::{
     basic::{color::LabelColor, FRAME_ID_MAP},
@@ -18,9 +17,9 @@ use truvis_rhi::{
         buffer::{RhiBuffer, RhiBufferCreateInfo},
         command_queue::RhiSubmitInfo,
         descriptor::{RhiDescriptorSet, RhiDescriptorSetLayout},
-        pipeline::{RhiPipeline, RhiPipelineTemplate},
+        pipeline::RhiGraphicsPipeline,
     },
-    render_core::Rhi,
+    rhi::Rhi,
 };
 
 #[derive(ShaderLayout)]
@@ -118,11 +117,11 @@ struct PhongUniformBuffer {
 }
 
 struct PhongApp {
-    descriptor_set_layouts: PhongAppDescriptorSetLayouts,
+    _descriptor_set_layouts: PhongAppDescriptorSetLayouts,
 
     /// 每帧独立的 descriptor set
     descriptor_sets: Vec<PhongAppDescriptorSets>,
-    pipeline: RhiPipeline,
+    pipeline: RhiGraphicsPipeline,
 
     /// BOX
     vertex_buffer: RhiBuffer,
@@ -143,6 +142,7 @@ struct PhongApp {
 impl PhongApp {
     fn create_descriptor_sets(
         rhi: &Rhi,
+        render_context: &RenderContext,
         frames_in_flight: usize,
     ) -> (PhongAppDescriptorSetLayouts, Vec<PhongAppDescriptorSets>) {
         let scene_descriptor_set_layout = RhiDescriptorSetLayout::<SceneShaderBindings>::new(rhi, "phong-scene");
@@ -161,16 +161,19 @@ impl PhongApp {
             .map(|tag| PhongAppDescriptorSets {
                 scene_set: RhiDescriptorSet::<SceneShaderBindings>::new(
                     rhi,
+                    render_context.descriptor_pool(),
                     &layouts.scene_layout,
                     &format!("phong-scene-{}", tag),
                 ),
                 mesh_set: RhiDescriptorSet::<MeshShaderBindings>::new(
                     rhi,
+                    render_context.descriptor_pool(),
                     &layouts.mesh_layout,
                     &format!("phong-mesh-{}", tag),
                 ),
                 material_set: RhiDescriptorSet::<MaterialShaderBindings>::new(
                     rhi,
+                    render_context.descriptor_pool(),
                     &layouts.material_layout,
                     &format!("phong-material-{}", tag),
                 ),
@@ -184,67 +187,32 @@ impl PhongApp {
         rhi: &Rhi,
         render_ctx: &mut RenderContext,
         descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
-    ) -> RhiPipeline {
+    ) -> RhiGraphicsPipeline {
         let extent = render_ctx.swapchain_extent();
-        RhiPipelineTemplate {
-            fragment_shader_path: Some("shader/phong/phong.ps.hlsl.spv".into()),
-            vertex_shader_path: Some("shader/phong/phong.vs.hlsl.spv".into()),
+        let mut ci = RhiGraphicsPipelineCreateInfo::default();
+        ci.vertex_shader_stage("shader/phong/phong.vs.hlsl.spv".to_string(), "main".to_string());
+        ci.fragment_shader_stage("shader/phong/phong.ps.hlsl.spv".to_string(), "main".to_string());
+        ci.push_constant_ranges(vec![vk::PushConstantRange::default()
+            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+            .offset(0)
+            .size(size_of::<PushConstant>() as u32)]);
+        ci.descriptor_set_layouts(descriptor_set_layouts);
+        ci.attach_info(vec![render_ctx.color_format()], Some(render_ctx.depth_format()), None);
+        ci.viewport(glam::vec2(0.0, 0.0), glam::vec2(extent.width as _, extent.height as _), 0.0, 1.0);
+        ci.scissor(extent.into());
+        ci.vertex_binding(VertexPNUAoS::vertex_input_bindings());
+        ci.vertex_attribute(VertexPNUAoS::vertex_input_attriutes());
+        ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
+            .blend_enable(false)
+            .color_write_mask(vk::ColorComponentFlags::RGBA)]);
 
-            descriptor_set_layouts,
-
-            push_constant_ranges: vec![vk::PushConstantRange::default()
-                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
-                .offset(0)
-                .size(size_of::<PushConstant>() as u32)],
-
-            color_formats: vec![render_ctx.color_format()],
-            depth_format: render_ctx.depth_format(),
-            viewport: Some(vk::Viewport {
-                x: 0.0,
-                y: 0.0,
-                width: extent.width as _,
-                height: extent.height as _,
-                min_depth: 0.0,
-                max_depth: 1.0,
-            }),
-            scissor: Some(extent.into()),
-            vertex_binding_desc: vec![vk::VertexInputBindingDescription {
-                binding: 0,
-                stride: size_of::<Vertex>() as u32,
-                input_rate: vk::VertexInputRate::VERTEX,
-            }],
-            vertex_attribute_desec: vec![
-                vk::VertexInputAttributeDescription {
-                    location: 0,
-                    binding: 0,
-                    format: vk::Format::R32G32B32_SFLOAT,
-                    offset: std::mem::offset_of!(Vertex, pos) as u32,
-                },
-                vk::VertexInputAttributeDescription {
-                    location: 1,
-                    binding: 0,
-                    format: vk::Format::R32G32B32_SFLOAT,
-                    offset: std::mem::offset_of!(Vertex, normal) as u32,
-                },
-                vk::VertexInputAttributeDescription {
-                    location: 2,
-                    binding: 0,
-                    format: vk::Format::R32G32_SFLOAT,
-                    offset: std::mem::offset_of!(Vertex, uv) as u32,
-                },
-            ],
-            color_attach_blend_states: vec![vk::PipelineColorBlendAttachmentState::default()
-                .blend_enable(false)
-                .color_write_mask(vk::ColorComponentFlags::RGBA)],
-            ..Default::default()
-        }
-        .create_pipeline(rhi, "phong")
+        RhiGraphicsPipeline::new(rhi.device.clone(), &ci, "phong")
     }
 
     fn create_vertices(rhi: &Rhi) -> RhiBuffer {
         let mut vertex_buffer =
-            RhiBuffer::new_vertex_buffer(rhi, size_of_val(&ShapeBox::VERTICES), "[phong]vertex-buffer");
-        vertex_buffer.transfer_data_by_stage_buffer(rhi, &ShapeBox::VERTICES);
+            RhiBuffer::new_vertex_buffer(rhi, size_of_val(VertexPNUAoS::shape_box()), "[phong]vertex-buffer");
+        vertex_buffer.transfer_data_sync(rhi, VertexPNUAoS::shape_box());
 
         vertex_buffer
     }
@@ -260,8 +228,8 @@ impl PhongApp {
         let mesh_instance_count = 32;
         let material_instance_count = 32;
 
-        *mesh_ubo_align = rhi.ubo_offset_align(size_of::<MeshUBO>() as vk::DeviceSize);
-        *mat_ubo_align = rhi.ubo_offset_align(size_of::<MaterialUBO>() as vk::DeviceSize);
+        *mesh_ubo_align = rhi.device.align_ubo_size(size_of::<MeshUBO>() as vk::DeviceSize);
+        *mat_ubo_align = rhi.device.align_ubo_size(size_of::<MaterialUBO>() as vk::DeviceSize);
 
         let scene_buffer_ci = Rc::new(RhiBufferCreateInfo::new(
             size_of::<SceneUBO>() as vk::DeviceSize * frames_in_flight as u64,
@@ -346,7 +314,7 @@ impl PhongApp {
             .range(size_of::<MaterialUBO>() as vk::DeviceSize);
         let mat_write = MaterialShaderBindings::mat().write_buffer(material_set.handle, 0, vec![mat_ubo_info]);
 
-        rhi.write_descriptor_sets2(&[scene_write, mesh_write, mat_write]);
+        rhi.device.write_descriptor_sets(&[scene_write, mesh_write, mat_write]);
     }
 }
 
@@ -357,7 +325,7 @@ impl App for PhongApp {
     }
 
     fn update(&mut self, app_ctx: &mut AppCtx) {
-        app_ctx.rhi.debug_utils.begin_queue_label(
+        app_ctx.rhi.device.debug_utils.begin_queue_label(
             app_ctx.rhi.graphics_queue.handle,
             "[main-pass]update",
             LabelColor::COLOR_PASS,
@@ -365,7 +333,7 @@ impl App for PhongApp {
         {
             self.update_scene_uniform(app_ctx.rhi, app_ctx.render_context.current_frame_index());
         }
-        app_ctx.rhi.debug_utils.end_queue_label(app_ctx.rhi.graphics_queue.handle);
+        app_ctx.rhi.device.debug_utils.end_queue_label(app_ctx.rhi.graphics_queue.handle);
     }
 
     fn draw(&self, app_ctx: &mut AppCtx) {
@@ -424,7 +392,7 @@ impl App for PhongApp {
                     &[self.descriptor_sets[frame_id].mesh_set.handle],
                     &[(self.mesh_ubo_offset_align * mesh_idx as u64) as u32],
                 );
-                cmd.cmd_draw(ShapeBox::VERTICES.len() as u32, 1, 0, 0);
+                cmd.cmd_draw(VertexPNUAoS::shape_box().len() as u32, 1, 0, 0);
             }
 
             cmd.end_rendering();
@@ -436,7 +404,7 @@ impl App for PhongApp {
 
     fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
         // TODO 通过其他方式获取到 frames in flight
-        let (layouts, sets) = Self::create_descriptor_sets(rhi, 3);
+        let (layouts, sets) = Self::create_descriptor_sets(rhi, render_context, 3);
         let pipeline = Self::create_pipeline(
             rhi,
             render_context,
@@ -471,7 +439,7 @@ impl App for PhongApp {
         projection.y_axis.y *= -1.0;
 
         Self {
-            descriptor_set_layouts: layouts,
+            _descriptor_set_layouts: layouts,
             descriptor_sets: sets,
             pipeline,
             vertex_buffer,

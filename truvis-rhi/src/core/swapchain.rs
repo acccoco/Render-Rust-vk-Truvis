@@ -1,8 +1,7 @@
-use std::sync::Arc;
+use std::rc::Rc;
 
 use ash::vk;
 use itertools::Itertools;
-use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
 use crate::{
     basic::FRAME_ID_MAP,
@@ -11,23 +10,19 @@ use crate::{
         synchronize::{RhiFence, RhiSemaphore},
         window_system::WindowSystem,
     },
-    render_core::Rhi,
+    rhi::Rhi,
 };
 
-pub struct RhiSwapchainInitInfo
-{
+pub struct RhiSwapchainInitInfo {
     format: vk::SurfaceFormatKHR,
     swapchain_present_mode: vk::PresentModeKHR,
 
-    // TODO 改为 Rc
-    window: Arc<WindowSystem>,
+    window: Rc<WindowSystem>,
 }
 
-impl RhiSwapchainInitInfo
-{
+impl RhiSwapchainInitInfo {
     #[inline]
-    pub fn new(window: Arc<WindowSystem>) -> Self
-    {
+    pub fn new(window: Rc<WindowSystem>) -> Self {
         Self {
             format: vk::SurfaceFormatKHR {
                 format: vk::Format::B8G8R8A8_UNORM,
@@ -40,54 +35,50 @@ impl RhiSwapchainInitInfo
 
     /// builder
     #[inline]
-    pub fn format(mut self, format: vk::SurfaceFormatKHR) -> Self
-    {
+    pub fn format(mut self, format: vk::SurfaceFormatKHR) -> Self {
         self.format = format;
         self
     }
 }
 
-struct RhiSurface
-{
+struct RhiSurface {
     handle: vk::SurfaceKHR,
     pf: ash::khr::surface::Instance,
 
-    window: Arc<WindowSystem>,
+    _window: Rc<WindowSystem>,
 }
 
-impl RhiSurface
-{
-    fn new(rhi: &Rhi, window: Arc<WindowSystem>) -> Self
-    {
-        let surface_pf = ash::khr::surface::Instance::new(&rhi.vk_pf, rhi.vk_instance());
+impl RhiSurface {
+    fn new(rhi: &Rhi, window: Rc<WindowSystem>) -> Self {
+        use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
+
+        let surface_pf = ash::khr::surface::Instance::new(&rhi.vk_pf, rhi.instance());
 
         let surface = unsafe {
             ash_window::create_surface(
                 &rhi.vk_pf,
-                rhi.vk_instance(),
+                rhi.instance(),
                 window.window().raw_display_handle().unwrap(),
                 window.window().raw_window_handle().unwrap(),
                 None,
             )
             .unwrap()
         };
-        rhi.set_debug_name(surface, "main-surface");
+        rhi.device.debug_utils.set_object_debug_name(surface, "main-surface");
 
         RhiSurface {
             handle: surface,
             pf: surface_pf,
-            window,
+            _window: window,
         }
     }
 }
 
-
-pub struct RhiSwapchain
-{
+pub struct RhiSwapchain {
     swapchain_pf: ash::khr::swapchain::Device,
     swapchain_handle: vk::SwapchainKHR,
 
-    surface: RhiSurface,
+    _surface: RhiSurface,
 
     /// 这里的 image 并非手动创建的，因此无法使用 RhiImage 类型
     pub images: Vec<vk::Image>,
@@ -99,11 +90,8 @@ pub struct RhiSwapchain
     pub present_mode: vk::PresentModeKHR,
 }
 
-
-impl RhiSwapchain
-{
-    pub fn new(rhi: &Rhi, init_info: &RhiSwapchainInitInfo) -> Self
-    {
+impl RhiSwapchain {
+    pub fn new(rhi: &Rhi, init_info: &RhiSwapchainInitInfo) -> Self {
         let pdevice = rhi.physical_device().handle;
         let surface = RhiSurface::new(rhi, init_info.window.clone());
 
@@ -120,7 +108,7 @@ impl RhiSwapchain
 
         let (images, image_views) = Self::create_images_and_views(rhi, swapchain_handle, &swapchain_pf, format);
 
-        let swapchain = Self {
+        Self {
             swapchain_pf,
             swapchain_handle,
             images,
@@ -129,12 +117,9 @@ impl RhiSwapchain
             color_format: format,
             color_space,
             present_mode,
-            surface,
-        };
-
-        swapchain
+            _surface: surface,
+        }
     }
-
 
     fn create_handle(
         rhi: &Rhi,
@@ -144,8 +129,7 @@ impl RhiSwapchain
         color_space: vk::ColorSpaceKHR,
         extent: vk::Extent2D,
         present_mode: vk::PresentModeKHR,
-    ) -> (vk::SwapchainKHR, ash::khr::swapchain::Device)
-    {
+    ) -> (vk::SwapchainKHR, ash::khr::swapchain::Device) {
         // 确定 image count
         // max_image_count == 0，表示不限制 image 数量
         let image_count = if surface_capabilities.max_image_count == 0 {
@@ -170,9 +154,9 @@ impl RhiSwapchain
             .clipped(true);
 
         unsafe {
-            let swapchain_pf = ash::khr::swapchain::Device::new(rhi.vk_instance(), rhi.vk_device());
+            let swapchain_pf = ash::khr::swapchain::Device::new(rhi.instance(), rhi.device());
             let swapchain_handle = swapchain_pf.create_swapchain(&create_info, None).unwrap();
-            rhi.set_debug_name(swapchain_handle, "main-swapchain");
+            rhi.device.debug_utils.set_object_debug_name(swapchain_handle, "main-swapchain");
 
             (swapchain_handle, swapchain_pf)
         }
@@ -183,8 +167,7 @@ impl RhiSwapchain
         swapchain_handle: vk::SwapchainKHR,
         swapchain_pf: &ash::khr::swapchain::Device,
         format: vk::Format,
-    ) -> (Vec<vk::Image>, Vec<vk::ImageView>)
-    {
+    ) -> (Vec<vk::Image>, Vec<vk::ImageView>) {
         let swapchain_images = unsafe { swapchain_pf.get_swapchain_images(swapchain_handle).unwrap() };
 
         let image_views = swapchain_images
@@ -201,7 +184,7 @@ impl RhiSwapchain
                             .level_count(1),
                     );
 
-                unsafe { rhi.vk_device().create_image_view(&create_info, None).unwrap() }
+                unsafe { rhi.device().create_image_view(&create_info, None).unwrap() }
             })
             .collect_vec();
 
@@ -209,8 +192,10 @@ impl RhiSwapchain
 
         // 为 images 和 image_views 设置 debug name
         for i in 0..images.len() {
-            rhi.set_debug_name(images[i], format!("swapchain-image-{}", FRAME_ID_MAP[i]));
-            rhi.set_debug_name(image_views[i], format!("swapchain-image-view-{}", FRAME_ID_MAP[i]));
+            rhi.device.debug_utils.set_object_debug_name(images[i], format!("swapchain-image-{}", FRAME_ID_MAP[i]));
+            rhi.device
+                .debug_utils
+                .set_object_debug_name(image_views[i], format!("swapchain-image-view-{}", FRAME_ID_MAP[i]));
         }
 
         (images, image_views)
@@ -221,8 +206,7 @@ impl RhiSwapchain
     /// @param present_mode: 优先使用的 present mode
     ///
     /// 可以是：immediate, mailbox, fifo, fifo_relaxed
-    fn init_present_mode2(rhi: &Rhi, surface: &RhiSurface, present_mode: vk::PresentModeKHR) -> vk::PresentModeKHR
-    {
+    fn init_present_mode2(rhi: &Rhi, surface: &RhiSurface, present_mode: vk::PresentModeKHR) -> vk::PresentModeKHR {
         unsafe {
             surface
                 .pf
@@ -235,7 +219,6 @@ impl RhiSwapchain
         }
     }
 
-
     /// 找到合适的 format 和 colorspace
     ///
     /// @param format: 优先使用的 format
@@ -245,8 +228,7 @@ impl RhiSwapchain
         rhi: &Rhi,
         surface: &RhiSurface,
         format: vk::SurfaceFormatKHR,
-    ) -> (vk::Format, vk::ColorSpaceKHR)
-    {
+    ) -> (vk::Format, vk::ColorSpaceKHR) {
         let surface_format = unsafe {
             surface
                 .pf
@@ -261,10 +243,8 @@ impl RhiSwapchain
     }
 
     #[inline]
-    pub fn acquire_next_frame(&self, semaphore: &RhiSemaphore, fence: Option<&RhiFence>) -> u32
-    {
-        // TODO 处理 optimal 的情况
-        let (image_index, _is_optimal) = unsafe {
+    pub fn acquire_next_frame(&self, semaphore: &RhiSemaphore, fence: Option<&RhiFence>) -> u32 {
+        let (image_index, is_optimal) = unsafe {
             self.swapchain_pf
                 .acquire_next_image(
                     self.swapchain_handle,
@@ -274,13 +254,17 @@ impl RhiSwapchain
                 )
                 .unwrap()
         };
-        // TODO 处理 optimal
+
+        // TODO 解决 suboptimal 的问题
+        if !is_optimal {
+            // log::warn!("swapchain acquire image index {} is not optimal", image_index);
+        }
+
         image_index
     }
 
     #[inline]
-    pub fn submit_frame(&self, queue: &RhiQueue, image_index: u32, wait_semaphores: &[RhiSemaphore])
-    {
+    pub fn submit_frame(&self, queue: &RhiQueue, image_index: u32, wait_semaphores: &[RhiSemaphore]) {
         let wait_semaphores = wait_semaphores.iter().map(|s| s.semaphore).collect_vec();
         let present_info = vk::PresentInfoKHR::default()
             .wait_semaphores(&wait_semaphores)

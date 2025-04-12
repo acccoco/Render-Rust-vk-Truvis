@@ -1,8 +1,7 @@
 use derive_getters::Getters;
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
-fn load_icon(bytes: &[u8]) -> winit::window::Icon
-{
+fn load_icon(bytes: &[u8]) -> winit::window::Icon {
     let (icon_rgba, icon_width, icon_height) = {
         let image = image::load_from_memory(bytes).unwrap().into_rgba8();
         let (width, height) = image.dimensions();
@@ -12,27 +11,22 @@ fn load_icon(bytes: &[u8]) -> winit::window::Icon
     winit::window::Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
 }
 
-pub struct WindowCreateInfo
-{
+pub struct WindowCreateInfo {
     pub width: i32,
     pub height: i32,
     pub title: String,
 }
 
-
 #[derive(Getters)]
-pub struct WindowSystem
-{
+pub struct WindowSystem {
     window: Window,
 
     width: i32,
     height: i32,
 }
 
-impl WindowSystem
-{
-    pub fn new(event_loop: &ActiveEventLoop, create_info: WindowCreateInfo) -> Self
-    {
+impl WindowSystem {
+    pub fn new(event_loop: &ActiveEventLoop, create_info: WindowCreateInfo) -> Self {
         let icon = load_icon(include_bytes!("../../../data/DruvisIII.png"));
         let window_attr = Window::default_attributes()
             .with_title(create_info.title.clone())

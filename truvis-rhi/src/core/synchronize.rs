@@ -4,26 +4,23 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::{core::device::RhiDevice, render_core::Rhi};
+use crate::{core::device::RhiDevice, rhi::Rhi};
 
 #[derive(Clone)]
-pub struct RhiFence
-{
+pub struct RhiFence {
     pub fence: vk::Fence,
     device: Rc<RhiDevice>,
 }
 
-impl RhiFence
-{
+impl RhiFence {
     /// # param
     /// * signaled - 是否创建时就 signaled
-    pub fn new(rhi: &Rhi, signaled: bool, debug_name: &str) -> Self
-    {
+    pub fn new(rhi: &Rhi, signaled: bool, debug_name: &str) -> Self {
         let fence_flags = if signaled { vk::FenceCreateFlags::SIGNALED } else { vk::FenceCreateFlags::empty() };
         let fence =
-            unsafe { rhi.vk_device().create_fence(&vk::FenceCreateInfo::default().flags(fence_flags), None).unwrap() };
+            unsafe { rhi.device().create_fence(&vk::FenceCreateInfo::default().flags(fence_flags), None).unwrap() };
 
-        rhi.set_debug_name(fence, debug_name);
+        rhi.device.debug_utils.set_object_debug_name(fence, debug_name);
         Self {
             fence,
             device: rhi.device.clone(),
@@ -31,22 +28,19 @@ impl RhiFence
     }
 
     /// 阻塞等待 fence
-    pub fn wait(&self)
-    {
+    pub fn wait(&self) {
         unsafe {
             self.device.wait_for_fences(std::slice::from_ref(&self.fence), true, u64::MAX).unwrap();
         }
     }
 
-    pub fn reset(&self)
-    {
+    pub fn reset(&self) {
         unsafe {
             self.device.reset_fences(std::slice::from_ref(&self.fence)).unwrap();
         }
     }
 
-    pub fn destroy(self)
-    {
+    pub fn destroy(self) {
         unsafe {
             self.device.destroy_fence(self.fence, None);
         }
@@ -54,52 +48,42 @@ impl RhiFence
 }
 
 #[derive(Clone)]
-pub struct RhiSemaphore
-{
+pub struct RhiSemaphore {
     pub(crate) semaphore: vk::Semaphore,
     device: Rc<RhiDevice>,
 }
 
-impl RhiSemaphore
-{
-    pub fn new(rhi: &Rhi, debug_name: &str) -> Self
-    {
-        let semaphore = unsafe { rhi.vk_device().create_semaphore(&vk::SemaphoreCreateInfo::default(), None).unwrap() };
+impl RhiSemaphore {
+    pub fn new(rhi: &Rhi, debug_name: &str) -> Self {
+        let semaphore = unsafe { rhi.device().create_semaphore(&vk::SemaphoreCreateInfo::default(), None).unwrap() };
 
-        rhi.set_debug_name(semaphore, debug_name);
+        rhi.device.debug_utils.set_object_debug_name(semaphore, debug_name);
         Self {
             semaphore,
             device: rhi.device.clone(),
         }
     }
 
-    pub fn destroy(self)
-    {
+    pub fn destroy(self) {
         unsafe {
             self.device.destroy_semaphore(self.semaphore, None);
         }
     }
 }
 
-
 /// 便捷创建 image memory barrier 的结构体
-pub struct RhiImageBarrier
-{
+pub struct RhiImageBarrier {
     inner: vk::ImageMemoryBarrier2<'static>,
 }
 
-impl Default for RhiImageBarrier
-{
-    fn default() -> Self
-    {
+impl Default for RhiImageBarrier {
+    fn default() -> Self {
         Self::new()
     }
 }
 
-impl RhiImageBarrier
-{
-    pub fn new() -> Self
-    {
+impl RhiImageBarrier {
+    pub fn new() -> Self {
         Self {
             inner: vk::ImageMemoryBarrier2 {
                 old_layout: vk::ImageLayout::UNDEFINED,
@@ -119,15 +103,13 @@ impl RhiImageBarrier
     }
 
     #[inline]
-    pub fn inner(&self) -> &vk::ImageMemoryBarrier2
-    {
+    pub fn inner(&self) -> &vk::ImageMemoryBarrier2 {
         &self.inner
     }
 
     /// builder
     #[inline]
-    pub fn queue_family_transfer(mut self, src_queue_family_index: u32, dst_queue_family_index: u32) -> Self
-    {
+    pub fn queue_family_transfer(mut self, src_queue_family_index: u32, dst_queue_family_index: u32) -> Self {
         self.inner.src_queue_family_index = src_queue_family_index;
         self.inner.dst_queue_family_index = dst_queue_family_index;
         self
@@ -135,8 +117,7 @@ impl RhiImageBarrier
 
     /// builder
     #[inline]
-    pub fn layout_transfer(mut self, old_layout: vk::ImageLayout, new_layout: vk::ImageLayout) -> Self
-    {
+    pub fn layout_transfer(mut self, old_layout: vk::ImageLayout, new_layout: vk::ImageLayout) -> Self {
         self.inner.old_layout = old_layout;
         self.inner.new_layout = new_layout;
         self
@@ -144,8 +125,7 @@ impl RhiImageBarrier
 
     /// builder
     #[inline]
-    pub fn src_mask(mut self, src_stage_mask: vk::PipelineStageFlags2, src_access_mask: vk::AccessFlags2) -> Self
-    {
+    pub fn src_mask(mut self, src_stage_mask: vk::PipelineStageFlags2, src_access_mask: vk::AccessFlags2) -> Self {
         self.inner.src_stage_mask = src_stage_mask;
         self.inner.src_access_mask = src_access_mask;
         self
@@ -153,8 +133,7 @@ impl RhiImageBarrier
 
     /// builder
     #[inline]
-    pub fn dst_mask(mut self, dst_stage_mask: vk::PipelineStageFlags2, dst_access_mask: vk::AccessFlags2) -> Self
-    {
+    pub fn dst_mask(mut self, dst_stage_mask: vk::PipelineStageFlags2, dst_access_mask: vk::AccessFlags2) -> Self {
         self.inner.dst_stage_mask = dst_stage_mask;
         self.inner.dst_access_mask = dst_access_mask;
         self
@@ -163,17 +142,14 @@ impl RhiImageBarrier
     /// builder
     /// layer 和 miplevel 都使用默认值
     #[inline]
-    pub fn image_aspect_flag(mut self, aspect_mask: vk::ImageAspectFlags) -> Self
-    {
+    pub fn image_aspect_flag(mut self, aspect_mask: vk::ImageAspectFlags) -> Self {
         self.inner.subresource_range.aspect_mask = aspect_mask;
         self
     }
 
-
     /// builder
     #[inline]
-    pub fn image(mut self, image: vk::Image) -> Self
-    {
+    pub fn image(mut self, image: vk::Image) -> Self {
         self.inner.image = image;
         self
     }

@@ -1,11 +1,10 @@
 use std::ffi::CStr;
 
 use ash::vk;
-
+use itertools::Itertools;
 
 /// 表示一张物理显卡
-pub struct RhiGpu
-{
+pub struct RhiPhysicalDevice {
     pub handle: vk::PhysicalDevice,
 
     pub features: vk::PhysicalDeviceFeatures,
@@ -20,10 +19,24 @@ pub struct RhiGpu
     pub queue_family_properties: Vec<vk::QueueFamilyProperties>,
 }
 
-impl RhiGpu
-{
-    pub fn new(pdevice: vk::PhysicalDevice, instance: &ash::Instance) -> Self
-    {
+impl RhiPhysicalDevice {
+    /// 创建一个新的物理显卡实例
+    ///
+    /// 优先选择独立显卡，如果没有则选择第一个可用的显卡
+    pub fn new_descrete_gpu(instance: &ash::Instance) -> Self {
+        unsafe {
+            instance
+                .enumerate_physical_devices()
+                .unwrap()
+                .iter()
+                .map(|pdevice| RhiPhysicalDevice::new(*pdevice, instance))
+                // 优先使用独立显卡
+                .find_or_first(RhiPhysicalDevice::is_descrete_gpu)
+                .unwrap()
+        }
+    }
+
+    pub fn new(pdevice: vk::PhysicalDevice, instance: &ash::Instance) -> Self {
         unsafe {
             let mut pd_rt_props = vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default();
             let mut pd_props2 = vk::PhysicalDeviceProperties2::default().push_next(&mut pd_rt_props);
@@ -50,18 +63,14 @@ impl RhiGpu
         }
     }
 
-
     #[inline]
     /// 当前 gpu 是否是独立显卡
-    pub fn is_descrete_gpu(&self) -> bool
-    {
+    pub fn is_descrete_gpu(&self) -> bool {
         self.properties.device_type == vk::PhysicalDeviceType::DISCRETE_GPU
     }
 
-
     /// 找到满足条件的 queue family 的 index
-    pub fn find_queue_family_index(&self, queue_flags: vk::QueueFlags) -> Option<u32>
-    {
+    pub fn find_queue_family_index(&self, queue_flags: vk::QueueFlags) -> Option<u32> {
         self.queue_family_properties
             .iter()
             .enumerate()

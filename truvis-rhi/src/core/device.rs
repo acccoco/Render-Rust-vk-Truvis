@@ -1,15 +1,15 @@
-use std::{collections::HashMap, ffi::CStr, ops::Deref, rc::Rc};
-
 use ash::vk;
 use itertools::Itertools;
+use std::{collections::HashMap, ffi::CStr, ops::Deref, rc::Rc};
 
-use crate::core::{command_queue::RhiQueue, instance::RhiInstance, physical_device::RhiGpu};
+use crate::core::debug_utils::RhiDebugUtils;
+use crate::core::{command_queue::RhiQueue, instance::RhiInstance, physical_device::RhiPhysicalDevice};
+use crate::shader_cursor::RhiWriteDescriptorSet;
 
-pub struct RhiDevice
-{
+pub struct RhiDevice {
     pub handle: ash::Device,
 
-    pub pdevice: Rc<RhiGpu>,
+    pub pdevice: Rc<RhiPhysicalDevice>,
 
     pub graphics_queue_family_index: u32,
     pub compute_queue_family_index: u32,
@@ -17,27 +17,26 @@ pub struct RhiDevice
 
     pub vk_dynamic_render_pf: Rc<ash::khr::dynamic_rendering::Device>,
     pub vk_acceleration_struct_pf: Rc<ash::khr::acceleration_structure::Device>,
+
+    pub debug_utils: Rc<RhiDebugUtils>,
 }
 
-impl Deref for RhiDevice
-{
+impl Deref for RhiDevice {
     type Target = ash::Device;
 
-    fn deref(&self) -> &Self::Target
-    {
+    fn deref(&self) -> &Self::Target {
         &self.handle
     }
 }
 
-impl RhiDevice
-{
+impl RhiDevice {
     /// # return
     /// * (device, graphics queue, compute queue, transfer queue)
     pub fn new(
+        vk_pf: &ash::Entry,
         instance: &RhiInstance,
-        pdevice: Rc<RhiGpu>,
-    ) -> (Rc<RhiDevice>, Rc<RhiQueue>, Rc<RhiQueue>, Rc<RhiQueue>)
-    {
+        pdevice: Rc<RhiPhysicalDevice>,
+    ) -> (Rc<RhiDevice>, Rc<RhiQueue>, Rc<RhiQueue>, Rc<RhiQueue>) {
         let graphics_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::GRAPHICS).unwrap();
         let compute_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::COMPUTE).unwrap();
         let transfer_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::TRANSFER).unwrap();
@@ -101,53 +100,54 @@ impl RhiDevice
             .enabled_extension_names(&device_exts)
             .push_next(&mut features);
 
-        unsafe {
-            let device = instance.handle.create_device(pdevice.handle, &device_create_info, None).unwrap();
+        let device = unsafe { instance.handle.create_device(pdevice.handle, &device_create_info, None).unwrap() };
 
-            let vk_dynamic_render_pf = Rc::new(ash::khr::dynamic_rendering::Device::new(&instance.handle, &device));
-            let vk_acceleration_struct_pf =
-                Rc::new(ash::khr::acceleration_structure::Device::new(&instance.handle, &device));
+        let debug_utils = Rc::new(RhiDebugUtils::new(vk_pf, &instance.handle, &device));
 
-            let device = Rc::new(Self {
-                handle: device,
-                pdevice: pdevice.clone(),
+        let vk_dynamic_render_pf = Rc::new(ash::khr::dynamic_rendering::Device::new(&instance.handle, &device));
+        let vk_acceleration_struct_pf =
+            Rc::new(ash::khr::acceleration_structure::Device::new(&instance.handle, &device));
 
-                graphics_queue_family_index,
-                compute_queue_family_index,
-                transfer_queue_family_index,
+        let device = Rc::new(Self {
+            handle: device,
+            pdevice: pdevice.clone(),
 
-                vk_dynamic_render_pf,
-                vk_acceleration_struct_pf,
-            });
+            graphics_queue_family_index,
+            compute_queue_family_index,
+            transfer_queue_family_index,
 
-            let graphics_queue = device.get_device_queue(graphics_queue_family_index, graphics_queue_index);
-            let compute_queue = device.get_device_queue(compute_queue_family_index, compute_queue_index);
-            let transfer_queue = device.get_device_queue(transfer_queue_family_index, transfer_queue_index);
+            vk_dynamic_render_pf,
+            vk_acceleration_struct_pf,
 
-            (
-                device.clone(),
-                Rc::new(RhiQueue {
-                    handle: graphics_queue,
-                    queue_family_index: graphics_queue_family_index,
-                    device: device.clone(),
-                }),
-                Rc::new(RhiQueue {
-                    handle: compute_queue,
-                    queue_family_index: compute_queue_family_index,
-                    device: device.clone(),
-                }),
-                Rc::new(RhiQueue {
-                    handle: transfer_queue,
-                    queue_family_index: transfer_queue_family_index,
-                    device: device.clone(),
-                }),
-            )
-        }
+            debug_utils,
+        });
+
+        let graphics_queue = unsafe { device.get_device_queue(graphics_queue_family_index, graphics_queue_index) };
+        let compute_queue = unsafe { device.get_device_queue(compute_queue_family_index, compute_queue_index) };
+        let transfer_queue = unsafe { device.get_device_queue(transfer_queue_family_index, transfer_queue_index) };
+
+        (
+            device.clone(),
+            Rc::new(RhiQueue {
+                handle: graphics_queue,
+                queue_family_index: graphics_queue_family_index,
+                device: device.clone(),
+            }),
+            Rc::new(RhiQueue {
+                handle: compute_queue,
+                queue_family_index: compute_queue_family_index,
+                device: device.clone(),
+            }),
+            Rc::new(RhiQueue {
+                handle: transfer_queue,
+                queue_family_index: transfer_queue_family_index,
+                device: device.clone(),
+            }),
+        )
     }
 
     /// 必要的 physical device core features
-    fn basic_gpu_core_features() -> vk::PhysicalDeviceFeatures
-    {
+    fn basic_gpu_core_features() -> vk::PhysicalDeviceFeatures {
         vk::PhysicalDeviceFeatures::default()
             .sampler_anisotropy(true)
             .fragment_stores_and_atomics(true)
@@ -155,8 +155,7 @@ impl RhiDevice
     }
 
     /// 必要的 physical device extension features
-    fn basic_gpu_ext_features() -> Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>>
-    {
+    fn basic_gpu_ext_features() -> Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>> {
         vec![
             Box::new(vk::PhysicalDeviceDynamicRenderingFeatures::default().dynamic_rendering(true)),
             Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::default().buffer_device_address(true)),
@@ -168,8 +167,7 @@ impl RhiDevice
     }
 
     /// 必要的 device extensions
-    fn basic_device_exts() -> Vec<&'static CStr>
-    {
+    fn basic_device_exts() -> Vec<&'static CStr> {
         let mut exts = vec![];
 
         // swapchain
@@ -181,7 +179,6 @@ impl RhiDevice
             ash::khr::create_renderpass2::NAME,
             ash::khr::dynamic_rendering::NAME,
         ]);
-
 
         // RayTracing 相关的
         exts.append(&mut vec![
@@ -195,5 +192,51 @@ impl RhiDevice
         ]);
 
         exts
+    }
+}
+
+impl RhiDevice {
+    /// 将 UBO 的尺寸和 min_UBO_Offset_Align 对齐，使得得到的尺寸是 min_UBO_Offset_Align 的整数倍
+    #[inline]
+    pub fn align_ubo_size(&self, ubo_size: vk::DeviceSize) -> vk::DeviceSize {
+        let min_ubo_align = self.pdevice.properties.limits.min_uniform_buffer_offset_alignment;
+        (ubo_size + min_ubo_align - 1) & !(min_ubo_align - 1)
+    }
+
+    #[inline]
+    pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str) -> vk::RenderPass {
+        let render_pass = unsafe { self.handle.create_render_pass(render_pass_ci, None).unwrap() };
+        self.debug_utils.set_object_debug_name(render_pass, debug_name);
+        render_pass
+    }
+
+    #[inline]
+    pub fn create_pipeline_cache(
+        &self,
+        pipeline_cache_ci: &vk::PipelineCacheCreateInfo,
+        debug_name: &str,
+    ) -> vk::PipelineCache {
+        let pipeline_cache = unsafe { self.handle.create_pipeline_cache(pipeline_cache_ci, None).unwrap() };
+        self.debug_utils.set_object_debug_name(pipeline_cache, debug_name);
+        pipeline_cache
+    }
+
+    #[inline]
+    pub fn create_frame_buffer(
+        &self,
+        frame_buffer_ci: &vk::FramebufferCreateInfo,
+        debug_name: &str,
+    ) -> vk::Framebuffer {
+        let frame_buffer = unsafe { self.handle.create_framebuffer(frame_buffer_ci, None).unwrap() };
+        self.debug_utils.set_object_debug_name(frame_buffer, debug_name);
+        frame_buffer
+    }
+
+    #[inline]
+    pub fn write_descriptor_sets(&self, writes: &[RhiWriteDescriptorSet]) {
+        let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();
+        unsafe {
+            self.handle.update_descriptor_sets(&writes, &[]);
+        }
     }
 }

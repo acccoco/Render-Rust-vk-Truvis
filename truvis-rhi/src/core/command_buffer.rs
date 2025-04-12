@@ -9,55 +9,43 @@ use crate::{
         buffer::RhiBuffer,
         command_pool::RhiCommandPool,
         command_queue::{RhiQueue, RhiSubmitInfo},
-        debug_utils::RhiDebugUtils,
         device::RhiDevice,
         query_pool::QueryPool,
         synchronize::RhiImageBarrier,
     },
-    render_core::Rhi,
+    rhi::Rhi,
 };
 
 #[derive(Clone)]
-pub struct RhiCommandBuffer
-{
+pub struct RhiCommandBuffer {
     pub handle: vk::CommandBuffer,
 
     /// command buffer 在需要通过 command pool 进行 free，因此需要保存 command pool 的引用
     pub command_pool: Rc<RhiCommandPool>,
 
     pub device: Rc<RhiDevice>,
-    pub debug_utils: Rc<RhiDebugUtils>,
 }
 
-impl RhiCommandBuffer
-{
-    pub fn new(
-        device: Rc<RhiDevice>,
-        debug_utils: Rc<RhiDebugUtils>,
-        command_pool: Rc<RhiCommandPool>,
-        debug_name: &str,
-    ) -> Self
-    {
+impl RhiCommandBuffer {
+    pub fn new(device: Rc<RhiDevice>, command_pool: Rc<RhiCommandPool>, debug_name: &str) -> Self {
         let info = vk::CommandBufferAllocateInfo::default()
             .command_pool(command_pool.handle())
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_buffer_count(1);
 
         let command_buffer = unsafe { device.allocate_command_buffers(&info).unwrap()[0] };
-        debug_utils.set_object_debug_name(command_buffer, debug_name);
+        device.debug_utils.set_object_debug_name(command_buffer, debug_name);
         RhiCommandBuffer {
             handle: command_buffer,
             command_pool,
 
             device,
-            debug_utils,
         }
     }
 
     /// getter
     #[inline]
-    fn handle(&self) -> vk::CommandBuffer
-    {
+    fn handle(&self) -> vk::CommandBuffer {
         self.handle
     }
 
@@ -66,12 +54,7 @@ impl RhiCommandBuffer
     where
         F: FnOnce(&RhiCommandBuffer) -> R,
     {
-        let command_buffer = RhiCommandBuffer::new(
-            rhi.device.clone(),
-            rhi.debug_utils.clone(),
-            command_pool,
-            &format!("one-time-{}", name),
-        );
+        let command_buffer = RhiCommandBuffer::new(rhi.device.clone(), command_pool, &format!("one-time-{}", name));
 
         command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, name);
         let result = func(&command_buffer);
@@ -88,8 +71,7 @@ impl RhiCommandBuffer
     ///
     /// 释放之后 command buffer 就不存在了
     #[inline]
-    pub fn free(self)
-    {
+    pub fn free(self) {
         unsafe {
             self.device.free_command_buffers(self.command_pool.handle(), std::slice::from_ref(&self.handle));
         }
@@ -99,8 +81,7 @@ impl RhiCommandBuffer
     ///
     /// 自动设置 debug label
     #[inline]
-    pub fn begin(&self, usage_flag: vk::CommandBufferUsageFlags, debug_label_name: &str)
-    {
+    pub fn begin(&self, usage_flag: vk::CommandBufferUsageFlags, debug_label_name: &str) {
         unsafe {
             self.device
                 .begin_command_buffer(self.handle, &vk::CommandBufferBeginInfo::default().flags(usage_flag))
@@ -113,20 +94,16 @@ impl RhiCommandBuffer
     ///
     /// 结束 debug label
     #[inline]
-    pub fn end(&self)
-    {
+    pub fn end(&self) {
         self.end_label();
         unsafe { self.device.end_command_buffer(self.handle).unwrap() }
     }
 }
 
-
 // transfer 类型的命令
-impl RhiCommandBuffer
-{
+impl RhiCommandBuffer {
     #[inline]
-    pub fn cmd_copy_buffer(&self, src: &RhiBuffer, dst: &mut RhiBuffer, regions: &[vk::BufferCopy])
-    {
+    pub fn cmd_copy_buffer(&self, src: &RhiBuffer, dst: &mut RhiBuffer, regions: &[vk::BufferCopy]) {
         unsafe {
             self.device.cmd_copy_buffer(self.handle, src.handle(), dst.handle(), regions);
         }
@@ -134,16 +111,14 @@ impl RhiCommandBuffer
 
     /// 注：仅支持 compute queue
     #[inline]
-    pub fn cmd_copy_acceleration_structure(&self, copy_info: &vk::CopyAccelerationStructureInfoKHR)
-    {
+    pub fn cmd_copy_acceleration_structure(&self, copy_info: &vk::CopyAccelerationStructureInfoKHR) {
         unsafe {
             self.device.vk_acceleration_struct_pf.cmd_copy_acceleration_structure(self.handle, copy_info);
         }
     }
 
     #[inline]
-    pub fn cmd_copy_buffer_to_image(&self, copy_info: &vk::CopyBufferToImageInfo2)
-    {
+    pub fn cmd_copy_buffer_to_image(&self, copy_info: &vk::CopyBufferToImageInfo2) {
         unsafe { self.device.cmd_copy_buffer_to_image2(self.handle, copy_info) }
     }
 
@@ -153,11 +128,9 @@ impl RhiCommandBuffer
     ///
     /// 需要在 render pass 之外进行，注意同步
     #[inline]
-    pub fn cmd_update_buffer(&self, buffer: vk::Buffer, offset: vk::DeviceSize, data: &[u8])
-    {
+    pub fn cmd_update_buffer(&self, buffer: vk::Buffer, offset: vk::DeviceSize, data: &[u8]) {
         unsafe { self.device.cmd_update_buffer(self.handle, buffer, offset, data) }
     }
-
 
     #[inline]
     pub fn cmd_push_constants(
@@ -166,8 +139,7 @@ impl RhiCommandBuffer
         stage: vk::ShaderStageFlags,
         offset: u32,
         data: &[u8],
-    )
-    {
+    ) {
         unsafe {
             self.device.cmd_push_constants(self.handle, pipeline_layout, stage, offset, data);
         }
@@ -175,24 +147,20 @@ impl RhiCommandBuffer
 }
 
 // 绘制类型命令
-impl RhiCommandBuffer
-{
+impl RhiCommandBuffer {
     #[inline]
-    pub fn cmd_begin_rendering(&self, render_info: &vk::RenderingInfo)
-    {
+    pub fn cmd_begin_rendering(&self, render_info: &vk::RenderingInfo) {
         unsafe {
             self.device.vk_dynamic_render_pf.cmd_begin_rendering(self.handle, render_info);
         }
     }
 
     #[inline]
-    pub fn end_rendering(&self)
-    {
+    pub fn end_rendering(&self) {
         unsafe {
             self.device.vk_dynamic_render_pf.cmd_end_rendering(self.handle);
         }
     }
-
 
     #[inline]
     pub fn draw_indexed(
@@ -202,8 +170,7 @@ impl RhiCommandBuffer
         instance_cnt: u32,
         first_instance: u32,
         vertex_offset: i32,
-    )
-    {
+    ) {
         unsafe {
             self.device.cmd_draw_indexed(
                 self.handle,
@@ -217,8 +184,7 @@ impl RhiCommandBuffer
     }
 
     #[inline]
-    pub fn cmd_draw(&self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32)
-    {
+    pub fn cmd_draw(&self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
         unsafe {
             self.device.cmd_draw(self.handle, vertex_count, instance_count, first_vertex, first_instance);
         }
@@ -232,8 +198,7 @@ impl RhiCommandBuffer
         first_set: u32,
         descriptor_sets: &[vk::DescriptorSet],
         dynamic_offsets: &[u32],
-    )
-    {
+    ) {
         unsafe {
             self.device.cmd_bind_descriptor_sets(
                 self.handle,
@@ -246,10 +211,8 @@ impl RhiCommandBuffer
         }
     }
 
-
     #[inline]
-    pub fn cmd_bind_pipeline(&self, bind_point: vk::PipelineBindPoint, pipeline: vk::Pipeline)
-    {
+    pub fn cmd_bind_pipeline(&self, bind_point: vk::PipelineBindPoint, pipeline: vk::Pipeline) {
         unsafe {
             self.device.cmd_bind_pipeline(self.handle, bind_point, pipeline);
         }
@@ -257,8 +220,7 @@ impl RhiCommandBuffer
 
     /// buffers 每个 vertex buffer 以及 offset
     #[inline]
-    pub fn cmd_bind_vertex_buffers(&self, first_bind: u32, buffers: &[RhiBuffer], offsets: &[vk::DeviceSize])
-    {
+    pub fn cmd_bind_vertex_buffers(&self, first_bind: u32, buffers: &[RhiBuffer], offsets: &[vk::DeviceSize]) {
         unsafe {
             let buffers = buffers.iter().map(|b| b.handle()).collect_vec();
             self.device.cmd_bind_vertex_buffers(self.handle, first_bind, &buffers, offsets);
@@ -266,24 +228,21 @@ impl RhiCommandBuffer
     }
 
     #[inline]
-    pub fn cmd_bind_index_buffer(&self, buffer: &RhiBuffer, offset: vk::DeviceSize, index_type: vk::IndexType)
-    {
+    pub fn cmd_bind_index_buffer(&self, buffer: &RhiBuffer, offset: vk::DeviceSize, index_type: vk::IndexType) {
         unsafe {
             self.device.cmd_bind_index_buffer(self.handle, buffer.handle(), offset, index_type);
         }
     }
 
     #[inline]
-    pub fn cmd_set_viewport(&self, first_viewport: u32, viewports: &[vk::Viewport])
-    {
+    pub fn cmd_set_viewport(&self, first_viewport: u32, viewports: &[vk::Viewport]) {
         unsafe {
             self.device.cmd_set_viewport(self.handle, first_viewport, viewports);
         }
     }
 
     #[inline]
-    pub fn cmd_set_scissor(&self, first_scissor: u32, scissors: &[vk::Rect2D])
-    {
+    pub fn cmd_set_scissor(&self, first_scissor: u32, scissors: &[vk::Rect2D]) {
         unsafe {
             self.device.cmd_set_scissor(self.handle, first_scissor, scissors);
         }
@@ -291,11 +250,9 @@ impl RhiCommandBuffer
 }
 
 // 同步命令
-impl RhiCommandBuffer
-{
+impl RhiCommandBuffer {
     #[inline]
-    pub fn memory_barrier(&self, barriers: &[vk::MemoryBarrier2])
-    {
+    pub fn memory_barrier(&self, barriers: &[vk::MemoryBarrier2]) {
         let dependency_info = vk::DependencyInfo::default().memory_barriers(barriers);
         unsafe {
             self.device.cmd_pipeline_barrier2(self.handle, &dependency_info);
@@ -303,8 +260,7 @@ impl RhiCommandBuffer
     }
 
     #[inline]
-    pub fn image_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[RhiImageBarrier])
-    {
+    pub fn image_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[RhiImageBarrier]) {
         let barriers = barriers.iter().map(|b| *b.inner()).collect_vec();
         let dependency_info =
             vk::DependencyInfo::default().image_memory_barriers(&barriers).dependency_flags(dependency_flags);
@@ -314,8 +270,7 @@ impl RhiCommandBuffer
     }
 
     #[inline]
-    pub fn buffer_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[vk::BufferMemoryBarrier2])
-    {
+    pub fn buffer_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[vk::BufferMemoryBarrier2]) {
         let dependency_info =
             vk::DependencyInfo::default().buffer_memory_barriers(barriers).dependency_flags(dependency_flags);
         unsafe {
@@ -324,18 +279,15 @@ impl RhiCommandBuffer
     }
 }
 
-
 // RayTracing 相关的命令
-impl RhiCommandBuffer
-{
+impl RhiCommandBuffer {
     /// 注：仅支持 compute queue
     #[inline]
     pub fn build_acceleration_structure(
         &self,
         geometry: &vk::AccelerationStructureBuildGeometryInfoKHR,
         ranges: &[vk::AccelerationStructureBuildRangeInfoKHR],
-    )
-    {
+    ) {
         unsafe {
             // 该函数可以一次构建多个 AccelerationStructure，这里只构建了 1 个
             self.device.vk_acceleration_struct_pf.cmd_build_acceleration_structures(
@@ -353,8 +305,7 @@ impl RhiCommandBuffer
         query_pool: &mut QueryPool,
         first_query: u32,
         acceleration_structures: &[vk::AccelerationStructureKHR],
-    )
-    {
+    ) {
         unsafe {
             self.device.vk_acceleration_struct_pf.cmd_write_acceleration_structures_properties(
                 self.handle,
@@ -368,23 +319,19 @@ impl RhiCommandBuffer
 }
 
 // debug 相关的指令
-impl RhiCommandBuffer
-{
+impl RhiCommandBuffer {
     #[inline]
-    pub fn begin_label(&self, label_name: &str, label_color: glam::Vec4)
-    {
-        self.debug_utils.cmd_begin_debug_label(self.handle, label_name, label_color);
+    pub fn begin_label(&self, label_name: &str, label_color: glam::Vec4) {
+        self.device.debug_utils.cmd_begin_debug_label(self.handle, label_name, label_color);
     }
 
     #[inline]
-    pub fn end_label(&self)
-    {
-        self.debug_utils.cmd_end_debug_label(self.handle);
+    pub fn end_label(&self) {
+        self.device.debug_utils.cmd_end_debug_label(self.handle);
     }
 
     #[inline]
-    pub fn insert_label(&self, label_name: &str, label_color: glam::Vec4)
-    {
-        self.debug_utils.cmd_insert_debug_label(self.handle, label_name, label_color);
+    pub fn insert_label(&self, label_name: &str, label_color: glam::Vec4) {
+        self.device.debug_utils.cmd_insert_debug_label(self.handle, label_name, label_color);
     }
 }

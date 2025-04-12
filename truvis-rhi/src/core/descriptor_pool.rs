@@ -1,8 +1,7 @@
 use std::rc::Rc;
 
+use crate::core::device::RhiDevice;
 use ash::vk;
-
-use crate::render_core::Rhi;
 
 /// 描述符池创建信息
 ///
@@ -10,16 +9,14 @@ use crate::render_core::Rhi;
 /// - 标志位
 /// - 最大描述符集数量
 /// - 每种类型描述符的最大数量
-pub struct RhiDescriptorPoolCreateInfo
-{
+pub struct RhiDescriptorPoolCreateInfo {
     /// Vulkan 描述符池创建信息
     inner: vk::DescriptorPoolCreateInfo<'static>,
     /// 描述符池大小信息
-    pool_sizes: Vec<vk::DescriptorPoolSize>,
+    _pool_sizes: Vec<vk::DescriptorPoolSize>,
 }
 
-impl RhiDescriptorPoolCreateInfo
-{
+impl RhiDescriptorPoolCreateInfo {
     /// 创建新的描述符池创建信息
     ///
     /// # 参数
@@ -30,8 +27,7 @@ impl RhiDescriptorPoolCreateInfo
     /// # 返回值
     /// 新的描述符池创建信息实例
     #[inline]
-    pub fn new(flags: vk::DescriptorPoolCreateFlags, max_sets: u32, pool_sizes: Vec<vk::DescriptorPoolSize>) -> Self
-    {
+    pub fn new(flags: vk::DescriptorPoolCreateFlags, max_sets: u32, pool_sizes: Vec<vk::DescriptorPoolSize>) -> Self {
         let inner = vk::DescriptorPoolCreateInfo {
             flags,
             max_sets,
@@ -39,7 +35,10 @@ impl RhiDescriptorPoolCreateInfo
             p_pool_sizes: pool_sizes.as_ptr(),
             ..Default::default()
         };
-        Self { inner, pool_sizes }
+        Self {
+            inner,
+            _pool_sizes: pool_sizes,
+        }
     }
 }
 
@@ -47,16 +46,14 @@ impl RhiDescriptorPoolCreateInfo
 ///
 /// 描述符池用于分配描述符集。
 /// 一个描述符池可以分配多个描述符集，但所有描述符集必须使用相同的布局。
-pub struct RhiDescriptorPool
-{
+pub struct RhiDescriptorPool {
     /// Vulkan 描述符池句柄
     handle: vk::DescriptorPool,
     /// 描述符池创建信息
-    info: Rc<RhiDescriptorPoolCreateInfo>,
+    _info: Rc<RhiDescriptorPoolCreateInfo>,
 }
 
-impl RhiDescriptorPool
-{
+impl RhiDescriptorPool {
     /// 创建新的描述符池
     ///
     /// # 参数
@@ -67,12 +64,14 @@ impl RhiDescriptorPool
     /// # 返回值
     /// 新的描述符池实例
     #[inline]
-    pub fn new(rhi: &Rhi, ci: Rc<RhiDescriptorPoolCreateInfo>, name: &str) -> Self
-    {
-        let pool = unsafe { rhi.device.create_descriptor_pool(&ci.inner, None).unwrap() };
-        rhi.debug_utils.set_object_debug_name(pool, name);
+    pub fn new(device: &RhiDevice, ci: Rc<RhiDescriptorPoolCreateInfo>, name: &str) -> Self {
+        let pool = unsafe { device.create_descriptor_pool(&ci.inner, None).unwrap() };
+        device.debug_utils.set_object_debug_name(pool, name);
 
-        Self { handle: pool, info: ci }
+        Self {
+            handle: pool,
+            _info: ci,
+        }
     }
 
     /// 获取 Vulkan 描述符池句柄
@@ -80,8 +79,7 @@ impl RhiDescriptorPool
     /// # 返回值
     /// Vulkan 描述符池句柄
     #[inline]
-    pub fn handle(&self) -> vk::DescriptorPool
-    {
+    pub fn handle(&self) -> vk::DescriptorPool {
         self.handle
     }
 }

@@ -2,19 +2,14 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::render_core::Rhi;
+use crate::rhi::Rhi;
 
-pub struct RhiSamplerCreateInfo
-{
+pub struct RhiSamplerCreateInfo {
     inner: vk::SamplerCreateInfo<'static>,
 }
 
-impl RhiSamplerCreateInfo
-{
-    /// 默认配置：linear，repeat
-    #[inline]
-    pub fn new() -> Self
-    {
+impl Default for RhiSamplerCreateInfo {
+    fn default() -> Self {
         let sampler_info = vk::SamplerCreateInfo::default()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)
@@ -36,28 +31,32 @@ impl RhiSamplerCreateInfo
     }
 }
 
-pub struct RhiSampler
-{
-    handle: vk::Sampler,
-
-    info: Rc<RhiSamplerCreateInfo>,
+impl RhiSamplerCreateInfo {
+    /// 默认配置：linear，repeat
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
-impl RhiSampler
-{
-    #[inline]
-    pub fn new(rhi: &Rhi, info: Rc<RhiSamplerCreateInfo>, debug_name: &str) -> Self
-    {
-        let handle = unsafe { rhi.device.create_sampler(&info.inner, None).unwrap() };
-        rhi.set_debug_name(handle, debug_name);
+pub struct RhiSampler {
+    handle: vk::Sampler,
 
-        Self { handle, info }
+    _info: Rc<RhiSamplerCreateInfo>,
+}
+
+impl RhiSampler {
+    #[inline]
+    pub fn new(rhi: &Rhi, info: Rc<RhiSamplerCreateInfo>, debug_name: &str) -> Self {
+        let handle = unsafe { rhi.device.create_sampler(&info.inner, None).unwrap() };
+        rhi.device.debug_utils.set_object_debug_name(handle, debug_name);
+
+        Self { handle, _info: info }
     }
 
     /// getter
     #[inline]
-    pub fn handle(&self) -> vk::Sampler
-    {
+    pub fn handle(&self) -> vk::Sampler {
         self.handle
     }
 }

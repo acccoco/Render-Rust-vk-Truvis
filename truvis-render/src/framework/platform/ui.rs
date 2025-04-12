@@ -2,8 +2,12 @@
 
 use std::{cell::RefCell, ffi::CString, rc::Rc};
 
+use crate::framework::rendering::render_context::RenderContext;
 use ash::vk;
 use image::EncodableLayout;
+use shader_layout_macro::ShaderLayout;
+use truvis_rhi::core::descriptor::RhiDescriptorSetLayout;
+use truvis_rhi::shader_cursor::ShaderCursor;
 use truvis_rhi::{
     basic::color::LabelColor,
     core::{
@@ -15,13 +19,10 @@ use truvis_rhi::{
         shader::RhiShaderModule,
         texture::RhiTexture2D,
     },
-    render_core::Rhi,
+    rhi::Rhi,
 };
 
-use crate::framework::rendering::render_context::RenderContext;
-
-pub struct UiMesh
-{
+pub struct UiMesh {
     pub vertex: RhiBuffer,
     vertex_count: usize,
 
@@ -29,17 +30,14 @@ pub struct UiMesh
     index_count: usize,
 }
 
-impl UiMesh
-{
+impl UiMesh {
     // TODO 频繁的创建和销毁 buffer，性能不好
-    pub fn from_draw_data(rhi: &Rhi, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self
-    {
+    pub fn from_draw_data(rhi: &Rhi, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self {
         let cmd = render_ctx.alloc_command_buffer("uipass-create-mesh");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]create-mesh");
 
         let (vertex_buffer, vertex_cnt) = Self::create_vertices(rhi, render_ctx, &cmd, draw_data);
         let (index_buffer, index_cnt) = Self::create_indices(rhi, render_ctx, &cmd, draw_data);
-
 
         cmd.begin_label("uipass-mesh-transfer-barrier", LabelColor::COLOR_CMD);
         {
@@ -91,8 +89,7 @@ impl UiMesh
         render_ctx: &mut RenderContext,
         cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (RhiBuffer, usize)
-    {
+    ) -> (RhiBuffer, usize) {
         let vertex_count = draw_data.total_vtx_count as usize;
         let mut vertices = Vec::with_capacity(vertex_count);
         for draw_list in draw_data.draw_lists() {
@@ -138,8 +135,7 @@ impl UiMesh
         render_ctx: &mut RenderContext,
         cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (RhiBuffer, usize)
-    {
+    ) -> (RhiBuffer, usize) {
         let index_count = draw_data.total_idx_count as usize;
         let mut indices = Vec::with_capacity(index_count);
         for draw_list in draw_data.draw_lists() {
@@ -178,22 +174,19 @@ impl UiMesh
         (index_buffer, index_count)
     }
 
-    fn destroy(self)
-    {
+    fn destroy(self) {
         self.indices.destroy();
         self.vertex.destroy();
     }
 }
 
-
-pub struct UI
-{
+pub struct UI {
     pub imgui: RefCell<imgui::Context>,
     pub platform: imgui_winit_support::WinitPlatform,
 
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
-    descriptor_set_layout: vk::DescriptorSetLayout,
+    descriptor_set_layout: RhiDescriptorSetLayout<UiShaderLayout>,
 
     descriptor_pool: Rc<RhiDescriptorPool>,
 
@@ -203,29 +196,22 @@ pub struct UI
     meshes: Vec<Option<UiMesh>>,
 }
 
-pub struct UiOptions
-{
+pub struct UiOptions {
     pub frames_in_flight: usize,
 }
 
-
-impl UI
-{
+impl UI {
     /// fonts atlas 使用的 texture id
     const FONT_TEX_ID: usize = usize::MAX;
 
-
-    pub fn new(rhi: &Rhi, render_ctx: &RenderContext, window: &winit::window::Window, options: &UiOptions) -> Self
-    {
+    pub fn new(rhi: &Rhi, render_ctx: &RenderContext, window: &winit::window::Window, options: &UiOptions) -> Self {
         let (mut imgui, platform) = Self::create_imgui(window);
 
-        let descriptor_set_layout = Self::create_descriptor_set(&rhi.device.handle);
-        rhi.set_debug_name(descriptor_set_layout, "[uipass]descriptor-set-layout");
-        let pipeline_layout = Self::create_pipeline_layout(&rhi.device.handle, descriptor_set_layout);
-        rhi.set_debug_name(pipeline_layout, "[uipass]pipeline-layout");
+        let descriptor_set_layout = RhiDescriptorSetLayout::<UiShaderLayout>::new(rhi, "[uipass]descriptor-set-layout");
+        let pipeline_layout = Self::create_pipeline_layout(&rhi.device.handle, descriptor_set_layout.layout);
+        rhi.device.debug_utils.set_object_debug_name(pipeline_layout, "[uipass]pipeline-layout");
         let pipeline = Self::create_pipeline(rhi, render_ctx, pipeline_layout);
-        rhi.set_debug_name(pipeline, "[uipass]pipeline");
-
+        rhi.device.debug_utils.set_object_debug_name(pipeline, "[uipass]pipeline");
 
         let fonts_texture = {
             let fonts = imgui.fonts();
@@ -245,7 +231,7 @@ impl UI
         fonts.tex_id = imgui::TextureId::from(Self::FONT_TEX_ID);
 
         let descriptor_pool = Rc::new(RhiDescriptorPool::new(
-            rhi,
+            &rhi.device,
             Rc::new(RhiDescriptorPoolCreateInfo::new(
                 vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET,
                 1,
@@ -256,25 +242,25 @@ impl UI
             "imgui-descriptor-pool",
         ));
 
-        let descriptor_set = rhi.allocate_descriptor_sets(
-            &vk::DescriptorSetAllocateInfo::default()
-                .descriptor_pool(descriptor_pool.handle())
-                .set_layouts(std::slice::from_ref(&descriptor_set_layout)),
-        )[0];
-        rhi.set_debug_name(descriptor_set, "[uipass]descriptor");
+        let descriptor_set = unsafe {
+            rhi.device()
+                .allocate_descriptor_sets(
+                    &vk::DescriptorSetAllocateInfo::default()
+                        .descriptor_pool(descriptor_pool.handle())
+                        .set_layouts(std::slice::from_ref(&descriptor_set_layout.layout)),
+                )
+                .unwrap()[0]
+        };
+        rhi.device.debug_utils.set_object_debug_name(descriptor_set, "[uipass]descriptor");
 
         // write
         {
             let image_info = vk::DescriptorImageInfo::default()
-                .sampler(fonts_texture.sampler.handle())
-                .image_view(fonts_texture.image_view.handle())
+                .sampler(fonts_texture.sampler().handle())
+                .image_view(fonts_texture.image_view().handle())
                 .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
-            let writes = vk::WriteDescriptorSet::default()
-                .dst_set(descriptor_set)
-                .dst_binding(0)
-                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .image_info(std::slice::from_ref(&image_info));
-            rhi.write_descriptor_sets(std::slice::from_ref(&writes));
+            let writes = UiShaderLayout::_font().write_image(descriptor_set, 0, vec![image_info]);
+            rhi.device.write_descriptor_sets(&[writes]);
         }
 
         // TODO Textures::new()
@@ -295,26 +281,22 @@ impl UI
         }
     }
 
-    pub fn prepare_frame(&self, window: &winit::window::Window)
-    {
+    pub fn prepare_frame(&self, window: &winit::window::Window) {
         let mut imgui = self.imgui.borrow_mut();
         self.platform.prepare_frame(imgui.io_mut(), window).unwrap();
     }
 
     // FIXME 这些 new frame，prepare frame 的顺序到底是什么?
-    pub fn new_frame(&mut self, _window: &winit::window::Window) -> &mut imgui::Ui
-    {
+    pub fn new_frame(&mut self, _window: &winit::window::Window) -> &mut imgui::Ui {
         let frame = self.imgui.get_mut().new_frame();
         // self.platform.prepare_render(&frame, window);
 
         frame
     }
 
-    pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>)
-    {
+    pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>) {
         self.platform.handle_event(self.imgui.get_mut().io_mut(), window, event);
     }
-
 
     // platform::prepare_frame()
     // imgui.new_frame()
@@ -327,13 +309,12 @@ impl UI
         render_ctx: &mut RenderContext,
         window: &winit::window::Window,
         f: impl FnOnce(&mut imgui::Ui),
-    ) -> Option<RhiCommandBuffer>
-    {
+    ) -> Option<RhiCommandBuffer> {
         self.platform.prepare_frame(self.imgui.borrow_mut().io_mut(), window).unwrap();
 
         let mut temp_imgui = self.imgui.borrow_mut();
-        let mut frame = temp_imgui.new_frame();
-        f(&mut frame);
+        let frame = temp_imgui.new_frame();
+        f(frame);
         self.platform.prepare_render(frame, window);
         let draw_data = temp_imgui.render();
         if draw_data.total_vtx_count == 0 {
@@ -343,11 +324,15 @@ impl UI
         let frame_index = render_ctx.current_frame_index();
 
         // TODO 这里需要标注一下名称，每个 tick 都会重新建立 vertex buffer
-        rhi.debug_utils.begin_queue_label(rhi.graphics_queue.handle, "[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
+        rhi.device.debug_utils.begin_queue_label(
+            rhi.graphics_queue.handle,
+            "[ui-pass]create-mesh",
+            LabelColor::COLOR_STAGE,
+        );
         if let Some(mesh) = self.meshes[frame_index].replace(UiMesh::from_draw_data(rhi, render_ctx, draw_data)) {
             mesh.destroy()
         }
-        rhi.debug_utils.end_queue_label(rhi.graphics_queue.handle);
+        rhi.device().debug_utils.end_queue_label(rhi.graphics_queue.handle);
 
         let mut cmd = render_ctx.alloc_command_buffer("uipass-render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]draw");
@@ -359,8 +344,7 @@ impl UI
 
     // TODO imgui 自己有个 Texture<> 类型，可以作为 hash 容器
     /// 根据 imgui 传来的 texture id，找到对应的 descriptor set
-    fn get_texture(&self, texture_id: imgui::TextureId) -> vk::DescriptorSet
-    {
+    fn get_texture(&self, texture_id: imgui::TextureId) -> vk::DescriptorSet {
         if texture_id.id() == Self::FONT_TEX_ID {
             self.font_descriptor_set
         } else {
@@ -374,8 +358,7 @@ impl UI
         cmd: &mut RhiCommandBuffer,
         mesh: &UiMesh,
         draw_data: &imgui::DrawData,
-    )
-    {
+    ) {
         let color_attach_info = vk::RenderingAttachmentInfo::default()
             .image_view(render_ctx.current_present_image_view())
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
@@ -481,8 +464,7 @@ impl UI
         cmd.end_rendering();
     }
 
-    fn create_imgui(window: &winit::window::Window) -> (imgui::Context, imgui_winit_support::WinitPlatform)
-    {
+    fn create_imgui(window: &winit::window::Window) -> (imgui::Context, imgui_winit_support::WinitPlatform) {
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None); // disable automatic saving .ini file
         let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui);
@@ -513,26 +495,10 @@ impl UI
         (imgui, platform)
     }
 
-    // TODO refactor
-    fn create_descriptor_set(device: &ash::Device) -> vk::DescriptorSetLayout
-    {
-        let bindings = [vk::DescriptorSetLayoutBinding::default()
-            .binding(0)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::FRAGMENT)];
-
-        let descriptor_set_create_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
-
-        unsafe { device.create_descriptor_set_layout(&descriptor_set_create_info, None).unwrap() }
-    }
-
-
     fn create_pipeline_layout(
         device: &ash::Device,
         descriptor_set_layout: vk::DescriptorSetLayout,
-    ) -> vk::PipelineLayout
-    {
+    ) -> vk::PipelineLayout {
         let push_const_range = [vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::VERTEX,
             offset: 0,
@@ -543,16 +509,17 @@ impl UI
         let layout_info = vk::PipelineLayoutCreateInfo::default()
             .set_layouts(&descriptor_set_layouts)
             .push_constant_ranges(&push_const_range);
-        let pipeline_layout = unsafe { device.create_pipeline_layout(&layout_info, None).unwrap() };
-        pipeline_layout
+
+        unsafe { device.create_pipeline_layout(&layout_info, None).unwrap() }
     }
 
-    fn create_pipeline(rhi: &Rhi, render_ctx: &RenderContext, pipeline_layout: vk::PipelineLayout) -> vk::Pipeline
-    {
+    fn create_pipeline(rhi: &Rhi, render_ctx: &RenderContext, pipeline_layout: vk::PipelineLayout) -> vk::Pipeline {
         let entry_point_name = CString::new("main").unwrap();
 
-        let vert_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.vs.hlsl.spv"));
-        let frag_shader_module = RhiShaderModule::new(rhi, std::path::Path::new("shader/imgui/shader.ps.hlsl.spv"));
+        let vert_shader_module =
+            RhiShaderModule::new(rhi.device.clone(), std::path::Path::new("shader/imgui/shader.vs.hlsl.spv"));
+        let frag_shader_module =
+            RhiShaderModule::new(rhi.device.clone(), std::path::Path::new("shader/imgui/shader.ps.hlsl.spv"));
 
         let shader_states_infos = [
             vk::PipelineShaderStageCreateInfo::default()
@@ -621,10 +588,10 @@ impl UI
 
         let color_blend_attachments = [vk::PipelineColorBlendAttachmentState::default()
             .color_write_mask(
-                vk::ColorComponentFlags::R |
-                    vk::ColorComponentFlags::G |
-                    vk::ColorComponentFlags::B |
-                    vk::ColorComponentFlags::A,
+                vk::ColorComponentFlags::R
+                    | vk::ColorComponentFlags::G
+                    | vk::ColorComponentFlags::B
+                    | vk::ColorComponentFlags::A,
             )
             .blend_enable(true)
             .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
@@ -681,4 +648,12 @@ impl UI
 
         pipeline
     }
+}
+
+#[derive(ShaderLayout)]
+struct UiShaderLayout {
+    #[binding = 0]
+    #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
+    #[stage = "FRAGMENT"]
+    _font: (),
 }

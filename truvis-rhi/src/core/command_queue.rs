@@ -9,18 +9,15 @@ use crate::core::{
     synchronize::{RhiFence, RhiSemaphore},
 };
 
-pub struct RhiQueue
-{
+pub struct RhiQueue {
     pub handle: vk::Queue,
     pub queue_family_index: u32,
 
     pub device: Rc<RhiDevice>,
 }
 
-impl RhiQueue
-{
-    pub fn submit(&self, batches: Vec<RhiSubmitInfo>, fence: Option<RhiFence>)
-    {
+impl RhiQueue {
+    pub fn submit(&self, batches: Vec<RhiSubmitInfo>, fence: Option<RhiFence>) {
         unsafe {
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = batches.iter().map(|b| *b.inner()).collect_vec();
@@ -30,28 +27,23 @@ impl RhiQueue
 
     /// 根据 specification，vkQueueWaitIdle 应该和 Fence 效率相同
     #[inline]
-    pub fn wait_idle(&self)
-    {
+    pub fn wait_idle(&self) {
         unsafe { self.device.queue_wait_idle(self.handle).unwrap() }
     }
 }
 
-
 /// RHi 关于 submitInfo 的封装，更易用
 #[derive(Default)]
-pub struct RhiSubmitInfo
-{
+pub struct RhiSubmitInfo {
     inner: vk::SubmitInfo2<'static>,
 
-    command_buffers: Vec<vk::CommandBufferSubmitInfo<'static>>,
+    _command_buffers: Vec<vk::CommandBufferSubmitInfo<'static>>,
     wait_infos: Vec<vk::SemaphoreSubmitInfo<'static>>,
     signal_infos: Vec<vk::SemaphoreSubmitInfo<'static>>,
 }
 
-impl RhiSubmitInfo
-{
-    pub fn new(commands: &[RhiCommandBuffer]) -> Self
-    {
+impl RhiSubmitInfo {
+    pub fn new(commands: &[RhiCommandBuffer]) -> Self {
         let command_buffers =
             commands.iter().map(|cmd| vk::CommandBufferSubmitInfo::default().command_buffer(cmd.handle)).collect_vec();
 
@@ -66,22 +58,20 @@ impl RhiSubmitInfo
 
         Self {
             inner,
-            command_buffers,
+            _command_buffers: command_buffers,
             wait_infos: vec![],
             signal_infos: vec![],
         }
     }
 
     #[inline]
-    pub fn inner(&self) -> &vk::SubmitInfo2
-    {
+    pub fn inner(&self) -> &vk::SubmitInfo2 {
         &self.inner
     }
 
     /// builder
     #[inline]
-    pub fn wait_infos(mut self, wait_semaphores: &[(RhiSemaphore, vk::PipelineStageFlags2)]) -> Self
-    {
+    pub fn wait_infos(mut self, wait_semaphores: &[(RhiSemaphore, vk::PipelineStageFlags2)]) -> Self {
         self.wait_infos = wait_semaphores
             .iter()
             .map(|(s, stage)| vk::SemaphoreSubmitInfo::default().semaphore(s.semaphore).stage_mask(*stage))
@@ -91,11 +81,9 @@ impl RhiSubmitInfo
         self
     }
 
-
     /// builder
     #[inline]
-    pub fn signal_infos(mut self, signal_semaphores: &[(RhiSemaphore, vk::PipelineStageFlags2)]) -> Self
-    {
+    pub fn signal_infos(mut self, signal_semaphores: &[(RhiSemaphore, vk::PipelineStageFlags2)]) -> Self {
         self.signal_infos = signal_semaphores
             .iter()
             .map(|(s, stage)| vk::SemaphoreSubmitInfo::default().semaphore(s.semaphore).stage_mask(*stage))

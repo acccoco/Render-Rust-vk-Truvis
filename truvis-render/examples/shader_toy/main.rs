@@ -1,58 +1,20 @@
-use std::mem::offset_of;
-
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use imgui::Ui;
+use truvis_render::resource::shape::vertex_pc::VertexPCAoS;
 use truvis_render::{
     framework::rendering::render_context::RenderContext,
     render::{App, AppCtx, AppInitInfo, Renderer, Timer},
 };
+use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
-    core::{
-        buffer::RhiBuffer,
-        command_queue::RhiSubmitInfo,
-        pipeline::{RhiPipeline, RhiPipelineTemplate},
-    },
-    render_core::Rhi,
+    core::{buffer::RhiBuffer, command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
+    rhi::Rhi,
 };
-
-#[derive(Clone, Debug, Copy)]
-#[repr(C)]
-struct Vertex
-{
-    pos: [f32; 4],
-    color: [f32; 4],
-}
-
-const INDEX_DATA: [u32; 6] = [0u32, 1, 2, 0, 2, 3];
-const VERTEX_DATA: [Vertex; 4] = [
-    // left bottom
-    Vertex {
-        pos: [-1.0, 1.0, 0.0, 1.0],
-        color: [0.2, 0.2, 0.0, 1.0],
-    },
-    // right bottom
-    Vertex {
-        pos: [1.0, 1.0, 0.0, 1.0],
-        color: [0.8, 0.2, 0.0, 1.0],
-    },
-    // right top
-    Vertex {
-        pos: [1.0, -1.0, 0.0, 1.0],
-        color: [0.8, 0.8, 0.0, 1.0],
-    },
-    // left top
-    Vertex {
-        pos: [-1.0, -1.0, 0.0, 1.0],
-        color: [0.2, 0.8, 0.0, 1.0],
-    },
-];
-
 
 #[derive(Pod, Zeroable, Copy, Clone)]
 #[repr(C)]
-pub struct PushConstants
-{
+pub struct PushConstants {
     /// 鼠标位置和状态
     mouse: glam::Vec4,
     /// 分辨率
@@ -69,79 +31,48 @@ pub struct PushConstants
     __padding__: [f32; 2],
 }
 
-
-struct ShaderToy
-{
+struct ShaderToy {
     vertex_buffer: RhiBuffer,
     index_buffer: RhiBuffer,
-    pipeline: RhiPipeline,
+    pipeline: RhiGraphicsPipeline,
 }
 
-impl ShaderToy
-{
-    fn init_buffer(rhi: &Rhi) -> (RhiBuffer, RhiBuffer)
-    {
-        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, size_of_val(&INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data_by_stage_buffer(rhi, &INDEX_DATA);
+impl ShaderToy {
+    fn init_buffer(rhi: &Rhi) -> (RhiBuffer, RhiBuffer) {
+        let mut index_buffer =
+            RhiBuffer::new_index_buffer(rhi, size_of_val(&VertexPCAoS::RECTANGLE_INDEX_DATA), "index-buffer");
+        index_buffer.transfer_data_sync(rhi, &VertexPCAoS::RECTANGLE_INDEX_DATA);
 
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, size_of_val(&VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data_by_stage_buffer(rhi, &VERTEX_DATA);
+        let mut vertex_buffer =
+            RhiBuffer::new_vertex_buffer(rhi, size_of_val(&VertexPCAoS::RECTANGLE_VERTEX_DATA), "vertex-buffer");
+        vertex_buffer.transfer_data_sync(rhi, &VertexPCAoS::RECTANGLE_VERTEX_DATA);
 
         (vertex_buffer, index_buffer)
     }
 
-    fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> RhiPipeline
-    {
+    fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> RhiGraphicsPipeline {
         let extent = render_context.swapchain_extent();
-        let push_constant_ranges = vec![vk::PushConstantRange {
+        let mut ci = RhiGraphicsPipelineCreateInfo::default();
+        ci.push_constant_ranges(vec![vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::ALL,
             offset: 0,
             size: size_of::<PushConstants>() as u32,
-        }];
-        RhiPipelineTemplate {
-            vertex_shader_path: Some("shader/shadertoy-glsl/shadertoy.vert.spv".into()),
-            fragment_shader_path: Some("shader/shadertoy-glsl/shadertoy.frag.spv".into()),
-            color_formats: vec![render_context.color_format()],
-            depth_format: render_context.depth_format(),
-            viewport: Some(vk::Viewport {
-                x: 0.0,
-                y: 0.0,
-                width: extent.width as _,
-                height: extent.height as _,
-                min_depth: 0.0,
-                max_depth: 1.0,
-            }),
-            scissor: Some(extent.into()),
-            vertex_binding_desc: vec![vk::VertexInputBindingDescription {
-                binding: 0,
-                stride: size_of::<Vertex>() as u32,
-                input_rate: vk::VertexInputRate::VERTEX,
-            }],
-            push_constant_ranges,
-            vertex_attribute_desec: vec![
-                vk::VertexInputAttributeDescription {
-                    location: 0,
-                    binding: 0,
-                    format: vk::Format::R32G32B32A32_SFLOAT,
-                    offset: offset_of!(Vertex, pos) as u32,
-                },
-                vk::VertexInputAttributeDescription {
-                    location: 1,
-                    binding: 0,
-                    format: vk::Format::R32G32B32A32_SFLOAT,
-                    offset: offset_of!(Vertex, color) as u32,
-                },
-            ],
-            color_attach_blend_states: vec![vk::PipelineColorBlendAttachmentState::default()
-                .blend_enable(false)
-                .color_write_mask(vk::ColorComponentFlags::RGBA)],
-            ..Default::default()
-        }
-        .create_pipeline(rhi, "shadertoy")
+        }]);
+        ci.vertex_shader_stage("shader/shadertoy-glsl/shadertoy.vert.spv".to_string(), "main".to_string());
+        ci.fragment_shader_stage("shader/shadertoy-glsl/shadertoy.frag.spv".to_string(), "main".to_string());
+        ci.attach_info(vec![render_context.color_format()], Some(render_context.depth_format()), None);
+        ci.viewport(glam::vec2(0.0, 0.0), glam::vec2(extent.width as f32, extent.height as f32), 0.0, 1.0);
+        ci.scissor(extent.into());
+        ci.vertex_binding(VertexPCAoS::vertex_input_bindings());
+        ci.vertex_attribute(VertexPCAoS::vertex_input_attributes());
+        ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
+            .blend_enable(false)
+            .color_write_mask(vk::ColorComponentFlags::RGBA)]);
+
+        RhiGraphicsPipeline::new(rhi.device.clone(), &ci, "shadertoy")
     }
 
-    fn run(&self, rhi: &Rhi, render_context: &mut RenderContext, timer: &Timer)
-    {
+    fn run(&self, rhi: &Rhi, render_context: &mut RenderContext, timer: &Timer) {
         let push_constants = PushConstants {
             time: timer.total_time,
             delta_time: timer.delta_time,
@@ -185,15 +116,14 @@ impl ShaderToy
             cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
             cmd.cmd_bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
             cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
-            cmd.draw_indexed(INDEX_DATA.len() as u32, 0, 1, 0, 0);
+            cmd.draw_indexed(VertexPCAoS::RECTANGLE_INDEX_DATA.len() as u32, 0, 1, 0, 0);
             cmd.end_rendering();
         }
         cmd.end();
         rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
-    fn new(rhi: &Rhi, render_context: &mut RenderContext) -> Self
-    {
+    fn new(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
         log::info!("start.");
 
         let (vertex_buffer, index_buffer) = Self::init_buffer(rhi);
@@ -207,31 +137,25 @@ impl ShaderToy
     }
 }
 
-impl App for ShaderToy
-{
-    fn update_ui(&mut self, ui: &mut Ui)
-    {
+impl App for ShaderToy {
+    fn update_ui(&mut self, ui: &mut Ui) {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
     }
 
-    fn update(&mut self, _app_ctx: &mut AppCtx)
-    {
+    fn update(&mut self, _app_ctx: &mut AppCtx) {
         //
     }
 
-    fn draw(&self, app_ctx: &mut AppCtx)
-    {
+    fn draw(&self, app_ctx: &mut AppCtx) {
         self.run(app_ctx.rhi, app_ctx.render_context, app_ctx.timer)
     }
 
-    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self
-    {
+    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
         ShaderToy::new(rhi, render_context)
     }
 
-    fn get_render_init_info() -> AppInitInfo
-    {
+    fn get_render_init_info() -> AppInitInfo {
         AppInitInfo {
             window_width: 1600,
             window_height: 900,
@@ -241,7 +165,6 @@ impl App for ShaderToy
     }
 }
 
-fn main()
-{
+fn main() {
     Renderer::<ShaderToy>::run();
 }

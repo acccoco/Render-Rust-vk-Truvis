@@ -10,7 +10,7 @@ use truvis_render::{
 };
 use truvis_rhi::{
     core::image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
-    render_core::Rhi,
+    rhi::Rhi,
 };
 
 fn main() {
@@ -127,7 +127,7 @@ impl VkApp {
             .attachments(&attachments)
             .subpasses(std::slice::from_ref(&subpass_description))
             .dependencies(&dependencies);
-        let render_pass = rhi.create_render_pass(&render_pass_ci, "main pass");
+        let render_pass = rhi.device.create_render_pass(&render_pass_ci, "main pass");
 
         render_pass
     }
@@ -191,7 +191,7 @@ impl VkApp {
                     .width(init_info.width)
                     .height(init_info.height)
                     .layers(1);
-                rhi.create_frame_buffer(&frame_buffer_ci, "frame buffer")
+                rhi.device.create_frame_buffer(&frame_buffer_ci, "frame buffer")
             })
             .collect_vec();
 
@@ -228,7 +228,8 @@ impl VkApp {
 
         let render_pass = Self::prepare_render_pass(rhi, render_context);
 
-        let pipeline_cache = rhi.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), "pipeline cache");
+        let pipeline_cache =
+            rhi.device.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), "pipeline cache");
 
         // TODO 考虑把这个挪到 render_context 里
         let depth_stencil = Self::setup_depth_stencil(rhi, render_context, &init_info);

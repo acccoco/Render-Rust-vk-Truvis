@@ -43,8 +43,8 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
     let field_names = field_infos.iter().map(|(name, ..)| name).collect::<Vec<_>>();
     let binding_values = field_infos.iter().map(|(_, binding, ..)| binding).collect::<Vec<_>>();
     let descriptor_types = field_infos.iter().map(|(_, _, descriptor_type, ..)| descriptor_type).collect::<Vec<_>>();
-    let counts = field_infos.iter().map(|(_, _, _, count, _)| count).collect::<Vec<_>>();
-    let stages = field_infos.iter().map(|(_, _, _, _, stage)| stage).collect::<Vec<_>>();
+    let counts = field_infos.iter().map(|(.., count, _)| count).collect::<Vec<_>>();
+    let stages = field_infos.iter().map(|(.., stage)| stage).collect::<Vec<_>>();
 
     // 生成代码：
     // 1. 实现 get_shader_bindings 方法，返回字段名和绑定值的元组数组

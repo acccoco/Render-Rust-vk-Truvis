@@ -1,29 +1,33 @@
-use std::{
-    collections::HashSet,
-    ffi::{c_char, CStr, CString},
-};
-
 use ash::vk;
 use itertools::Itertools;
+use std::ops::Deref;
+use std::{
+    collections::HashSet,
+    ffi::{CStr, CString, c_char},
+};
 
 use crate::core::debug_utils::RhiDebugUtils;
 
-pub struct RhiInstance
-{
+pub struct RhiInstance {
     pub handle: ash::Instance,
 }
 
+impl Deref for RhiInstance {
+    type Target = ash::Instance;
 
-impl RhiInstance
-{
+    fn deref(&self) -> &Self::Target {
+        &self.handle
+    }
+}
+
+impl RhiInstance {
     /// 设置所需的 layers 和 extensions，创建 vk instance
     pub fn new(
         vk_entry: &ash::Entry,
         app_name: String,
         engine_name: String,
         extra_instance_exts: Vec<&'static CStr>,
-    ) -> Self
-    {
+    ) -> Self {
         let app_name = CString::new(app_name.as_str()).unwrap();
         let engine_name = CString::new(engine_name.as_str()).unwrap();
         let app_info = vk::ApplicationInfo::default()
@@ -45,7 +49,6 @@ impl RhiInstance
             log::info!("\t{:?}", unsafe { CStr::from_ptr(*layer) });
         }
 
-
         let mut instance_ci = vk::InstanceCreateInfo::default()
             .application_info(&app_info)
             .enabled_extension_names(&enabled_extensions)
@@ -57,17 +60,16 @@ impl RhiInstance
 
         let handle = unsafe { vk_entry.create_instance(&instance_ci, None).unwrap() };
 
-        let instance = Self { handle };
-        instance
+        Self { handle }
     }
 
-    fn get_layer_setting_for_single<'a, T>(
+    /// 用于在创建 instance 时设置 layer 的参数
+    fn _get_layer_setting_for_single<'a, T>(
         layer_name: &'static CStr,
         setting_name: &'static CStr,
         ty: vk::LayerSettingTypeEXT,
         value: &'a T,
-    ) -> vk::LayerSettingEXT<'a>
-    {
+    ) -> vk::LayerSettingEXT<'a> {
         vk::LayerSettingEXT {
             p_layer_name: layer_name.as_ptr(),
             p_setting_name: setting_name.as_ptr(),
@@ -78,13 +80,13 @@ impl RhiInstance
         }
     }
 
-    fn get_layer_setting_for_array<'a, T>(
+    /// 用于在创建 instance 时设置 layer 的参数
+    fn _get_layer_setting_for_array<'a, T>(
         layer_name: &'static CStr,
         setting_name: &'static CStr,
         ty: vk::LayerSettingTypeEXT,
         value: &'a [T],
-    ) -> vk::LayerSettingEXT<'a>
-    {
+    ) -> vk::LayerSettingEXT<'a> {
         vk::LayerSettingEXT {
             p_layer_name: layer_name.as_ptr(),
             p_setting_name: setting_name.as_ptr(),
@@ -99,8 +101,7 @@ impl RhiInstance
     ///
     /// # return
     /// instance 所需的，且受支持的 extension
-    fn get_extensions(vk_entry: &ash::Entry, extra_instance_exts: &[&'static CStr]) -> Vec<*const c_char>
-    {
+    fn get_extensions(vk_entry: &ash::Entry, extra_instance_exts: &[&'static CStr]) -> Vec<*const c_char> {
         let all_ext_props = unsafe { vk_entry.enumerate_instance_extension_properties(None).unwrap() };
         let mut enabled_extensions: HashSet<&'static CStr> = HashSet::new();
 
@@ -118,7 +119,7 @@ impl RhiInstance
 
         // 检查外部传入的 extension 是否支持
         for ext in extra_instance_exts {
-            enable_ext(*ext);
+            enable_ext(ext);
         }
 
         for ext in Self::basic_instance_exts() {
@@ -128,10 +129,8 @@ impl RhiInstance
         enabled_extensions.iter().map(|ext| ext.as_ptr()).collect_vec()
     }
 
-
     /// instance 所需的所有 layers
-    fn get_layers(vk_entry: &ash::Entry) -> Vec<*const c_char>
-    {
+    fn get_layers(vk_entry: &ash::Entry) -> Vec<*const c_char> {
         let all_layer_props = unsafe { vk_entry.enumerate_instance_layer_properties().unwrap() };
 
         let mut validation_layers = Vec::new();
@@ -156,8 +155,7 @@ impl RhiInstance
     }
 
     /// 必须要开启的 instance layers
-    fn basic_instance_layers() -> Vec<&'static CStr>
-    {
+    fn basic_instance_layers() -> Vec<&'static CStr> {
         // 无需开启 validation layer，使用 vulkan configurator 控制 validation layer 的开启
         // layers.push(cstr::cstr!("VK_LAYER_KHRONOS_validation"))
 
@@ -165,8 +163,7 @@ impl RhiInstance
     }
 
     /// 必须要开启的 instance extensions
-    fn basic_instance_exts() -> Vec<&'static CStr>
-    {
+    fn basic_instance_exts() -> Vec<&'static CStr> {
         let exts = vec![
             // 这个 extension 可以单独使用，提供以下功能：
             // 1. debug messenger

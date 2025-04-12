@@ -2,14 +2,11 @@ use std::ffi::{CStr, CString};
 
 use ash::vk;
 
-
-pub struct RhiDebugUtils
-{
+pub struct RhiDebugUtils {
     pub vk_debug_utils_instance: ash::ext::debug_utils::Instance,
     pub vk_debug_utils_device: ash::ext::debug_utils::Device,
     pub vk_debug_utils_messenger: vk::DebugUtilsMessengerEXT,
 }
-
 
 /// debug messenger 的回调函数
 /// # Safety
@@ -18,16 +15,14 @@ unsafe extern "system" fn vk_debug_callback(
     message_type: vk::DebugUtilsMessageTypeFlagsEXT,
     p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
     _user_data: *mut std::os::raw::c_void,
-) -> vk::Bool32
-{
-    let callback_data = *p_callback_data;
+) -> vk::Bool32 {
+    let callback_data = unsafe { *p_callback_data };
 
     let msg = if callback_data.p_message.is_null() {
         std::borrow::Cow::from("")
     } else {
-        CStr::from_ptr(callback_data.p_message).to_string_lossy()
+        unsafe { CStr::from_ptr(callback_data.p_message).to_string_lossy() }
     };
-
 
     // 按照 | 切分 msg 字符串，并在中间插入换行符
     // let msg = msg.split('|').collect::<Vec<&str>>().join("\n\t");
@@ -51,11 +46,8 @@ unsafe extern "system" fn vk_debug_callback(
     vk::FALSE
 }
 
-
-impl RhiDebugUtils
-{
-    pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, device: &ash::Device) -> Self
-    {
+impl RhiDebugUtils {
+    pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, device: &ash::Device) -> Self {
         let loader = ash::ext::debug_utils::Instance::new(vk_pf, instance);
 
         let create_info = Self::debug_utils_messenger_ci();
@@ -71,8 +63,7 @@ impl RhiDebugUtils
     }
 
     /// 存放 msg 参数，用于初始化 debug messenger
-    pub fn debug_msg_type() -> vk::DebugUtilsMessageTypeFlagsEXT
-    {
+    pub fn debug_msg_type() -> vk::DebugUtilsMessageTypeFlagsEXT {
         static mut DEBUG_MSG_TYPE: vk::DebugUtilsMessageTypeFlagsEXT = vk::DebugUtilsMessageTypeFlagsEXT::empty();
         unsafe {
             if vk::DebugUtilsMessageTypeFlagsEXT::empty() == DEBUG_MSG_TYPE {
@@ -84,8 +75,7 @@ impl RhiDebugUtils
     }
 
     /// 存放 msg 参数，用于初始化 debug messenger
-    pub fn debug_msg_severity() -> vk::DebugUtilsMessageSeverityFlagsEXT
-    {
+    pub fn debug_msg_severity() -> vk::DebugUtilsMessageSeverityFlagsEXT {
         static mut DEBUG_MSG_SEVERITY: vk::DebugUtilsMessageSeverityFlagsEXT =
             vk::DebugUtilsMessageSeverityFlagsEXT::empty();
         unsafe {
@@ -97,10 +87,8 @@ impl RhiDebugUtils
         }
     }
 
-
     /// 用于创建 debug messenger 的结构体
-    pub fn debug_utils_messenger_ci() -> vk::DebugUtilsMessengerCreateInfoEXT<'static>
-    {
+    pub fn debug_utils_messenger_ci() -> vk::DebugUtilsMessengerCreateInfoEXT<'static> {
         vk::DebugUtilsMessengerCreateInfoEXT::default()
             .message_severity(Self::debug_msg_severity())
             .message_type(Self::debug_msg_type())
@@ -146,8 +134,7 @@ impl RhiDebugUtils
     }
 
     #[inline]
-    pub fn cmd_end_debug_label(&self, command_buffer: vk::CommandBuffer)
-    {
+    pub fn cmd_end_debug_label(&self, command_buffer: vk::CommandBuffer) {
         unsafe {
             self.vk_debug_utils_device.cmd_end_debug_utils_label(command_buffer);
         }
@@ -182,8 +169,7 @@ impl RhiDebugUtils
     }
 
     #[inline]
-    pub fn end_queue_label(&self, queue: vk::Queue)
-    {
+    pub fn end_queue_label(&self, queue: vk::Queue) {
         unsafe {
             self.vk_debug_utils_device.queue_end_debug_utils_label(queue);
         }

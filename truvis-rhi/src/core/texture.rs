@@ -7,23 +7,18 @@ use crate::{
         image::{RhiImage2D, RhiImage2DView, RhiImageViewCreateInfo},
         sampler::{RhiSampler, RhiSamplerCreateInfo},
     },
-    render_core::Rhi,
+    rhi::Rhi,
 };
 
-
-// TODO 使用 private
-pub struct RhiTexture2D
-{
-    pub image: Rc<RhiImage2D>,
-    pub sampler: Rc<RhiSampler>,
-    pub image_view: Rc<RhiImage2DView>,
+pub struct RhiTexture2D {
+    image: Rc<RhiImage2D>,
+    sampler: Rc<RhiSampler>,
+    image_view: Rc<RhiImage2DView>,
 }
 
-impl RhiTexture2D
-{
+impl RhiTexture2D {
     #[inline]
-    pub fn new(rhi: &Rhi, image: Rc<RhiImage2D>, name: &str) -> Self
-    {
+    pub fn new(rhi: &Rhi, image: Rc<RhiImage2D>, name: &str) -> Self {
         let sampler = Rc::new(RhiSampler::new(rhi, Rc::new(RhiSamplerCreateInfo::new()), &format!("{}-sampler", name)));
 
         let image_view = Rc::new(RhiImage2DView::new(
@@ -38,5 +33,23 @@ impl RhiTexture2D
             sampler,
             image_view,
         }
+    }
+
+    /// getter
+    #[inline]
+    pub fn image(&self) -> &RhiImage2D {
+        &self.image
+    }
+
+    /// getter
+    #[inline]
+    pub fn sampler(&self) -> &RhiSampler {
+        &self.sampler
+    }
+
+    /// getter
+    #[inline]
+    pub fn image_view(&self) -> &RhiImage2DView {
+        &self.image_view
     }
 }
