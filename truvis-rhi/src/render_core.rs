@@ -1,18 +1,17 @@
 use std::{ffi::CStr, rc::Rc};
 
-use ash::vk;
-use itertools::Itertools;
-
 use crate::core::{
     allocator::RhiAllocator, command_pool::RhiCommandPool, command_queue::RhiQueue, debug_utils::RhiDebugUtils,
     device::RhiDevice, instance::RhiInstance, physical_device::RhiGpu,
 };
+use crate::shader_cursor::RhiWriteDescriptorSet;
+use ash::vk;
+use itertools::Itertools;
 
 /// Rhi 只需要做到能够创建各种资源的程度就行了
 ///
 /// 与 VulkanSamples 的 VulkanSamle 及 ApiVulkanSample 作用类似
-pub struct Rhi
-{
+pub struct Rhi {
     /// vk 基础函数的接口
     pub vk_pf: ash::Entry,
     instance: Rc<RhiInstance>,
@@ -35,15 +34,13 @@ pub struct Rhi
 }
 
 // init 相关
-impl Rhi
-{
+impl Rhi {
     const MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
     const MAX_MATERIAL_CNT: u32 = 256;
 
     const ENGINE_NAME: &'static str = "DruvisIII";
 
-    pub fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self
-    {
+    pub fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
         let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");
 
         let instance = Rc::new(RhiInstance::new(&vk_pf, app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts));
@@ -108,8 +105,7 @@ impl Rhi
         }
     }
 
-    fn init_descriptor_pool(device: &RhiDevice) -> vk::DescriptorPool
-    {
+    fn init_descriptor_pool(device: &RhiDevice) -> vk::DescriptorPool {
         let pool_size = [
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
@@ -151,8 +147,7 @@ impl Rhi
         }
     }
 
-    fn init_pdevice(instance: &ash::Instance) -> RhiGpu
-    {
+    fn init_pdevice(instance: &ash::Instance) -> RhiGpu {
         let pdevice = unsafe {
             instance
                 .enumerate_physical_devices()
@@ -169,30 +164,25 @@ impl Rhi
 }
 
 // 属性访问
-impl Rhi
-{
+impl Rhi {
     #[inline]
-    pub(crate) fn vk_instance(&self) -> &ash::Instance
-    {
+    pub(crate) fn vk_instance(&self) -> &ash::Instance {
         &self.instance.handle
     }
 
     #[inline]
-    pub(crate) fn vk_device(&self) -> &ash::Device
-    {
+    pub(crate) fn vk_device(&self) -> &ash::Device {
         &self.device.handle
     }
 
     #[inline]
-    pub(crate) fn physical_device(&self) -> &RhiGpu
-    {
+    pub(crate) fn physical_device(&self) -> &RhiGpu {
         &self.physical_device
     }
 
     /// 将 UBO 的尺寸和 min_UBO_Offset_Align 对齐，使得得到的尺寸是 min_UBO_Offset_Align 的整数倍
     #[inline]
-    pub fn ubo_offset_align(&self, ubo_size: vk::DeviceSize) -> vk::DeviceSize
-    {
+    pub fn ubo_offset_align(&self, ubo_size: vk::DeviceSize) -> vk::DeviceSize {
         let min_ubo_align = self.physical_device().properties.limits.min_uniform_buffer_offset_alignment;
         (ubo_size + min_ubo_align - 1) & !(min_ubo_align - 1)
     }
@@ -200,16 +190,14 @@ impl Rhi
 
 // TODO 区分一下 Rhi 的定位。以下的方法放在 Device 里面似乎也是 ok 的
 // 工具方法
-impl Rhi
-{
+impl Rhi {
     /// 根据给定的格式，返回支持的格式
     pub fn find_supported_format(
         &self,
         candidates: &[vk::Format],
         tiling: vk::ImageTiling,
         features: vk::FormatFeatureFlags,
-    ) -> Vec<vk::Format>
-    {
+    ) -> Vec<vk::Format> {
         candidates
             .iter()
             .filter(|f| {
@@ -227,8 +215,7 @@ impl Rhi
     }
 
     #[inline]
-    pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str) -> vk::RenderPass
-    {
+    pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str) -> vk::RenderPass {
         let render_pass = unsafe { self.device.create_render_pass(render_pass_ci, None).unwrap() };
         self.set_debug_name(render_pass, debug_name);
         render_pass
@@ -239,17 +226,18 @@ impl Rhi
         &self,
         pipeline_cache_ci: &vk::PipelineCacheCreateInfo,
         debug_name: &str,
-    ) -> vk::PipelineCache
-    {
+    ) -> vk::PipelineCache {
         let pipeline_cache = unsafe { self.device.create_pipeline_cache(pipeline_cache_ci, None).unwrap() };
         self.set_debug_name(pipeline_cache, debug_name);
         pipeline_cache
     }
 
     #[inline]
-    pub fn create_frame_buffer(&self, frame_buffer_ci: &vk::FramebufferCreateInfo, debug_name: &str)
-        -> vk::Framebuffer
-    {
+    pub fn create_frame_buffer(
+        &self,
+        frame_buffer_ci: &vk::FramebufferCreateInfo,
+        debug_name: &str,
+    ) -> vk::Framebuffer {
         let frame_buffer = unsafe { self.device.create_framebuffer(frame_buffer_ci, None).unwrap() };
         self.set_debug_name(frame_buffer, debug_name);
         frame_buffer
@@ -258,24 +246,29 @@ impl Rhi
     // TODO 放到 descriptor 里面去
     // TODO 抽象出 RhiDescriptorSet
     #[inline]
-    pub fn allocate_descriptor_sets(&self, alloc_info: &vk::DescriptorSetAllocateInfo) -> Vec<vk::DescriptorSet>
-    {
+    pub fn allocate_descriptor_sets(&self, alloc_info: &vk::DescriptorSetAllocateInfo) -> Vec<vk::DescriptorSet> {
         unsafe { self.vk_device().allocate_descriptor_sets(alloc_info).unwrap() }
     }
 
-    // TODO 放到 descriptor 里面去
+    // FIXME remove me
     #[inline]
-    pub fn write_descriptor_sets(&self, writes: &[vk::WriteDescriptorSet])
-    {
+    pub fn write_descriptor_sets(&self, writes: &[vk::WriteDescriptorSet]) {
         unsafe {
             self.vk_device().update_descriptor_sets(writes, &[]);
+        }
+    }
+
+    #[inline]
+    pub fn write_descriptor_sets2(&self, writes: &[RhiWriteDescriptorSet]) {
+        let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();
+        unsafe {
+            self.vk_device().update_descriptor_sets(&writes, &[]);
         }
     }
 }
 
 // debug label 相关
-impl Rhi
-{
+impl Rhi {
     #[inline]
     pub fn set_debug_name<T, S>(&self, handle: T, name: S)
     where

@@ -1,89 +1,73 @@
-use std::marker::PhantomData;
-
 use ash::vk;
+use shader_layout_trait::ShaderBindingItem;
+use std::usize;
 
-use crate::{
-    basic::DataUtils,
-    core::{command_buffer::RhiCommandBuffer, descriptor::RhiDescriptorUpdateInfo},
-    render_core::Rhi,
-};
+pub struct RhiWriteDescriptorSet {
+    pub dst_set: vk::DescriptorSet,
+    pub dst_binding: u32,
+    pub dst_array_element: u32,
+    pub descriptor_type: vk::DescriptorType,
 
-/// 游标类型
-///
-/// 用于描述游标类型，游标类型决定了描述符的类型。
-pub enum ShaderCursorType
-{
-    Buffer,
-    Image,
-    Sampler,
+    pub buffers: Vec<vk::DescriptorBufferInfo>,
+    pub images: Vec<vk::DescriptorImageInfo>,
 }
 
-
-pub struct Binding
-{
-    pub set: u32,
-    pub binding: u32,
-}
-
-/// 某个 descriptor 的访问器
-pub trait ShaderCursor
-{
-    fn get_binding(&self) -> Binding;
-
-    fn get_type() -> vk::DescriptorType;
-
-    fn write(&self, rhi: &Rhi, update_info: RhiDescriptorUpdateInfo);
-}
-
-
-pub struct BufferCursor<S: Sized>
-{
-    _phantom: PhantomData<S>,
-}
-
-impl<S: Sized> BufferCursor<S>
-{
-    fn write(cmd: &mut RhiCommandBuffer, buffer: vk::Buffer, data: &S)
-    {
-        cmd.cmd_update_buffer(buffer, size_of::<S>() as vk::DeviceSize, DataUtils::transform_u8(&data))
+impl RhiWriteDescriptorSet {
+    pub fn to_vk_type(&self) -> vk::WriteDescriptorSet {
+        vk::WriteDescriptorSet {
+            dst_set: self.dst_set,
+            dst_binding: self.dst_binding,
+            dst_array_element: self.dst_array_element,
+            descriptor_count: usize::max(self.buffers.len(), self.images.len()) as u32,
+            descriptor_type: self.descriptor_type,
+            // 选择 buffer ptr 还是 image ptr，是由 descriptor type 控制的
+            p_buffer_info: self.buffers.as_ptr(),
+            p_image_info: self.images.as_ptr(),
+            ..Default::default()
+        }
     }
 }
 
-pub struct Texture2DCursor
-{
-    set: u32,
-    binding: u32,
-}
+pub trait ShaderCursor {
+    fn get_binding(&self) -> &ShaderBindingItem;
 
+    fn write_buffer(
+        &self,
+        dst_set: vk::DescriptorSet,
+        start_array: u32,
+        buffers: Vec<vk::DescriptorBufferInfo>,
+    ) -> RhiWriteDescriptorSet {
+        let item = self.get_binding();
+        RhiWriteDescriptorSet {
+            dst_set,
+            dst_binding: item.binding,
+            dst_array_element: start_array,
+            buffers,
+            descriptor_type: item.descriptor_type,
+            images: vec![],
+        }
+    }
 
-impl Texture2DCursor
-{
-    pub fn new(set: u32, binding: u32) -> Self
-    {
-        Self { set, binding }
+    fn write_image(
+        &self,
+        dst_set: vk::DescriptorSet,
+        start_array: u32,
+        images: Vec<vk::DescriptorImageInfo>,
+    ) -> RhiWriteDescriptorSet {
+        let item = self.get_binding();
+        RhiWriteDescriptorSet {
+            dst_set,
+            dst_binding: item.binding,
+            dst_array_element: start_array,
+            descriptor_type: item.descriptor_type,
+            buffers: vec![],
+            images,
+        }
     }
 }
 
-impl ShaderCursor for Texture2DCursor
-{
-    fn get_binding(&self) -> Binding
-    {
-        todo!()
+impl ShaderCursor for ShaderBindingItem {
+    fn get_binding(&self) -> &ShaderBindingItem {
+        &self
     }
-
-    fn get_type() -> vk::DescriptorType
-    {
-        vk::DescriptorType::COMBINED_IMAGE_SAMPLER
-    }
-
-    fn write(&self, _rhi: &Rhi, _update_info: RhiDescriptorUpdateInfo)
-    {
-        todo!()
-    }
-}
-
-/// material 这个 descriptor set 的定义
-struct MaterialSet
-{
-    params: Texture2DCursor,
 }

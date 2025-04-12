@@ -2,6 +2,7 @@ mod data;
 
 use std::rc::Rc;
 
+use crate::data::{ShapeBox, Vertex};
 use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
@@ -10,6 +11,7 @@ use truvis_render::{
     framework::rendering::render_context::RenderContext,
     render::{App, AppCtx, AppInitInfo, Renderer},
 };
+use truvis_rhi::shader_cursor::ShaderCursor;
 use truvis_rhi::{
     basic::{color::LabelColor, FRAME_ID_MAP},
     core::{
@@ -19,59 +21,47 @@ use truvis_rhi::{
         pipeline::{RhiPipeline, RhiPipelineTemplate},
     },
     render_core::Rhi,
-    shader_cursor::ShaderCursorType,
 };
 
-use crate::data::{ShapeBox, Vertex};
-
-
 #[derive(ShaderLayout)]
-struct SceneShaderBindings
-{
+struct SceneShaderBindings {
     #[binding = 0]
     #[descriptor_type = "UNIFORM_BUFFER_DYNAMIC"]
     #[stage = "VERTEX | FRAGMENT"]
-    _scene: ShaderCursorType,
+    scene: (),
 }
 
-
 #[derive(ShaderLayout)]
-struct MeshShaderBindings
-{
+struct MeshShaderBindings {
     #[binding = 0]
     #[descriptor_type = "UNIFORM_BUFFER_DYNAMIC"]
     #[stage = "VERTEX | FRAGMENT"]
-    _mesh: ShaderCursorType,
+    mesh: (),
 }
 
 #[derive(ShaderLayout)]
-struct MaterialShaderBindings
-{
+struct MaterialShaderBindings {
     #[binding = 0]
     #[descriptor_type = "UNIFORM_BUFFER_DYNAMIC"]
     #[stage = "FRAGMENT"]
-    _mat: ShaderCursorType,
+    mat: (),
 }
 
-struct PhongAppDescriptorSetLayouts
-{
+struct PhongAppDescriptorSetLayouts {
     scene_layout: RhiDescriptorSetLayout<SceneShaderBindings>,
     mesh_layout: RhiDescriptorSetLayout<MeshShaderBindings>,
     material_layout: RhiDescriptorSetLayout<MaterialShaderBindings>,
 }
 
-struct PhongAppDescriptorSets
-{
+struct PhongAppDescriptorSets {
     scene_set: RhiDescriptorSet<SceneShaderBindings>,
     mesh_set: RhiDescriptorSet<MeshShaderBindings>,
     material_set: RhiDescriptorSet<MaterialShaderBindings>,
 }
 
-
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
-struct Light
-{
+struct Light {
     pos: glam::Vec3,
     pos_padding__: i32,
 
@@ -81,8 +71,7 @@ struct Light
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
-struct SceneUBO
-{
+struct SceneUBO {
     projection: glam::Mat4,
     view: glam::Mat4,
 
@@ -93,25 +82,21 @@ struct SceneUBO
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-struct MeshUBO
-{
+struct MeshUBO {
     model: glam::Mat4,
     trans_inv_model: glam::Mat4,
 }
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-struct MaterialUBO
-{
+struct MaterialUBO {
     color: glam::Vec4,
 }
-
 
 // TODO 考虑差分为 vertex 的和 fragment 的；
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, Default)]
-struct PushConstant
-{
+struct PushConstant {
     camera_pos: glam::Vec3,
     camera_pos_padding__: i32,
 
@@ -126,16 +111,13 @@ struct PushConstant
     fps: f32,
 }
 
-struct PhongUniformBuffer
-{
+struct PhongUniformBuffer {
     scene_uniform_buffer: RhiBuffer,
     mesh_uniform_buffer: RhiBuffer,
     material_uniform_buffer: RhiBuffer,
 }
 
-
-struct PhongApp
-{
+struct PhongApp {
     descriptor_set_layouts: PhongAppDescriptorSetLayouts,
 
     /// 每帧独立的 descriptor set
@@ -158,14 +140,11 @@ struct PhongApp
     push: PushConstant,
 }
 
-
-impl PhongApp
-{
+impl PhongApp {
     fn create_descriptor_sets(
         rhi: &Rhi,
         frames_in_flight: usize,
-    ) -> (PhongAppDescriptorSetLayouts, Vec<PhongAppDescriptorSets>)
-    {
+    ) -> (PhongAppDescriptorSetLayouts, Vec<PhongAppDescriptorSets>) {
         let scene_descriptor_set_layout = RhiDescriptorSetLayout::<SceneShaderBindings>::new(rhi, "phong-scene");
         let mesh_descriptor_set_layout = RhiDescriptorSetLayout::<MeshShaderBindings>::new(rhi, "phong-mesh");
         let material_descriptor_set_layout =
@@ -205,8 +184,7 @@ impl PhongApp
         rhi: &Rhi,
         render_ctx: &mut RenderContext,
         descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
-    ) -> RhiPipeline
-    {
+    ) -> RhiPipeline {
         let extent = render_ctx.swapchain_extent();
         RhiPipelineTemplate {
             fragment_shader_path: Some("shader/phong/phong.ps.hlsl.spv".into()),
@@ -263,8 +241,7 @@ impl PhongApp
         .create_pipeline(rhi, "phong")
     }
 
-    fn create_vertices(rhi: &Rhi) -> RhiBuffer
-    {
+    fn create_vertices(rhi: &Rhi) -> RhiBuffer {
         let mut vertex_buffer =
             RhiBuffer::new_vertex_buffer(rhi, size_of_val(&ShapeBox::VERTICES), "[phong]vertex-buffer");
         vertex_buffer.transfer_data_by_stage_buffer(rhi, &ShapeBox::VERTICES);
@@ -279,8 +256,7 @@ impl PhongApp
         frames_in_flight: usize,
         mesh_ubo_align: &mut vk::DeviceSize,
         mat_ubo_align: &mut vk::DeviceSize,
-    ) -> Vec<PhongUniformBuffer>
-    {
+    ) -> Vec<PhongUniformBuffer> {
         let mesh_instance_count = 32;
         let material_instance_count = 32;
 
@@ -335,8 +311,7 @@ impl PhongApp
     }
 
     /// 将场景的信息更新到 uniform buffer 中去，并且和 descriptor set 绑定起来
-    fn update_scene_uniform(&mut self, rhi: &Rhi, frame_index: usize)
-    {
+    fn update_scene_uniform(&mut self, rhi: &Rhi, frame_index: usize) {
         let PhongUniformBuffer {
             scene_uniform_buffer,
             mesh_uniform_buffer,
@@ -357,52 +332,31 @@ impl PhongApp
             .buffer(scene_uniform_buffer.handle())
             .offset(0)
             .range(size_of::<SceneUBO>() as vk::DeviceSize);
-        let scene_write = vk::WriteDescriptorSet::default()
-            .dst_set(scene_set.descriptor_set)
-            .dst_binding(0)
-            .dst_array_element(0)
-            .descriptor_count(1)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
-            .buffer_info(std::slice::from_ref(&scene_ubo_info));
+        let scene_write = SceneShaderBindings::scene().write_buffer(scene_set.handle, 0, vec![scene_ubo_info]);
 
         let mesh_ubo_info = vk::DescriptorBufferInfo::default()
             .buffer(mesh_uniform_buffer.handle())
             .offset(0)
             .range(size_of::<MeshUBO>() as vk::DeviceSize);
-        let mesh_write = vk::WriteDescriptorSet::default()
-            .dst_set(mesh_set.descriptor_set)
-            .dst_binding(0)
-            .dst_array_element(0)
-            .descriptor_count(1)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
-            .buffer_info(std::slice::from_ref(&mesh_ubo_info));
+        let mesh_write = MeshShaderBindings::mesh().write_buffer(mesh_set.handle, 0, vec![mesh_ubo_info]);
 
         let mat_ubo_info = vk::DescriptorBufferInfo::default()
             .buffer(material_uniform_buffer.handle())
             .offset(0)
             .range(size_of::<MaterialUBO>() as vk::DeviceSize);
-        let mat_write = vk::WriteDescriptorSet::default()
-            .dst_set(material_set.descriptor_set)
-            .dst_binding(0)
-            .dst_array_element(0)
-            .descriptor_count(1)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC)
-            .buffer_info(std::slice::from_ref(&mat_ubo_info));
+        let mat_write = MaterialShaderBindings::mat().write_buffer(material_set.handle, 0, vec![mat_ubo_info]);
 
-        rhi.write_descriptor_sets(&[scene_write, mesh_write, mat_write]);
+        rhi.write_descriptor_sets2(&[scene_write, mesh_write, mat_write]);
     }
 }
 
-impl App for PhongApp
-{
-    fn update_ui(&mut self, ui: &mut Ui)
-    {
+impl App for PhongApp {
+    fn update_ui(&mut self, ui: &mut Ui) {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
     }
 
-    fn update(&mut self, app_ctx: &mut AppCtx)
-    {
+    fn update(&mut self, app_ctx: &mut AppCtx) {
         app_ctx.rhi.debug_utils.begin_queue_label(
             app_ctx.rhi.graphics_queue.handle,
             "[main-pass]update",
@@ -414,8 +368,7 @@ impl App for PhongApp
         app_ctx.rhi.debug_utils.end_queue_label(app_ctx.rhi.graphics_queue.handle);
     }
 
-    fn draw(&self, app_ctx: &mut AppCtx)
-    {
+    fn draw(&self, app_ctx: &mut AppCtx) {
         let frame_id = app_ctx.render_context.current_frame_index();
 
         let color_attach = <Self as App>::get_color_attachment(app_ctx.render_context.current_present_image_view());
@@ -446,7 +399,7 @@ impl App for PhongApp
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline.pipeline_layout,
                 0,
-                &[self.descriptor_sets[frame_id].scene_set.descriptor_set],
+                &[self.descriptor_sets[frame_id].scene_set.handle],
                 &[0],
             );
 
@@ -455,7 +408,7 @@ impl App for PhongApp
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline.pipeline_layout,
                 2,
-                &[self.descriptor_sets[frame_id].material_set.descriptor_set],
+                &[self.descriptor_sets[frame_id].material_set.handle],
                 // TODO 只使用一个材质
                 &[0],
             );
@@ -468,7 +421,7 @@ impl App for PhongApp
                     vk::PipelineBindPoint::GRAPHICS,
                     self.pipeline.pipeline_layout,
                     1,
-                    &[self.descriptor_sets[frame_id].mesh_set.descriptor_set],
+                    &[self.descriptor_sets[frame_id].mesh_set.handle],
                     &[(self.mesh_ubo_offset_align * mesh_idx as u64) as u32],
                 );
                 cmd.cmd_draw(ShapeBox::VERTICES.len() as u32, 1, 0, 0);
@@ -481,8 +434,7 @@ impl App for PhongApp
         app_ctx.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
-    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self
-    {
+    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
         // TODO 通过其他方式获取到 frames in flight
         let (layouts, sets) = Self::create_descriptor_sets(rhi, 3);
         let pipeline = Self::create_pipeline(
@@ -510,7 +462,6 @@ impl App for PhongApp
             glam::Mat4::from_translation(glam::vec3(0.0, 0.0, 0.0)) * rot,
             glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
-
 
         let camera_pos = glam::vec3(20.0, 0.0, 0.0);
         let camera_dir = glam::vec3(-1.0, 0.0, 0.0);
@@ -570,8 +521,7 @@ impl App for PhongApp
         }
     }
 
-    fn get_render_init_info() -> AppInitInfo
-    {
+    fn get_render_init_info() -> AppInitInfo {
         AppInitInfo {
             window_width: 800,
             window_height: 800,
@@ -581,8 +531,6 @@ impl App for PhongApp
     }
 }
 
-
-fn main()
-{
+fn main() {
     Renderer::<PhongApp>::run();
 }

@@ -2,7 +2,6 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta};
 
-
 /// 为结构体实现 ShaderLayout 派生宏
 ///
 /// 支持的属性：
@@ -11,8 +10,7 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta};
 /// - count: 指定描述符数量
 /// - stage: 指定着色器阶段（如 VERTEX, FRAGMENT 等）
 #[proc_macro_derive(ShaderLayout, attributes(binding, descriptor_type, count, stage))]
-pub fn derive_shader_layout(input: TokenStream) -> TokenStream
-{
+pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
     // 解析输入为 DeriveInput 结构
     let input = parse_macro_input!(input as DeriveInput);
     let struct_name = &input.ident;
@@ -52,6 +50,21 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream
     // 1. 实现 get_shader_bindings 方法，返回字段名和绑定值的元组数组
     // 2. 实现 ShaderBindingLayout trait，返回完整的 ShaderBindingItem 数组
     let expanded = quote! {
+        impl #struct_name {
+            #(
+                pub fn #field_names() -> &'static shader_layout_trait::ShaderBindingItem {
+                    static CURSOR: std::sync::OnceLock<shader_layout_trait::ShaderBindingItem> = std::sync::OnceLock::new();
+                    CURSOR.get_or_init(|| shader_layout_trait::ShaderBindingItem{
+                        name: stringify!(#field_names),
+                        binding: #binding_values,
+                        descriptor_type: #descriptor_types,
+                        stage_flags: #stages,
+                        count: #counts,
+                    })
+                }
+            )*
+        }
+
         impl shader_layout_trait::ShaderBindingLayout for #struct_name {
             fn get_shader_bindings() -> Vec<shader_layout_trait::ShaderBindingItem> {
                 vec![
@@ -65,6 +78,7 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream
                 ]
             }
         }
+
     };
 
     expanded.into()
@@ -73,8 +87,7 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream
 /// 从字段属性中获取 binding 值
 ///
 /// 属性格式示例：#[binding = 0]
-fn get_binding_value(attrs: &[Attribute]) -> Option<u32>
-{
+fn get_binding_value(attrs: &[Attribute]) -> Option<u32> {
     for attr in attrs {
         if attr.path().is_ident("binding") {
             if let Meta::NameValue(meta) = &attr.meta {
@@ -94,8 +107,7 @@ fn get_binding_value(attrs: &[Attribute]) -> Option<u32>
 /// 从字段属性中获取 descriptor_type 值
 ///
 /// 属性格式示例：#[descriptor_type = "UNIFORM_BUFFER"]
-fn get_descriptor_type(attrs: &[Attribute]) -> syn::Expr
-{
+fn get_descriptor_type(attrs: &[Attribute]) -> syn::Expr {
     for attr in attrs {
         if attr.path().is_ident("descriptor_type") {
             if let Meta::NameValue(meta) = &attr.meta {
@@ -117,8 +129,7 @@ fn get_descriptor_type(attrs: &[Attribute]) -> syn::Expr
 /// 从字段属性中获取 count 值
 ///
 /// 属性格式示例：#[count = 1]
-fn get_count_value(attrs: &[Attribute]) -> syn::Expr
-{
+fn get_count_value(attrs: &[Attribute]) -> syn::Expr {
     for attr in attrs {
         if attr.path().is_ident("count") {
             if let Meta::NameValue(meta) = &attr.meta {
@@ -133,13 +144,7 @@ fn get_count_value(attrs: &[Attribute]) -> syn::Expr
 /// 从字段属性中获取 stage 值
 ///
 /// 属性格式示例：#[stage = "VERTEX | FRAGMENT"]
-/// 支持的着色器阶段：
-/// - VERTEX
-/// - FRAGMENT
-///
-/// 多个阶段可以用 | 连接
-fn get_stage_value(attrs: &[Attribute]) -> syn::Expr
-{
+fn get_stage_value(attrs: &[Attribute]) -> syn::Expr {
     for attr in attrs {
         if attr.path().is_ident("stage") {
             if let Meta::NameValue(meta) = &attr.meta {
@@ -159,6 +164,7 @@ fn get_stage_value(attrs: &[Attribute]) -> syn::Expr
             }
         }
     }
+
     // 默认值：顶点和片段着色器
     syn::parse_quote!(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
 }

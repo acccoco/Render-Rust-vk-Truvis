@@ -15,13 +15,11 @@ use truvis_rhi::{
         pipeline::{RhiPipeline, RhiPipelineTemplate},
     },
     render_core::Rhi,
-    shader_cursor::ShaderCursorType,
 };
 
 #[derive(Clone, Debug, Copy)]
 #[repr(C)]
-struct Vertex
-{
+struct Vertex {
     pos: [f32; 4],
     color: [f32; 4],
 }
@@ -51,24 +49,20 @@ const VERTEX_DATA: [Vertex; 4] = [
     },
 ];
 
-
 #[derive(ShaderLayout)]
-struct RTShaderBindings
-{
+struct RTShaderBindings {
     #[binding = 0]
     #[stage = "RAYGEN_KHR"]
     #[descriptor_type = "ACCELERATION_STRUCTURE_KHR"]
-    tlas: ShaderCursorType,
+    tlas: (),
 
     #[binding = 1]
     #[stage = "RAYGEN_KHR"]
     #[descriptor_type = "STORAGE_IMAGE"]
-    output_image: ShaderCursorType,
+    output_image: (),
 }
 
-
-struct HelloRT
-{
+struct HelloRT {
     vertex_buffer: RhiBuffer,
     index_buffer: RhiBuffer,
     pipeline: RhiPipeline,
@@ -76,11 +70,8 @@ struct HelloRT
     tlas: RhiAcceleration, // 只能由一个
 }
 
-
-impl HelloRT
-{
-    fn init_buffer(rhi: &Rhi) -> (RhiBuffer, RhiBuffer)
-    {
+impl HelloRT {
+    fn init_buffer(rhi: &Rhi) -> (RhiBuffer, RhiBuffer) {
         let mut index_buffer = RhiBuffer::new_index_buffer(rhi, size_of_val(&INDEX_DATA), "index-buffer");
         index_buffer.transfer_data_by_stage_buffer(rhi, &INDEX_DATA);
 
@@ -94,8 +85,7 @@ impl HelloRT
         rhi: &Rhi,
         vertex_buffer: &RhiBuffer,
         index_buffer: &RhiBuffer,
-    ) -> (RhiAcceleration, RhiAcceleration)
-    {
+    ) -> (RhiAcceleration, RhiAcceleration) {
         let triangles_data = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
             vertex_data: vk::DeviceOrHostAddressConstKHR {
@@ -119,7 +109,6 @@ impl HelloRT
             vk::BuildAccelerationStructureFlagsKHR::empty(),
             "hello",
         );
-
 
         // 3x4 row-major 的变换矩阵
         let trans = vk::TransformMatrixKHR {
@@ -147,12 +136,10 @@ impl HelloRT
         let tlas =
             RhiAcceleration::build_tlas(rhi, &instances, vk::BuildAccelerationStructureFlagsKHR::empty(), "hello");
 
-
         (tlas, blas)
     }
 
-    fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> RhiPipeline
-    {
+    fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> RhiPipeline {
         let extent = render_context.swapchain_extent();
         RhiPipelineTemplate {
             fragment_shader_path: Some("shader/hello_triangle/triangle.frag.spv".into()),
@@ -195,8 +182,7 @@ impl HelloRT
         .create_pipeline(rhi, "rt")
     }
 
-    fn run(&self, rhi: &Rhi, render_context: &mut RenderContext)
-    {
+    fn run(&self, rhi: &Rhi, render_context: &mut RenderContext) {
         let depth_attach_info = <Self as App>::get_depth_attachment(render_context.depth_view.handle());
         let color_attach_info = <Self as App>::get_color_attachment(render_context.current_present_image_view());
         let render_info = <Self as App>::get_render_info(
@@ -222,9 +208,7 @@ impl HelloRT
         rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
-
-    fn new(rhi: &Rhi, render_context: &RenderContext) -> Self
-    {
+    fn new(rhi: &Rhi, render_context: &RenderContext) -> Self {
         log::info!("start.");
         let (vertex_buffer, index_buffer) = Self::init_buffer(rhi);
         let (tlas, blas) = Self::init_acceleration(rhi, &vertex_buffer, &index_buffer);
@@ -240,31 +224,25 @@ impl HelloRT
     }
 }
 
-impl App for HelloRT
-{
-    fn update_ui(&mut self, ui: &mut Ui)
-    {
+impl App for HelloRT {
+    fn update_ui(&mut self, ui: &mut Ui) {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
     }
 
-    fn update(&mut self, _app_ctx: &mut AppCtx)
-    {
+    fn update(&mut self, _app_ctx: &mut AppCtx) {
         //
     }
 
-    fn draw(&self, app_ctx: &mut AppCtx)
-    {
+    fn draw(&self, app_ctx: &mut AppCtx) {
         self.run(app_ctx.rhi, app_ctx.render_context);
     }
 
-    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self
-    {
+    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
         HelloRT::new(rhi, render_context)
     }
 
-    fn get_render_init_info() -> AppInitInfo
-    {
+    fn get_render_init_info() -> AppInitInfo {
         AppInitInfo {
             window_width: 800,
             window_height: 800,
@@ -274,8 +252,6 @@ impl App for HelloRT
     }
 }
 
-
-fn main()
-{
+fn main() {
     Renderer::<HelloRT>::run();
 }

@@ -11,28 +11,23 @@ use truvis_render::{
 use truvis_rhi::{
     core::image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
     render_core::Rhi,
-    shader_cursor::ShaderCursorType,
 };
 
-fn main()
-{
+fn main() {
     Renderer::<VkApp>::run();
 }
 
-struct InitInfo
-{
+struct InitInfo {
     width: u32,
     height: u32,
 }
 
-struct DepthStencil
-{
+struct DepthStencil {
     image: Rc<RhiImage2D>,
     view: Rc<RhiImage2DView>,
 }
 
-struct VkApp
-{
+struct VkApp {
     width: u32,
     height: u32,
 
@@ -44,41 +39,37 @@ struct VkApp
 }
 
 #[derive(ShaderLayout)]
-struct SceneShaderBindings
-{
+struct SceneShaderBindings {
     #[binding = 0]
     #[stage = "VERTEX | FRAGMENT"]
     #[descriptor_type = "UNIFORM_BUFFER"]
-    filed_0: ShaderCursorType,
-    
+    filed_0: (),
+
     acc: vk::DescriptorType,
 
     #[binding = 1]
     #[stage = "FRAGMENT"]
     #[descriptor_type = "UNIFORM_BUFFER"]
-    filed_1: ShaderCursorType,
+    filed_1: (),
 
     #[binding = 2]
     #[stage = "FRAGMENT"]
     #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
-    filed_2: ShaderCursorType,
+    filed_2: (),
 
     #[binding = 3]
     #[stage = "FRAGMENT"]
     #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
-    filed_3: ShaderCursorType,
+    filed_3: (),
 
     #[binding = 4]
     #[stage = "FRAGMENT"]
     #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
-    filed_4: ShaderCursorType,
+    filed_4: (),
 }
 
-
-impl VkApp
-{
-    fn prepare_render_pass(rhi: &Rhi, render_ctx: &RenderContext) -> vk::RenderPass
-    {
+impl VkApp {
+    fn prepare_render_pass(rhi: &Rhi, render_ctx: &RenderContext) -> vk::RenderPass {
         // attachment
         let attachments = vec![
             // Color attachment
@@ -141,8 +132,7 @@ impl VkApp
         render_pass
     }
 
-    fn setup_depth_stencil(rhi: &Rhi, render_ctx: &RenderContext, init_info: &InitInfo) -> DepthStencil
-    {
+    fn setup_depth_stencil(rhi: &Rhi, render_ctx: &RenderContext, init_info: &InitInfo) -> DepthStencil {
         // TODO 使用 vkmem
 
         // TODO 可以把这个 format 存下来
@@ -188,8 +178,7 @@ impl VkApp
         render_pass: vk::RenderPass,
         init_info: &InitInfo,
         depth_stencil: &DepthStencil,
-    ) -> Vec<vk::Framebuffer>
-    {
+    ) -> Vec<vk::Framebuffer> {
         let frame_buffers = render_context
             .render_swapchain
             .image_views
@@ -210,8 +199,7 @@ impl VkApp
     }
 
     // TODO
-    fn setup_desriptors(_rhi: &Rhi, _render_ctx: &RenderContext)
-    {
+    fn setup_desriptors(_rhi: &Rhi, _render_ctx: &RenderContext) {
         // scene descriptor sets: matrices and environment maps
         // 数量和 swapchain 的 image 保持一致
         {
@@ -230,11 +218,9 @@ impl VkApp
         // skybox descriptor sets
     }
 
-
     fn setup_pipelines() {}
 
-    fn new(rhi: &Rhi, render_context: &mut RenderContext) -> Self
-    {
+    fn new(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
         let init_info = InitInfo {
             width: 800,
             height: 800,
@@ -264,30 +250,24 @@ impl VkApp
     }
 }
 
-impl App for VkApp
-{
-    fn update_ui(&mut self, _ui: &mut Ui)
-    {
+impl App for VkApp {
+    fn update_ui(&mut self, _ui: &mut Ui) {
         todo!()
     }
 
-    fn update(&mut self, _app_ctx: &mut AppCtx)
-    {
+    fn update(&mut self, _app_ctx: &mut AppCtx) {
         //
     }
 
-    fn draw(&self, _app_ctx: &mut AppCtx)
-    {
+    fn draw(&self, _app_ctx: &mut AppCtx) {
         todo!()
     }
 
-    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self
-    {
+    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
         VkApp::new(rhi, render_context)
     }
 
-    fn get_render_init_info() -> AppInitInfo
-    {
+    fn get_render_init_info() -> AppInitInfo {
         AppInitInfo {
             window_width: 800,
             window_height: 800,

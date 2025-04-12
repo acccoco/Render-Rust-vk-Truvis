@@ -71,7 +71,7 @@ where
     T: ShaderBindingLayout,
 {
     /// Vulkan 描述符集句柄
-    pub descriptor_set: vk::DescriptorSet,
+    pub handle: vk::DescriptorSet,
     /// 用于在编译时关联泛型参数 T
     phantom_data: std::marker::PhantomData<T>,
 }
@@ -112,7 +112,7 @@ where
             let descriptor_set = rhi.vk_device().allocate_descriptor_sets(&alloc_info).unwrap()[0];
             rhi.set_debug_name(descriptor_set, debug_name);
             Self {
-                descriptor_set,
+                handle: descriptor_set,
                 phantom_data: std::marker::PhantomData,
             }
         }
