@@ -198,7 +198,12 @@ impl PhongApp {
             .size(size_of::<PushConstant>() as u32)]);
         ci.descriptor_set_layouts(descriptor_set_layouts);
         ci.attach_info(vec![render_ctx.color_format()], Some(render_ctx.depth_format()), None);
-        ci.viewport(glam::vec2(0.0, 0.0), glam::vec2(extent.width as _, extent.height as _), 0.0, 1.0);
+        ci.viewport(
+            glam::vec2(0.0, extent.height as f32),
+            glam::vec2(extent.width as _, -(extent.height as f32)),
+            0.0,
+            1.0,
+        );
         ci.scissor(extent.into());
         ci.vertex_binding(VertexPNUAoS::vertex_input_bindings());
         ci.vertex_attribute(VertexPNUAoS::vertex_input_attriutes());
@@ -434,9 +439,8 @@ impl App for PhongApp {
         let camera_pos = glam::vec3(20.0, 0.0, 0.0);
         let camera_dir = glam::vec3(-1.0, 0.0, 0.0);
 
-        // vulkan NDC 是 X-Right, Y-Up 的，framebuffer 的起点又是左上角，需要翻转 Y 轴
+        // 从 RightHand-Y-Up 的 ViewSpace 到 LeftHand-Y-Up 的 NDC
         let mut projection = glam::Mat4::perspective_infinite_rh(90f32.to_radians(), 1.0, 0.1);
-        projection.y_axis.y *= -1.0;
 
         Self {
             _descriptor_set_layouts: layouts,

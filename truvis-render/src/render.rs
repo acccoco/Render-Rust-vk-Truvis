@@ -1,10 +1,10 @@
+use ash::vk;
+use raw_window_handle::HasRawDisplayHandle;
+use std::rc::Rc;
 use std::{
     ffi::CStr,
     sync::{Arc, OnceLock},
 };
-use std::rc::Rc;
-use ash::vk;
-use raw_window_handle::HasRawDisplayHandle;
 use truvis_rhi::{
     basic::{color::LabelColor, FRAME_ID_MAP},
     core::{
@@ -182,7 +182,7 @@ pub trait App {
     }
 }
 
-pub fn panic_handler(info: &std::panic::PanicInfo) {
+pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     log::error!("{}", info);
     // std::thread::sleep(std::time::Duration::from_secs(3));
 }

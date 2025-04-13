@@ -9,18 +9,19 @@ pub struct VertexPCAoS {
     color: [f32; 4],
 }
 impl VertexPCAoS {
+    /// 位于 RightHand-Y-Up 的坐标系，XY 平面上的一个正立的三角形
     pub const TRIANGLE_INDEX_DATA: [u32; 3] = [0u32, 1, 2];
     pub const TRIANGLE_VERTEX_DATA: [VertexPCAoS; 3] = [
         VertexPCAoS {
-            pos: [-1.0, 1.0, 0.0, 1.0],
+            pos: [-1.0, -1.0, 0.0, 1.0],
             color: [0.0, 1.0, 0.0, 1.0],
         },
         VertexPCAoS {
-            pos: [1.0, 1.0, 0.0, 1.0],
+            pos: [1.0, -1.0, 0.0, 1.0],
             color: [0.0, 0.0, 1.0, 1.0],
         },
         VertexPCAoS {
-            pos: [0.0, -1.0, 0.0, 1.0],
+            pos: [0.0, 1.0, 0.0, 1.0],
             color: [1.0, 0.0, 0.0, 1.0],
         },
     ];

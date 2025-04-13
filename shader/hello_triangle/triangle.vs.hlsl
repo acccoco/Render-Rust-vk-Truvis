@@ -20,7 +20,6 @@ struct VsOutput
 
 VsOutput main(VsInput input, uint VertexIndex: SV_VertexID)
 {
-
     VsOutput output = (VsOutput)0;
     output.Color = input.Color;
     output.UV = input.Position.xy * 0.5 + 0.5;

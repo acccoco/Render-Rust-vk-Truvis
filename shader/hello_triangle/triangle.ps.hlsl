@@ -16,6 +16,6 @@ struct PS_OUTPUT
 PS_OUTPUT main(PS_INPUT input)
 {
     PS_OUTPUT output = (PS_OUTPUT)0;
-    output.Color = float4(input.UV, 0.0, 1.0);
+    output.Color = input.Color;
     return output;
 }

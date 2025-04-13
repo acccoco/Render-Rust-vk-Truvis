@@ -43,7 +43,12 @@ impl HelloTriangle {
             Some(render_context.depth_format()),
             Some(vk::Format::UNDEFINED),
         );
-        pipeline_ci.viewport(glam::vec2(0.0, 0.0), glam::vec2(extent.width as f32, extent.height as f32), 0.0, 1.0);
+        pipeline_ci.viewport(
+            glam::vec2(0.0, extent.height as f32),
+            glam::vec2(extent.width as f32, -(extent.height as f32)),
+            0.0,
+            1.0,
+        );
         pipeline_ci.scissor(extent.into());
         pipeline_ci.vertex_binding(VertexPCAoS::vertex_input_bindings());
         pipeline_ci.vertex_attribute(VertexPCAoS::vertex_input_attributes());

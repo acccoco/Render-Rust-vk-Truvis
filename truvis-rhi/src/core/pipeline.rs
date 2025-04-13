@@ -77,7 +77,7 @@ impl Default for RhiGraphicsPipelineCreateInfo {
                 .polygon_mode(vk::PolygonMode::FILL)
                 .line_width(1.0)
                 .cull_mode(vk::CullModeFlags::BACK)
-                // FIXME 背面剔除，会涉及到 vulkan 的投影矩阵
+                // 按照 OpenGL 的传统，将 CCW 视为 front face
                 .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
                 .depth_bias_enable(false),
             msaa_sample: vk::SampleCountFlags::TYPE_1,

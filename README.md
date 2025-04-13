@@ -38,8 +38,9 @@
 * model space: Right-Handed, Y-Up
 * world: Right-Handed, Y-Up
 * camera: 右手，Y-Up。相机朝向 -Z
-* clip：x 和相机保持一直，y 和相机相反（朝下）
-* framebuffer：顶点在左上角。深度 0-1，0 在最远处，1 在最近处
+* NDC: LeftHand, Y-Up
+* framebuffer：原点在左上角
+* viewport：确保 `height < 0` 
 
 ![坐标系](doc/img/coords.png)
 
