@@ -2,9 +2,8 @@
 
 use std::rc::Rc;
 
-use ash::vk;
-
 use crate::{core::device::RhiDevice, rhi::Rhi};
+use ash::vk;
 
 #[derive(Clone)]
 pub struct RhiFence {
@@ -78,12 +77,6 @@ pub struct RhiImageBarrier {
 
 impl Default for RhiImageBarrier {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl RhiImageBarrier {
-    pub fn new() -> Self {
         Self {
             inner: vk::ImageMemoryBarrier2 {
                 old_layout: vk::ImageLayout::UNDEFINED,
@@ -100,6 +93,12 @@ impl RhiImageBarrier {
                 ..Default::default()
             },
         }
+    }
+}
+
+impl RhiImageBarrier {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     #[inline]
@@ -124,6 +123,7 @@ impl RhiImageBarrier {
     }
 
     /// builder
+    #[allow(clippy::redundant_clone)]
     #[inline]
     pub fn src_mask(mut self, src_stage_mask: vk::PipelineStageFlags2, src_access_mask: vk::AccessFlags2) -> Self {
         self.inner.src_stage_mask = src_stage_mask;
@@ -132,6 +132,7 @@ impl RhiImageBarrier {
     }
 
     /// builder
+    #[allow(clippy::redundant_clone)]
     #[inline]
     pub fn dst_mask(mut self, dst_stage_mask: vk::PipelineStageFlags2, dst_access_mask: vk::AccessFlags2) -> Self {
         self.inner.dst_stage_mask = dst_stage_mask;
@@ -151,6 +152,56 @@ impl RhiImageBarrier {
     #[inline]
     pub fn image(mut self, image: vk::Image) -> Self {
         self.inner.image = image;
+        self
+    }
+}
+
+pub struct RhiBufferBarrier {
+    inner: vk::BufferMemoryBarrier2<'static>,
+}
+
+impl Default for RhiBufferBarrier {
+    fn default() -> Self {
+        Self {
+            inner: vk::BufferMemoryBarrier2 {
+                src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                ..Default::default()
+            },
+        }
+    }
+}
+
+impl RhiBufferBarrier {
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[inline]
+    pub fn inner(&self) -> &vk::BufferMemoryBarrier2 {
+        &self.inner
+    }
+
+    #[inline]
+    pub fn src_mask(mut self, src_stage_mask: vk::PipelineStageFlags2, src_access_mask: vk::AccessFlags2) -> Self {
+        self.inner.src_stage_mask = src_stage_mask;
+        self.inner.src_access_mask = src_access_mask;
+        self
+    }
+
+    #[inline]
+    pub fn dst_mask(mut self, dst_stage_mask: vk::PipelineStageFlags2, dst_access_mask: vk::AccessFlags2) -> Self {
+        self.inner.dst_stage_mask = dst_stage_mask;
+        self.inner.dst_access_mask = dst_access_mask;
+        self
+    }
+
+    #[inline]
+    pub fn buffer(mut self, buffer: vk::Buffer, offset: vk::DeviceSize, size: vk::DeviceSize) -> Self {
+        self.inner.buffer = buffer;
+        self.inner.offset = offset;
+        self.inner.size = size;
         self
     }
 }

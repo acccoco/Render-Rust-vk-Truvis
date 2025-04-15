@@ -2,10 +2,8 @@ use ash::vk;
 use imgui::Ui;
 use std::mem::offset_of;
 use truvis_render::resource::shape::vertex_pc::VertexPCAoS;
-use truvis_render::{
-    framework::rendering::render_context::RenderContext,
-    render::{App, AppCtx, AppInitInfo, Renderer},
-};
+use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer};
+use truvis_render::render_context::RenderContext;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
     core::{buffer::RhiBuffer, command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},

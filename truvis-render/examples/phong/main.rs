@@ -4,12 +4,12 @@ use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
 use shader_layout_macro::ShaderLayout;
+use truvis_render::platform::camera::Camera;
+use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer};
+use truvis_render::render_context::RenderContext;
 use truvis_render::resource::shape::vertex_pnu::VertexPNUAoS;
-use truvis_render::{
-    framework::rendering::render_context::RenderContext,
-    render::{App, AppCtx, AppInitInfo, Renderer},
-};
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
+use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::shader_cursor::ShaderCursor;
 use truvis_rhi::{
     basic::{color::LabelColor, FRAME_ID_MAP},
@@ -59,7 +59,7 @@ struct PhongAppDescriptorSets {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
 struct Light {
     pos: glam::Vec3,
     pos_padding__: i32,
@@ -69,7 +69,7 @@ struct Light {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
 struct SceneUBO {
     projection: glam::Mat4,
     view: glam::Mat4,
@@ -135,6 +135,8 @@ struct PhongApp {
     mesh_ubo: Vec<MeshUBO>,
     mat_ubo: Vec<MaterialUBO>,
     scene_ubo: SceneUBO,
+
+    camera: Camera,
 
     push: PushConstant,
 }
@@ -238,7 +240,7 @@ impl PhongApp {
 
         let scene_buffer_ci = Rc::new(RhiBufferCreateInfo::new(
             size_of::<SceneUBO>() as vk::DeviceSize * frames_in_flight as u64,
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
+            vk::BufferUsageFlags::UNIFORM_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         ));
         let mesh_buffer_ci = Rc::new(RhiBufferCreateInfo::new(
             *mesh_ubo_align * mesh_instance_count * frames_in_flight as u64,
@@ -330,6 +332,38 @@ impl App for PhongApp {
     }
 
     fn update(&mut self, app_ctx: &mut AppCtx) {
+        // camera controller
+        if app_ctx.input_state.right_button_pressed {
+            let delta = app_ctx.input_state.crt_mouse_pos - app_ctx.input_state.last_mouse_pos;
+            let delta = delta * (app_ctx.timer.delta_time_s as f64) * 100.0;
+
+            self.camera.rotate_yaw(delta.x as f32);
+            self.camera.rotate_pitch(delta.y as f32);
+
+            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyW) {
+                self.camera.move_forward(app_ctx.timer.delta_time_s * 100.0);
+            }
+            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyS) {
+                self.camera.move_forward(-app_ctx.timer.delta_time_s * 100.0);
+            }
+            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyA) {
+                self.camera.move_right(-app_ctx.timer.delta_time_s * 100.0);
+            }
+            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyD) {
+                self.camera.move_right(app_ctx.timer.delta_time_s * 100.0);
+            }
+            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyQ) {
+                self.camera.move_up(-app_ctx.timer.delta_time_s * 100.0);
+            }
+            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyE) {
+                self.camera.move_up(app_ctx.timer.delta_time_s * 100.0);
+            }
+        }
+
+        self.push.camera_pos = self.camera.position;
+        self.push.camera_dir = self.camera.camera_forward();
+        self.scene_ubo.view = self.camera.get_view_matrix();
+
         app_ctx.rhi.device.debug_utils.begin_queue_label(
             app_ctx.rhi.graphics_queue.handle,
             "[main-pass]update",
@@ -358,6 +392,19 @@ impl App for PhongApp {
         let cmd = RenderContext::alloc_command_buffer(app_ctx.render_context, "[main-pass]render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[phong-pass]draw");
         {
+            cmd.cmd_update_buffer(
+                self.uniform_buffers[frame_id].scene_uniform_buffer.handle(),
+                0,
+                bytemuck::bytes_of(&self.scene_ubo),
+            );
+            cmd.buffer_memory_barrier(
+                vk::DependencyFlags::empty(),
+                &[RhiBufferBarrier::default()
+                    .buffer(self.uniform_buffers[frame_id].scene_uniform_buffer.handle(), 0, vk::WHOLE_SIZE)
+                    .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
+                    .dst_mask(vk::PipelineStageFlags2::VERTEX_SHADER, vk::AccessFlags2::SHADER_READ)],
+            );
+
             cmd.cmd_begin_rendering(&render_info);
             cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
             cmd.cmd_push_constants(
@@ -436,11 +483,14 @@ impl App for PhongApp {
             glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
 
-        let camera_pos = glam::vec3(20.0, 0.0, 0.0);
-        let camera_dir = glam::vec3(-1.0, 0.0, 0.0);
+        let camera = Camera {
+            position: glam::vec3(20.0, 0.0, 0.0),
+            euler_yaw_deg: 90.0,
+            ..Default::default()
+        };
 
         // 从 RightHand-Y-Up 的 ViewSpace 到 LeftHand-Y-Up 的 NDC
-        let mut projection = glam::Mat4::perspective_infinite_rh(90f32.to_radians(), 1.0, 0.1);
+        let mut projection = glam::Mat4::perspective_infinite_rh(60f32.to_radians(), 1.0, 0.1);
 
         Self {
             _descriptor_set_layouts: layouts,
@@ -462,7 +512,7 @@ impl App for PhongApp {
             }],
             scene_ubo: SceneUBO {
                 projection,
-                view: glam::Mat4::look_to_rh(camera_pos, camera_dir, glam::vec3(0.0, 1.0, 0.0)),
+                view: camera.get_view_matrix(),
                 l1: Light {
                     pos: glam::vec3(-20.0, 40.0, 0.0),
                     color: glam::vec3(5.0, 6.0, 1.0) * 2.0,
@@ -480,8 +530,8 @@ impl App for PhongApp {
                 },
             },
             push: PushConstant {
-                camera_pos,
-                camera_dir,
+                camera_pos: camera.position,
+                camera_dir: camera.camera_forward(),
                 frame_id: 0,
                 delta_time_ms: 0.0,
                 mouse_pos: Default::default(),
@@ -490,6 +540,7 @@ impl App for PhongApp {
                 fps: 0.0,
                 ..Default::default()
             },
+            camera,
         }
     }
 

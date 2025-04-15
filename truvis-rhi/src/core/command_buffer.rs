@@ -3,6 +3,7 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
+use crate::core::synchronize::RhiBufferBarrier;
 use crate::{
     basic::color::LabelColor,
     core::{
@@ -122,7 +123,7 @@ impl RhiCommandBuffer {
         unsafe { self.device.cmd_copy_buffer_to_image2(self.handle, copy_info) }
     }
 
-    /// 将 data 传输到 buffer 中，大小限制：65536Bytes
+    /// 将 data 传输到 buffer 中，大小限制：65536Bytes=64KB
     ///
     /// 首先将 data copy 到 cmd buffer 中，然后再 transfer 到指定 buffer 中，这是一个  transfer op
     ///
@@ -270,9 +271,10 @@ impl RhiCommandBuffer {
     }
 
     #[inline]
-    pub fn buffer_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[vk::BufferMemoryBarrier2]) {
+    pub fn buffer_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[RhiBufferBarrier]) {
+        let barriers = barriers.iter().map(|b| *b.inner()).collect_vec();
         let dependency_info =
-            vk::DependencyInfo::default().buffer_memory_barriers(barriers).dependency_flags(dependency_flags);
+            vk::DependencyInfo::default().buffer_memory_barriers(&barriers).dependency_flags(dependency_flags);
         unsafe {
             self.device.cmd_pipeline_barrier2(self.handle, &dependency_info);
         }

@@ -4,10 +4,8 @@ use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
 use shader_layout_macro::ShaderLayout;
-use truvis_render::{
-    framework::rendering::render_context::RenderContext,
-    render::{App, AppCtx, AppInitInfo, Renderer},
-};
+use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer};
+use truvis_render::render_context::RenderContext;
 use truvis_rhi::{
     core::image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
     rhi::Rhi,

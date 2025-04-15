@@ -2,11 +2,12 @@
 
 use std::{cell::RefCell, ffi::CString, rc::Rc};
 
-use crate::framework::rendering::render_context::RenderContext;
+use crate::render_context::RenderContext;
 use ash::vk;
 use image::EncodableLayout;
 use shader_layout_macro::ShaderLayout;
 use truvis_rhi::core::descriptor::RhiDescriptorSetLayout;
+use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::shader_cursor::ShaderCursor;
 use truvis_rhi::{
     basic::color::LabelColor,
@@ -43,30 +44,17 @@ impl UiMesh {
         {
             cmd.buffer_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[vk::BufferMemoryBarrier2::default()
-                    .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
-                    .dst_stage_mask(vk::PipelineStageFlags2::INDEX_INPUT)
-                    .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
-                    .dst_access_mask(vk::AccessFlags2::INDEX_READ)
-                    .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                    .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                    .buffer(index_buffer.handle())
-                    .offset(0)
-                    .size(vk::WHOLE_SIZE)],
+                &[RhiBufferBarrier::default()
+                    .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
+                    .dst_mask(vk::PipelineStageFlags2::INDEX_INPUT, vk::AccessFlags2::INDEX_READ)
+                    .buffer(index_buffer.handle(), 0, vk::WHOLE_SIZE)],
             );
-
             cmd.buffer_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[vk::BufferMemoryBarrier2::default()
-                    .src_stage_mask(vk::PipelineStageFlags2::TRANSFER)
-                    .dst_stage_mask(vk::PipelineStageFlags2::VERTEX_INPUT)
-                    .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
-                    .dst_access_mask(vk::AccessFlags2::VERTEX_ATTRIBUTE_READ)
-                    .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                    .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                    .buffer(vertex_buffer.handle())
-                    .offset(0)
-                    .size(vk::WHOLE_SIZE)],
+                &[RhiBufferBarrier::default()
+                    .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
+                    .dst_mask(vk::PipelineStageFlags2::VERTEX_INPUT, vk::AccessFlags2::VERTEX_ATTRIBUTE_READ)
+                    .buffer(vertex_buffer.handle(), 0, vk::WHOLE_SIZE)],
             );
         }
         cmd.end_label();

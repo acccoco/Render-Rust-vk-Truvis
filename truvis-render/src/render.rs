@@ -1,5 +1,9 @@
+use crate::platform::ui::{UiOptions, UI};
+use crate::render_context::{RenderContext, RenderContextInitInfo};
 use ash::vk;
 use raw_window_handle::HasRawDisplayHandle;
+use std::collections::HashMap;
+use std::iter::Map;
 use std::rc::Rc;
 use std::{
     ffi::CStr,
@@ -29,17 +33,12 @@ use winit::{
     window::WindowId,
 };
 
-use crate::framework::{
-    platform::ui::{UiOptions, UI},
-    rendering::render_context::{RenderContext, RenderContextInitInfo},
-};
-
 pub struct Timer {
     pub start_time: std::time::SystemTime,
     pub last_time: std::time::SystemTime,
     // FIXME 改成 Duration
-    pub delta_time: f32,
-    pub total_time: f32,
+    pub delta_time_s: f32,
+    pub total_time_s: f32,
     pub total_frame: i32,
 }
 
@@ -49,8 +48,8 @@ impl Default for Timer {
             start_time: std::time::SystemTime::now(),
             last_time: std::time::SystemTime::now(),
             total_frame: 0,
-            delta_time: 0.0,
-            total_time: 0.0,
+            delta_time_s: 0.0,
+            total_time_s: 0.0,
         }
     }
 }
@@ -60,8 +59,8 @@ impl Timer {
         self.start_time = std::time::SystemTime::now();
         self.last_time = std::time::SystemTime::now();
         self.total_frame = 0;
-        self.delta_time = 0.0;
-        self.total_time = 0.0;
+        self.delta_time_s = 0.0;
+        self.total_time_s = 0.0;
     }
 
     pub fn update(&mut self) {
@@ -70,15 +69,19 @@ impl Timer {
         let delta_time = now.duration_since(self.last_time).unwrap().as_secs_f32();
         self.last_time = now;
         self.total_frame += 1;
-        self.total_time = total_time;
-        self.delta_time = delta_time;
+        self.total_time_s = total_time;
+        self.delta_time_s = delta_time;
     }
 }
 
+/// 记录输入信息
 pub struct InputState {
-    pub crt_mouse_pos: (f64, f64),
-    pub last_mouse_pos: (f64, f64),
+    /// 当前帧的鼠标位置 pixel
+    pub crt_mouse_pos: glam::DVec2,
+    /// 上一帧的鼠标位置 pixel
+    pub last_mouse_pos: glam::DVec2,
     pub right_button_pressed: bool,
+    pub key_pressed: HashMap<winit::keyboard::KeyCode, bool>,
 }
 
 /// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
@@ -214,9 +217,10 @@ impl<A: App> Renderer<A> {
             rhi: None,
 
             input_state: InputState {
-                crt_mouse_pos: (0.0, 0.0),
-                last_mouse_pos: (0.0, 0.0),
+                crt_mouse_pos: glam::DVec2::default(),
+                last_mouse_pos: glam::DVec2::default(),
                 right_button_pressed: false,
+                key_pressed: Default::default(),
             },
         }
     }
@@ -283,7 +287,7 @@ impl<A: App> Renderer<A> {
 
     fn tick(&mut self) {
         self.timer.update();
-        let duration = std::time::Duration::from_secs_f32(self.timer.delta_time);
+        let duration = std::time::Duration::from_secs_f32(self.timer.delta_time_s);
         self.ui.as_ref().unwrap().imgui.borrow_mut().io_mut().update_delta_time(duration);
 
         self.render_context.as_mut().unwrap().acquire_frame();
@@ -399,7 +403,25 @@ impl<A: App> winit::application::ApplicationHandler<UserEvent> for Renderer<A> {
                 self.tick();
             }
             WindowEvent::CursorMoved { position, .. } => {
-                self.input_state.crt_mouse_pos = (position.x, position.y);
+                self.input_state.crt_mouse_pos = glam::dvec2(position.x, position.y);
+            }
+            WindowEvent::MouseWheel { delta, .. } => {}
+            WindowEvent::MouseInput { state, button, .. } => {
+                if button == winit::event::MouseButton::Right {
+                    self.input_state.right_button_pressed = state == winit::event::ElementState::Pressed;
+                }
+            }
+            WindowEvent::Focused(focues) => {}
+            WindowEvent::KeyboardInput {
+                event:
+                    winit::event::KeyEvent {
+                        physical_key: winit::keyboard::PhysicalKey::Code(key_code),
+                        state,
+                        ..
+                    },
+                ..
+            } => {
+                self.input_state.key_pressed.insert(key_code, state == winit::event::ElementState::Pressed);
             }
 
             _ => {}

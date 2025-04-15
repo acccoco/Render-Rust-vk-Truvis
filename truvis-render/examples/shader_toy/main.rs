@@ -2,10 +2,8 @@ use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use imgui::Ui;
 use truvis_render::resource::shape::vertex_pc::VertexPCAoS;
-use truvis_render::{
-    framework::rendering::render_context::RenderContext,
-    render::{App, AppCtx, AppInitInfo, Renderer, Timer},
-};
+use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer, Timer};
+use truvis_render::render_context::RenderContext;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
     core::{buffer::RhiBuffer, command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
@@ -74,10 +72,10 @@ impl ShaderToy {
 
     fn run(&self, rhi: &Rhi, render_context: &mut RenderContext, timer: &Timer) {
         let push_constants = PushConstants {
-            time: timer.total_time,
-            delta_time: timer.delta_time,
+            time: timer.total_time_s,
+            delta_time: timer.delta_time_s,
             frame: timer.total_frame,
-            frame_rate: 1.0 / timer.delta_time,
+            frame_rate: 1.0 / timer.delta_time_s,
             resolution: glam::Vec2::new(
                 render_context.swapchain_extent().width as f32,
                 render_context.swapchain_extent().height as f32,
