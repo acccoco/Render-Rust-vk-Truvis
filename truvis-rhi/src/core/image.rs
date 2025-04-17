@@ -3,6 +3,8 @@ use std::rc::Rc;
 use ash::vk;
 use vk_mem::Alloc;
 
+use crate::core::allocator::RhiAllocator;
+use crate::core::device::RhiDevice;
 use crate::{
     core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, synchronize::RhiImageBarrier},
     rhi::Rhi,
@@ -95,10 +97,12 @@ impl RhiImageViewCreateInfo {
 pub struct RhiImage2D {
     pub handle: vk::Image,
 
-    _alloc: vk_mem::Allocation,
+    allocation: vk_mem::Allocation,
 
     _name: String,
     image_info: Rc<RhiImageCreateInfo>,
+
+    allocator: Rc<RhiAllocator>,
 }
 
 impl RhiImage2D {
@@ -116,9 +120,10 @@ impl RhiImage2D {
             _name: debug_name.to_string(),
 
             handle: image,
-            _alloc: alloc,
+            allocation: alloc,
 
             image_info,
+            allocator: rhi.allocator.clone(),
         }
     }
 
@@ -155,7 +160,6 @@ impl RhiImage2D {
             |cmd| image.transfer_data(rhi, cmd, data),
             name,
         );
-        stage_buffer.destroy();
 
         image
     }
@@ -241,12 +245,20 @@ impl RhiImage2D {
     }
 }
 
+impl Drop for RhiImage2D {
+    fn drop(&mut self) {
+        unsafe { self.allocator.destroy_image(self.handle, &mut self.allocation) }
+    }
+}
+
 pub struct RhiImage2DView {
     handle: vk::ImageView,
 
     _image: Rc<RhiImage2D>,
     _info: Rc<RhiImageViewCreateInfo>,
     _name: String,
+
+    device: Rc<RhiDevice>,
 }
 
 impl RhiImage2DView {
@@ -259,6 +271,7 @@ impl RhiImage2DView {
             _image: image,
             _info: Rc::new(info),
             _name: name,
+            device: rhi.device.clone(),
         }
     }
 
@@ -266,5 +279,13 @@ impl RhiImage2DView {
     #[inline]
     pub fn handle(&self) -> vk::ImageView {
         self.handle
+    }
+}
+
+impl Drop for RhiImage2DView {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.destroy_image_view(self.handle, None);
+        }
     }
 }

@@ -9,7 +9,8 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta};
 /// - descriptor_type: 指定描述符类型（如 UNIFORM_BUFFER, COMBINED_IMAGE_SAMPLER 等）
 /// - count: 指定描述符数量
 /// - stage: 指定着色器阶段（如 VERTEX, FRAGMENT 等）
-#[proc_macro_derive(ShaderLayout, attributes(binding, descriptor_type, count, stage))]
+/// - flags: 指定描述符绑定标志（如 UPDATE_AFTER_BIND, PARTIALLY_BOUND 等）
+#[proc_macro_derive(ShaderLayout, attributes(binding, descriptor_type, count, stage, flags))]
 pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
     // 解析输入为 DeriveInput 结构
     let input = parse_macro_input!(input as DeriveInput);
@@ -24,7 +25,7 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
         _ => panic!("Only structs are supported"),
     };
 
-    // 收集字段信息：名称、绑定、描述符类型、数量和着色器阶段
+    // 收集字段信息：名称、绑定、描述符类型、数量、着色器阶段和标志
     let mut field_infos = Vec::new();
 
     for field in fields {
@@ -33,18 +34,23 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
         let descriptor_type = get_descriptor_type(&field.attrs);
         let count = get_count_value(&field.attrs);
         let stage = get_stage_value(&field.attrs);
+        let flags = get_flags_value(&field.attrs);
 
         if let Some(binding) = binding {
-            field_infos.push((field_name, binding, descriptor_type, count, stage));
+            // 创建不带前后缀下划线的方法名
+            let method_name = syn::Ident::new(field_name.to_string().trim_matches('_'), field_name.span());
+            field_infos.push((field_name, method_name, binding, descriptor_type, count, stage, flags));
         }
     }
 
     // 生成获取绑定信息的方法
     let field_names = field_infos.iter().map(|(name, ..)| name).collect::<Vec<_>>();
-    let binding_values = field_infos.iter().map(|(_, binding, ..)| binding).collect::<Vec<_>>();
-    let descriptor_types = field_infos.iter().map(|(_, _, descriptor_type, ..)| descriptor_type).collect::<Vec<_>>();
-    let counts = field_infos.iter().map(|(.., count, _)| count).collect::<Vec<_>>();
-    let stages = field_infos.iter().map(|(.., stage)| stage).collect::<Vec<_>>();
+    let method_names = field_infos.iter().map(|(_, method_name, ..)| method_name).collect::<Vec<_>>();
+    let binding_values = field_infos.iter().map(|(_, _, binding, ..)| binding).collect::<Vec<_>>();
+    let descriptor_types = field_infos.iter().map(|(_, _, _, descriptor_type, ..)| descriptor_type).collect::<Vec<_>>();
+    let counts = field_infos.iter().map(|(.., count, _, _)| count).collect::<Vec<_>>();
+    let stages = field_infos.iter().map(|(.., stage, _)| stage).collect::<Vec<_>>();
+    let flags = field_infos.iter().map(|(.., flags)| flags).collect::<Vec<_>>();
 
     // 生成代码：
     // 1. 实现 get_shader_bindings 方法，返回字段名和绑定值的元组数组
@@ -52,14 +58,15 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl #struct_name {
             #(
-                pub fn #field_names() -> &'static shader_layout_trait::ShaderBindingItem {
+                pub fn #method_names() -> &'static shader_layout_trait::ShaderBindingItem {
                     static CURSOR: std::sync::OnceLock<shader_layout_trait::ShaderBindingItem> = std::sync::OnceLock::new();
                     CURSOR.get_or_init(|| shader_layout_trait::ShaderBindingItem{
-                        name: stringify!(#field_names),
+                        name: stringify!(#field_names).trim_matches('_'),
                         binding: #binding_values,
                         descriptor_type: #descriptor_types,
                         stage_flags: #stages,
                         count: #counts,
+                        flags: #flags,
                     })
                 }
             )*
@@ -69,16 +76,16 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
             fn get_shader_bindings() -> Vec<shader_layout_trait::ShaderBindingItem> {
                 vec![
                     #(shader_layout_trait::ShaderBindingItem {
-                        name: stringify!(#field_names),
+                        name: stringify!(#field_names).trim_matches('_'),
                         binding: #binding_values,
                         descriptor_type: #descriptor_types,
                         stage_flags: #stages,
                         count: #counts,
+                        flags: #flags,
                     }),*
                 ]
             }
         }
-
     };
 
     expanded.into()
@@ -167,4 +174,32 @@ fn get_stage_value(attrs: &[Attribute]) -> syn::Expr {
 
     // 默认值：顶点和片段着色器
     syn::parse_quote!(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+}
+
+/// 从字段属性中获取 flags 值
+///
+/// 属性格式示例：#[flags = "UPDATE_AFTER_BIND | PARTIALLY_BOUND"]
+fn get_flags_value(attrs: &[Attribute]) -> syn::Expr {
+    for attr in attrs {
+        if attr.path().is_ident("flags") {
+            if let Meta::NameValue(meta) = &attr.meta {
+                if let syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(lit_str),
+                    ..
+                }) = &meta.value
+                {
+                    let flags = lit_str.value();
+                    let binding_flags = flags
+                        .split(" | ")
+                        .map(|s| format!("vk::DescriptorBindingFlags::{}", s))
+                        .collect::<Vec<_>>()
+                        .join(" | ");
+                    return syn::parse_str(&binding_flags).unwrap();
+                }
+            }
+        }
+    }
+
+    // 默认值：空标志
+    syn::parse_quote!(vk::DescriptorBindingFlags::empty())
 }

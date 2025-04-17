@@ -45,12 +45,13 @@ pub struct RenderContext {
 
     device: Rc<RhiDevice>,
     graphics_queue: Rc<RhiQueue>,
-    command_queue: Rc<RhiQueue>,
-    transfer_queue: Rc<RhiQueue>,
+    _command_queue: Rc<RhiQueue>,
+    _transfer_queue: Rc<RhiQueue>,
 }
 
 const DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
 const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
+const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
 
 impl RenderContext {
     pub fn new(rhi: &Rhi, init_info: &RenderContextInitInfo, render_swapchain_init_info: RhiSwapchainInitInfo) -> Self {
@@ -98,8 +99,8 @@ impl RenderContext {
 
             device: rhi.device.clone(),
             graphics_queue: rhi.graphics_queue.clone(),
-            command_queue: rhi.compute_queue.clone(),
-            transfer_queue: rhi.transfer_queue.clone(),
+            _command_queue: rhi.compute_queue.clone(),
+            _transfer_queue: rhi.transfer_queue.clone(),
         }
     }
 
@@ -185,17 +186,23 @@ impl RenderContext {
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_IMAGE,
-                descriptor_count: 32,
+                descriptor_count: DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT + 32,
             },
         ];
 
         let pool_ci = Rc::new(RhiDescriptorPoolCreateInfo::new(
-            vk::DescriptorPoolCreateFlags::empty(),
+            vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET | vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND,
             DESCRIPTOR_POOL_MAX_MATERIAL_CNT + DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
             pool_size,
         ));
 
         RhiDescriptorPool::new(device, pool_ci, "ctx-descriptor-pool")
+    }
+
+    /// getter
+    #[inline]
+    pub fn graphics_queue(&self) -> &RhiQueue {
+        &self.graphics_queue
     }
 
     /// 准备好渲染当前frame 所需的资源

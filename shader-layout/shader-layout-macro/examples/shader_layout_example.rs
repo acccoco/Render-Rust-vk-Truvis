@@ -16,7 +16,7 @@ struct MyShader {
     #[descriptor_type = "UNIFORM_BUFFER"]
     #[count = 1]
     #[stage = "VERTEX | FRAGMENT"]
-    uniform_buffer: (),
+    _uniform_buffer_: (),
 
     /// 纹理采样器，绑定到绑定点 1
     /// 仅用于片段着色器
@@ -24,7 +24,7 @@ struct MyShader {
     #[descriptor_type = "UNIFORM_BUFFER_DYNAMIC"]
     #[count = 1]
     #[stage = "FRAGMENT"]
-    texture: (),
+    _texture: (),
 
     /// 独立采样器，绑定到绑定点 2
     /// 仅用于片段着色器
@@ -32,7 +32,7 @@ struct MyShader {
     #[descriptor_type = "SAMPLER"]
     #[count = 1]
     #[stage = "FRAGMENT"]
-    sampler: (),
+    _sampler___: (),
 }
 
 fn main() {

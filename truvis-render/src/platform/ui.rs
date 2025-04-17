@@ -1,12 +1,14 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use std::{cell::RefCell, ffi::CString, rc::Rc};
-
 use crate::render_context::RenderContext;
+use crate::resource::shape::vertex_pc::VertexPCAoS;
 use ash::vk;
 use image::EncodableLayout;
 use shader_layout_macro::ShaderLayout;
+use std::mem::offset_of;
+use std::{cell::RefCell, ffi::CString, rc::Rc};
 use truvis_rhi::core::descriptor::RhiDescriptorSetLayout;
+use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::shader_cursor::ShaderCursor;
 use truvis_rhi::{
@@ -23,22 +25,65 @@ use truvis_rhi::{
     rhi::Rhi,
 };
 
-pub struct UiMesh {
-    pub vertex: RhiBuffer,
-    vertex_count: usize,
-
-    pub indices: RhiBuffer,
-    index_count: usize,
+/// AoS: Array of Structs
+struct ImGuiVertex {
+    pos: glam::Vec2,
+    uv: glam::Vec2,
+    color: u32, // R8G8B8A8
 }
 
-impl UiMesh {
-    // TODO 频繁的创建和销毁 buffer，性能不好
+impl ImGuiVertex {
+    fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription> {
+        vec![vk::VertexInputBindingDescription {
+            binding: 0,
+            stride: size_of::<ImGuiVertex>() as u32,
+            input_rate: vk::VertexInputRate::VERTEX,
+        }]
+    }
+
+    fn vertex_input_attributes() -> Vec<vk::VertexInputAttributeDescription> {
+        vec![
+            vk::VertexInputAttributeDescription {
+                binding: 0,
+                location: 0,
+                format: vk::Format::R32G32_SFLOAT,
+                offset: offset_of!(ImGuiVertex, pos) as u32,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 0,
+                location: 1,
+                format: vk::Format::R32G32_SFLOAT,
+                offset: offset_of!(ImGuiVertex, uv) as u32,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 0,
+                location: 2,
+                format: vk::Format::R8G8B8A8_UNORM,
+                offset: offset_of!(ImGuiVertex, color) as u32,
+            },
+        ]
+    }
+}
+
+/// imgui 绘制所需的 vertex buffer 和 index buffer
+struct GuiMesh {
+    vertex_buffer: RhiBuffer,
+    _vertex_count: usize,
+    vertex_stage_buffer: RhiBuffer,
+
+    index_buffer: RhiBuffer,
+    index_count: usize,
+    index_stage_buffer: RhiBuffer,
+}
+
+impl GuiMesh {
     pub fn from_draw_data(rhi: &Rhi, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self {
         let cmd = render_ctx.alloc_command_buffer("uipass-create-mesh");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]create-mesh");
 
-        let (vertex_buffer, vertex_cnt) = Self::create_vertices(rhi, render_ctx, &cmd, draw_data);
-        let (index_buffer, index_cnt) = Self::create_indices(rhi, render_ctx, &cmd, draw_data);
+        let (vertex_buffer, vertex_cnt, vertex_stage_buffer) =
+            Self::create_vertex_buffer(rhi, render_ctx, &cmd, draw_data);
+        let (index_buffer, index_cnt, index_stage_buffer) = Self::create_index_buffer(rhi, render_ctx, &cmd, draw_data);
 
         cmd.begin_label("uipass-mesh-transfer-barrier", LabelColor::COLOR_CMD);
         {
@@ -60,24 +105,28 @@ impl UiMesh {
         cmd.end_label();
         cmd.end();
 
-        rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
+        render_ctx.graphics_queue().submit(vec![RhiSubmitInfo::new(&[cmd])], None);
 
         Self {
-            vertex: vertex_buffer,
-            vertex_count: vertex_cnt,
-            indices: index_buffer,
+            vertex_buffer,
+            _vertex_count: vertex_cnt,
+            vertex_stage_buffer,
+
+            index_buffer,
             index_count: index_cnt,
+            index_stage_buffer,
         }
     }
 
-    /// # Return
-    /// (vertices buffer, vertex count)
-    fn create_vertices(
+    /// 从 draw data 中提取出 vertex 数据，创建 vertex buffer
+    ///
+    /// @return (vertex buffer, vertex count, stage buffer)
+    fn create_vertex_buffer(
         rhi: &Rhi,
         render_ctx: &mut RenderContext,
         cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (RhiBuffer, usize) {
+    ) -> (RhiBuffer, usize, RhiBuffer) {
         let vertex_count = draw_data.total_vtx_count as usize;
         let mut vertices = Vec::with_capacity(vertex_count);
         for draw_list in draw_data.draw_lists() {
@@ -90,40 +139,39 @@ impl UiMesh {
             vertices_size,
             &format!("{}-imgui-vertex-buffer", render_ctx.current_frame_prefix()),
         );
+
+        let mut stage_buffer = RhiBuffer::new_stage_buffer(
+            rhi,
+            vertices_size as vk::DeviceSize,
+            &format!("{}-imgui-vertex-stage-buffer", render_ctx.current_frame_prefix()),
+        );
+        stage_buffer.transfer_data_by_mem_map(&vertices);
+
+        cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
         {
-            // FIXME destroy stage buffer
-            let mut stage_buffer = RhiBuffer::new_stage_buffer(
-                rhi,
-                vertices_size as vk::DeviceSize,
-                &format!("{}-imgui-vertex-stage-buffer", render_ctx.current_frame_prefix()),
+            cmd.cmd_copy_buffer(
+                &stage_buffer,
+                &mut vertex_buffer,
+                &[vk::BufferCopy {
+                    size: vertices_size as vk::DeviceSize,
+                    ..Default::default()
+                }],
             );
-            stage_buffer.transfer_data_by_mem_map(&vertices);
-
-            cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
-            {
-                cmd.cmd_copy_buffer(
-                    &stage_buffer,
-                    &mut vertex_buffer,
-                    &[vk::BufferCopy {
-                        size: vertices_size as vk::DeviceSize,
-                        ..Default::default()
-                    }],
-                );
-            }
-            cmd.end_label();
         }
+        cmd.end_label();
 
-        (vertex_buffer, vertex_count)
+        (vertex_buffer, vertex_count, stage_buffer)
     }
 
-    /// # Return
-    /// (index buffer, index count)
-    fn create_indices(
+    /// 从 draw data 中提取出 index 数据，创建 index buffer
+    ///
+    /// @return (index buffer, index count, stage buffer)
+    fn create_index_buffer(
         rhi: &Rhi,
         render_ctx: &mut RenderContext,
         cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (RhiBuffer, usize) {
+    ) -> (RhiBuffer, usize, RhiBuffer) {
         let index_count = draw_data.total_idx_count as usize;
         let mut indices = Vec::with_capacity(index_count);
         for draw_list in draw_data.draw_lists() {
@@ -136,66 +184,62 @@ impl UiMesh {
             indices_size,
             &format!("{}-imgui-index-buffer", render_ctx.current_frame_prefix()),
         );
+        let mut stage_buffer = RhiBuffer::new_stage_buffer(
+            rhi,
+            indices_size as vk::DeviceSize,
+            &format!("{}-imgui-index-stage-buffer", render_ctx.current_frame_prefix()),
+        );
+        stage_buffer.transfer_data_by_mem_map(&indices);
+
+        cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);
         {
-            // FIXME destroy stage buffer
-            let mut stage_buffer = RhiBuffer::new_stage_buffer(
-                rhi,
-                indices_size as vk::DeviceSize,
-                &format!("{}-imgui-index-stage-buffer", render_ctx.current_frame_prefix()),
+            cmd.cmd_copy_buffer(
+                &stage_buffer,
+                &mut index_buffer,
+                &[vk::BufferCopy {
+                    size: indices_size as vk::DeviceSize,
+                    ..Default::default()
+                }],
             );
-            stage_buffer.transfer_data_by_mem_map(&indices);
-
-            cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);
-            {
-                cmd.cmd_copy_buffer(
-                    &stage_buffer,
-                    &mut index_buffer,
-                    &[vk::BufferCopy {
-                        size: indices_size as vk::DeviceSize,
-                        ..Default::default()
-                    }],
-                );
-            }
-            cmd.end_label();
         }
+        cmd.end_label();
 
-        (index_buffer, index_count)
-    }
-
-    fn destroy(self) {
-        self.indices.destroy();
-        self.vertex.destroy();
+        (index_buffer, index_count, stage_buffer)
     }
 }
 
-pub struct UI {
-    pub imgui: RefCell<imgui::Context>,
+pub struct Gui {
+    pub context: RefCell<imgui::Context>,
     pub platform: imgui_winit_support::WinitPlatform,
 
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
-    descriptor_set_layout: RhiDescriptorSetLayout<UiShaderLayout>,
+    _descriptor_set_layout: RhiDescriptorSetLayout<UiShaderLayout>,
 
     descriptor_pool: Rc<RhiDescriptorPool>,
 
     fonts_texture: RhiTexture2D,
     font_descriptor_set: vk::DescriptorSet,
 
-    meshes: Vec<Option<UiMesh>>,
+    meshes: Vec<Option<GuiMesh>>,
+
+    device: Rc<RhiDevice>,
 }
 
-pub struct UiOptions {
+pub struct UiCreateInfo {
     pub frames_in_flight: usize,
 }
 
-impl UI {
-    /// fonts atlas 使用的 texture id
-    const FONT_TEX_ID: usize = usize::MAX;
-
-    pub fn new(rhi: &Rhi, render_ctx: &RenderContext, window: &winit::window::Window, options: &UiOptions) -> Self {
+// constructor & getter
+impl Gui {
+    pub fn new(rhi: &Rhi, render_ctx: &RenderContext, window: &winit::window::Window, options: &UiCreateInfo) -> Self {
         let (mut imgui, platform) = Self::create_imgui(window);
 
-        let descriptor_set_layout = RhiDescriptorSetLayout::<UiShaderLayout>::new(rhi, "[uipass]descriptor-set-layout");
+        let descriptor_set_layout = RhiDescriptorSetLayout::<UiShaderLayout>::new(
+            rhi,
+            vk::DescriptorSetLayoutCreateFlags::empty(),
+            "[uipass]descriptor-set-layout",
+        );
         let pipeline_layout = Self::create_pipeline_layout(&rhi.device.handle, descriptor_set_layout.layout);
         rhi.device.debug_utils.set_object_debug_name(pipeline_layout, "[uipass]pipeline-layout");
         let pipeline = Self::create_pipeline(rhi, render_ctx, pipeline_layout);
@@ -215,8 +259,7 @@ impl UI {
             RhiTexture2D::new(rhi, image, "imgui-fonts-texture")
         };
 
-        let fonts = imgui.fonts();
-        fonts.tex_id = imgui::TextureId::from(Self::FONT_TEX_ID);
+        imgui.fonts().tex_id = imgui::TextureId::from(Self::FONT_TEX_ID);
 
         let descriptor_pool = Rc::new(RhiDescriptorPool::new(
             &rhi.device,
@@ -243,213 +286,32 @@ impl UI {
 
         // write
         {
-            let image_info = vk::DescriptorImageInfo::default()
-                .sampler(fonts_texture.sampler().handle())
-                .image_view(fonts_texture.image_view().handle())
-                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
-            let writes = UiShaderLayout::_font().write_image(descriptor_set, 0, vec![image_info]);
+            let writes = UiShaderLayout::font().write_image(
+                descriptor_set,
+                0,
+                vec![fonts_texture.descriptor_image_info(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)],
+            );
             rhi.device.write_descriptor_sets(&[writes]);
         }
 
         // TODO Textures::new()
 
         Self {
-            imgui: RefCell::new(imgui),
+            context: RefCell::new(imgui),
             platform,
 
             pipeline,
             pipeline_layout,
 
-            descriptor_set_layout,
+            _descriptor_set_layout: descriptor_set_layout,
             fonts_texture,
             descriptor_pool,
             font_descriptor_set: descriptor_set,
 
             meshes: (0..options.frames_in_flight).map(|_| None).collect(),
+
+            device: rhi.device.clone(),
         }
-    }
-
-    pub fn prepare_frame(&self, window: &winit::window::Window) {
-        let mut imgui = self.imgui.borrow_mut();
-        self.platform.prepare_frame(imgui.io_mut(), window).unwrap();
-    }
-
-    // FIXME 这些 new frame，prepare frame 的顺序到底是什么?
-    pub fn new_frame(&mut self, _window: &winit::window::Window) -> &mut imgui::Ui {
-        let frame = self.imgui.get_mut().new_frame();
-        // self.platform.prepare_render(&frame, window);
-
-        frame
-    }
-
-    pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>) {
-        self.platform.handle_event(self.imgui.get_mut().io_mut(), window, event);
-    }
-
-    // platform::prepare_frame()
-    // imgui.new_frame()
-    // 自定义：app::update_ui()
-    // paltform::prepare_render()
-    // imgui.render()
-    pub fn draw(
-        &mut self,
-        rhi: &Rhi,
-        render_ctx: &mut RenderContext,
-        window: &winit::window::Window,
-        f: impl FnOnce(&mut imgui::Ui),
-    ) -> Option<RhiCommandBuffer> {
-        self.platform.prepare_frame(self.imgui.borrow_mut().io_mut(), window).unwrap();
-
-        let mut temp_imgui = self.imgui.borrow_mut();
-        let frame = temp_imgui.new_frame();
-        f(frame);
-        self.platform.prepare_render(frame, window);
-        let draw_data = temp_imgui.render();
-        if draw_data.total_vtx_count == 0 {
-            return None;
-        }
-
-        let frame_index = render_ctx.current_frame_index();
-
-        // TODO 这里需要标注一下名称，每个 tick 都会重新建立 vertex buffer
-        rhi.device.debug_utils.begin_queue_label(
-            rhi.graphics_queue.handle,
-            "[ui-pass]create-mesh",
-            LabelColor::COLOR_STAGE,
-        );
-        if let Some(mesh) = self.meshes[frame_index].replace(UiMesh::from_draw_data(rhi, render_ctx, draw_data)) {
-            mesh.destroy()
-        }
-        rhi.device().debug_utils.end_queue_label(rhi.graphics_queue.handle);
-
-        let mut cmd = render_ctx.alloc_command_buffer("uipass-render");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]draw");
-        self.record_cmd(render_ctx, &mut cmd, self.meshes[frame_index].as_ref().unwrap(), draw_data);
-        cmd.end();
-
-        Some(cmd)
-    }
-
-    // TODO imgui 自己有个 Texture<> 类型，可以作为 hash 容器
-    /// 根据 imgui 传来的 texture id，找到对应的 descriptor set
-    fn get_texture(&self, texture_id: imgui::TextureId) -> vk::DescriptorSet {
-        if texture_id.id() == Self::FONT_TEX_ID {
-            self.font_descriptor_set
-        } else {
-            unimplemented!()
-        }
-    }
-
-    fn record_cmd(
-        &self,
-        render_ctx: &mut RenderContext,
-        cmd: &mut RhiCommandBuffer,
-        mesh: &UiMesh,
-        draw_data: &imgui::DrawData,
-    ) {
-        let color_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(render_ctx.current_present_image_view())
-            .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-            .load_op(vk::AttachmentLoadOp::LOAD)
-            .store_op(vk::AttachmentStoreOp::STORE);
-        let depth_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(render_ctx.depth_view.handle())
-            .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-            .load_op(vk::AttachmentLoadOp::LOAD)
-            .store_op(vk::AttachmentStoreOp::STORE);
-        let render_info = vk::RenderingInfo::default()
-            .layer_count(1)
-            .render_area(render_ctx.swapchain_extent().into())
-            .color_attachments(std::slice::from_ref(&color_attach_info))
-            .depth_attachment(&depth_attach_info);
-
-        let viewport = vk::Viewport {
-            width: draw_data.framebuffer_scale[0] * draw_data.display_size[0],
-            height: draw_data.framebuffer_scale[1] * draw_data.display_size[1],
-            min_depth: 0.0,
-            ..Default::default()
-        };
-
-        cmd.cmd_begin_rendering(&render_info);
-        cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline);
-        cmd.cmd_set_viewport(0, std::slice::from_ref(&viewport));
-        let projection =
-            glam::Mat4::orthographic_rh(0.0, draw_data.display_size[0], 0.0, draw_data.display_size[1], -1.0, 1.0);
-        cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::VERTEX, 0, projection.as_ref().as_bytes());
-        cmd.cmd_bind_index_buffer(&mesh.indices, 0, vk::IndexType::UINT16);
-        cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&mesh.vertex), &[0]);
-
-        let mut index_offset = 0;
-        let mut vertex_offset = 0;
-        // 缓存之前已经加载过的 texture
-        let mut last_texture_id: Option<imgui::TextureId> = None;
-        let clip_offset = draw_data.display_pos;
-        let clip_scale = draw_data.framebuffer_scale;
-
-        // 简而言之：对于每个 command，设置正确的 vertex, index, texture, scissor 即可
-        for draw_list in draw_data.draw_lists() {
-            for command in draw_list.commands() {
-                match command {
-                    imgui::DrawCmd::Elements {
-                        count,
-                        cmd_params:
-                            imgui::DrawCmdParams {
-                                clip_rect,
-                                texture_id, // 当前绘制命令用到的 texture，这个 id 是 app 决定的
-                                vtx_offset,
-                                idx_offset,
-                            },
-                    } => {
-                        let clip_x = (clip_rect[0] - clip_offset[0]) * clip_scale[0];
-                        let clip_y = (clip_rect[1] - clip_offset[1]) * clip_scale[1];
-                        let clip_w = (clip_rect[2] - clip_offset[0]) * clip_scale[0] - clip_x;
-                        let clip_h = (clip_rect[3] - clip_offset[1]) * clip_scale[1] - clip_y;
-
-                        let scissors = [vk::Rect2D {
-                            offset: vk::Offset2D {
-                                x: (clip_x as i32).max(0),
-                                y: (clip_y as i32).max(0),
-                            },
-                            extent: vk::Extent2D {
-                                width: clip_w as _,
-                                height: clip_h as _,
-                            },
-                        }];
-                        cmd.cmd_set_scissor(0, &scissors);
-
-                        // 加载 texture，如果和上一个 command 使用的 texture 不是同一个，则需要重新加载
-                        if Some(texture_id) != last_texture_id {
-                            cmd.bind_descriptor_sets(
-                                vk::PipelineBindPoint::GRAPHICS,
-                                self.pipeline_layout,
-                                0,
-                                &[self.get_texture(texture_id)],
-                                &[],
-                            );
-                            last_texture_id = Some(texture_id);
-                        }
-
-                        cmd.draw_indexed(
-                            count as u32,
-                            index_offset + idx_offset as u32,
-                            1,
-                            0,
-                            vertex_offset + vtx_offset as i32,
-                        );
-                    }
-                    imgui::DrawCmd::ResetRenderState => {
-                        log::warn!("imgui reset render state");
-                    }
-                    imgui::DrawCmd::RawCallback { .. } => {
-                        log::warn!("imgui raw callback");
-                    }
-                }
-            }
-
-            index_offset += draw_list.idx_buffer().len() as u32;
-            vertex_offset += draw_list.vtx_buffer().len() as i32;
-        }
-        cmd.end_rendering();
     }
 
     fn create_imgui(window: &winit::window::Window) -> (imgui::Context, imgui_winit_support::WinitPlatform) {
@@ -521,27 +383,8 @@ impl UI {
         ];
 
         // 20 = R32G32 + R32G32 + R8G8B8A8
-        let binding_desc = [vk::VertexInputBindingDescription::default()
-            .binding(0)
-            .stride(20)
-            .input_rate(vk::VertexInputRate::VERTEX)];
-        let attribute_desc = [
-            vk::VertexInputAttributeDescription::default()
-                .binding(0)
-                .location(0)
-                .format(vk::Format::R32G32_SFLOAT)
-                .offset(0),
-            vk::VertexInputAttributeDescription::default()
-                .binding(0)
-                .location(1)
-                .format(vk::Format::R32G32_SFLOAT)
-                .offset(8),
-            vk::VertexInputAttributeDescription::default()
-                .binding(0)
-                .location(2)
-                .format(vk::Format::R8G8B8A8_UNORM)
-                .offset(16),
-        ];
+        let binding_desc = ImGuiVertex::vertex_input_bindings();
+        let attribute_desc = ImGuiVertex::vertex_input_attributes();
 
         let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::default()
             .vertex_binding_descriptions(&binding_desc)
@@ -635,6 +478,182 @@ impl UI {
         frag_shader_module.destroy();
 
         pipeline
+    }
+}
+
+impl Gui {
+    /// fonts atlas 使用的 texture id
+    const FONT_TEX_ID: usize = usize::MAX;
+
+    /// 接受 window 的事件
+    pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>) {
+        self.platform.handle_event(self.context.get_mut().io_mut(), window, event);
+    }
+
+    /// 内部的执行顺序
+    /// - WinitPlatform::prepare_frame()
+    /// - Context::new_frame()
+    /// - 自定义：app::update_ui()
+    /// - WinitPlatform::prepare_render()
+    /// - Context::render()
+    pub fn draw(
+        &mut self,
+        rhi: &Rhi,
+        render_ctx: &mut RenderContext,
+        window: &winit::window::Window,
+        f: impl FnOnce(&mut imgui::Ui),
+    ) -> Option<RhiCommandBuffer> {
+        // 看源码可知：imgui 可能会设定鼠标位置
+        self.platform.prepare_frame(self.context.borrow_mut().io_mut(), window).unwrap();
+
+        let mut temp_imgui = self.context.borrow_mut();
+        let frame = temp_imgui.new_frame();
+        f(frame);
+        // 看源码可知：imgui 可能会因此鼠标指针
+        self.platform.prepare_render(frame, window);
+        let draw_data = temp_imgui.render();
+        if draw_data.total_vtx_count == 0 {
+            return None;
+        }
+
+        let frame_index = render_ctx.current_frame_index();
+
+        rhi.device.debug_utils.begin_queue_label(
+            rhi.graphics_queue.handle,
+            "[ui-pass]create-mesh",
+            LabelColor::COLOR_STAGE,
+        );
+        self.meshes[frame_index].replace(GuiMesh::from_draw_data(rhi, render_ctx, draw_data));
+        rhi.device().debug_utils.end_queue_label(rhi.graphics_queue.handle);
+
+        let mut cmd = render_ctx.alloc_command_buffer("uipass-render");
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]draw");
+        self.record_cmd(render_ctx, &mut cmd, self.meshes[frame_index].as_ref().unwrap(), draw_data);
+        cmd.end();
+
+        Some(cmd)
+    }
+
+    // TODO imgui 自己有个 Texture<> 类型，可以作为 hash 容器
+    /// 根据 imgui 传来的 texture id，找到对应的 descriptor set
+    fn get_texture(&self, texture_id: imgui::TextureId) -> vk::DescriptorSet {
+        if texture_id.id() == Self::FONT_TEX_ID {
+            self.font_descriptor_set
+        } else {
+            unimplemented!()
+        }
+    }
+
+    fn record_cmd(
+        &self,
+        render_ctx: &mut RenderContext,
+        cmd: &mut RhiCommandBuffer,
+        mesh: &GuiMesh,
+        draw_data: &imgui::DrawData,
+    ) {
+        let color_attach_info = vk::RenderingAttachmentInfo::default()
+            .image_view(render_ctx.current_present_image_view())
+            .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+            .load_op(vk::AttachmentLoadOp::LOAD)
+            .store_op(vk::AttachmentStoreOp::STORE);
+        let depth_attach_info = vk::RenderingAttachmentInfo::default()
+            .image_view(render_ctx.depth_view.handle())
+            .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+            .load_op(vk::AttachmentLoadOp::LOAD)
+            .store_op(vk::AttachmentStoreOp::STORE);
+        let render_info = vk::RenderingInfo::default()
+            .layer_count(1)
+            .render_area(render_ctx.swapchain_extent().into())
+            .color_attachments(std::slice::from_ref(&color_attach_info))
+            .depth_attachment(&depth_attach_info);
+
+        let viewport = vk::Viewport {
+            width: draw_data.framebuffer_scale[0] * draw_data.display_size[0],
+            height: draw_data.framebuffer_scale[1] * draw_data.display_size[1],
+            min_depth: 0.0,
+            ..Default::default()
+        };
+
+        cmd.cmd_begin_rendering(&render_info);
+        cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+        cmd.cmd_set_viewport(0, std::slice::from_ref(&viewport));
+        let projection =
+            glam::Mat4::orthographic_rh(0.0, draw_data.display_size[0], 0.0, draw_data.display_size[1], -1.0, 1.0);
+        cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::VERTEX, 0, projection.as_ref().as_bytes());
+        cmd.cmd_bind_index_buffer(&mesh.index_buffer, 0, vk::IndexType::UINT16);
+        cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&mesh.vertex_buffer), &[0]);
+
+        let mut index_offset = 0;
+        let mut vertex_offset = 0;
+        // 缓存之前已经加载过的 texture
+        let mut last_texture_id: Option<imgui::TextureId> = None;
+        let clip_offset = draw_data.display_pos;
+        let clip_scale = draw_data.framebuffer_scale;
+
+        // 简而言之：对于每个 command，设置正确的 vertex, index, texture, scissor 即可
+        for draw_list in draw_data.draw_lists() {
+            for command in draw_list.commands() {
+                match command {
+                    imgui::DrawCmd::Elements {
+                        count,
+                        cmd_params:
+                            imgui::DrawCmdParams {
+                                clip_rect,
+                                texture_id, // 当前绘制命令用到的 texture，这个 id 是 app 决定的
+                                vtx_offset,
+                                idx_offset,
+                            },
+                    } => {
+                        let clip_x = (clip_rect[0] - clip_offset[0]) * clip_scale[0];
+                        let clip_y = (clip_rect[1] - clip_offset[1]) * clip_scale[1];
+                        let clip_w = (clip_rect[2] - clip_offset[0]) * clip_scale[0] - clip_x;
+                        let clip_h = (clip_rect[3] - clip_offset[1]) * clip_scale[1] - clip_y;
+
+                        let scissors = [vk::Rect2D {
+                            offset: vk::Offset2D {
+                                x: (clip_x as i32).max(0),
+                                y: (clip_y as i32).max(0),
+                            },
+                            extent: vk::Extent2D {
+                                width: clip_w as _,
+                                height: clip_h as _,
+                            },
+                        }];
+                        cmd.cmd_set_scissor(0, &scissors);
+
+                        // 加载 texture，如果和上一个 command 使用的 texture 不是同一个，则需要重新加载
+                        if Some(texture_id) != last_texture_id {
+                            cmd.bind_descriptor_sets(
+                                vk::PipelineBindPoint::GRAPHICS,
+                                self.pipeline_layout,
+                                0,
+                                &[self.get_texture(texture_id)],
+                                &[],
+                            );
+                            last_texture_id = Some(texture_id);
+                        }
+
+                        cmd.draw_indexed(
+                            count as u32,
+                            index_offset + idx_offset as u32,
+                            1,
+                            0,
+                            vertex_offset + vtx_offset as i32,
+                        );
+                    }
+                    imgui::DrawCmd::ResetRenderState => {
+                        log::warn!("imgui reset render state");
+                    }
+                    imgui::DrawCmd::RawCallback { .. } => {
+                        log::warn!("imgui raw callback");
+                    }
+                }
+            }
+
+            index_offset += draw_list.idx_buffer().len() as u32;
+            vertex_offset += draw_list.vtx_buffer().len() as i32;
+        }
+        cmd.end_rendering();
     }
 }
 

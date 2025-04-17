@@ -46,6 +46,23 @@ struct MaterialShaderBindings {
     mat: (),
 }
 
+#[derive(ShaderLayout)]
+struct BindlessTextureBindings {
+    #[binding = 0]
+    #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
+    #[stage = "FRAGMENT"]
+    #[count = 128]
+    #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
+    textures: (),
+
+    #[binding = 1]
+    #[descriptor_type = "STORAGE_IMAGE"]
+    #[stage = "FRAGMENT"]
+    #[count = 128]
+    #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
+    images: (),
+}
+
 struct PhongAppDescriptorSetLayouts {
     scene_layout: RhiDescriptorSetLayout<SceneShaderBindings>,
     mesh_layout: RhiDescriptorSetLayout<MeshShaderBindings>,
@@ -122,6 +139,9 @@ struct PhongUniformBuffer {
 struct PhongApp {
     _descriptor_set_layouts: PhongAppDescriptorSetLayouts,
 
+    bindless_layout: RhiDescriptorSetLayout<BindlessTextureBindings>,
+    bindless_descriptor_set: RhiDescriptorSet<BindlessTextureBindings>,
+
     /// 每帧独立的 descriptor set
     descriptor_sets: Vec<PhongAppDescriptorSets>,
     pipeline: RhiGraphicsPipeline,
@@ -150,10 +170,21 @@ impl PhongApp {
         render_context: &RenderContext,
         frames_in_flight: usize,
     ) -> (PhongAppDescriptorSetLayouts, Vec<PhongAppDescriptorSets>) {
-        let scene_descriptor_set_layout = RhiDescriptorSetLayout::<SceneShaderBindings>::new(rhi, "phong-scene");
-        let mesh_descriptor_set_layout = RhiDescriptorSetLayout::<MeshShaderBindings>::new(rhi, "phong-mesh");
-        let material_descriptor_set_layout =
-            RhiDescriptorSetLayout::<MaterialShaderBindings>::new(rhi, "phong-material");
+        let scene_descriptor_set_layout = RhiDescriptorSetLayout::<SceneShaderBindings>::new(
+            rhi,
+            vk::DescriptorSetLayoutCreateFlags::empty(),
+            "phong-scene",
+        );
+        let mesh_descriptor_set_layout = RhiDescriptorSetLayout::<MeshShaderBindings>::new(
+            rhi,
+            vk::DescriptorSetLayoutCreateFlags::empty(),
+            "phong-mesh",
+        );
+        let material_descriptor_set_layout = RhiDescriptorSetLayout::<MaterialShaderBindings>::new(
+            rhi,
+            vk::DescriptorSetLayoutCreateFlags::empty(),
+            "phong-material",
+        );
 
         let layouts = PhongAppDescriptorSetLayouts {
             scene_layout: scene_descriptor_set_layout,
@@ -504,9 +535,25 @@ impl App for PhongApp {
         // 从 RightHand-Y-Up 的 ViewSpace 到 LeftHand-Y-Up 的 NDC
         let projection = glam::Mat4::perspective_infinite_rh(60f32.to_radians(), 1.0, 0.1);
 
+        let bindless_layout = RhiDescriptorSetLayout::<BindlessTextureBindings>::new(
+            rhi,
+            vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
+            "bindless-layout",
+        );
+        let bindless_descriptor_set = RhiDescriptorSet::<BindlessTextureBindings>::new(
+            rhi,
+            render_context.descriptor_pool(),
+            &bindless_layout,
+            "bindless-descriptor-set",
+        );
+
         Self {
             _descriptor_set_layouts: layouts,
             descriptor_sets: sets,
+
+            bindless_layout,
+            bindless_descriptor_set,
+
             pipeline,
             vertex_buffer,
             uniform_buffers,

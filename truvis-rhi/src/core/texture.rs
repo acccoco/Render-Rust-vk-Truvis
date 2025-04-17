@@ -52,4 +52,12 @@ impl RhiTexture2D {
     pub fn image_view(&self) -> &RhiImage2DView {
         &self.image_view
     }
+
+    #[inline]
+    pub fn descriptor_image_info(&self, layout: vk::ImageLayout) -> vk::DescriptorImageInfo {
+        vk::DescriptorImageInfo::default()
+            .sampler(self.sampler().handle())
+            .image_view(self.image_view().handle())
+            .image_layout(layout)
+    }
 }

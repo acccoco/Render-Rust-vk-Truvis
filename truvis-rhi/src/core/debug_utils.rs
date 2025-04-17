@@ -67,8 +67,9 @@ impl RhiDebugUtils {
         static mut DEBUG_MSG_TYPE: vk::DebugUtilsMessageTypeFlagsEXT = vk::DebugUtilsMessageTypeFlagsEXT::empty();
         unsafe {
             if vk::DebugUtilsMessageTypeFlagsEXT::empty() == DEBUG_MSG_TYPE {
-                DEBUG_MSG_TYPE =
-                    vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE;
+                DEBUG_MSG_TYPE = vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+                    | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
+                    | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE;
             }
             DEBUG_MSG_TYPE
         }

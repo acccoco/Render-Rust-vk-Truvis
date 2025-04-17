@@ -8,6 +8,7 @@ pub struct ShaderBindingItem {
     pub descriptor_type: vk::DescriptorType,
     pub stage_flags: vk::ShaderStageFlags,
     pub count: u32,
+    pub flags: vk::DescriptorBindingFlags,
 }
 
 /// 着色器绑定布局 trait
@@ -25,9 +26,9 @@ pub trait ShaderBindingLayout {
     ///
     /// 该函数不应该被覆盖，它使用 get_shader_bindings 的结果
     /// 生成 Vulkan 描述符集布局所需的绑定信息。
-    fn get_bindings() -> Vec<vk::DescriptorSetLayoutBinding<'static>> {
+    fn get_vk_bindings() -> (Vec<vk::DescriptorSetLayoutBinding<'static>>, Vec<vk::DescriptorBindingFlags>) {
         let bindings = Self::get_shader_bindings();
-        bindings
+        let layout_bindings = bindings
             .iter()
             .map(|item| vk::DescriptorSetLayoutBinding {
                 binding: item.binding,
@@ -36,6 +37,10 @@ pub trait ShaderBindingLayout {
                 stage_flags: item.stage_flags,
                 ..Default::default()
             })
-            .collect()
+            .collect();
+
+        let binding_flags = bindings.iter().map(|item| item.flags).collect();
+
+        (layout_bindings, binding_flags)
     }
 }

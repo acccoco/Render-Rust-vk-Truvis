@@ -42,10 +42,14 @@ where
     ///
     /// # 返回值
     /// 新的描述符集布局实例
-    pub fn new(rhi: &Rhi, debug_name: &str) -> Self {
+    pub fn new(rhi: &Rhi, flags: vk::DescriptorSetLayoutCreateFlags, debug_name: &str) -> Self {
         // 从类型 T 获取绑定信息
-        let bindings = T::get_bindings();
-        let create_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
+        let (bindings, binding_flags) = T::get_vk_bindings();
+        let mut bind_flags_ci = vk::DescriptorSetLayoutBindingFlagsCreateInfo::default().binding_flags(&binding_flags);
+
+        let create_info =
+            vk::DescriptorSetLayoutCreateInfo::default().flags(flags).bindings(&bindings).push_next(&mut bind_flags_ci);
+        vk::DescriptorBindingFlags::empty();
 
         // 创建 Vulkan 描述符集布局
         let layout = unsafe { rhi.device().create_descriptor_set_layout(&create_info, None).unwrap() };

@@ -59,8 +59,8 @@ pub struct RhiBuffer {
     allocator: Rc<RhiAllocator>,
     device: Rc<RhiDevice>,
 
-    buffer_info: Rc<RhiBufferCreateInfo>,
-    alloc_info: Rc<vk_mem::AllocationCreateInfo>,
+    _buffer_info: Rc<RhiBufferCreateInfo>,
+    _alloc_info: Rc<vk_mem::AllocationCreateInfo>,
 }
 
 impl RhiBuffer {
@@ -89,8 +89,8 @@ impl RhiBuffer {
                 debug_name: debug_name.to_string(),
                 allocator: rhi.allocator.clone(),
                 device: rhi.device.clone(),
-                buffer_info: buffer_ci,
-                alloc_info: alloc_ci,
+                _buffer_info: buffer_ci,
+                _alloc_info: alloc_ci,
             }
         }
     }
@@ -148,7 +148,7 @@ impl RhiBuffer {
                 | vk::BufferUsageFlags::TRANSFER_DST
                 | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
-            debug_name.as_ref(),
+            debug_name,
         )
     }
 
@@ -161,7 +161,7 @@ impl RhiBuffer {
                 | vk::BufferUsageFlags::TRANSFER_DST
                 | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
-            debug_name.as_ref(),
+            debug_name,
         )
     }
 
@@ -209,13 +209,6 @@ impl RhiBuffer {
         unsafe {
             self.allocator.unmap_memory(&mut self.allocation);
             self.map_ptr = None;
-        }
-    }
-
-    #[inline]
-    pub fn destroy(mut self) {
-        unsafe {
-            self.allocator.destroy_buffer(self.handle, &mut self.allocation);
         }
     }
 
@@ -272,11 +265,18 @@ impl RhiBuffer {
             },
             &cmd_name,
         );
-
-        stage_buffer.destroy();
     }
 
     pub fn get_device_address(&self) -> vk::DeviceAddress {
         unsafe { self.device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.handle)) }
+    }
+}
+
+impl Drop for RhiBuffer {
+    fn drop(&mut self) {
+        self.unmap();
+        unsafe {
+            self.allocator.destroy_buffer(self.handle, &mut self.allocation);
+        }
     }
 }

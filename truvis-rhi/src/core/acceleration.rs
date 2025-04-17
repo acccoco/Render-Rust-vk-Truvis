@@ -145,7 +145,6 @@ impl RhiAcceleration {
         // 回收临时资源
         {
             uncompact_acceleration.destroy();
-            scratch_buffer.destroy();
             query_pool.destroy();
         }
 
@@ -237,12 +236,6 @@ impl RhiAcceleration {
             "build-tlas",
         );
 
-        // 回收资源
-        {
-            acceleration_instance_buffer.destroy();
-            scratch_buffer.destroy();
-        }
-
         acceleration
     }
 
@@ -283,7 +276,6 @@ impl RhiAcceleration {
     pub fn destroy(self) {
         unsafe {
             self.device.vk_acceleration_struct_pf.destroy_acceleration_structure(self.acceleration_structure, None);
-            self.buffer.destroy();
         }
     }
 }

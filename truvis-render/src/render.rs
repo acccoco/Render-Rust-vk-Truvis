@@ -1,4 +1,4 @@
-use crate::platform::ui::{UiOptions, UI};
+use crate::platform::ui::{Gui, UiCreateInfo};
 use crate::render_context::{RenderContext, RenderContextInitInfo};
 use ash::vk;
 use raw_window_handle::HasRawDisplayHandle;
@@ -102,7 +102,7 @@ pub struct Renderer<A: App> {
     /// ui 只能在 event loop 中创建，因此使用 option 包装
     ///
     /// 依赖于 RenderContext 和 Core
-    pub ui: Option<UI>,
+    pub gui: Option<Gui>,
 
     pub inner_app: Option<Box<A>>,
 
@@ -212,7 +212,7 @@ impl<A: App> Renderer<A> {
             timer: Timer::default(),
             window: None,
             render_context: None,
-            ui: None,
+            gui: None,
             inner_app: None,
             rhi: None,
 
@@ -271,11 +271,11 @@ impl<A: App> Renderer<A> {
         }
 
         // ui
-        self.ui = Some(UI::new(
+        self.gui = Some(Gui::new(
             self.rhi(),
             &self.render_context.as_ref().unwrap(),
             self.window.as_ref().unwrap().window(),
-            &UiOptions {
+            &UiCreateInfo {
                 // FIXME 统一一下出现的位置。RenderContext 里面也有这个配置
                 frames_in_flight: 3,
             },
@@ -288,7 +288,7 @@ impl<A: App> Renderer<A> {
     fn tick(&mut self) {
         self.timer.update();
         let duration = std::time::Duration::from_secs_f32(self.timer.delta_time_s);
-        self.ui.as_ref().unwrap().imgui.borrow_mut().io_mut().update_delta_time(duration);
+        self.gui.as_ref().unwrap().context.borrow_mut().io_mut().update_delta_time(duration);
 
         self.render_context.as_mut().unwrap().acquire_frame();
 
@@ -321,7 +321,7 @@ impl<A: App> Renderer<A> {
         );
         {
             // FIXME ui cmd 需要释放
-            let ui_cmd = self.ui.as_mut().unwrap().draw(
+            let ui_cmd = self.gui.as_mut().unwrap().draw(
                 self.rhi.as_ref().unwrap(),
                 self.render_context.as_mut().unwrap(),
                 self.window.as_ref().unwrap().window(),
@@ -385,7 +385,7 @@ impl<A: App> winit::application::ApplicationHandler<UserEvent> for Renderer<A> {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
-        self.ui.as_mut().unwrap().handle_event::<UserEvent>(
+        self.gui.as_mut().unwrap().handle_event::<UserEvent>(
             self.window.as_ref().unwrap().window(),
             &winit::event::Event::WindowEvent {
                 window_id,
@@ -394,6 +394,9 @@ impl<A: App> winit::application::ApplicationHandler<UserEvent> for Renderer<A> {
         );
         match event {
             WindowEvent::CloseRequested => {
+                unsafe {
+                    self.rhi().device.device_wait_idle().unwrap();
+                }
                 event_loop.exit();
             }
             WindowEvent::Resized(new_size) => {

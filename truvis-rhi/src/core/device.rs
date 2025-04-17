@@ -164,6 +164,14 @@ impl RhiDevice {
             Box::new(vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default().acceleration_structure(true)),
             Box::new(vk::PhysicalDeviceHostQueryResetFeatures::default().host_query_reset(true)),
             Box::new(vk::PhysicalDeviceSynchronization2Features::default().synchronization2(true)),
+            Box::new(
+                vk::PhysicalDeviceDescriptorIndexingFeatures::default()
+                    .descriptor_binding_partially_bound(true) // 即使一些 descriptor 是 invalid
+                    .runtime_descriptor_array(true)
+                    .descriptor_binding_sampled_image_update_after_bind(true)
+                    .descriptor_binding_storage_image_update_after_bind(true)
+                    .descriptor_binding_variable_descriptor_count(true),
+            ),
         ]
     }
 
