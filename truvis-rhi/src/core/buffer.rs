@@ -1,6 +1,5 @@
-use std::{ffi::c_void, rc::Rc};
-
 use ash::vk;
+use std::{ffi::c_void, rc::Rc};
 use vk_mem::Alloc;
 
 use crate::{
@@ -59,10 +58,13 @@ pub struct RhiBuffer {
     allocator: Rc<RhiAllocator>,
     device: Rc<RhiDevice>,
 
+    device_addr: Option<vk::DeviceAddress>,
+
     _buffer_info: Rc<RhiBufferCreateInfo>,
     _alloc_info: Rc<vk_mem::AllocationCreateInfo>,
 }
 
+// constructor & getter & builder
 impl RhiBuffer {
     /// # param
     /// * align: 对 memory 的 offset align 限制
@@ -91,6 +93,7 @@ impl RhiBuffer {
                 device: rhi.device.clone(),
                 _buffer_info: buffer_ci,
                 _alloc_info: alloc_ci,
+                device_addr: None,
             }
         }
     }
@@ -192,6 +195,15 @@ impl RhiBuffer {
     }
 
     #[inline]
+    pub fn device_address(&self) -> vk::DeviceAddress {
+        self.device_addr.unwrap_or_else(|| unsafe {
+            self.device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.handle))
+        })
+    }
+}
+
+impl RhiBuffer {
+    #[inline]
     pub fn map(&mut self) {
         if self.map_ptr.is_some() {
             return;
@@ -236,10 +248,7 @@ impl RhiBuffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    pub fn transfer_data_sync<T>(&mut self, rhi: &Rhi, data: &[T])
-    where
-        T: Sized + Copy,
-    {
+    pub fn transfer_data_sync(&mut self, rhi: &Rhi, data: &[impl Sized + Copy]) {
         let mut stage_buffer = Self::new_stage_buffer(
             rhi,
             size_of_val(data) as vk::DeviceSize,
@@ -267,8 +276,10 @@ impl RhiBuffer {
         );
     }
 
-    pub fn get_device_address(&self) -> vk::DeviceAddress {
-        unsafe { self.device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.handle)) }
+    /// 默认的 descriptor buffer info
+    #[inline]
+    pub fn get_descriptor_buffer_info_ubo<T: Sized>(&self) -> vk::DescriptorBufferInfo {
+        vk::DescriptorBufferInfo::default().buffer(self.handle).offset(0).range(size_of::<T>() as vk::DeviceSize)
     }
 }
 

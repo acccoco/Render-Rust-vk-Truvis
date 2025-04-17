@@ -339,23 +339,21 @@ impl PhongApp {
             material_set,
         } = &mut self.descriptor_sets[frame_index];
 
-        let scene_ubo_info = vk::DescriptorBufferInfo::default()
-            .buffer(scene_uniform_buffer.handle())
-            .offset(0)
-            .range(size_of::<SceneUBO>() as vk::DeviceSize);
-        let scene_write = SceneShaderBindings::scene().write_buffer(scene_set.handle, 0, vec![scene_ubo_info]);
-
-        let mesh_ubo_info = vk::DescriptorBufferInfo::default()
-            .buffer(mesh_uniform_buffer.handle())
-            .offset(0)
-            .range(size_of::<MeshUBO>() as vk::DeviceSize);
-        let mesh_write = MeshShaderBindings::mesh().write_buffer(mesh_set.handle, 0, vec![mesh_ubo_info]);
-
-        let mat_ubo_info = vk::DescriptorBufferInfo::default()
-            .buffer(material_uniform_buffer.handle())
-            .offset(0)
-            .range(size_of::<MaterialUBO>() as vk::DeviceSize);
-        let mat_write = MaterialShaderBindings::mat().write_buffer(material_set.handle, 0, vec![mat_ubo_info]);
+        let scene_write = SceneShaderBindings::scene().write_buffer(
+            scene_set.handle,
+            0,
+            vec![scene_uniform_buffer.get_descriptor_buffer_info_ubo::<SceneUBO>()],
+        );
+        let mesh_write = MeshShaderBindings::mesh().write_buffer(
+            mesh_set.handle,
+            0,
+            vec![mesh_uniform_buffer.get_descriptor_buffer_info_ubo::<MeshUBO>()],
+        );
+        let mat_write = MaterialShaderBindings::mat().write_buffer(
+            material_set.handle,
+            0,
+            vec![material_uniform_buffer.get_descriptor_buffer_info_ubo::<MaterialUBO>()],
+        );
 
         rhi.device.write_descriptor_sets(&[scene_write, mesh_write, mat_write]);
     }

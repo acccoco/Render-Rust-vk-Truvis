@@ -87,7 +87,7 @@ impl RhiAcceleration {
         // 填充 build geometry info 的剩余部分以 build AccelerationStructure
         build_geometry_info.dst_acceleration_structure = uncompact_acceleration.acceleration_structure;
         build_geometry_info.scratch_data = vk::DeviceOrHostAddressKHR {
-            device_address: scratch_buffer.get_device_address(),
+            device_address: scratch_buffer.device_address(),
         };
 
         // 创建一个 QueryPool，用于查询 compact size
@@ -172,7 +172,7 @@ impl RhiAcceleration {
                     // false: data 是 &[&vk::AccelerationStructureInstanceKHR]
                     array_of_pointers: vk::FALSE,
                     data: vk::DeviceOrHostAddressConstKHR {
-                        device_address: acceleration_instance_buffer.get_device_address(),
+                        device_address: acceleration_instance_buffer.device_address(),
                     },
                     ..Default::default()
                 },
@@ -217,7 +217,7 @@ impl RhiAcceleration {
 
         // 补全剩下的 build info
         geometry_info.dst_acceleration_structure = acceleration.acceleration_structure;
-        geometry_info.scratch_data.device_address = scratch_buffer.get_device_address();
+        geometry_info.scratch_data.device_address = scratch_buffer.device_address();
 
         // range info
         let range_info = vk::AccelerationStructureBuildRangeInfoKHR {

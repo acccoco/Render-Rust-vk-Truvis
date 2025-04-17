@@ -1,4 +1,5 @@
 // pub mod gltf_loader;
 pub mod material;
-pub mod model;
+pub mod mesh;
 pub mod shape;
+mod obj_loader;
