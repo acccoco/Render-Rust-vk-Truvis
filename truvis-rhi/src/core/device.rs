@@ -152,6 +152,7 @@ impl RhiDevice {
             .sampler_anisotropy(true)
             .fragment_stores_and_atomics(true)
             .independent_blend(true)
+            .shader_int64(true) // 用于 buffer device address
     }
 
     /// 必要的 physical device extension features

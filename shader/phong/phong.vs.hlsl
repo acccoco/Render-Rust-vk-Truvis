@@ -1,3 +1,5 @@
+#include "phong.inc.hlsl"
+
 struct VsInput
 {
     [[vk::location(0)]]
@@ -24,14 +26,6 @@ struct VsOutput
     float2 uv : ACC_2;
 };
 
-struct Light
-{
-    float3 pos;
-    float pos_padding__;
-    float3 color;
-    float color_padding__;
-};
-
 [[vk::binding(0, 0)]]
 cbuffer SceneUBO
 {
@@ -50,13 +44,16 @@ cbuffer MeshUBO
     float4x4 trans_inv_model;
 };
 
-#include "phong.hlsl.inc"
+[[vk::push_constant]]
+PushConstants push_constants;
 
 VsOutput main(VsInput input)
 {
     VsOutput output = (VsOutput)0;
 
-    const float4x4 mvp = mul(projection, mul(view, model));
+    SceneData scene = vk::RawBufferLoad<SceneData>(push_constants.scene_buffer_addr, 4);
+
+    const float4x4 mvp = mul(projection, mul(scene.view, model));
     output.pos = mul(mvp, float4(input.pos, 1.0));
     output.world_pos = mul(model, float4(input.pos, 1.0)).xyz;
     output.uv = input.uv;

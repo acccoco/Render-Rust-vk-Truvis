@@ -1,3 +1,5 @@
+#include "phong.inc.hlsl"
+
 struct PsInput
 {
     [[vk::location(0)]]
@@ -16,28 +18,8 @@ struct PsOutput
     float4 color : SV_TARGET0;
 };
 
-struct PushConstants
-{
-    float3 camera_pos;
-    float3 camera_dir;
-    uint frame_id;
-    float delta_time_ms;
-    float2 mouse;
-    float2 resolution;
-    float time;
-    float frame_rate;
-};
-
 [[vk::push_constant]]
 PushConstants push_constants;
-
-struct Light
-{
-    float3 pos;
-    float pos_padding__;
-    float3 color;
-    float color_padding__;
-};
 
 [[vk::binding(0, 0)]]
 cbuffer SceneUBO

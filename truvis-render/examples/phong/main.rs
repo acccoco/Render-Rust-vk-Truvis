@@ -102,12 +102,15 @@ struct PushConstant {
     camera_dir: glam::Vec3,
     camera_dir_padding__: i32,
 
-    frame_id: u32,
-    delta_time_ms: f32,
     mouse_pos: glam::Vec2,
     resolution: glam::Vec2,
+
+    frame_id: u32,
+    delta_time_ms: f32,
     time_ms: f32,
     fps: f32,
+
+    scene_buffer_addr: u64,
 }
 
 struct PhongUniformBuffer {
@@ -240,7 +243,9 @@ impl PhongApp {
 
         let scene_buffer_ci = Rc::new(RhiBufferCreateInfo::new(
             size_of::<SceneUBO>() as vk::DeviceSize * frames_in_flight as u64,
-            vk::BufferUsageFlags::UNIFORM_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
+            vk::BufferUsageFlags::UNIFORM_BUFFER
+                | vk::BufferUsageFlags::TRANSFER_DST
+                | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
         ));
         let mesh_buffer_ci = Rc::new(RhiBufferCreateInfo::new(
             *mesh_ubo_align * mesh_instance_count * frames_in_flight as u64,
@@ -363,6 +368,13 @@ impl App for PhongApp {
         self.push.camera_pos = self.camera.position;
         self.push.camera_dir = self.camera.camera_forward();
         self.scene_ubo.view = self.camera.get_view_matrix();
+        self.push.scene_buffer_addr = unsafe {
+            let frame_id = app_ctx.render_context.current_frame_index();
+            app_ctx.rhi.device.get_buffer_device_address(
+                &vk::BufferDeviceAddressInfo::default()
+                    .buffer(self.uniform_buffers[frame_id].scene_uniform_buffer.handle()),
+            )
+        };
 
         app_ctx.rhi.device.debug_utils.begin_queue_label(
             app_ctx.rhi.graphics_queue.handle,
@@ -490,7 +502,7 @@ impl App for PhongApp {
         };
 
         // 从 RightHand-Y-Up 的 ViewSpace 到 LeftHand-Y-Up 的 NDC
-        let mut projection = glam::Mat4::perspective_infinite_rh(60f32.to_radians(), 1.0, 0.1);
+        let projection = glam::Mat4::perspective_infinite_rh(60f32.to_radians(), 1.0, 0.1);
 
         Self {
             _descriptor_set_layouts: layouts,
