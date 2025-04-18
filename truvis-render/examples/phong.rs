@@ -7,6 +7,7 @@ use shader_layout_macro::ShaderLayout;
 use truvis_render::platform::camera::Camera;
 use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer};
 use truvis_render::render_context::RenderContext;
+use truvis_render::resource::obj_loader::ObjLoader;
 use truvis_render::resource::shape::vertex_pnu::VertexPNUAoS;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
@@ -496,6 +497,7 @@ impl App for PhongApp {
     }
 
     fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
+        let obj_loader = ObjLoader::load("assets/obj/spot.obj");
         // TODO 通过其他方式获取到 frames in flight
         let (layouts, sets) = Self::create_descriptor_sets(rhi, render_context, 3);
         let pipeline = Self::create_pipeline(
