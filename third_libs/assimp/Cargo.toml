@@ -1,0 +1,15 @@
+[package]
+name = "truvis-assimp"
+version = "0.1.0"
+edition = "2021"
+description = "为 Truvis 提供 Assimp 绑定"
+
+
+[dependencies]
+anyhow = { workspace = true }
+simplelog = { workspace = true }
+log = { workspace = true }
+ash = { workspace = true }
+
+[build-dependencies]
+cmake = "0.1.54"

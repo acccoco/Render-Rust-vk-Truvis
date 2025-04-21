@@ -11,6 +11,9 @@ members = [
     "xtask/build-shader",
     # 用于生成 shader 代码的工具，暂时不使用
     # "xtask/shader-gen",
+
+    # 手动绑定 assmip
+    "third_libs/assimp",
 ]
 
 resolver = "2"

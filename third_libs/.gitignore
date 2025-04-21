@@ -1,0 +1,5 @@
+build
+CMakeFiles
+*.log
+.cmake
+vcpkg_installed
