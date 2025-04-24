@@ -39,6 +39,7 @@ mod test {
 
     #[test]
     fn load_obj() {
-        ObjLoader::load("assets/obj/spot.obj")
+        // 测试用例的 workdir 是当前 crate 的目录
+        ObjLoader::load("../assets/obj/spot.obj")
     }
 }

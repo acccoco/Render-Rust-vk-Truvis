@@ -1,5 +1,5 @@
 {
-  "dependencies": [
-    "assimp"
-  ]
+  "name": "truvis-assimp",
+  "version": "1.0.0",
+  "dependencies": ["assimp"]
 }

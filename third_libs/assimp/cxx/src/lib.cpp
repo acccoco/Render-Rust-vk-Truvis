@@ -25,7 +25,7 @@ void countVertices(const aiNode* node, const aiScene* scene, unsigned int& total
 unsigned int get_vert_cnts()
 {
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile("path/to/your/file.obj", aiProcess_Triangulate | aiProcess_FlipUVs);
+    const aiScene* scene = importer.ReadFile("D:\\code\\Render-Rust-vk-Truvis\\assets\\obj\\spot.obj", aiProcess_Triangulate | aiProcess_FlipUVs);
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
     {

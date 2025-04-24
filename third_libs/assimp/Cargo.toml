@@ -13,3 +13,4 @@ ash = { workspace = true }
 
 [build-dependencies]
 cmake = "0.1.54"
+bindgen = "0.71.1"

@@ -3,3 +3,4 @@ CMakeFiles
 *.log
 .cmake
 vcpkg_installed
+bindings.rs

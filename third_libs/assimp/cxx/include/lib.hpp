@@ -1,4 +1,12 @@
 #pragma once
 
+#ifdef BUILDING_DLL
+#define DLL_API __declspec(dllexport)
+#else
+#define DLL_API __declspec(dllimport)
+#endif
 
-unsigned int get_vert_cnts();
+
+extern "C" {
+DLL_API unsigned int get_vert_cnts();
+}
