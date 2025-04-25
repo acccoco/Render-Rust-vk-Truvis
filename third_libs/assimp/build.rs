@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 fn main() {
     println!("cargo:rerun-if-changed=cxx/CMakeLists.txt");
+    println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=cxx/vcpkg.json");
     println!("cargo:rerun-if-changed=cxx/include");
     println!("cargo:rerun-if-changed=cxx/src");
@@ -56,6 +57,7 @@ fn build_cmake_project() {
 
     // 用于找到 dll 所需的引导 lib
     println!("cargo:rustc-link-search=native={}", cxx_bin_dir().display());
+    println!("cargo:rustc-link-lib=static={}", "truvis-assimp");
 }
 
 /// 复制 DLL 文件到目标目录
@@ -87,7 +89,7 @@ fn gen_rust_binding() {
         // The input header we would like to generate
         // bindings for.
         .header("cxx/include/lib.hpp")
-        .dynamic_library_name("TruvisAssimp")
+        // .dynamic_library_name("TruvisAssimp")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
