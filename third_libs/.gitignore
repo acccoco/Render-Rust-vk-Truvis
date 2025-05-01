@@ -4,3 +4,5 @@ CMakeFiles
 .cmake
 vcpkg_installed
 bindings.rs
+*.dll
+*.lib

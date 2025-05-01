@@ -1,14 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 
+# 命令行需要指定的参数：
+# -Thost=x64 -Ax64
+
 project(TruvisAssimp)
-
-# 强制静态链接设置
-# set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "")
-# set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-
-# msbuild 乱码问题
-add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
-add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
 # 从当前目录开始查找 assimp
 find_package(assimp REQUIRED CONFIG)
@@ -22,6 +17,22 @@ add_executable(main src/main.cpp)
 target_include_directories(main PUBLIC include)
 target_link_libraries(main PUBLIC truvis-assimp)
 
-# 安装头文件
-# 其实可以啥也不用安装，只是确保存在 install 这个 target 让 rust-cmake 调用，相当于 BUILD_ALL
-install(DIRECTORY include/ DESTINATION include)
+# 安装
+# 使用 CODE 可以确保读取到的文件是运行时的
+install(CODE [[
+    file(GLOB DEBUG_DLLS ${CMAKE_BINARY_DIR}/Debug/*.dll)
+    file(GLOB DEBUG_LIBS ${CMAKE_BINARY_DIR}/Debug/*.lib)
+    message(STATUS "install dlls(debug): ${DEBUG_DLLS}")
+    message(STATUS "install libs(debug): ${DEBUG_LIBS}")
+
+    file(INSTALL ${DEBUG_DLLS} DESTINATION "${CMAKE_INSTALL_PREFIX}/Debug/bin")
+    file(INSTALL ${DEBUG_LIBS} DESTINATION "${CMAKE_INSTALL_PREFIX}/Debug/lib")
+
+    file(GLOB RELEASE_DLLS ${CMAKE_BINARY_DIR}/Release/*.dll)
+    file(GLOB RELEASE_LIBS ${CMAKE_BINARY_DIR}/Release/*.lib)
+    message(STATUS "install dlls(release): ${RELEASE_DLLS}")
+    message(STATUS "install libs(release): ${RELEASE_LIBS}")
+
+    file(INSTALL ${RELEASE_DLLS} DESTINATION "${CMAKE_INSTALL_PREFIX}/Release/bin")
+    file(INSTALL ${RELEASE_LIBS} DESTINATION "${CMAKE_INSTALL_PREFIX}/Release/lib")
+]])

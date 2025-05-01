@@ -1,16 +1,9 @@
-use cmake::Config;
-use std::path::PathBuf;
-
 fn main() {
     println!("cargo:rerun-if-changed=cxx/CMakeLists.txt");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=cxx/vcpkg.json");
     println!("cargo:rerun-if-changed=cxx/include");
     println!("cargo:rerun-if-changed=cxx/src");
-
-    // 目录结构
-    // $OUTDIR = $PROJECT/target/debug/build/$CRATE-$HASH/out
-    // 其中：build/Debug 或者 build/Release 就是存放 lib, dll, exe, pdb 的位置
 
     // 编译 CMake 项目
     build_cmake_project();
@@ -22,53 +15,75 @@ fn main() {
     gen_rust_binding();
 }
 
-/// 当前项目的 target 文件夹
-fn _target_dir() -> PathBuf {
-    let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
-    let debug_dir = out_dir.parent().unwrap().parent().unwrap().parent().unwrap().parent().unwrap();
-    debug_dir.to_path_buf()
-}
+/// # 默认目录结构
+/// * cargo 默认的环境变量：${OUTDIR} = $PROJECT/target/debug/build/$CRATE-$HASH/out
+/// * 默认情况下，cmake 的 build 目录 = ${OUTDIR}/build
+/// * 其中：${OUTDIR}/build/Debug 或者 ${OUTDIR}/build/Release 就是存放 lib, dll, exe, pdb 的位置
+struct Dirs;
+impl Dirs {
+    /// 当前项目的 target 文件夹
+    fn _rust_target_dir() -> std::path::PathBuf {
+        let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
+        let debug_or_release_dir = out_dir.parent().unwrap().parent().unwrap().parent().unwrap().parent().unwrap();
+        debug_or_release_dir.to_path_buf()
+    }
 
-/// cmake 项目编译结果的文件夹，放置 exe, lib, dll
-fn cxx_bin_dir() -> PathBuf {
-    std::path::PathBuf::from(format!(
-        "{}/build/{}",
-        std::env::var("OUT_DIR").unwrap(),
-        if cfg!(debug_assertions) { "Debug" } else { "Release" }
-    ))
-}
+    /// 自定义的 cmake 输出目录，里面存放 cmake 的 build 文件夹
+    fn cmake_custom_output_dir() -> std::path::PathBuf {
+        Self::build_dir().join("cargo-cmake-output")
+    }
 
-/// rust 项目编译结果的文件夹，放置 exe, d, dll
-fn rust_bin_dir() -> PathBuf {
-    let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
-    let debug_dir = out_dir.parent().unwrap().parent().unwrap().parent().unwrap();
-    debug_dir.to_path_buf()
+    fn cmake_custom_bin_dir() -> std::path::PathBuf {
+        std::path::PathBuf::from(format!(
+            "{}/build/{}",
+            Self::cmake_custom_output_dir().display(),
+            if cfg!(debug_assertions) { "Debug" } else { "Release" }
+        ))
+    }
+
+    /// rust 项目编译结果的文件夹，放置 exe, d, dll
+    /// target/debug 或者 target/release
+    fn rust_bin_dir() -> std::path::PathBuf {
+        let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
+        let debug_dir = out_dir.parent().unwrap().parent().unwrap().parent().unwrap();
+        debug_dir.to_path_buf()
+    }
+
+    /// build.rs 所在的文件夹
+    fn build_dir() -> std::path::PathBuf {
+        std::env::current_dir().unwrap()
+    }
 }
 
 /// 编译 CMake 项目
 fn build_cmake_project() {
     // 配置 CMake 项目
-    Config::new("cxx")
+    let build_dir = cmake::Config::new("cxx")
         .define(
             "CMAKE_TOOLCHAIN_FILE",
             format!("{}/scripts/buildsystems/vcpkg.cmake", std::env::var("VCPKG_ROOT").unwrap()),
         )
+        .out_dir(Dirs::cmake_custom_output_dir())
+        .build_target("all_build")
         .build();
 
     // 用于找到 dll 所需的引导 lib
-    println!("cargo:rustc-link-search=native={}", cxx_bin_dir().display());
-    println!("cargo:rustc-link-lib=static={}", "truvis-assimp");
+    let build_type_str = if cfg!(debug_assertions) { "Debug" } else { "Release" };
+    println!("cargo:rustc-link-search=native={}/build/{}", build_dir.display(), build_type_str);
+
+    let cxx_target = "truvis-assimp";
+    println!("cargo:rustc-link-lib=static={}", cxx_target);
 }
 
 /// 复制 DLL 文件到目标目录
 fn copy_dll_files() {
-    let rust_bin_dir = rust_bin_dir();
+    let rust_bin_dir = Dirs::rust_bin_dir();
 
     // 使用 cargo:warning= 前缀让消息显示在构建输出中
     // println!("cargo:warning=Target directory: {}", target_dir);
 
     // 只需要复制 dll 文件到 target/debug 目录下
-    for entry in std::fs::read_dir(cxx_bin_dir()).unwrap() {
+    for entry in std::fs::read_dir(Dirs::cmake_custom_bin_dir()).unwrap() {
         let entry = entry.unwrap();
         let file_name = entry.file_name();
         let source_path = entry.path();
