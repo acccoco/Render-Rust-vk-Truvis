@@ -145,7 +145,7 @@ pub trait App {
             .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
             .image_view(depth_image_view)
             .load_op(vk::AttachmentLoadOp::CLEAR)
-            .store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .store_op(vk::AttachmentStoreOp::STORE)
             .clear_value(vk::ClearValue {
                 depth_stencil: vk::ClearDepthStencilValue {
                     depth: 1_f32, // 1 表示无限远

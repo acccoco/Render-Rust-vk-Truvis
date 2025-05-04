@@ -500,23 +500,24 @@ impl App for PhongApp {
             self.camera.rotate_yaw(delta.x as f32);
             self.camera.rotate_pitch(delta.y as f32);
 
+            let move_speed = 10_f32;
             if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyW) {
-                self.camera.move_forward(app_ctx.timer.delta_time_s * 100.0);
+                self.camera.move_forward(app_ctx.timer.delta_time_s * move_speed);
             }
             if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyS) {
-                self.camera.move_forward(-app_ctx.timer.delta_time_s * 100.0);
+                self.camera.move_forward(-app_ctx.timer.delta_time_s * move_speed);
             }
             if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyA) {
-                self.camera.move_right(-app_ctx.timer.delta_time_s * 100.0);
+                self.camera.move_right(-app_ctx.timer.delta_time_s * move_speed);
             }
             if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyD) {
-                self.camera.move_right(app_ctx.timer.delta_time_s * 100.0);
-            }
-            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyQ) {
-                self.camera.move_up(-app_ctx.timer.delta_time_s * 100.0);
+                self.camera.move_right(app_ctx.timer.delta_time_s * move_speed);
             }
             if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyE) {
-                self.camera.move_up(app_ctx.timer.delta_time_s * 100.0);
+                self.camera.move_up(-app_ctx.timer.delta_time_s * move_speed);
+            }
+            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyQ) {
+                self.camera.move_up(app_ctx.timer.delta_time_s * move_speed);
             }
         }
 

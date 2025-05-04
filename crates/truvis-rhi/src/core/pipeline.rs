@@ -87,7 +87,7 @@ impl Default for RhiGraphicsPipelineCreateInfo {
             enable_logical_op: false,
 
             depth_stencil_info: vk::PipelineDepthStencilStateCreateInfo::default()
-                .depth_test_enable(false)
+                .depth_test_enable(true)
                 .depth_write_enable(true)
                 .depth_compare_op(vk::CompareOp::LESS)
                 .depth_bounds_test_enable(false)
