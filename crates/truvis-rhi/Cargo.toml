@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-shader-layout-macro = { path = "../shader-layout/shader-layout-macro" }
-shader-layout-trait = { path = "../shader-layout/shader-layout-trait" }
+shader-layout-macro = { workspace = true }
+shader-layout-trait = { workspace = true }
 
 
 # 默认 features：

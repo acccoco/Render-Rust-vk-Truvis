@@ -11,5 +11,5 @@ proc-macro = true
 syn = { version = "2.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
-shader-layout-trait = { path = "../shader-layout-trait" }
+shader-layout-trait = { workspace = true }
 ash = { workspace = true }

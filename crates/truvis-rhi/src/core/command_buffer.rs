@@ -184,6 +184,7 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// 不使用 index buffer 的绘制
     #[inline]
     pub fn cmd_draw(&self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
         unsafe {

@@ -97,11 +97,7 @@ impl RhiDebugUtils {
     }
 
     #[inline]
-    pub fn set_object_debug_name<T, S>(&self, handle: T, name: S)
-    where
-        T: vk::Handle + Copy,
-        S: AsRef<str>,
-    {
+    pub fn set_object_debug_name(&self, handle: impl vk::Handle + Copy, name: impl AsRef<str>) {
         let name = CString::new(name.as_ref()).unwrap();
         unsafe {
             self.vk_debug_utils_device

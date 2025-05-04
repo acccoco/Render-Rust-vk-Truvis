@@ -73,7 +73,7 @@ impl RhiBuffer {
         buffer_ci: Rc<RhiBufferCreateInfo>,
         alloc_ci: Rc<vk_mem::AllocationCreateInfo>,
         align: Option<vk::DeviceSize>,
-        debug_name: &str,
+        debug_name: impl AsRef<str>,
     ) -> Self {
         unsafe {
             let (buffer, allocation) = if let Some(offset_align) = align {
@@ -82,13 +82,13 @@ impl RhiBuffer {
                 rhi.allocator.create_buffer(buffer_ci.info(), &alloc_ci).unwrap()
             };
 
-            rhi.device.debug_utils.set_object_debug_name(buffer, debug_name);
+            rhi.device.debug_utils.set_object_debug_name(buffer, debug_name.as_ref());
             Self {
                 handle: buffer,
                 allocation,
                 map_ptr: None,
                 size: buffer_ci.size(),
-                debug_name: debug_name.to_string(),
+                debug_name: debug_name.as_ref().to_string(),
                 allocator: rhi.allocator.clone(),
                 device: rhi.device.clone(),
                 _buffer_info: buffer_ci,
@@ -99,7 +99,12 @@ impl RhiBuffer {
     }
 
     #[inline]
-    pub fn new_device_buffer(rhi: &Rhi, size: vk::DeviceSize, flags: vk::BufferUsageFlags, debug_name: &str) -> Self {
+    pub fn new_device_buffer(
+        rhi: &Rhi,
+        size: vk::DeviceSize,
+        flags: vk::BufferUsageFlags,
+        debug_name: impl AsRef<str>,
+    ) -> Self {
         Self::new(
             rhi,
             Rc::new(RhiBufferCreateInfo::new(size, flags)),
@@ -128,7 +133,7 @@ impl RhiBuffer {
     }
 
     #[inline]
-    pub fn new_stage_buffer(rhi: &Rhi, size: vk::DeviceSize, debug_name: &str) -> Self {
+    pub fn new_stage_buffer(rhi: &Rhi, size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
         Self::new(
             rhi,
             Rc::new(RhiBufferCreateInfo::new(size, vk::BufferUsageFlags::TRANSFER_SRC)),
@@ -143,7 +148,7 @@ impl RhiBuffer {
     }
 
     #[inline]
-    pub fn new_index_buffer(rhi: &Rhi, size: usize, debug_name: &str) -> Self {
+    pub fn new_index_buffer(rhi: &Rhi, size: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
             rhi,
             size as vk::DeviceSize,
@@ -155,8 +160,16 @@ impl RhiBuffer {
         )
     }
 
+    /// 创建 index buffer，并向其内写入数据
     #[inline]
-    pub fn new_vertex_buffer(rhi: &Rhi, size: usize, debug_name: &str) -> Self {
+    pub fn new_index_buffer_sync(rhi: &Rhi, data: &[impl Sized + Copy], debug_name: impl AsRef<str>) -> Self {
+        let mut index_buffer = Self::new_index_buffer(rhi, size_of_val(data), debug_name);
+        index_buffer.transfer_data_sync(rhi, data);
+        index_buffer
+    }
+
+    #[inline]
+    pub fn new_vertex_buffer(rhi: &Rhi, size: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
             rhi,
             size as vk::DeviceSize,
@@ -169,7 +182,7 @@ impl RhiBuffer {
     }
 
     #[inline]
-    pub fn new_accleration_buffer(rhi: &Rhi, size: usize, debug_name: &str) -> Self {
+    pub fn new_accleration_buffer(rhi: &Rhi, size: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
             rhi,
             size as vk::DeviceSize,
@@ -179,7 +192,7 @@ impl RhiBuffer {
     }
 
     #[inline]
-    pub fn new_accleration_scratch_buffer(rhi: &Rhi, size: vk::DeviceSize, debug_name: &str) -> Self {
+    pub fn new_accleration_scratch_buffer(rhi: &Rhi, size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
             rhi,
             size,
@@ -252,7 +265,7 @@ impl RhiBuffer {
         let mut stage_buffer = Self::new_stage_buffer(
             rhi,
             size_of_val(data) as vk::DeviceSize,
-            &format!("{}-stage-buffer", self.debug_name),
+            format!("{}-stage-buffer", self.debug_name),
         );
 
         stage_buffer.transfer_data_by_mem_map(data);

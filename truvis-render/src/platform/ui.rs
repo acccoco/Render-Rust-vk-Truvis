@@ -1,7 +1,6 @@
 //! 参考 imgui-rs-vulkan-renderer
 
 use crate::render_context::RenderContext;
-use crate::resource::shape::vertex_pc::VertexPCAoS;
 use ash::vk;
 use image::EncodableLayout;
 use shader_layout_macro::ShaderLayout;

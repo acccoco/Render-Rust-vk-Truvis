@@ -92,7 +92,7 @@ pub struct Renderer<A: App> {
     pub window: Option<Rc<WindowSystem>>,
 
     /// Rhi 需要在 window 之后创建，因为需要获取 window 相关的 extension
-    pub rhi: Option<Arc<Rhi>>,
+    pub rhi: Option<Rc<Rhi>>,
 
     /// render context 需要在 event loop 中创建，因此使用 option 包装
     ///
@@ -148,7 +148,7 @@ pub trait App {
             .store_op(vk::AttachmentStoreOp::DONT_CARE)
             .clear_value(vk::ClearValue {
                 depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1_f32,
+                    depth: 1_f32, // 1 表示无限远
                     stencil: 0,
                 },
             })
@@ -258,7 +258,7 @@ impl<A: App> Renderer<A> {
             .iter()
             .map(|ext| unsafe { CStr::from_ptr(*ext) })
             .collect();
-            self.rhi = Some(Arc::new(Rhi::new(render_init_info.app_name.clone(), extra_instance_ext)));
+            self.rhi = Some(Rc::new(Rhi::new(render_init_info.app_name.clone(), extra_instance_ext)));
         }
 
         // render context

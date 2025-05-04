@@ -1,36 +1,25 @@
 use ash::vk;
 use imgui::Ui;
-use std::mem::offset_of;
-use truvis_render::resource::shape::vertex_pc::VertexPCAoS;
+use model_manager::component::mesh::SimpleMesh;
+use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
+use model_manager::vertex::VertexLayout;
 use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer};
 use truvis_render::render_context::RenderContext;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
-    core::{buffer::RhiBuffer, command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
+    core::{command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
     rhi::Rhi,
 };
 
 struct HelloTriangle {
-    vertex_buffer: RhiBuffer,
-    index_buffer: RhiBuffer,
+    triangle: SimpleMesh,
+
     pipeline: RhiGraphicsPipeline,
 
     frame_id: u64,
 }
 
 impl HelloTriangle {
-    fn init_buffer(rhi: &Rhi) -> (RhiBuffer, RhiBuffer) {
-        let mut index_buffer =
-            RhiBuffer::new_index_buffer(rhi, size_of_val(&VertexPCAoS::TRIANGLE_INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data_sync(rhi, &VertexPCAoS::TRIANGLE_INDEX_DATA);
-
-        let mut vertex_buffer =
-            RhiBuffer::new_vertex_buffer(rhi, size_of_val(&VertexPCAoS::TRIANGLE_VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data_sync(rhi, &VertexPCAoS::TRIANGLE_VERTEX_DATA);
-
-        (vertex_buffer, index_buffer)
-    }
-
     fn init_pipeline(rhi: &Rhi, render_context: &mut RenderContext) -> RhiGraphicsPipeline {
         let extent = render_context.swapchain_extent();
         let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
@@ -48,8 +37,8 @@ impl HelloTriangle {
             1.0,
         );
         pipeline_ci.scissor(extent.into());
-        pipeline_ci.vertex_binding(VertexPCAoS::vertex_input_bindings());
-        pipeline_ci.vertex_attribute(VertexPCAoS::vertex_input_attributes());
+        pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
+        pipeline_ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
         pipeline_ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(false)
             .color_write_mask(vk::ColorComponentFlags::RGBA)]);
@@ -74,9 +63,9 @@ impl HelloTriangle {
         {
             cmd.cmd_begin_rendering(&render_info);
             cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
-            cmd.cmd_bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
-            cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
-            cmd.draw_indexed(VertexPCAoS::TRIANGLE_INDEX_DATA.len() as u32, 0, 1, 0, 0);
+            cmd.cmd_bind_index_buffer(&self.triangle.index_buffer, 0, vk::IndexType::UINT32);
+            cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.triangle.vertex_buffer), &[0]);
+            cmd.draw_indexed(self.triangle.index_cnt, 0, 1, 0, 0);
             cmd.end_rendering();
         }
         cmd.end();
@@ -85,10 +74,9 @@ impl HelloTriangle {
 
     fn new(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
         let pipeline = HelloTriangle::init_pipeline(rhi, render_context);
-        let (vertex_buffer, index_buffer) = HelloTriangle::init_buffer(rhi);
+        let triangle = VertexAosLayoutPosColor::triangle(rhi);
         Self {
-            vertex_buffer,
-            index_buffer,
+            triangle,
             pipeline,
 
             frame_id: 0,

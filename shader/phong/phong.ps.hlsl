@@ -3,13 +3,13 @@
 struct PsInput
 {
     [[vk::location(0)]]
-    float3 world_pos : ACC_0;
+    float3 world_pos : WORLD_POS;
 
     [[vk::location(1)]]
-    float3 frag_normal : ACC_1;
+    float3 frag_normal : FRAG_NORMAL;
 
     [[vk::location(2)]]
-    float2 uv : ACC_2;
+    float2 uv : UV;
 };
 
 struct PsOutput

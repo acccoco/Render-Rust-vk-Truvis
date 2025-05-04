@@ -1,3 +1,4 @@
+/// 强制执行的方法: touch build.rs; cargo build
 fn main() {
     println!("cargo:rerun-if-changed=cxx/CMakeLists.txt");
     println!("cargo:rerun-if-changed=build.rs");
@@ -33,9 +34,23 @@ impl Dirs {
         Self::build_dir().join("cargo-cmake-output")
     }
 
-    fn cmake_custom_bin_dir() -> std::path::PathBuf {
+    /// 自定义的 cmake install 的文件夹，里面存放着 dll
+    ///
+    /// 该文件夹在 CMakeLists.txt 中指定
+    fn cmake_custom_install_bin_dir() -> std::path::PathBuf {
         std::path::PathBuf::from(format!(
-            "{}/build/{}",
+            "{}/{}/bin",
+            Self::cmake_custom_output_dir().display(),
+            if cfg!(debug_assertions) { "Debug" } else { "Release" }
+        ))
+    }
+
+    /// 自定义的 cmake install 的文件夹，里面存放着 lib
+    ///
+    /// 该文件夹在 CMakeLists.txt 中指定
+    fn cmake_custom_install_lib_dir() -> std::path::PathBuf {
+        std::path::PathBuf::from(format!(
+            "{}/{}/lib",
             Self::cmake_custom_output_dir().display(),
             if cfg!(debug_assertions) { "Debug" } else { "Release" }
         ))
@@ -58,40 +73,38 @@ impl Dirs {
 /// 编译 CMake 项目
 fn build_cmake_project() {
     // 配置 CMake 项目
-    let build_dir = cmake::Config::new("cxx")
+    cmake::Config::new("cxx")
         .define(
             "CMAKE_TOOLCHAIN_FILE",
             format!("{}/scripts/buildsystems/vcpkg.cmake", std::env::var("VCPKG_ROOT").unwrap()),
         )
         .out_dir(Dirs::cmake_custom_output_dir())
-        .build_target("all_build")
         .build();
 
-    // 用于找到 dll 所需的引导 lib
-    let build_type_str = if cfg!(debug_assertions) { "Debug" } else { "Release" };
-    println!("cargo:rustc-link-search=native={}/build/{}", build_dir.display(), build_type_str);
+    println!("cargo:rustc-link-search=native={}", Dirs::cmake_custom_install_lib_dir().display());
+    println!("cargo:rustc-link-search=native={}", Dirs::cmake_custom_install_bin_dir().display());
 
-    let cxx_target = "truvis-assimp";
+    let cxx_target = "truvis-assimp-cxx";
     println!("cargo:rustc-link-lib=static={}", cxx_target);
 }
 
 /// 复制 DLL 文件到目标目录
 fn copy_dll_files() {
-    let rust_bin_dir = Dirs::rust_bin_dir();
-
     // 使用 cargo:warning= 前缀让消息显示在构建输出中
-    // println!("cargo:warning=Target directory: {}", target_dir);
+    // println!("cargo:warning=src dir: {}", Dirs::cmake_custom_install_bin_dir().display());
 
     // 只需要复制 dll 文件到 target/debug 目录下
-    for entry in std::fs::read_dir(Dirs::cmake_custom_bin_dir()).unwrap() {
+    for entry in std::fs::read_dir(Dirs::cmake_custom_install_bin_dir()).unwrap() {
         let entry = entry.unwrap();
         let file_name = entry.file_name();
         let source_path = entry.path();
-        if source_path.extension().unwrap_or_default() != "dll" {
+        let suffix = source_path.extension().unwrap_or_default();
+        if suffix != "dll" && suffix != "pdb" {
             continue;
         }
-        let destination_path = rust_bin_dir.join(file_name);
-        std::fs::copy(source_path, destination_path).unwrap();
+
+        std::fs::copy(&source_path, Dirs::rust_bin_dir().join(&file_name)).unwrap();
+        std::fs::copy(&source_path, Dirs::rust_bin_dir().join("examples").join(&file_name)).unwrap();
     }
 }
 
@@ -101,19 +114,14 @@ fn gen_rust_binding() {
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
-        // The input header we would like to generate
-        // bindings for.
         .header("cxx/include/lib.hpp")
-        // .dynamic_library_name("TruvisAssimp")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-        // Finish the builder and generate the bindings.
         .generate()
-        // Unwrap the Result and panic on failure.
         .expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_path = std::path::PathBuf::from("src").join("bindings.rs");
+    let out_path = std::path::PathBuf::from("src").join("ffi_bindings.rs");
     bindings.write_to_file(out_path).expect("Couldn't write bindings!");
 }

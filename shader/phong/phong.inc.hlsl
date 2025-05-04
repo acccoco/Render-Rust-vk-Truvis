@@ -1,20 +1,33 @@
 struct PushConstants
 {
+    // offset = 0 Byte
     float3 camera_pos;
     int camera_pos_padding__;
 
+    // offset = 16 Byte
     float3 camera_dir;
     int camera_dir_padding__;
 
+    // offset = 32 Byte
     float2 mouse;
     float2 resolution;
 
+    // offset = 48 Byte
     uint frame_id;
     float delta_time_ms;
     float time;
     float frame_rate;
 
+    // TODO temp solution
+    // offset = 64 Byte
+    float4x4 model;
+
+    // offset = 128 Byte
+    float4x4 inv_model;
+
+    // offset = 192 Byte
     uint64_t scene_buffer_addr;
+    uint64_t scene_buffer_addr_padding__1;
 };
 
 struct Light

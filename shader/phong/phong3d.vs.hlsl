@@ -9,6 +9,12 @@ struct VsInput
     float3 normal : NORMAL;
 
     [[vk::location(2)]]
+    float3 tangent: TANGENT;
+
+    [[vk::location(3)]]
+    float3 bitangent: BITANGENT;
+
+    [[vk::location(4)]]
     float2 uv : UV;
 };
 
@@ -53,11 +59,11 @@ VsOutput main(VsInput input)
 
     SceneData scene = vk::RawBufferLoad<SceneData>(push_constants.scene_buffer_addr, 4);
 
-    const float4x4 mvp = mul(projection, mul(scene.view, model));
+    const float4x4 mvp = mul(projection, mul(scene.view, push_constants.model));
     output.pos = mul(mvp, float4(input.pos, 1.0));
-    output.world_pos = mul(model, float4(input.pos, 1.0)).xyz;
+    output.world_pos = mul(push_constants.model, float4(input.pos, 1.0)).xyz;
     output.uv = input.uv;
-    output.frag_normal = mul(trans_inv_model, float4(input.normal, 0.0)).xyz;
+    output.frag_normal = mul(push_constants.inv_model, float4(input.normal, 0.0)).xyz;
 
     return output;
 }

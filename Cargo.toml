@@ -1,29 +1,47 @@
 [workspace]
 members = [
-    # 用于生成 shader 布局的 macro
-    "shader-layout/shader-layout-macro",
-    # 用于描述 shader 布局的 trait
-    "shader-layout/shader-layout-trait",
-    # 渲染库
-    "truvis-render", "truvis-rhi",
-    "truvis-rhi",
-    # 构建工具
-    "xtask/build-shader",
-    # 用于生成 shader 代码的工具，暂时不使用
-    # "xtask/shader-gen",
+    "crates/shader-layout-macro", # 用于生成 shader 布局的 macro
+    "crates/shader-layout-trait", # 用于描述 shader 布局的 trait
+    "crates/truvis-rhi", # 渲染库
+    "crates/model-manager", # 场景管理
 
-    # 手动绑定 assmip
-    "third_libs/assimp",
+    "xtask/build-shader", # 构建工具
+    # "xtask/shader-gen",   # 用于生成 shader 代码的工具，暂时不使用
+
+    "third_libs/assimp", # 手动绑定 assmip
+
+    "truvis-render",
 ]
 
 resolver = "2"
 
-
 [workspace.dependencies]
+shader-layout-macro = { path = "crates/shader-layout-macro" }
+shader-layout-trait = { path = "crates/shader-layout-trait" }
+truvis-rhi = { path = "crates/truvis-rhi" }
+model-manager = { path = "crates/model-manager" }
+build-shader = { path = "xtask/build-shader" }
+truvis-assimp = { path = "third_libs/assimp" }
+truvis-render = { path = "truvis-render" }
+
+
+# 图形相关的库
+################################################
 ash = "0.38.0"
+glam = "0.22.0"
+
+# vulkan memory allocate
+# vk-mem-0.4.0 和 ash-0.38.0+1.3.281 匹配
+vk-mem = { git = "https://github.com/gwihlidal/vk-mem-rs", tag = "0.4.0" }
+
+
+
+# 窗口和 UI
+###################################################
+# create vk surface using window handle
 ash-window = "0.13.0"
 
-# window creation lib
+# window create & event loop
 winit = "0.30.8"
 imgui-winit-support = "0.13.0"
 imgui = "0.12.0"
@@ -31,24 +49,42 @@ imgui = "0.12.0"
 # 让 winit 可以和图形库通信
 raw-window-handle = "0.6.2"
 
+
+# 资源加载
+######################################################
 # image parser
 image = "0.24.5"
 
+# load gltf
+gltf = "1.0.0"
+
+# 读取 .obj
+tobj = "4.0.3"
+
+
+# 引擎工具
+#######################################################
 # print 颜色
 colored = "2"
 
+# 日志
+log = "0.4.0"
+simplelog = "0.12.2"
+
+# 计时器
+chrono = "0.4.38"
+
+uuid = "1.16.0"
+
+
+# 语言便利性工具
+######################################################
 # 各种自动的 macro
 derive-getters = "0.2.0"
 derive-new = "0.5.9"
 derive_setters = "0.1.5"
 derive_builder = "0.12.0"
-
-# load gltf
-gltf = "1.0.0"
-
-glam = { version = "0.22.0" }
-
-bytemuck = { version = "1.16.0" }
+bytemuck = "1.16.0"
 
 # 允许超过 2 个 iter 进行 zip
 itertools = "0.10.5"
@@ -63,15 +99,8 @@ array-init = "2.1.0"
 cstr = "0.2.11"
 
 # 序列化和反序列化
-serde = { version = "1.0.152", features = ["derive"] }
+serde = "1.0.152"
 serde_json = "1.0.91"
-
-# 读取 .obj
-tobj = "4.0.3"
-
-# vulkan memory allocate
-# vk-mem-0.4.0 和 ash-0.38.0+1.3.281 匹配
-vk-mem = { git = "https://github.com/gwihlidal/vk-mem-rs", tag = "0.4.0" }
 
 # 随机数
 rand = "0.8.5"
@@ -82,14 +111,8 @@ include_dir = "0.7.3"
 # 延迟初始化 static
 lazy_static = "1.4.0"
 
-# 日志
-log = "0.4.0"
-simplelog = { version = "0.12.2", features = ["default"] }
 
 bitflags = "2.3.2"
 
 # 简化错误处理
 anyhow = "1.0.84"
-
-# 计时器
-chrono = "0.4.38"

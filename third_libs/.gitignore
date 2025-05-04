@@ -6,3 +6,5 @@ vcpkg_installed
 bindings.rs
 *.dll
 *.lib
+.cache
+*.pdb

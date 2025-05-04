@@ -1,12 +1,14 @@
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use imgui::Ui;
-use truvis_render::resource::shape::vertex_pc::VertexPCAoS;
+use model_manager::component::mesh::SimpleMesh;
+use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
+use model_manager::vertex::VertexLayout;
 use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer, Timer};
 use truvis_render::render_context::RenderContext;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
-    core::{buffer::RhiBuffer, command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
+    core::{command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
     rhi::Rhi,
 };
 
@@ -30,24 +32,11 @@ pub struct PushConstants {
 }
 
 struct ShaderToy {
-    vertex_buffer: RhiBuffer,
-    index_buffer: RhiBuffer,
+    rectangle: SimpleMesh,
     pipeline: RhiGraphicsPipeline,
 }
 
 impl ShaderToy {
-    fn init_buffer(rhi: &Rhi) -> (RhiBuffer, RhiBuffer) {
-        let mut index_buffer =
-            RhiBuffer::new_index_buffer(rhi, size_of_val(&VertexPCAoS::RECTANGLE_INDEX_DATA), "index-buffer");
-        index_buffer.transfer_data_sync(rhi, &VertexPCAoS::RECTANGLE_INDEX_DATA);
-
-        let mut vertex_buffer =
-            RhiBuffer::new_vertex_buffer(rhi, size_of_val(&VertexPCAoS::RECTANGLE_VERTEX_DATA), "vertex-buffer");
-        vertex_buffer.transfer_data_sync(rhi, &VertexPCAoS::RECTANGLE_VERTEX_DATA);
-
-        (vertex_buffer, index_buffer)
-    }
-
     fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> RhiGraphicsPipeline {
         let extent = render_context.swapchain_extent();
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
@@ -61,8 +50,8 @@ impl ShaderToy {
         ci.attach_info(vec![render_context.color_format()], Some(render_context.depth_format()), None);
         ci.viewport(glam::vec2(0.0, 0.0), glam::vec2(extent.width as f32, extent.height as f32), 0.0, 1.0);
         ci.scissor(extent.into());
-        ci.vertex_binding(VertexPCAoS::vertex_input_bindings());
-        ci.vertex_attribute(VertexPCAoS::vertex_input_attributes());
+        ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
+        ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
         ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(false)
             .color_write_mask(vk::ColorComponentFlags::RGBA)]);
@@ -112,9 +101,9 @@ impl ShaderToy {
 
             cmd.cmd_begin_rendering(&render_info);
             cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
-            cmd.cmd_bind_index_buffer(&self.index_buffer, 0, vk::IndexType::UINT32);
-            cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.vertex_buffer), &[0]);
-            cmd.draw_indexed(VertexPCAoS::RECTANGLE_INDEX_DATA.len() as u32, 0, 1, 0, 0);
+            cmd.cmd_bind_index_buffer(&self.rectangle.index_buffer, 0, vk::IndexType::UINT32);
+            cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.rectangle.vertex_buffer), &[0]);
+            cmd.draw_indexed(self.rectangle.index_cnt, 0, 1, 0, 0);
             cmd.end_rendering();
         }
         cmd.end();
@@ -124,14 +113,10 @@ impl ShaderToy {
     fn new(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
         log::info!("start.");
 
-        let (vertex_buffer, index_buffer) = Self::init_buffer(rhi);
         let pipeline = Self::init_pipeline(rhi, render_context);
+        let rectangle = VertexAosLayoutPosColor::rectangle(rhi);
 
-        Self {
-            vertex_buffer,
-            index_buffer,
-            pipeline,
-        }
+        Self { rectangle, pipeline }
     }
 }
 

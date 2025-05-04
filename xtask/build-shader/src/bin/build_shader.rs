@@ -3,8 +3,7 @@
 use std::fs;
 
 #[derive(Debug)]
-enum ShaderStage
-{
+enum ShaderStage {
     Vertex,
 
     /// hlsl Hull shader
@@ -31,26 +30,22 @@ enum ShaderStage
 }
 
 #[derive(Debug)]
-enum ShaderType
-{
+enum ShaderType {
     Glsl,
     Hlsl,
 }
 
 #[derive(Debug)]
-struct ShaderCompileEntry
-{
+struct ShaderCompileEntry {
     shader_path: std::path::PathBuf,
     shader_stage: ShaderStage,
     output_path: std::path::PathBuf,
     shader_type: ShaderType,
 }
 
-impl ShaderCompileEntry
-{
+impl ShaderCompileEntry {
     /// 生成 shader compile 的任务
-    fn new(entry: &std::fs::DirEntry) -> Option<Self>
-    {
+    fn new(entry: &std::fs::DirEntry) -> Option<Self> {
         let shader_path = entry.path();
         let shader_name = entry.file_name().into_string().unwrap();
         let dir = shader_path.parent().unwrap().to_str().unwrap().to_string();
@@ -82,10 +77,8 @@ impl ShaderCompileEntry
         })
     }
 
-
     /// 使用 glslc 编译 glsl 文件
-    fn build_glsl(&self)
-    {
+    fn build_glsl(&self) {
         let output = std::process::Command::new("glslc")
             .args([
                 "-Ishader/include",
@@ -100,8 +93,12 @@ impl ShaderCompileEntry
             .unwrap();
 
         if !output.status.success() {
-            log::info!("stdout: {stdout}", stdout = String::from_utf8_lossy(&output.stdout));
-            log::error!("stderr: {stderr}", stderr = String::from_utf8_lossy(&output.stderr));
+            if !output.stdout.is_empty() {
+                log::info!("stdout: {stdout}", stdout = String::from_utf8_lossy(&output.stdout));
+            }
+            if !output.stderr.is_empty() {
+                log::error!("stderr: {stderr}", stderr = String::from_utf8_lossy(&output.stderr));
+            }
             panic!("failed to compilie shader: {:#?}", self.shader_path);
         }
     }
@@ -113,8 +110,7 @@ impl ShaderCompileEntry
     /// Nsight 使用时：
     ///
     /// https://docs.nvidia.com/nsight-graphics/UserGuide/index.html#configuring-your-application-shaders
-    fn build_hlsl(&self)
-    {
+    fn build_hlsl(&self) {
         // shader model 6.3 支持 ray tracing
         // shader model 6.5 支持 task shader 和 mesh shader
         // dxc.exe -spirv -T vs_6_1 -E main .\input.vert -Fo .\output.vert.spv -fspv-extension=SPV_EXT_descriptor_indexing
@@ -125,12 +121,12 @@ impl ShaderCompileEntry
             ShaderStage::Geometry => "gs",
             ShaderStage::Fragment => "ps",
             ShaderStage::Compute => "cs",
-            ShaderStage::RayGen |
-            ShaderStage::AnyHit |
-            ShaderStage::ClosestHit |
-            ShaderStage::Miss |
-            ShaderStage::Intersection |
-            ShaderStage::RayCallable => "lib",
+            ShaderStage::RayGen
+            | ShaderStage::AnyHit
+            | ShaderStage::ClosestHit
+            | ShaderStage::Miss
+            | ShaderStage::Intersection
+            | ShaderStage::RayCallable => "lib",
             ShaderStage::Task => "as",
             ShaderStage::Mesh => "ms",
         };
@@ -148,17 +144,19 @@ impl ShaderCompileEntry
             .arg("-Zi"); // 包含 debug 信息
         let output = cmd.output().unwrap();
         if !output.status.success() {
-            log::info!("stdout: \n{stdout}", stdout = String::from_utf8_lossy(&output.stdout));
-            log::info!("stderr: \n{stderr}", stderr = String::from_utf8_lossy(&output.stderr));
+            if !output.stderr.is_empty() {
+                log::info!("stdout: \n{stdout}", stdout = String::from_utf8_lossy(&output.stdout));
+            }
+            if !output.stderr.is_empty() {
+                log::error!("stderr: \n{stderr}", stderr = String::from_utf8_lossy(&output.stderr));
+            }
             panic!("failed to compilie shader: {:#?}", self.shader_path);
         }
     }
 }
 
-
 /// 编译一个文件夹中的 shader
-fn compile_one_dir(dir: &std::path::Path)
-{
+fn compile_one_dir(dir: &std::path::Path) {
     std::fs::read_dir(dir)
         .unwrap()
         .filter_map(|entry| ShaderCompileEntry::new(entry.as_ref().unwrap())) //
@@ -166,8 +164,8 @@ fn compile_one_dir(dir: &std::path::Path)
             if !entry.output_path.exists() {
                 return true;
             }
-            let need_re_compile = fs::metadata(&entry.shader_path).unwrap().modified().unwrap() >
-                fs::metadata(&entry.output_path).unwrap().modified().unwrap();
+            let need_re_compile = fs::metadata(&entry.shader_path).unwrap().modified().unwrap()
+                > fs::metadata(&entry.output_path).unwrap().modified().unwrap();
             if !need_re_compile {
                 log::info!("skip compile shader: {:?}", entry.shader_path);
             }
@@ -182,10 +180,8 @@ fn compile_one_dir(dir: &std::path::Path)
         });
 }
 
-
 /// 编译 shader 文件夹下的所有 shader
-fn compile_all_shader()
-{
+fn compile_all_shader() {
     std::fs::read_dir("shader")
         .unwrap() //
         .filter(|entry| entry.as_ref().unwrap().path().is_dir())
@@ -195,9 +191,7 @@ fn compile_all_shader()
         });
 }
 
-
-fn main()
-{
+fn main() {
     use simplelog::*;
     TermLogger::init(LevelFilter::Info, ConfigBuilder::new().build(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
 
