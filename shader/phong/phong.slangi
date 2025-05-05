@@ -1,3 +1,13 @@
+struct SceneData
+{
+    float4x4 projection;
+    float4x4 view;
+
+    Light light_1;
+    Light light_2;
+    Light light_3;
+};
+
 struct PushConstants
 {
     // offset = 0 Byte
@@ -26,7 +36,8 @@ struct PushConstants
     float4x4 inv_model;
 
     // offset = 192 Byte
-    uint64_t scene_buffer_addr;
+    // uint64_t scene_buffer_addr;
+    const SceneData *scene_buffer_ptr;
     uint64_t scene_buffer_addr_padding__1;
 };
 
@@ -38,12 +49,3 @@ struct Light
     float color_padding__;
 };
 
-struct SceneData
-{
-    float4x4 projection;
-    float4x4 view;
-
-    Light light_1;
-    Light light_2;
-    Light light_3;
-};

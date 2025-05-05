@@ -45,8 +45,8 @@ impl ShaderToy {
             offset: 0,
             size: size_of::<PushConstants>() as u32,
         }]);
-        ci.vertex_shader_stage("shader/shadertoy-glsl/shadertoy.vert.spv".to_string(), "main".to_string());
-        ci.fragment_shader_stage("shader/shadertoy-glsl/shadertoy.frag.spv".to_string(), "main".to_string());
+        ci.vertex_shader_stage("shader/build/shadertoy-glsl/shadertoy.vert.spv".to_string(), "main".to_string());
+        ci.fragment_shader_stage("shader/build/shadertoy-glsl/shadertoy.frag.spv".to_string(), "main".to_string());
         ci.attach_info(vec![render_context.color_format()], Some(render_context.depth_format()), None);
         ci.viewport(glam::vec2(0.0, 0.0), glam::vec2(extent.width as f32, extent.height as f32), 0.0, 1.0);
         ci.scissor(extent.into());

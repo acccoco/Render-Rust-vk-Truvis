@@ -1,7 +1,5 @@
 //! 将指定目录下的所有 shader 文件编译为 spv 文件，输出到同一目录下
 
-use std::fs;
-
 #[derive(Debug)]
 enum ShaderStage {
     Vertex,
@@ -27,29 +25,36 @@ enum ShaderStage {
     /// hlsl Amplification shader
     Task,
     Mesh,
+
+    /// slang 不需要明确的 shader stage
+    Slang,
 }
 
 #[derive(Debug)]
 enum ShaderType {
     Glsl,
     Hlsl,
+    Slang,
 }
 
+/// 一个具体的编译任务
 #[derive(Debug)]
-struct ShaderCompileEntry {
+struct ShaderCompileTask {
     shader_path: std::path::PathBuf,
     shader_stage: ShaderStage,
     output_path: std::path::PathBuf,
     shader_type: ShaderType,
 }
 
-impl ShaderCompileEntry {
+impl ShaderCompileTask {
     /// 生成 shader compile 的任务
     fn new(entry: &std::fs::DirEntry) -> Option<Self> {
         let shader_path = entry.path();
+        let shader_dir = shader_path.parent().unwrap();
+        let relative_dir = shader_dir.strip_prefix("shader").unwrap();
         let shader_name = entry.file_name().into_string().unwrap();
-        let dir = shader_path.parent().unwrap().to_str().unwrap().to_string();
-        let output_path = format!("{}/{}.spv", dir, shader_name);
+
+        let output_path = format!("shader/build/{}/{}.spv", relative_dir.to_str().unwrap(), shader_name);
 
         let shader_stage = if shader_name.ends_with(".vert") || shader_name.ends_with(".vs.hlsl") {
             ShaderStage::Vertex
@@ -63,11 +68,19 @@ impl ShaderCompileEntry {
             ShaderStage::RayGen
         } else if shader_name.ends_with(".rmiss") {
             ShaderStage::Miss
+        } else if shader_name.ends_with(".slang") {
+            ShaderStage::Slang
         } else {
             return None;
         };
 
-        let shader_type = if shader_name.ends_with(".hlsl") { ShaderType::Hlsl } else { ShaderType::Glsl };
+        let shader_type = if shader_name.ends_with(".hlsl") {
+            ShaderType::Hlsl
+        } else if shader_name.ends_with(".slang") {
+            ShaderType::Slang
+        } else {
+            ShaderType::Glsl
+        };
 
         Some(Self {
             shader_path,
@@ -75,6 +88,17 @@ impl ShaderCompileEntry {
             shader_stage,
             output_path: std::path::PathBuf::from(output_path),
         })
+    }
+
+    fn process_cmd_output(&self, output: std::process::Output) {
+        if !output.status.success() {
+            if !output.stdout.is_empty() {
+                log::info!("stdout: {stdout}", stdout = String::from_utf8_lossy(&output.stdout));
+            }
+            if !output.stderr.is_empty() {
+                log::error!("stderr: {stderr}", stderr = String::from_utf8_lossy(&output.stderr));
+            }
+        }
     }
 
     /// 使用 glslc 编译 glsl 文件
@@ -92,15 +116,7 @@ impl ShaderCompileEntry {
             .output()
             .unwrap();
 
-        if !output.status.success() {
-            if !output.stdout.is_empty() {
-                log::info!("stdout: {stdout}", stdout = String::from_utf8_lossy(&output.stdout));
-            }
-            if !output.stderr.is_empty() {
-                log::error!("stderr: {stderr}", stderr = String::from_utf8_lossy(&output.stderr));
-            }
-            panic!("failed to compilie shader: {:#?}", self.shader_path);
-        }
+        self.process_cmd_output(output);
     }
 
     /// 使用 dxc 编译 hlsl 文件，dxc 在 vulkan sdk 中附带
@@ -129,6 +145,7 @@ impl ShaderCompileEntry {
             | ShaderStage::RayCallable => "lib",
             ShaderStage::Task => "as",
             ShaderStage::Mesh => "ms",
+            ShaderStage::Slang => panic!("dxc does not support slang"),
         };
         let shader_model = "6_7";
         let entry_point = "main";
@@ -143,29 +160,44 @@ impl ShaderCompileEntry {
             .arg("-fspv-debug=vulkan-with-source") // SPIR-V NonSemantic Shader DebugInfo Instructions，用于 Nsight 调试
             .arg("-Zi"); // 包含 debug 信息
         let output = cmd.output().unwrap();
-        if !output.status.success() {
-            if !output.stderr.is_empty() {
-                log::info!("stdout: \n{stdout}", stdout = String::from_utf8_lossy(&output.stdout));
-            }
-            if !output.stderr.is_empty() {
-                log::error!("stderr: \n{stderr}", stderr = String::from_utf8_lossy(&output.stderr));
-            }
-            panic!("failed to compilie shader: {:#?}", self.shader_path);
-        }
+        self.process_cmd_output(output);
+    }
+
+    /// 使用 slangc 编译 slang 文件
+    fn build_slang(&self) {
+        let output = std::process::Command::new("slangc")
+            .args([
+                "-I",
+                "shader/include",
+                "-g",                          // 生成调式信息
+                "-matrix-layout-column-major", // 列主序
+                "-fvk-use-entrypoint-name",    // 具有多个 entry 时，需要这个选项
+                "-o",
+                self.output_path.to_str().unwrap(),
+                self.shader_path.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+
+        self.process_cmd_output(output);
     }
 }
 
 /// 编译一个文件夹中的 shader
 fn compile_one_dir(dir: &std::path::Path) {
+    // dir 相对于 shader 的相对路径
     std::fs::read_dir(dir)
         .unwrap()
-        .filter_map(|entry| ShaderCompileEntry::new(entry.as_ref().unwrap())) //
+        .filter(|entry| entry.as_ref().unwrap().path().is_file())
+        .filter_map(|entry| ShaderCompileTask::new(entry.as_ref().unwrap())) //
         .filter(|entry| {
             if !entry.output_path.exists() {
                 return true;
             }
-            let need_re_compile = fs::metadata(&entry.shader_path).unwrap().modified().unwrap()
-                > fs::metadata(&entry.output_path).unwrap().modified().unwrap();
+            // let need_re_compile = fs::metadata(&entry.shader_path).unwrap().modified().unwrap()
+            //     > fs::metadata(&entry.output_path).unwrap().modified().unwrap();
+            // 都需要重新编译
+            let need_re_compile = true;
             if !need_re_compile {
                 log::info!("skip compile shader: {:?}", entry.shader_path);
             }
@@ -173,9 +205,12 @@ fn compile_one_dir(dir: &std::path::Path) {
         })
         .for_each(|entry| {
             log::info!("compile shader: {:#?}", entry);
+            // 确保 entry.output_path 是存在的
+            std::fs::create_dir_all(entry.output_path.parent().unwrap()).unwrap();
             match entry.shader_type {
                 ShaderType::Glsl => entry.build_glsl(),
                 ShaderType::Hlsl => entry.build_hlsl(),
+                ShaderType::Slang => entry.build_slang(),
             }
         });
 }

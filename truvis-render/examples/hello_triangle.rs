@@ -23,8 +23,10 @@ impl HelloTriangle {
     fn init_pipeline(rhi: &Rhi, render_context: &mut RenderContext) -> RhiGraphicsPipeline {
         let extent = render_context.swapchain_extent();
         let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
-        pipeline_ci.vertex_shader_stage("shader/hello_triangle/triangle.vs.hlsl.spv".to_string(), "main".to_string());
-        pipeline_ci.fragment_shader_stage("shader/hello_triangle/triangle.ps.hlsl.spv".to_string(), "main".to_string());
+        pipeline_ci
+            .vertex_shader_stage("shader/build/hello_triangle/triangle.slang.spv".to_string(), "vsmain".to_string());
+        pipeline_ci
+            .fragment_shader_stage("shader/build/hello_triangle/triangle.slang.spv".to_string(), "psmain".to_string());
         pipeline_ci.attach_info(
             vec![render_context.color_format()],
             Some(render_context.depth_format()),

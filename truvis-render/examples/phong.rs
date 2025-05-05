@@ -247,8 +247,8 @@ impl PhongApp {
     ) -> (RhiGraphicsPipeline, RhiGraphicsPipeline) {
         let extent = render_ctx.swapchain_extent();
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
-        ci.vertex_shader_stage("shader/phong/phong.vs.hlsl.spv".to_string(), "main".to_string());
-        ci.fragment_shader_stage("shader/phong/phong.ps.hlsl.spv".to_string(), "main".to_string());
+        ci.vertex_shader_stage("shader/build/phong/phong.vs.slang.spv".to_string(), "main".to_string());
+        ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv".to_string(), "main".to_string());
         ci.push_constant_ranges(vec![vk::PushConstantRange::default()
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
             .offset(0)
@@ -270,7 +270,7 @@ impl PhongApp {
 
         let simple_pipe = RhiGraphicsPipeline::new(rhi.device.clone(), &ci, "phong-simple-pipe");
 
-        ci.vertex_shader_stage("shader/phong/phong3d.vs.hlsl.spv".to_string(), "main".to_string());
+        ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv".to_string(), "main".to_string());
         ci.vertex_binding(VertexLayoutAos3D::vertex_input_bindings());
         ci.vertex_attribute(VertexLayoutAos3D::vertex_input_attributes());
 

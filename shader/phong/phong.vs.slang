@@ -1,4 +1,4 @@
-#include "phong.inc.hlsl"
+#include "phong.slangi"
 
 struct VsInput
 {
@@ -47,11 +47,13 @@ cbuffer MeshUBO
 [[vk::push_constant]]
 PushConstants push_constants;
 
+[shader("vertex")]
 VsOutput main(VsInput input)
 {
     VsOutput output = (VsOutput)0;
 
-    SceneData scene = vk::RawBufferLoad<SceneData>(push_constants.scene_buffer_addr, 4);
+    // SceneData scene = vk::RawBufferLoad<SceneData>(push_constants.scene_buffer_addr, 4);
+    SceneData scene = *push_constants.scene_buffer_ptr;
 
     const float4x4 mvp = mul(projection, mul(scene.view, model));
     output.pos = mul(mvp, float4(input.pos, 1.0));

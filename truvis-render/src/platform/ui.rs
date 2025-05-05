@@ -363,22 +363,20 @@ impl Gui {
     }
 
     fn create_pipeline(rhi: &Rhi, render_ctx: &RenderContext, pipeline_layout: vk::PipelineLayout) -> vk::Pipeline {
-        let entry_point_name = CString::new("main").unwrap();
-
         let vert_shader_module =
-            RhiShaderModule::new(rhi.device.clone(), std::path::Path::new("shader/imgui/shader.vs.hlsl.spv"));
+            RhiShaderModule::new(rhi.device.clone(), std::path::Path::new("shader/build/imgui/imgui.slang.spv"));
         let frag_shader_module =
-            RhiShaderModule::new(rhi.device.clone(), std::path::Path::new("shader/imgui/shader.ps.hlsl.spv"));
+            RhiShaderModule::new(rhi.device.clone(), std::path::Path::new("shader/build/imgui/imgui.slang.spv"));
 
         let shader_states_infos = [
             vk::PipelineShaderStageCreateInfo::default()
                 .stage(vk::ShaderStageFlags::VERTEX)
                 .module(vert_shader_module.handle)
-                .name(&entry_point_name),
+                .name(cstr::cstr!("vsmain")),
             vk::PipelineShaderStageCreateInfo::default()
                 .stage(vk::ShaderStageFlags::FRAGMENT)
                 .module(frag_shader_module.handle)
-                .name(&entry_point_name),
+                .name(cstr::cstr!("psmain")),
         ];
 
         // 20 = R32G32 + R32G32 + R8G8B8A8

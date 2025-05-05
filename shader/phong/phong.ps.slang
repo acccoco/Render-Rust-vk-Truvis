@@ -1,4 +1,4 @@
-#include "phong.inc.hlsl"
+#include "phong.slangi"
 
 struct PsInput
 {
@@ -32,21 +32,13 @@ cbuffer SceneUBO
     Light light_3;
 };
 
-[[vk::binding(0, 0)]]
+[[vk::binding(0, 2)]]
 cbuffer MaterialUBO
 {
     float4 color;
 };
 
-// [[vk::binding(0, 1)]]
-// [[vk::combinedImageSampler]]
-// Texture2D<float4> diffuse_texture;
-
-// [[vk::binding(0, 1)]]
-// [[vk::combinedImageSampler]]
-// SamplerState diffuse_sampler;
-
-float3 phong_light(float3 pos, float3 normal, float3 light_pos, float3 light_color)
+func phong_light(pos: float3, normal: float3, light_pos: float3, light_color: float3)->float3
 {
     const float3 light_dir = normalize(pos - light_pos);
     const float3 view_dir = normalize(pos - push_constants.camera_pos);
@@ -75,6 +67,7 @@ float3 phong_light(float3 pos, float3 normal, float3 light_pos, float3 light_col
     return color;
 }
 
+[shader("pixel")]
 PsOutput main(PsInput input)
 {
     const float3 normal = normalize(input.frag_normal);

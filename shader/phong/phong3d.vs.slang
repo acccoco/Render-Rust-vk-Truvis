@@ -1,4 +1,4 @@
-#include "phong.inc.hlsl"
+#include "phong.slangi"
 
 struct VsInput
 {
@@ -9,19 +9,17 @@ struct VsInput
     float3 normal : NORMAL;
 
     [[vk::location(2)]]
-    float3 tangent: TANGENT;
+    float3 tangent : TANGENT;
 
     [[vk::location(3)]]
-    float3 bitangent: BITANGENT;
+    float3 bitangent : BITANGENT;
 
     [[vk::location(4)]]
     float2 uv : UV;
 };
 
-struct VsOutput
+struct CoarseVertex
 {
-    float4 pos : SV_POSITION;
-
     [[vk::location(0)]]
     float3 world_pos : WORLD_POS;
 
@@ -30,6 +28,13 @@ struct VsOutput
 
     [[vk::location(2)]]
     float2 uv : UV;
+};
+
+struct VsOutput
+{
+    float4 pos : SV_POSITION;
+
+    CoarseVertex coarse_vertex : CoarseVertex;
 };
 
 [[vk::binding(0, 0)]]
@@ -53,17 +58,19 @@ cbuffer MeshUBO
 [[vk::push_constant]]
 PushConstants push_constants;
 
+[shader("vertex")]
 VsOutput main(VsInput input)
 {
     VsOutput output = (VsOutput)0;
 
-    SceneData scene = vk::RawBufferLoad<SceneData>(push_constants.scene_buffer_addr, 4);
+    // SceneData scene = vk::RawBufferLoad<SceneData>(push_constants.scene_buffer_addr, 4);
+    SceneData scene = *push_constants.scene_buffer_ptr;
 
     const float4x4 mvp = mul(projection, mul(scene.view, push_constants.model));
     output.pos = mul(mvp, float4(input.pos, 1.0));
-    output.world_pos = mul(push_constants.model, float4(input.pos, 1.0)).xyz;
-    output.uv = input.uv;
-    output.frag_normal = mul(push_constants.inv_model, float4(input.normal, 0.0)).xyz;
+    output.coarse_vertex.world_pos = mul(push_constants.model, float4(input.pos, 1.0)).xyz;
+    output.coarse_vertex.uv = input.uv;
+    output.coarse_vertex.frag_normal = mul(push_constants.inv_model, float4(input.normal, 0.0)).xyz;
 
     return output;
 }

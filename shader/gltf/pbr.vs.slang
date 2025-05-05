@@ -60,6 +60,7 @@ cbuffer UBONode
     uint node_jointCount;
 };
 
+[shader("vertex")]
 VsOutput main(VsInput input)
 {
     VsOutput output = (VsOutput)0;
