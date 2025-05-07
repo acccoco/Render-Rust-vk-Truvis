@@ -1,23 +1,20 @@
 [package]
-name = "truvis-assimp"
+name = "shader-binding"
 version = "0.1.0"
 edition = "2021"
-description = "为 Truvis 提供 Assimp 绑定"
 
 
 [dependencies]
-model-manager = { workspace = true }
 truvis-rhi = { workspace = true }
 
 anyhow = { workspace = true }
 simplelog = { workspace = true }
 log = { workspace = true }
 ash = { workspace = true }
-itertools = { workspace = true }
-uuid = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
+bytemuck = { workspace = true, features = ["derive"] }
 
 
 [build-dependencies]
-cmake = { workspace = true }
 bindgen = { workspace = true }

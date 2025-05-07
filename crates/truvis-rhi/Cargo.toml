@@ -2,6 +2,7 @@
 name = "truvis-rhi"
 version = "0.1.0"
 edition = "2024"
+description = "Truvis 的 RHI 层，提供 Vulkan 的封装和抽象"
 
 [dependencies]
 shader-layout-macro = { workspace = true }

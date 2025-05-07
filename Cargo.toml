@@ -5,6 +5,8 @@ members = [
     "crates/truvis-rhi", # 渲染库
     "crates/model-manager", # 场景管理
 
+    "shader/shader-binding", # 将 shader 代码和 rust 代码绑定的库
+
     "xtask/build-shader", # 构建工具
     # "xtask/shader-gen",   # 用于生成 shader 代码的工具，暂时不使用
 
@@ -23,6 +25,7 @@ model-manager = { path = "crates/model-manager" }
 build-shader = { path = "xtask/build-shader" }
 truvis-assimp = { path = "third_libs/assimp" }
 truvis-render = { path = "truvis-render" }
+shader-binding = { path = "shader/shader-binding" }
 
 
 # 图形相关的库
@@ -116,3 +119,7 @@ bitflags = "2.3.2"
 
 # 简化错误处理
 anyhow = "1.0.84"
+
+cmake = "0.1.54"
+bindgen = "0.71.1"
+

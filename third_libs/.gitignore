@@ -8,3 +8,4 @@ bindings.rs
 *.lib
 .cache
 *.pdb
+ffi_bindings.rs

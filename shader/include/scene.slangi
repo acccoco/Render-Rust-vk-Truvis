@@ -1,0 +1,59 @@
+#pragma once
+
+#ifdef __SLANG__
+#define Ptr(T) T *
+#else
+#define Ptr(T) uint64_t
+#endif
+
+struct Light
+{
+    float3 pos;
+    float pos_padding__;
+    float3 color;
+    float color_padding__;
+};
+
+struct SceneData
+{
+    float4x4 projection;
+    float4x4 view;
+
+    Light light_1;
+    Light light_2;
+    Light light_3;
+};
+
+struct PushConstants
+{
+    // offset = 0 Byte
+    float3 camera_pos;
+    int camera_pos_padding__;
+
+    // offset = 16 Byte
+    float3 camera_dir;
+    int camera_dir_padding__;
+
+    // offset = 32 Byte
+    float2 mouse;
+    float2 resolution;
+
+    // offset = 48 Byte
+    uint frame_id;
+    float delta_time_ms;
+    float time;
+    float frame_rate;
+
+    // TODO temp solution
+    // offset = 64 Byte
+    float4x4 model;
+
+    // offset = 128 Byte
+    float4x4 inv_model;
+
+    // offset = 192 Byte
+    // uint64_t scene_buffer_addr;
+    const Ptr(SceneData) scene_buffer_ptr;
+    uint64_t scene_buffer_addr_padding__1;
+};
+

@@ -219,6 +219,11 @@ fn compile_one_dir(dir: &std::path::Path) {
 fn compile_all_shader() {
     std::fs::read_dir("shader")
         .unwrap() //
+        // 跳过 shader-binding 文件夹
+        .filter(|entry| {
+            let p = entry.as_ref().unwrap().path();
+            !p.ends_with("shader-binding")
+        })
         .filter(|entry| entry.as_ref().unwrap().path().is_dir())
         .for_each(|entry| {
             log::info!("compile shader in dir: {:#?}", entry.as_ref().unwrap().path());

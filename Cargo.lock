@@ -1982,6 +1982,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "shader-binding"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ash",
+ "bindgen",
+ "bytemuck",
+ "glam",
+ "log",
+ "simplelog",
+ "truvis-rhi",
+ "uuid",
+]
+
+[[package]]
 name = "shader-layout-macro"
 version = "0.1.0"
 dependencies = [
@@ -2351,6 +2366,7 @@ dependencies = [
  "raw-window-handle",
  "serde",
  "serde_json",
+ "shader-binding",
  "shader-layout-macro",
  "shader-layout-trait",
  "simplelog",

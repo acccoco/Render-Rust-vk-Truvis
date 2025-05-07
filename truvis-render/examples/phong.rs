@@ -11,6 +11,7 @@ use model_manager::manager::mesh_manager::MeshManager;
 use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
 use model_manager::vertex::vertex_pnu::VertexLayoutAosPosNormalUv;
 use model_manager::vertex::VertexLayout;
+use shader_binding::PushConstants;
 use shader_layout_macro::ShaderLayout;
 use truvis_assimp::SceneLoader;
 use truvis_render::platform::camera::Camera;
@@ -118,31 +119,31 @@ struct MaterialUBO {
     color: glam::Vec4,
 }
 
-// TODO 考虑差分为 vertex 的和 fragment 的；
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, Default)]
-struct PushConstant {
-    camera_pos: glam::Vec3,
-    camera_pos_padding__: i32,
-
-    camera_dir: glam::Vec3,
-    camera_dir_padding__: i32,
-
-    mouse_pos: glam::Vec2,
-    resolution: glam::Vec2,
-
-    frame_id: u32,
-    delta_time_ms: f32,
-    time_ms: f32,
-    fps: f32,
-
-    // TODO 临时方案
-    model: glam::Mat4,
-    inv_model: glam::Mat4,
-
-    scene_buffer_addr: u64,
-    scene_buffer_addr_padding__1: u64,
-}
+// // TODO 考虑差分为 vertex 的和 fragment 的；
+// #[repr(C)]
+// #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable, Default)]
+// struct PushConstant {
+//     camera_pos: glam::Vec3,
+//     camera_pos_padding__: i32,
+//
+//     camera_dir: glam::Vec3,
+//     camera_dir_padding__: i32,
+//
+//     mouse_pos: glam::Vec2,
+//     resolution: glam::Vec2,
+//
+//     frame_id: u32,
+//     delta_time_ms: f32,
+//     time_ms: f32,
+//     fps: f32,
+//
+//     // TODO 临时方案
+//     model: glam::Mat4,
+//     inv_model: glam::Mat4,
+//
+//     scene_buffer_addr: u64,
+//     scene_buffer_addr_padding__1: u64,
+// }
 
 struct PhongUniformBuffer {
     scene_uniform_buffer: RhiBuffer,
@@ -182,7 +183,7 @@ struct PhongApp {
 
     camera: Camera,
 
-    push: PushConstant,
+    push: PushConstants,
 }
 
 impl PhongApp {
@@ -252,7 +253,7 @@ impl PhongApp {
         ci.push_constant_ranges(vec![vk::PushConstantRange::default()
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
             .offset(0)
-            .size(size_of::<PushConstant>() as u32)]);
+            .size(size_of::<PushConstants>() as u32)]);
         ci.descriptor_set_layouts(descriptor_set_layouts);
         ci.attach_info(vec![render_ctx.color_format()], Some(render_ctx.depth_format()), None);
         ci.viewport(
@@ -471,7 +472,7 @@ impl PhongApp {
             cmd.cmd_push_constants(
                 self.pipeline_3d.pipeline_layout,
                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                offset_of!(PushConstant, model) as u32,
+                offset_of!(PushConstants, model) as u32,
                 bytemuck::bytes_of(&transform_data),
             );
 
@@ -521,10 +522,12 @@ impl App for PhongApp {
             }
         }
 
-        self.push.camera_pos = self.camera.position;
-        self.push.camera_dir = self.camera.camera_forward();
+        use shader_binding::float3;
+
+        self.push.camera_pos = self.camera.position.into();
+        self.push.camera_dir = self.camera.camera_forward().into();
         self.scene_ubo_per_draw.view = self.camera.get_view_matrix();
-        self.push.scene_buffer_addr = unsafe {
+        self.push.scene_buffer_ptr = unsafe {
             let frame_id = app_ctx.render_context.current_frame_index();
             app_ctx.rhi.device.get_buffer_device_address(
                 &vk::BufferDeviceAddressInfo::default()
@@ -700,15 +703,15 @@ impl App for PhongApp {
                     ..Default::default()
                 },
             },
-            push: PushConstant {
-                camera_pos: camera.position,
-                camera_dir: camera.camera_forward(),
+            push: PushConstants {
+                camera_pos: camera.position.into(),
+                camera_dir: camera.camera_forward().into(),
                 frame_id: 0,
                 delta_time_ms: 0.0,
-                mouse_pos: Default::default(),
+                mouse: Default::default(),
                 resolution: Default::default(),
-                time_ms: 0.0,
-                fps: 0.0,
+                time: 0.0,
+                frame_rate: 0.0,
                 ..Default::default()
             },
             camera,
