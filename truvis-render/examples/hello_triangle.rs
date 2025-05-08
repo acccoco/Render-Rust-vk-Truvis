@@ -3,8 +3,9 @@ use imgui::Ui;
 use model_manager::component::mesh::SimpleMesh;
 use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
 use model_manager::vertex::VertexLayout;
-use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer};
-use truvis_render::render_context::RenderContext;
+use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
+use truvis_render::render::Renderer;
+use truvis_render::frame_context::FrameContext;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
@@ -20,7 +21,7 @@ struct HelloTriangle {
 }
 
 impl HelloTriangle {
-    fn init_pipeline(rhi: &Rhi, render_context: &mut RenderContext) -> RhiGraphicsPipeline {
+    fn init_pipeline(rhi: &Rhi, render_context: &mut FrameContext) -> RhiGraphicsPipeline {
         let extent = render_context.swapchain_extent();
         let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
         pipeline_ci
@@ -32,13 +33,6 @@ impl HelloTriangle {
             Some(render_context.depth_format()),
             Some(vk::Format::UNDEFINED),
         );
-        pipeline_ci.viewport(
-            glam::vec2(0.0, extent.height as f32),
-            glam::vec2(extent.width as f32, -(extent.height as f32)),
-            0.0,
-            1.0,
-        );
-        pipeline_ci.scissor(extent.into());
         pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
         pipeline_ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
         pipeline_ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
@@ -48,10 +42,10 @@ impl HelloTriangle {
         RhiGraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, "hello-triangle-pipeline")
     }
 
-    fn my_update(&self, rhi: &Rhi, render_context: &mut RenderContext) {
-        let color_attach = <Self as App>::get_color_attachment(render_context.current_present_image_view());
-        let depth_attach = <Self as App>::get_depth_attachment(render_context.depth_view.handle());
-        let render_info = <Self as App>::get_render_info(
+    fn my_update(&self, rhi: &Rhi, render_context: &mut FrameContext) {
+        let color_attach = <Self as OuterApp>::get_color_attachment(render_context.current_present_image_view());
+        let depth_attach = <Self as OuterApp>::get_depth_attachment(render_context.depth_view.handle());
+        let render_info = <Self as OuterApp>::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
                 extent: render_context.swapchain_extent(),
@@ -59,12 +53,33 @@ impl HelloTriangle {
             std::slice::from_ref(&color_attach),
             &depth_attach,
         );
+        let swapchain_extend = render_context.swapchain_extent();
 
-        let cmd = RenderContext::alloc_command_buffer(render_context, "render");
+        let cmd = FrameContext::alloc_command_buffer(render_context, "render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);
             cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
+
+            cmd.cmd_set_viewport(
+                0,
+                &[vk::Viewport {
+                    x: 0.0,
+                    y: swapchain_extend.height as f32,
+                    width: swapchain_extend.width as f32,
+                    height: -(swapchain_extend.height as f32),
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                }],
+            );
+            cmd.cmd_set_scissor(
+                0,
+                &[vk::Rect2D {
+                    offset: vk::Offset2D::default(),
+                    extent: swapchain_extend,
+                }],
+            );
+
             cmd.cmd_bind_index_buffer(&self.triangle.index_buffer, 0, vk::IndexType::UINT32);
             cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.triangle.vertex_buffer), &[0]);
             cmd.draw_indexed(self.triangle.index_cnt, 0, 1, 0, 0);
@@ -74,7 +89,7 @@ impl HelloTriangle {
         rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
-    fn new(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
+    fn new(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
         let pipeline = HelloTriangle::init_pipeline(rhi, render_context);
         let triangle = VertexAosLayoutPosColor::triangle(rhi);
         Self {
@@ -86,7 +101,7 @@ impl HelloTriangle {
     }
 }
 
-impl App for HelloTriangle {
+impl OuterApp for HelloTriangle {
     fn update_ui(&mut self, ui: &mut Ui) {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
@@ -112,21 +127,16 @@ impl App for HelloTriangle {
         self.my_update(app_ctx.rhi, app_ctx.render_context);
     }
 
-    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
-        log::info!("start.");
+    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
+        log::info!("hello triangle init.");
         HelloTriangle::new(rhi, render_context)
     }
 
-    fn get_render_init_info() -> AppInitInfo {
-        AppInitInfo {
-            window_width: 800,
-            window_height: 800,
-            app_name: "hello-triangle".to_string(),
-            enable_validation: true,
-        }
+    fn rebuild(&mut self, rhi: &Rhi, render_context: &mut FrameContext) {
+        // do nothing
     }
 }
 
 fn main() {
-    Renderer::<HelloTriangle>::run();
+    TruvisApp::<HelloTriangle>::run();
 }

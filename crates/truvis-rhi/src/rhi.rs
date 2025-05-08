@@ -1,5 +1,6 @@
 use std::{ffi::CStr, rc::Rc};
 
+use crate::core::descriptor_pool::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo};
 use crate::core::{
     allocator::RhiAllocator, command_pool::RhiCommandPool, command_queue::RhiQueue, device::RhiDevice,
     instance::RhiInstance, physical_device::RhiPhysicalDevice,
@@ -25,7 +26,13 @@ pub struct Rhi {
     pub graphics_queue: Rc<RhiQueue>,
     pub compute_queue: Rc<RhiQueue>,
     pub transfer_queue: Rc<RhiQueue>,
+
+    descriptor_pool: RhiDescriptorPool,
 }
+
+const DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
+const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
+const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
 
 // init 相关
 impl Rhi {
@@ -72,6 +79,8 @@ impl Rhi {
 
         let allocator = Rc::new(RhiAllocator::new(instance.clone(), physical_device.clone(), device.clone()));
 
+        let descriptor_pool = Rhi::init_descriptor_pool(device.clone());
+
         Self {
             vk_pf,
             instance,
@@ -84,7 +93,49 @@ impl Rhi {
             graphics_queue,
             compute_queue,
             transfer_queue,
+            descriptor_pool,
         }
+    }
+
+    fn init_descriptor_pool(device: Rc<RhiDevice>) -> RhiDescriptorPool {
+        let pool_size = vec![
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
+                descriptor_count: 128,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_BUFFER,
+                descriptor_count: DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                descriptor_count: DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::INPUT_ATTACHMENT,
+                descriptor_count: 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
+                descriptor_count: 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_IMAGE,
+                descriptor_count: DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT + 32,
+            },
+        ];
+
+        let pool_ci = Rc::new(RhiDescriptorPoolCreateInfo::new(
+            vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET | vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND,
+            DESCRIPTOR_POOL_MAX_MATERIAL_CNT + DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
+            pool_size,
+        ));
+
+        RhiDescriptorPool::new(device, pool_ci, "ctx-descriptor-pool")
     }
 }
 
@@ -103,6 +154,11 @@ impl Rhi {
     #[inline]
     pub fn physical_device(&self) -> &RhiPhysicalDevice {
         &self.physical_device
+    }
+
+    #[inline]
+    pub fn descriptor_pool(&self) -> &RhiDescriptorPool {
+        &self.descriptor_pool
     }
 }
 

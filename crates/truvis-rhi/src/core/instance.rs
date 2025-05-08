@@ -38,16 +38,19 @@ impl RhiInstance {
             .engine_version(vk::make_api_version(0, 1, 0, 0));
 
         let enabled_extensions = Self::get_extensions(vk_entry, &extra_instance_exts);
-        log::info!("instance extensions: ");
+        // 多行输出到一个字符串
+        let mut enabled_extensions_str = String::new();
         for ext in &enabled_extensions {
-            log::info!("\t{:?}", unsafe { CStr::from_ptr(*ext) });
+            enabled_extensions_str.push_str(&format!("\n\t{:?}", unsafe { CStr::from_ptr(*ext) }));
         }
+        log::info!("instance extensions: {}", enabled_extensions_str);
 
         let enabled_layers = Self::get_layers(vk_entry);
-        log::info!("instance layers: ");
+        let mut enabled_layers_str = String::new();
         for layer in &enabled_layers {
-            log::info!("\t{:?}", unsafe { CStr::from_ptr(*layer) });
+            enabled_layers_str.push_str(&format!("\n\t{:?}", unsafe { CStr::from_ptr(*layer) }));
         }
+        log::info!("instance layers: {}", enabled_layers_str);
 
         let mut instance_ci = vk::InstanceCreateInfo::default()
             .application_info(&app_info)

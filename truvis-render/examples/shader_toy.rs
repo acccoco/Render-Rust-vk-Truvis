@@ -4,8 +4,10 @@ use imgui::Ui;
 use model_manager::component::mesh::SimpleMesh;
 use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
 use model_manager::vertex::VertexLayout;
-use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer, Timer};
-use truvis_render::render_context::RenderContext;
+use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
+use truvis_render::platform::timer::Timer;
+use truvis_render::render::Renderer;
+use truvis_render::frame_context::FrameContext;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
@@ -37,7 +39,7 @@ struct ShaderToy {
 }
 
 impl ShaderToy {
-    fn init_pipeline(rhi: &Rhi, render_context: &RenderContext) -> RhiGraphicsPipeline {
+    fn init_pipeline(rhi: &Rhi, render_context: &FrameContext) -> RhiGraphicsPipeline {
         let extent = render_context.swapchain_extent();
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
         ci.push_constant_ranges(vec![vk::PushConstantRange {
@@ -59,7 +61,7 @@ impl ShaderToy {
         RhiGraphicsPipeline::new(rhi.device.clone(), &ci, "shadertoy")
     }
 
-    fn run(&self, rhi: &Rhi, render_context: &mut RenderContext, timer: &Timer) {
+    fn run(&self, rhi: &Rhi, render_context: &mut FrameContext, timer: &Timer) {
         let push_constants = PushConstants {
             time: timer.total_time_s,
             delta_time: timer.delta_time_s,
@@ -78,9 +80,9 @@ impl ShaderToy {
             __padding__: [0.0, 0.0],
         };
 
-        let depth_attach_info = <Self as App>::get_depth_attachment(render_context.depth_view.handle());
-        let color_attach_info = <Self as App>::get_color_attachment(render_context.current_present_image_view());
-        let render_info = <Self as App>::get_render_info(
+        let depth_attach_info = <Self as OuterApp>::get_depth_attachment(render_context.depth_view.handle());
+        let color_attach_info = <Self as OuterApp>::get_color_attachment(render_context.current_present_image_view());
+        let render_info = <Self as OuterApp>::get_render_info(
             vk::Rect2D {
                 offset: Default::default(),
                 extent: render_context.swapchain_extent(),
@@ -110,7 +112,7 @@ impl ShaderToy {
         rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
-    fn new(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
+    fn new(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
         log::info!("start.");
 
         let pipeline = Self::init_pipeline(rhi, render_context);
@@ -120,7 +122,7 @@ impl ShaderToy {
     }
 }
 
-impl App for ShaderToy {
+impl OuterApp for ShaderToy {
     fn update_ui(&mut self, ui: &mut Ui) {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
@@ -134,20 +136,20 @@ impl App for ShaderToy {
         self.run(app_ctx.rhi, app_ctx.render_context, app_ctx.timer)
     }
 
-    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
+    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
         ShaderToy::new(rhi, render_context)
     }
 
-    fn get_render_init_info() -> AppInitInfo {
-        AppInitInfo {
-            window_width: 1600,
-            window_height: 900,
-            app_name: "hello-triangle".to_string(),
-            enable_validation: true,
-        }
-    }
+    // fn get_render_init_info() -> AppInitInfo {
+    //     AppInitInfo {
+    //         window_width: 1600,
+    //         window_height: 900,
+    //         app_name: "hello-triangle".to_string(),
+    //         enable_validation: true,
+    //     }
+    // }
 }
 
 fn main() {
-    Renderer::<ShaderToy>::run();
+    TruvisApp::<ShaderToy>::run();
 }

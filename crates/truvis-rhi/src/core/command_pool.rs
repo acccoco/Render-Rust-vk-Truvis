@@ -11,6 +11,14 @@ pub struct RhiCommandPool {
     device: Rc<RhiDevice>,
 }
 
+impl Drop for RhiCommandPool {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.destroy_command_pool(self.handle, None);
+        }
+    }
+}
+
 impl RhiCommandPool {
     #[inline]
     pub fn new(rhi: &Rhi, queue_family_index: u32, flags: vk::CommandPoolCreateFlags, debug_name: &str) -> Self {

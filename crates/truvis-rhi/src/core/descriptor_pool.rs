@@ -51,6 +51,15 @@ pub struct RhiDescriptorPool {
     handle: vk::DescriptorPool,
     /// 描述符池创建信息
     _info: Rc<RhiDescriptorPoolCreateInfo>,
+
+    device: Rc<RhiDevice>,
+}
+
+impl Drop for RhiDescriptorPool {
+    /// 释放 Vulkan 描述符池
+    fn drop(&mut self) {
+        unsafe { self.device.destroy_descriptor_pool(self.handle, None) };
+    }
 }
 
 impl RhiDescriptorPool {
@@ -64,13 +73,14 @@ impl RhiDescriptorPool {
     /// # 返回值
     /// 新的描述符池实例
     #[inline]
-    pub fn new(device: &RhiDevice, ci: Rc<RhiDescriptorPoolCreateInfo>, name: &str) -> Self {
+    pub fn new(device: Rc<RhiDevice>, ci: Rc<RhiDescriptorPoolCreateInfo>, name: &str) -> Self {
         let pool = unsafe { device.create_descriptor_pool(&ci.inner, None).unwrap() };
         device.debug_utils.set_object_debug_name(pool, name);
 
         Self {
             handle: pool,
             _info: ci,
+            device,
         }
     }
 

@@ -3,8 +3,7 @@
 #[doc = " 4 字节对齐"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct CxxVec2f
-{
+pub struct CxxVec2f {
     pub x: f32,
     pub y: f32,
 }
@@ -18,8 +17,7 @@ const _: () = {
 #[doc = " 4 字节对齐"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct CxxVec3f
-{
+pub struct CxxVec3f {
     pub x: f32,
     pub y: f32,
     pub z: f32,
@@ -35,8 +33,7 @@ const _: () = {
 #[doc = " 4 字节对齐"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct CxxVec4f
-{
+pub struct CxxVec4f {
     pub x: f32,
     pub y: f32,
     pub z: f32,
@@ -54,8 +51,7 @@ const _: () = {
 #[doc = " 4x4 矩阵结构体 (列主序)"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct CxxMat4f
-{
+pub struct CxxMat4f {
     pub m: [f32; 16usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
@@ -67,8 +63,7 @@ const _: () = {
 #[doc = " 三角形面结构体"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct CxxTriangleFace
-{
+pub struct CxxTriangleFace {
     pub a: ::std::os::raw::c_uint,
     pub b: ::std::os::raw::c_uint,
     pub c: ::std::os::raw::c_uint,
@@ -84,8 +79,7 @@ const _: () = {
 #[doc = " 顶点结构体"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct CxxVertex3D
-{
+pub struct CxxVertex3D {
     pub position: CxxVec3f,
     pub normal: CxxVec3f,
     pub tangent: CxxVec3f,
@@ -105,8 +99,7 @@ const _: () = {
 #[doc = " 适合光栅化的几何体结构体，以 AoS(Array of Struct) 的形式组织"]
 #[repr(C)]
 #[derive(Debug)]
-pub struct CxxRasterGeometry
-{
+pub struct CxxRasterGeometry {
     pub vertex_cnt_: ::std::os::raw::c_uint,
     pub vertex_array_: *mut CxxVertex3D,
     pub face_cnt_: ::std::os::raw::c_uint,
@@ -127,8 +120,7 @@ const _: () = {
 #[doc = " 材质结构体"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct CxxMaterial
-{
+pub struct CxxMaterial {
     pub ambient: CxxVec4f,
     pub diffuse: CxxVec4f,
     pub specular: CxxVec4f,
@@ -154,8 +146,7 @@ const _: () = {
 };
 #[repr(C)]
 #[derive(Debug)]
-pub struct CxxInstance
-{
+pub struct CxxInstance {
     #[doc = " 坐标系：右手系，X-Right，Y-Up"]
     pub world_transform: CxxMat4f,
     #[doc = " 几何体索引数量"]

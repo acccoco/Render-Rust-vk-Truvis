@@ -18,14 +18,14 @@ pub struct WindowCreateInfo {
 }
 
 #[derive(Getters)]
-pub struct WindowSystem {
+pub struct MainWindow {
     window: Window,
 
     width: i32,
     height: i32,
 }
 
-impl WindowSystem {
+impl MainWindow {
     pub fn new(event_loop: &ActiveEventLoop, create_info: WindowCreateInfo) -> Self {
         let icon = load_icon(include_bytes!("./DruvisIII.png"));
         let window_attr = Window::default_attributes()

@@ -30,11 +30,6 @@ pub struct RhiGraphicsPipelineCreateInfo {
 
     primitive_topology: vk::PrimitiveTopology,
 
-    /// 可以为 None，有 dynamic states 指定
-    viewport: Option<vk::Viewport>,
-    /// 可以为 None，有 dynamic states 指定
-    scissor: Option<vk::Rect2D>,
-
     // FIXME
     rasterize_state_info: vk::PipelineRasterizationStateCreateInfo<'static>,
 
@@ -68,9 +63,6 @@ impl Default for RhiGraphicsPipelineCreateInfo {
 
             primitive_topology: vk::PrimitiveTopology::TRIANGLE_LIST,
 
-            viewport: None,
-            scissor: None,
-
             rasterize_state_info: vk::PipelineRasterizationStateCreateInfo::default()
                 .depth_clamp_enable(false)
                 .rasterizer_discard_enable(false)
@@ -92,7 +84,7 @@ impl Default for RhiGraphicsPipelineCreateInfo {
                 .depth_compare_op(vk::CompareOp::LESS)
                 .depth_bounds_test_enable(false)
                 .stencil_test_enable(false),
-            dynamic_states: vec![],
+            dynamic_states: vec![vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR],
             push_constant_ranges: vec![],
         }
     }
@@ -133,27 +125,6 @@ impl RhiGraphicsPipelineCreateInfo {
             entry_point,
             path: std::path::PathBuf::from(path),
         });
-        self
-    }
-
-    /// builder
-    #[inline]
-    pub fn viewport(&mut self, offset: glam::Vec2, extend: glam::Vec2, min_depth: f32, max_depth: f32) -> &mut Self {
-        self.viewport = Some(vk::Viewport {
-            x: offset.x,
-            y: offset.y,
-            width: extend.x,
-            height: extend.y,
-            min_depth,
-            max_depth,
-        });
-        self
-    }
-
-    /// builder
-    #[inline]
-    pub fn scissor(&mut self, rect: vk::Rect2D) -> &mut Self {
-        self.scissor = Some(rect);
         self
     }
 
@@ -243,11 +214,12 @@ impl RhiGraphicsPipeline {
             .topology(create_info.primitive_topology)
             .primitive_restart_enable(false);
 
-        let viewport = create_info.viewport.as_ref().unwrap();
-        let scissor = create_info.scissor.as_ref().unwrap();
-        let viewport_info = vk::PipelineViewportStateCreateInfo::default()
-            .viewports(std::slice::from_ref(viewport))
-            .scissors(std::slice::from_ref(scissor));
+        // viewport 和 scissor 具体值由 dynamic 决定，但是数量由该 create info 决定
+        let viewport_info = vk::PipelineViewportStateCreateInfo {
+            viewport_count: 1,
+            scissor_count: 1,
+            ..Default::default()
+        };
 
         // MSAA 配置
         let msaa_info = vk::PipelineMultisampleStateCreateInfo::default()

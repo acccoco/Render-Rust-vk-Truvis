@@ -17,7 +17,7 @@ use truvis_rhi::{
     rhi::Rhi,
 };
 
-pub struct RenderContext {
+pub struct FrameContext {
     pub render_swapchain: RhiSwapchain,
 
     swapchain_image_index: usize,
@@ -33,8 +33,6 @@ pub struct RenderContext {
     /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
     allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
 
-    descriptor_pool: RhiDescriptorPool,
-
     pub depth_format: vk::Format,
     pub depth_image: Rc<RhiImage2D>,
     pub depth_view: Rc<RhiImage2DView>,
@@ -49,11 +47,7 @@ pub struct RenderContext {
     _transfer_queue: Rc<RhiQueue>,
 }
 
-const DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
-const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
-const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
-
-impl RenderContext {
+impl FrameContext {
     pub fn new(rhi: &Rhi, init_info: &RenderContextInitInfo, render_swapchain_init_info: RhiSwapchainInitInfo) -> Self {
         let render_swapchain = RhiSwapchain::new(rhi, &render_swapchain_init_info);
         let (depth_format, depth_image, depth_image_view) =
@@ -74,7 +68,6 @@ impl RenderContext {
             .collect();
 
         let graphics_command_pools = Self::init_command_pool(rhi, init_info);
-        let descriptor_pool = Self::init_descriptor_pool(&rhi.device);
 
         Self {
             render_swapchain,
@@ -86,8 +79,6 @@ impl RenderContext {
 
             graphics_command_pools,
             allocated_command_buffers: vec![Vec::new(); init_info.frames_in_flight],
-
-            descriptor_pool,
 
             depth_format,
             depth_image,
@@ -156,47 +147,6 @@ impl RenderContext {
             .collect();
 
         graphics_command_pools
-    }
-
-    fn init_descriptor_pool(device: &RhiDevice) -> RhiDescriptorPool {
-        let pool_size = vec![
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
-                descriptor_count: 128,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                descriptor_count: DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::INPUT_ATTACHMENT,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_IMAGE,
-                descriptor_count: DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT + 32,
-            },
-        ];
-
-        let pool_ci = Rc::new(RhiDescriptorPoolCreateInfo::new(
-            vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET | vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND,
-            DESCRIPTOR_POOL_MAX_MATERIAL_CNT + DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
-            pool_size,
-        ));
-
-        RhiDescriptorPool::new(device, pool_ci, "ctx-descriptor-pool")
     }
 
     /// getter
@@ -325,14 +275,7 @@ impl RenderContext {
             RhiCommandBuffer::new(self.device.clone(), self.graphics_command_pools[self.current_frame].clone(), &name);
 
         self.allocated_command_buffers[self.current_frame].push(cmd.clone());
-
         cmd
-    }
-
-    /// getter
-    #[inline]
-    pub fn descriptor_pool(&self) -> &RhiDescriptorPool {
-        &self.descriptor_pool
     }
 
     /// 直接从 swapchain 获取 extent
@@ -386,6 +329,12 @@ impl RenderContext {
     #[inline]
     pub fn current_present_image_view(&self) -> vk::ImageView {
         self.render_swapchain.image_views[self.swapchain_image_index]
+    }
+}
+
+impl Drop for FrameContext {
+    fn drop(&mut self) {
+        log::info!("RenderContext drop.");
     }
 }
 

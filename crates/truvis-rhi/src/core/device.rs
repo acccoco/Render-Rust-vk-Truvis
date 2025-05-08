@@ -80,10 +80,11 @@ impl RhiDevice {
             .collect_vec();
 
         let device_exts = Self::basic_device_exts().iter().map(|e| e.as_ptr()).collect_vec();
-        log::info!("device exts:");
+        let mut exts_str = String::new();
         for ext in &device_exts {
-            log::info!("\t{:?}", unsafe { CStr::from_ptr(*ext) });
+            exts_str.push_str(&format!("\n\t{:?}", unsafe { CStr::from_ptr(*ext) }));
         }
+        log::info!("device exts: {}", exts_str);
 
         let mut features = vk::PhysicalDeviceFeatures2::default().features(Self::basic_gpu_core_features());
         let mut gpu_ext_features = Self::basic_gpu_ext_features();

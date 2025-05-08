@@ -1,4 +1,5 @@
 //! 将指定目录下的所有 shader 文件编译为 spv 文件，输出到同一目录下
+use std::io::Write;
 
 #[derive(Debug)]
 enum ShaderStage {
@@ -232,8 +233,20 @@ fn compile_all_shader() {
 }
 
 fn main() {
-    use simplelog::*;
-    TermLogger::init(LevelFilter::Info, ConfigBuilder::new().build(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
+    env_logger::Builder::new()
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{}:{} {} [{}] - {}",
+                record.file().unwrap_or("unknown"),
+                record.line().unwrap_or(0),
+                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                record.level(),
+                record.args()
+            )
+        })
+        .filter(None, log::LevelFilter::Debug)
+        .init();
 
     compile_all_shader()
 }

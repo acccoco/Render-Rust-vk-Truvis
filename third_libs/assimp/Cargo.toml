@@ -9,10 +9,6 @@ description = "为 Truvis 提供 Assimp 绑定"
 model-manager = { workspace = true }
 truvis-rhi = { workspace = true }
 
-anyhow = { workspace = true }
-simplelog = { workspace = true }
-log = { workspace = true }
-ash = { workspace = true }
 itertools = { workspace = true }
 uuid = { workspace = true }
 glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }

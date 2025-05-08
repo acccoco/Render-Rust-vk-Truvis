@@ -4,6 +4,10 @@ pub struct Camera {
     pub euler_yaw_deg: f32,
     pub euler_pitch_deg: f32,
     pub euler_roll_deg: f32,
+
+    pub asp: f32,
+    pub fov_deg: f32,
+    pub near: f32,
 }
 
 impl Camera {
@@ -40,6 +44,11 @@ impl Camera {
         let dir = transform.transform_vector3(Self::CAMERA_FORWAED);
 
         glam::Mat4::look_to_rh(self.position, dir, Self::CAMERA_UP)
+    }
+
+    /// 从 RightHand-Y-Up 的 ViewSpace 转换到 LeftHand-Y-Up 的 NDC
+    pub fn get_projection_matrix(&self) -> glam::Mat4 {
+        glam::Mat4::perspective_infinite_rh(self.fov_deg.to_radians(), self.asp, self.near)
     }
 
     pub fn camera_forward(&self) -> glam::Vec3 {
@@ -97,6 +106,9 @@ impl Default for Camera {
             euler_yaw_deg: 0.0,
             euler_pitch_deg: 0.0,
             euler_roll_deg: 0.0,
+            asp: 1.0,
+            fov_deg: 60.0,
+            near: 0.1,
         }
     }
 }

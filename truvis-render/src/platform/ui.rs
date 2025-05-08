@@ -1,6 +1,6 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use crate::render_context::RenderContext;
+use crate::frame_context::FrameContext;
 use ash::vk;
 use image::EncodableLayout;
 use shader_layout_macro::ShaderLayout;
@@ -76,7 +76,7 @@ struct GuiMesh {
 }
 
 impl GuiMesh {
-    pub fn from_draw_data(rhi: &Rhi, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self {
+    pub fn from_draw_data(rhi: &Rhi, render_ctx: &mut FrameContext, draw_data: &imgui::DrawData) -> Self {
         let cmd = render_ctx.alloc_command_buffer("uipass-create-mesh");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]create-mesh");
 
@@ -122,7 +122,7 @@ impl GuiMesh {
     /// @return (vertex buffer, vertex count, stage buffer)
     fn create_vertex_buffer(
         rhi: &Rhi,
-        render_ctx: &mut RenderContext,
+        render_ctx: &mut FrameContext,
         cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
     ) -> (RhiBuffer, usize, RhiBuffer) {
@@ -167,7 +167,7 @@ impl GuiMesh {
     /// @return (index buffer, index count, stage buffer)
     fn create_index_buffer(
         rhi: &Rhi,
-        render_ctx: &mut RenderContext,
+        render_ctx: &mut FrameContext,
         cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
     ) -> (RhiBuffer, usize, RhiBuffer) {
@@ -207,6 +207,10 @@ impl GuiMesh {
     }
 }
 
+pub struct UiCreateInfo {
+    pub frames_in_flight: usize,
+}
+
 pub struct Gui {
     pub context: RefCell<imgui::Context>,
     pub platform: imgui_winit_support::WinitPlatform,
@@ -223,15 +227,13 @@ pub struct Gui {
     meshes: Vec<Option<GuiMesh>>,
 
     device: Rc<RhiDevice>,
-}
 
-pub struct UiCreateInfo {
-    pub frames_in_flight: usize,
+    cmd: Option<RhiCommandBuffer>,
 }
 
 // constructor & getter
 impl Gui {
-    pub fn new(rhi: &Rhi, render_ctx: &RenderContext, window: &winit::window::Window, options: &UiCreateInfo) -> Self {
+    pub fn new(rhi: &Rhi, render_ctx: &FrameContext, window: &winit::window::Window, options: &UiCreateInfo) -> Self {
         let (mut imgui, platform) = Self::create_imgui(window);
 
         let descriptor_set_layout = RhiDescriptorSetLayout::<UiShaderLayout>::new(
@@ -261,7 +263,7 @@ impl Gui {
         imgui.fonts().tex_id = imgui::TextureId::from(Self::FONT_TEX_ID);
 
         let descriptor_pool = Rc::new(RhiDescriptorPool::new(
-            &rhi.device,
+            rhi.device.clone(),
             Rc::new(RhiDescriptorPoolCreateInfo::new(
                 vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET,
                 1,
@@ -310,7 +312,13 @@ impl Gui {
             meshes: (0..options.frames_in_flight).map(|_| None).collect(),
 
             device: rhi.device.clone(),
+
+            cmd: None,
         }
+    }
+
+    pub fn update_delta_time(&mut self, duration: std::time::Duration) {
+        self.context.get_mut().io_mut().update_delta_time(duration);
     }
 
     fn create_imgui(window: &winit::window::Window) -> (imgui::Context, imgui_winit_support::WinitPlatform) {
@@ -362,7 +370,7 @@ impl Gui {
         unsafe { device.create_pipeline_layout(&layout_info, None).unwrap() }
     }
 
-    fn create_pipeline(rhi: &Rhi, render_ctx: &RenderContext, pipeline_layout: vk::PipelineLayout) -> vk::Pipeline {
+    fn create_pipeline(rhi: &Rhi, render_ctx: &FrameContext, pipeline_layout: vk::PipelineLayout) -> vk::Pipeline {
         let vert_shader_module =
             RhiShaderModule::new(rhi.device.clone(), std::path::Path::new("shader/build/imgui/imgui.slang.spv"));
         let frag_shader_module =
@@ -496,10 +504,10 @@ impl Gui {
     pub fn draw(
         &mut self,
         rhi: &Rhi,
-        render_ctx: &mut RenderContext,
+        render_ctx: &mut FrameContext,
         window: &winit::window::Window,
         f: impl FnOnce(&mut imgui::Ui),
-    ) -> Option<RhiCommandBuffer> {
+    ) {
         // 看源码可知：imgui 可能会设定鼠标位置
         self.platform.prepare_frame(self.context.borrow_mut().io_mut(), window).unwrap();
 
@@ -510,7 +518,7 @@ impl Gui {
         self.platform.prepare_render(frame, window);
         let draw_data = temp_imgui.render();
         if draw_data.total_vtx_count == 0 {
-            return None;
+            return;
         }
 
         let frame_index = render_ctx.current_frame_index();
@@ -523,12 +531,12 @@ impl Gui {
         self.meshes[frame_index].replace(GuiMesh::from_draw_data(rhi, render_ctx, draw_data));
         rhi.device().debug_utils.end_queue_label(rhi.graphics_queue.handle);
 
-        let mut cmd = render_ctx.alloc_command_buffer("uipass-render");
+        let cmd = render_ctx.alloc_command_buffer("uipass-render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]draw");
-        self.record_cmd(render_ctx, &mut cmd, self.meshes[frame_index].as_ref().unwrap(), draw_data);
+        self.record_cmd(render_ctx, &cmd, self.meshes[frame_index].as_ref().unwrap(), draw_data);
         cmd.end();
 
-        Some(cmd)
+        render_ctx.graphics_queue().submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
     // TODO imgui 自己有个 Texture<> 类型，可以作为 hash 容器
@@ -543,8 +551,8 @@ impl Gui {
 
     fn record_cmd(
         &self,
-        render_ctx: &mut RenderContext,
-        cmd: &mut RhiCommandBuffer,
+        render_ctx: &mut FrameContext,
+        cmd: &RhiCommandBuffer,
         mesh: &GuiMesh,
         draw_data: &imgui::DrawData,
     ) {

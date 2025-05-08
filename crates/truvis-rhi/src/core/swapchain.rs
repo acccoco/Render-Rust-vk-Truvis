@@ -3,12 +3,13 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
+use crate::core::device::RhiDevice;
 use crate::{
     basic::FRAME_ID_MAP,
     core::{
         command_queue::RhiQueue,
         synchronize::{RhiFence, RhiSemaphore},
-        window_system::WindowSystem,
+        window_system::MainWindow,
     },
     rhi::Rhi,
 };
@@ -17,12 +18,12 @@ pub struct RhiSwapchainInitInfo {
     format: vk::SurfaceFormatKHR,
     swapchain_present_mode: vk::PresentModeKHR,
 
-    window: Rc<WindowSystem>,
+    window: Rc<MainWindow>,
 }
 
 impl RhiSwapchainInitInfo {
     #[inline]
-    pub fn new(window: Rc<WindowSystem>) -> Self {
+    pub fn new(window: Rc<MainWindow>) -> Self {
         Self {
             format: vk::SurfaceFormatKHR {
                 format: vk::Format::B8G8R8A8_UNORM,
@@ -45,11 +46,11 @@ struct RhiSurface {
     handle: vk::SurfaceKHR,
     pf: ash::khr::surface::Instance,
 
-    _window: Rc<WindowSystem>,
+    _window: Rc<MainWindow>,
 }
 
 impl RhiSurface {
-    fn new(rhi: &Rhi, window: Rc<WindowSystem>) -> Self {
+    fn new(rhi: &Rhi, window: Rc<MainWindow>) -> Self {
         use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
         let surface_pf = ash::khr::surface::Instance::new(&rhi.vk_pf, rhi.instance());
@@ -74,9 +75,18 @@ impl RhiSurface {
     }
 }
 
+impl Drop for RhiSurface {
+    fn drop(&mut self) {
+        log::info!("destroying surface");
+        unsafe { self.pf.destroy_surface(self.handle, None) }
+    }
+}
+
 pub struct RhiSwapchain {
     swapchain_pf: ash::khr::swapchain::Device,
     swapchain_handle: vk::SwapchainKHR,
+
+    device: Rc<RhiDevice>,
 
     _surface: RhiSurface,
 
@@ -95,13 +105,14 @@ impl RhiSwapchain {
         let pdevice = rhi.physical_device().handle;
         let surface = RhiSurface::new(rhi, init_info.window.clone());
 
-        let present_mode = Self::init_present_mode2(rhi, &surface, init_info.swapchain_present_mode);
+        let present_mode = Self::init_present_mode(rhi, &surface, init_info.swapchain_present_mode);
         let (format, color_space) = Self::init_format_and_colorspace(rhi, &surface, init_info.format);
 
         let surface_capabilities =
             unsafe { surface.pf.get_physical_device_surface_capabilities(pdevice, surface.handle).unwrap() };
 
-        let extent = surface_capabilities.current_extent;
+        let mut extent = surface_capabilities.current_extent;
+        log::info!("surface capability extent: {:?}", extent);
 
         let (swapchain_handle, swapchain_pf) =
             Self::create_handle(rhi, &surface, &surface_capabilities, format, color_space, extent, present_mode);
@@ -118,6 +129,7 @@ impl RhiSwapchain {
             color_space,
             present_mode,
             _surface: surface,
+            device: rhi.device.clone(),
         }
     }
 
@@ -137,6 +149,11 @@ impl RhiSwapchain {
         } else {
             u32::min(surface_capabilities.max_image_count, surface_capabilities.min_image_count + 1)
         };
+
+        log::info!("swapchain image count: {}", image_count);
+        log::info!("swapchain format: {:?}", format);
+        log::info!("swapchain color space: {:?}", color_space);
+        log::info!("swapchain present mode: {:?}", present_mode);
 
         let create_info = vk::SwapchainCreateInfoKHR::default()
             .surface(surface.handle)
@@ -206,7 +223,7 @@ impl RhiSwapchain {
     /// @param present_mode: 优先使用的 present mode
     ///
     /// 可以是：immediate, mailbox, fifo, fifo_relaxed
-    fn init_present_mode2(rhi: &Rhi, surface: &RhiSurface, present_mode: vk::PresentModeKHR) -> vk::PresentModeKHR {
+    fn init_present_mode(rhi: &Rhi, surface: &RhiSurface, present_mode: vk::PresentModeKHR) -> vk::PresentModeKHR {
         unsafe {
             surface
                 .pf
@@ -272,5 +289,17 @@ impl RhiSwapchain {
             .swapchains(std::slice::from_ref(&self.swapchain_handle));
 
         unsafe { self.swapchain_pf.queue_present(queue.handle, &present_info).unwrap() };
+    }
+}
+
+impl Drop for RhiSwapchain {
+    fn drop(&mut self) {
+        log::info!("destroying swapchain");
+        unsafe {
+            for view in &self.image_views {
+                self.device.destroy_image_view(*view, None);
+            }
+            self.swapchain_pf.destroy_swapchain(self.swapchain_handle, None);
+        }
     }
 }

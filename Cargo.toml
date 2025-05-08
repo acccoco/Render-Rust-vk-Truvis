@@ -72,7 +72,8 @@ colored = "2"
 
 # 日志
 log = "0.4.0"
-simplelog = "0.12.2"
+env_logger = "0.11.8"
+anstyle = "1.0.10"
 
 # 计时器
 chrono = "0.4.38"

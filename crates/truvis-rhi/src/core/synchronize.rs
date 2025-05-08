@@ -11,6 +11,9 @@ pub struct RhiFence {
     device: Rc<RhiDevice>,
 }
 
+// 不应该实现 Fence，因为可以 Clone，需要手动 destroy
+// impl Drop for RhiFence {}
+
 impl RhiFence {
     /// # param
     /// * signaled - 是否创建时就 signaled
@@ -51,6 +54,9 @@ pub struct RhiSemaphore {
     pub(crate) semaphore: vk::Semaphore,
     device: Rc<RhiDevice>,
 }
+
+// 不应该实现 Semaphore，因为可以 Clone，需要手动 destroy
+// impl Drop for RhiSemaphore {}
 
 impl RhiSemaphore {
     pub fn new(rhi: &Rhi, debug_name: &str) -> Self {

@@ -4,8 +4,9 @@ use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
 use shader_layout_macro::ShaderLayout;
-use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer};
-use truvis_render::render_context::RenderContext;
+use truvis_render::app::{OuterApp, AppCtx, AppInitInfo};
+use truvis_render::render::Renderer;
+use truvis_render::frame_context::FrameContext;
 use truvis_rhi::{
     core::image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
     rhi::Rhi,
@@ -67,7 +68,7 @@ struct SceneShaderBindings {
 }
 
 impl VkApp {
-    fn prepare_render_pass(rhi: &Rhi, render_ctx: &RenderContext) -> vk::RenderPass {
+    fn prepare_render_pass(rhi: &Rhi, render_ctx: &FrameContext) -> vk::RenderPass {
         // attachment
         let attachments = vec![
             // Color attachment
@@ -130,7 +131,7 @@ impl VkApp {
         render_pass
     }
 
-    fn setup_depth_stencil(rhi: &Rhi, render_ctx: &RenderContext, init_info: &InitInfo) -> DepthStencil {
+    fn setup_depth_stencil(rhi: &Rhi, render_ctx: &FrameContext, init_info: &InitInfo) -> DepthStencil {
         // TODO 使用 vkmem
 
         // TODO 可以把这个 format 存下来
@@ -172,7 +173,7 @@ impl VkApp {
 
     fn setup_frame_buffer(
         rhi: &Rhi,
-        render_context: &RenderContext,
+        render_context: &FrameContext,
         render_pass: vk::RenderPass,
         init_info: &InitInfo,
         depth_stencil: &DepthStencil,
@@ -197,7 +198,7 @@ impl VkApp {
     }
 
     // TODO
-    fn setup_desriptors(_rhi: &Rhi, _render_ctx: &RenderContext) {
+    fn setup_desriptors(_rhi: &Rhi, _render_ctx: &FrameContext) {
         // scene descriptor sets: matrices and environment maps
         // 数量和 swapchain 的 image 保持一致
         {
@@ -218,7 +219,7 @@ impl VkApp {
 
     fn setup_pipelines() {}
 
-    fn new(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
+    fn new(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
         let init_info = InitInfo {
             width: 800,
             height: 800,
@@ -249,7 +250,7 @@ impl VkApp {
     }
 }
 
-impl App for VkApp {
+impl OuterApp for VkApp {
     fn update_ui(&mut self, _ui: &mut Ui) {
         todo!()
     }
@@ -262,7 +263,7 @@ impl App for VkApp {
         todo!()
     }
 
-    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
+    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
         VkApp::new(rhi, render_context)
     }
 

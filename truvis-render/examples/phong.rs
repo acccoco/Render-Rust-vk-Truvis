@@ -14,9 +14,9 @@ use model_manager::vertex::VertexLayout;
 use shader_binding::PushConstants;
 use shader_layout_macro::ShaderLayout;
 use truvis_assimp::SceneLoader;
+use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
+use truvis_render::frame_context::FrameContext;
 use truvis_render::platform::camera::Camera;
-use truvis_render::render::{App, AppCtx, AppInitInfo, Renderer};
-use truvis_render::render_context::RenderContext;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
@@ -189,7 +189,7 @@ struct PhongApp {
 impl PhongApp {
     fn create_descriptor_sets(
         rhi: &Rhi,
-        render_context: &RenderContext,
+        render_context: &FrameContext,
         frames_in_flight: usize,
     ) -> (PhongAppDescriptorSetLayouts, Vec<PhongAppDescriptorSets>) {
         let scene_descriptor_set_layout = RhiDescriptorSetLayout::<SceneShaderBindings>::new(
@@ -219,19 +219,19 @@ impl PhongApp {
             .map(|tag| PhongAppDescriptorSets {
                 scene_set: RhiDescriptorSet::<SceneShaderBindings>::new(
                     rhi,
-                    render_context.descriptor_pool(),
+                    rhi.descriptor_pool(),
                     &layouts.scene_layout,
                     &format!("phong-scene-{}", tag),
                 ),
                 mesh_set: RhiDescriptorSet::<MeshShaderBindings>::new(
                     rhi,
-                    render_context.descriptor_pool(),
+                    rhi.descriptor_pool(),
                     &layouts.mesh_layout,
                     &format!("phong-mesh-{}", tag),
                 ),
                 material_set: RhiDescriptorSet::<MaterialShaderBindings>::new(
                     rhi,
-                    render_context.descriptor_pool(),
+                    rhi.descriptor_pool(),
                     &layouts.material_layout,
                     &format!("phong-material-{}", tag),
                 ),
@@ -243,7 +243,7 @@ impl PhongApp {
 
     fn create_pipeline(
         rhi: &Rhi,
-        render_ctx: &mut RenderContext,
+        render_ctx: &mut FrameContext,
         descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
     ) -> (RhiGraphicsPipeline, RhiGraphicsPipeline) {
         let extent = render_ctx.swapchain_extent();
@@ -256,13 +256,6 @@ impl PhongApp {
             .size(size_of::<PushConstants>() as u32)]);
         ci.descriptor_set_layouts(descriptor_set_layouts);
         ci.attach_info(vec![render_ctx.color_format()], Some(render_ctx.depth_format()), None);
-        ci.viewport(
-            glam::vec2(0.0, extent.height as f32),
-            glam::vec2(extent.width as _, -(extent.height as f32)),
-            0.0,
-            1.0,
-        );
-        ci.scissor(extent.into());
         ci.vertex_binding(VertexLayoutAosPosNormalUv::vertex_input_bindings());
         ci.vertex_attribute(VertexLayoutAosPosNormalUv::vertex_input_attributes());
         ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
@@ -384,6 +377,27 @@ impl PhongApp {
         let frame_id = app_ctx.render_context.current_frame_index();
 
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline_simple.pipeline);
+
+        let swapchain_extend = app_ctx.render_context.swapchain_extent();
+        cmd.cmd_set_viewport(
+            0,
+            &[vk::Viewport {
+                x: 0.0,
+                y: swapchain_extend.height as f32,
+                width: swapchain_extend.width as f32,
+                height: -(swapchain_extend.height as f32),
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }],
+        );
+        cmd.cmd_set_scissor(
+            0,
+            &[vk::Rect2D {
+                offset: vk::Offset2D::default(),
+                extent: swapchain_extend,
+            }],
+        );
+
         cmd.cmd_push_constants(
             self.pipeline_simple.pipeline_layout,
             vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
@@ -431,6 +445,26 @@ impl PhongApp {
         let frame_id = app_ctx.render_context.current_frame_index();
 
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline_3d.pipeline);
+        let swapchain_extend = app_ctx.render_context.swapchain_extent();
+        cmd.cmd_set_viewport(
+            0,
+            &[vk::Viewport {
+                x: 0.0,
+                y: swapchain_extend.height as f32,
+                width: swapchain_extend.width as f32,
+                height: -(swapchain_extend.height as f32),
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }],
+        );
+        cmd.cmd_set_scissor(
+            0,
+            &[vk::Rect2D {
+                offset: vk::Offset2D::default(),
+                extent: swapchain_extend,
+            }],
+        );
+
         cmd.cmd_push_constants(
             self.pipeline_3d.pipeline_layout,
             vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
@@ -486,7 +520,7 @@ impl PhongApp {
     }
 }
 
-impl App for PhongApp {
+impl OuterApp for PhongApp {
     fn update_ui(&mut self, ui: &mut Ui) {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
@@ -522,11 +556,10 @@ impl App for PhongApp {
             }
         }
 
-        use shader_binding::float3;
-
         self.push.camera_pos = self.camera.position.into();
         self.push.camera_dir = self.camera.camera_forward().into();
         self.scene_ubo_per_draw.view = self.camera.get_view_matrix();
+        self.scene_ubo_per_draw.projection = self.camera.get_projection_matrix();
         self.push.scene_buffer_ptr = unsafe {
             let frame_id = app_ctx.render_context.current_frame_index();
             app_ctx.rhi.device.get_buffer_device_address(
@@ -549,9 +582,10 @@ impl App for PhongApp {
     fn draw(&self, app_ctx: &mut AppCtx) {
         let frame_id = app_ctx.render_context.current_frame_index();
 
-        let color_attach = <Self as App>::get_color_attachment(app_ctx.render_context.current_present_image_view());
-        let depth_attach = <Self as App>::get_depth_attachment(app_ctx.render_context.depth_view.handle());
-        let render_info = <Self as App>::get_render_info(
+        let color_attach =
+            <Self as OuterApp>::get_color_attachment(app_ctx.render_context.current_present_image_view());
+        let depth_attach = <Self as OuterApp>::get_depth_attachment(app_ctx.render_context.depth_view.handle());
+        let render_info = <Self as OuterApp>::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
                 extent: app_ctx.render_context.swapchain_extent(),
@@ -560,7 +594,7 @@ impl App for PhongApp {
             &depth_attach,
         );
 
-        let cmd = RenderContext::alloc_command_buffer(app_ctx.render_context, "[main-pass]render");
+        let cmd = FrameContext::alloc_command_buffer(app_ctx.render_context, "[main-pass]render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[phong-pass]draw");
         {
             // 更新 per draw 的场景数据 ubo
@@ -596,7 +630,7 @@ impl App for PhongApp {
         app_ctx.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
-    fn init(rhi: &Rhi, render_context: &mut RenderContext) -> Self {
+    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
         // TODO 通过其他方式获取到 frames in flight
         let (layouts, sets) = Self::create_descriptor_sets(rhi, render_context, 3);
         let (pipe_simple, pipe_3d) = Self::create_pipeline(
@@ -652,7 +686,7 @@ impl App for PhongApp {
         );
         let bindless_descriptor_set = RhiDescriptorSet::<BindlessTextureBindings>::new(
             rhi,
-            render_context.descriptor_pool(),
+            rhi.descriptor_pool(),
             &bindless_layout,
             "bindless-descriptor-set",
         );
@@ -685,7 +719,7 @@ impl App for PhongApp {
                 color: glam::Vec4::new(1.0, 0.0, 0.0, 1.0),
             }],
             scene_ubo_per_draw: SceneUboPerDraw {
-                projection,
+                projection: camera.get_projection_matrix(),
                 view: camera.get_view_matrix(),
                 l1: Light {
                     pos: glam::vec3(-20.0, 40.0, 0.0),
@@ -718,16 +752,12 @@ impl App for PhongApp {
         }
     }
 
-    fn get_render_init_info() -> AppInitInfo {
-        AppInitInfo {
-            window_width: 800,
-            window_height: 800,
-            app_name: "Phong".to_string(),
-            enable_validation: true,
-        }
+    fn rebuild(&mut self, rhi: &Rhi, render_context: &mut FrameContext) {
+        self.camera.asp =
+            render_context.swapchain_extent().width as f32 / render_context.swapchain_extent().height as f32;
     }
 }
 
 fn main() {
-    Renderer::<PhongApp>::run();
+    TruvisApp::<PhongApp>::run();
 }

@@ -27,6 +27,9 @@ pub struct RhiCommandBuffer {
     pub device: Rc<RhiDevice>,
 }
 
+// 不能实现 Drop，因为需要手动去 free；cmd 支持 clone，不应该在意外的地方 free
+// impl Drop for RhiCommandBuffer {}
+
 impl RhiCommandBuffer {
     pub fn new(device: Rc<RhiDevice>, command_pool: Rc<RhiCommandPool>, debug_name: &str) -> Self {
         let info = vk::CommandBufferAllocateInfo::default()
@@ -61,7 +64,7 @@ impl RhiCommandBuffer {
         let result = func(&command_buffer);
         command_buffer.end();
 
-        queue.submit(vec![RhiSubmitInfo::new(std::slice::from_ref(&command_buffer))], None);
+        queue.submit(vec![RhiSubmitInfo::new(&[command_buffer.clone()])], None);
         queue.wait_idle();
         command_buffer.free();
 
