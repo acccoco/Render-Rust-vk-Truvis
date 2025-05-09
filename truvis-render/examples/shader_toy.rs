@@ -5,17 +5,17 @@ use model_manager::component::mesh::SimpleMesh;
 use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
 use model_manager::vertex::VertexLayout;
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
-use truvis_render::platform::timer::Timer;
-use truvis_render::render::Renderer;
 use truvis_render::frame_context::FrameContext;
+use truvis_render::platform::timer::Timer;
+use truvis_render::renderer::framebuffer::RenderBuffer;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
     rhi::Rhi,
 };
 
-#[derive(Pod, Zeroable, Copy, Clone)]
 #[repr(C)]
+#[derive(Pod, Zeroable, Copy, Clone)]
 pub struct PushConstants {
     /// 鼠标位置和状态
     mouse: glam::Vec4,
@@ -40,18 +40,15 @@ struct ShaderToy {
 
 impl ShaderToy {
     fn init_pipeline(rhi: &Rhi, render_context: &FrameContext) -> RhiGraphicsPipeline {
-        let extent = render_context.swapchain_extent();
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
         ci.push_constant_ranges(vec![vk::PushConstantRange {
-            stage_flags: vk::ShaderStageFlags::ALL,
+            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
             offset: 0,
             size: size_of::<PushConstants>() as u32,
         }]);
         ci.vertex_shader_stage("shader/build/shadertoy-glsl/shadertoy.vert.spv".to_string(), "main".to_string());
         ci.fragment_shader_stage("shader/build/shadertoy-glsl/shadertoy.frag.spv".to_string(), "main".to_string());
         ci.attach_info(vec![render_context.color_format()], Some(render_context.depth_format()), None);
-        ci.viewport(glam::vec2(0.0, 0.0), glam::vec2(extent.width as f32, extent.height as f32), 0.0, 1.0);
-        ci.scissor(extent.into());
         ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
         ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
         ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
@@ -80,9 +77,9 @@ impl ShaderToy {
             __padding__: [0.0, 0.0],
         };
 
-        let depth_attach_info = <Self as OuterApp>::get_depth_attachment(render_context.depth_view.handle());
-        let color_attach_info = <Self as OuterApp>::get_color_attachment(render_context.current_present_image_view());
-        let render_info = <Self as OuterApp>::get_render_info(
+        let depth_attach_info = RenderBuffer::get_depth_attachment(render_context.depth_view.handle());
+        let color_attach_info = RenderBuffer::get_color_attachment(render_context.current_present_image_view());
+        let render_info = RenderBuffer::get_render_info(
             vk::Rect2D {
                 offset: Default::default(),
                 extent: render_context.swapchain_extent(),
@@ -96,13 +93,34 @@ impl ShaderToy {
         {
             cmd.cmd_push_constants(
                 self.pipeline.pipeline_layout,
-                vk::ShaderStageFlags::ALL,
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 0,
                 bytemuck::bytes_of(&push_constants),
             );
 
             cmd.cmd_begin_rendering(&render_info);
             cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
+
+            let swapchain_extend = render_context.swapchain_extent();
+            cmd.cmd_set_viewport(
+                0,
+                &[vk::Viewport {
+                    x: 0.0,
+                    y: 0.0,
+                    width: swapchain_extend.width as f32,
+                    height: swapchain_extend.height as f32,
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                }],
+            );
+            cmd.cmd_set_scissor(
+                0,
+                &[vk::Rect2D {
+                    offset: vk::Offset2D::default(),
+                    extent: swapchain_extend,
+                }],
+            );
+
             cmd.cmd_bind_index_buffer(&self.rectangle.index_buffer, 0, vk::IndexType::UINT32);
             cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.rectangle.vertex_buffer), &[0]);
             cmd.draw_indexed(self.rectangle.index_cnt, 0, 1, 0, 0);
@@ -123,7 +141,11 @@ impl ShaderToy {
 }
 
 impl OuterApp for ShaderToy {
-    fn update_ui(&mut self, ui: &mut Ui) {
+    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
+        ShaderToy::new(rhi, render_context)
+    }
+
+    fn draw_ui(&mut self, ui: &mut Ui) {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
     }
@@ -135,19 +157,6 @@ impl OuterApp for ShaderToy {
     fn draw(&self, app_ctx: &mut AppCtx) {
         self.run(app_ctx.rhi, app_ctx.render_context, app_ctx.timer)
     }
-
-    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
-        ShaderToy::new(rhi, render_context)
-    }
-
-    // fn get_render_init_info() -> AppInitInfo {
-    //     AppInitInfo {
-    //         window_width: 1600,
-    //         window_height: 900,
-    //         app_name: "hello-triangle".to_string(),
-    //         enable_validation: true,
-    //     }
-    // }
 }
 
 fn main() {

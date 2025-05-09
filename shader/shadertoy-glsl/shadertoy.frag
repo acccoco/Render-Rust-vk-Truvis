@@ -4,14 +4,7 @@
 
 #define SHADERTOY
 
-layout(push_constant) uniform PushConstants {
-    vec4 mouse;
-    vec2 resolution;
-    float time;
-    float delta_time;
-    int frame;
-    float frame_rate;
-} pc;
+#include "shadertoy.inc.glsl"
 
 layout (location = 0) in vec2 fragCoord;
 

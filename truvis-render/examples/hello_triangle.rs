@@ -4,8 +4,9 @@ use model_manager::component::mesh::SimpleMesh;
 use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
 use model_manager::vertex::VertexLayout;
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
-use truvis_render::render::Renderer;
 use truvis_render::frame_context::FrameContext;
+use truvis_render::render::Renderer;
+use truvis_render::renderer::framebuffer::RenderBuffer;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
@@ -22,7 +23,6 @@ struct HelloTriangle {
 
 impl HelloTriangle {
     fn init_pipeline(rhi: &Rhi, render_context: &mut FrameContext) -> RhiGraphicsPipeline {
-        let extent = render_context.swapchain_extent();
         let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
         pipeline_ci
             .vertex_shader_stage("shader/build/hello_triangle/triangle.slang.spv".to_string(), "vsmain".to_string());
@@ -43,9 +43,9 @@ impl HelloTriangle {
     }
 
     fn my_update(&self, rhi: &Rhi, render_context: &mut FrameContext) {
-        let color_attach = <Self as OuterApp>::get_color_attachment(render_context.current_present_image_view());
-        let depth_attach = <Self as OuterApp>::get_depth_attachment(render_context.depth_view.handle());
-        let render_info = <Self as OuterApp>::get_render_info(
+        let color_attach = RenderBuffer::get_color_attachment(render_context.current_present_image_view());
+        let depth_attach = RenderBuffer::get_depth_attachment(render_context.depth_view.handle());
+        let render_info = RenderBuffer::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
                 extent: render_context.swapchain_extent(),
@@ -102,7 +102,12 @@ impl HelloTriangle {
 }
 
 impl OuterApp for HelloTriangle {
-    fn update_ui(&mut self, ui: &mut Ui) {
+    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
+        log::info!("hello triangle init.");
+        HelloTriangle::new(rhi, render_context)
+    }
+
+    fn draw_ui(&mut self, ui: &mut Ui) {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
         ui.text_wrapped(format!("Frame ID: {}", self.frame_id));
@@ -125,15 +130,6 @@ impl OuterApp for HelloTriangle {
 
     fn draw(&self, app_ctx: &mut AppCtx) {
         self.my_update(app_ctx.rhi, app_ctx.render_context);
-    }
-
-    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
-        log::info!("hello triangle init.");
-        HelloTriangle::new(rhi, render_context)
-    }
-
-    fn rebuild(&mut self, rhi: &Rhi, render_context: &mut FrameContext) {
-        // do nothing
     }
 }
 

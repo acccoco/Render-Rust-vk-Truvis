@@ -31,62 +31,17 @@ pub fn panic_handler(info: &std::panic::PanicHookInfo) {
 }
 
 pub trait OuterApp {
-    fn update_ui(&mut self, ui: &mut imgui::Ui);
+    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self;
+
+    fn draw_ui(&mut self, ui: &mut imgui::Ui);
 
     fn update(&mut self, app_ctx: &mut AppCtx);
 
     /// 发生于 acquire_frame 之后，submit_frame 之前
     fn draw(&self, app_ctx: &mut AppCtx);
 
-    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self;
-
     /// window 发生改变后，重建
-    fn rebuild(&mut self, rhi: &Rhi, render_context: &mut FrameContext);
-
-    // FIXME
-    fn get_depth_attachment(depth_image_view: vk::ImageView) -> vk::RenderingAttachmentInfo<'static> {
-        vk::RenderingAttachmentInfo::default()
-            .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-            .image_view(depth_image_view)
-            .load_op(vk::AttachmentLoadOp::CLEAR)
-            .store_op(vk::AttachmentStoreOp::STORE)
-            .clear_value(vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1_f32, // 1 表示无限远
-                    stencil: 0,
-                },
-            })
-    }
-
-    fn get_color_attachment(image_view: vk::ImageView) -> vk::RenderingAttachmentInfo<'static> {
-        vk::RenderingAttachmentInfo::default()
-            .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-            .image_view(image_view)
-            .load_op(vk::AttachmentLoadOp::CLEAR)
-            .store_op(vk::AttachmentStoreOp::STORE)
-            .clear_value(vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [0_f32, 0_f32, 0_f32, 1_f32],
-                },
-            })
-    }
-
-    // FIXME
-    fn get_render_info<'a, 'b, 'c>(
-        area: vk::Rect2D,
-        color_attachs: &'a [vk::RenderingAttachmentInfo],
-        depth_attach: &'b vk::RenderingAttachmentInfo,
-    ) -> vk::RenderingInfo<'c>
-    where
-        'b: 'c,
-        'a: 'c,
-    {
-        vk::RenderingInfo::default()
-            .layer_count(1)
-            .render_area(area)
-            .color_attachments(color_attachs)
-            .depth_attachment(depth_attach)
-    }
+    fn rebuild(&mut self, rhi: &Rhi, render_context: &mut FrameContext) {}
 }
 
 pub struct TruvisApp<T: OuterApp> {
@@ -206,7 +161,7 @@ impl<T: OuterApp> TruvisApp<T> {
                 &mut renderer.render_context,
                 self.window_system.get().unwrap().window(),
                 |imgui| {
-                    self.outer_app.get_mut().unwrap().update_ui(imgui);
+                    self.outer_app.get_mut().unwrap().draw_ui(imgui);
                 },
             );
         }

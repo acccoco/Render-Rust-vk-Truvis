@@ -1,9 +1,11 @@
 mod shader_bindings;
 
-pub use shader_bindings::*;
+pub mod shader {
+    pub use crate::shader_bindings::*;
+}
 
 mod slang_traits {
-    use super::*;
+    use crate::shader_bindings::*;
 
     impl From<glam::Vec3> for float3 {
         fn from(value: glam::Vec3) -> Self {
