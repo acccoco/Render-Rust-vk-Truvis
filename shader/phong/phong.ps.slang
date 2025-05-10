@@ -23,7 +23,7 @@ Sampler2D<float4> textures[];
 Texture2D<float4> images[];
 
 
-func phong_light(camera_pos: float3, pos: float3, normal: float3, light: PointLight)->float3
+func phong_light(camera_pos: float3, pos: float3, normal: float3, light: PointLight, uv: float2, diffuse_map_id: uint)->float3
 {
     const float3 light_dir = normalize(pos - light.pos);
     const float3 view_dir = normalize(pos - camera_pos);
@@ -42,8 +42,8 @@ func phong_light(camera_pos: float3, pos: float3, normal: float3, light: PointLi
     const float light_attenuation = 10.0 / (const_term + linear_term * distance + quadratic_term * distance * distance);
 
     // FIXME object color
-    const float4 object_color = float4(0.8, 0.8, 0.8, 1.0);
-    // diffuse_texture.Sample(diffuse_sampler, input.uv).rgb
+    // const float4 object_color = float4(0.8, 0.8, 0.8, 1.0);
+    const float4 object_color = textures[diffuse_map_id].Sample(uv);
 
     const float3 diffuse_color = object_color.rgb * diffuse_coef * light.color;
     const float3 specular_color = float3(1.f, 1.f, 1.f) * specular_coef;
@@ -58,12 +58,17 @@ PsOutput main(PsInput input)
     const float3 normal = normalize(input.coarse_vertex.frag_normal);
 
     const uint light_cnt = draw_data.frame_data.light_data.light_count.x;
+    const uint mat_id = draw_data.frame_data.ins_data.instances[draw_data.instance_id].mat_id;
+    const PBRMaterial mat = draw_data.frame_data.mat_data.materials[mat_id];
+    const uint diffuse_map_id = mat.diffuse_map;
+
+    const float2 uv = input.coarse_vertex.uv;
 
     float3 light_term = float3(0.0, 0.0, 0.0);
     for (uint i = 0; i < light_cnt; i++)
     {
         const PointLight point_light = draw_data.frame_data.light_data.lights[i];
-        light_term += phong_light(draw_data.frame_data.camera_pos, input.coarse_vertex.world_pos, normal, point_light);
+        light_term += phong_light(draw_data.frame_data.camera_pos, input.coarse_vertex.world_pos, normal, point_light, uv, diffuse_map_id);
     }
 
     const float3 min_color = float3(0.1, 0.1, 0.1);

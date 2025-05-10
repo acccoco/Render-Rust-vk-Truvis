@@ -31,6 +31,7 @@ impl RhiWriteDescriptorSet {
 pub trait ShaderCursor {
     fn get_binding(&self) -> &ShaderBindingItem;
 
+    /// 确保当前 descriptor 是 buffer
     fn write_buffer(
         &self,
         dst_set: vk::DescriptorSet,
@@ -48,6 +49,7 @@ pub trait ShaderCursor {
         }
     }
 
+    /// 确保当前 descriptor 是 image
     fn write_image(
         &self,
         dst_set: vk::DescriptorSet,

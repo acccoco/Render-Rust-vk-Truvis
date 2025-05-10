@@ -24,7 +24,7 @@ pub struct FrameContext {
     current_frame: usize,
 
     /// frames in flight
-    pub frames_cnt: usize,
+    pub frame_cnt_in_flight: usize,
 
     /// 当前的帧序号，一直累加
     frame_id: usize,
@@ -77,7 +77,7 @@ impl FrameContext {
             swapchain_image_index: 0,
             current_frame: 0,
             frame_id: 0,
-            frames_cnt: init_info.frames_in_flight,
+            frame_cnt_in_flight: init_info.frames_in_flight,
 
             graphics_command_pools,
             allocated_command_buffers: vec![Vec::new(); init_info.frames_in_flight],
@@ -264,7 +264,7 @@ impl FrameContext {
             &[self.current_render_complete_semaphore()],
         );
 
-        self.current_frame = (self.current_frame + 1) % self.frames_cnt;
+        self.current_frame = (self.current_frame + 1) % self.frame_cnt_in_flight;
         self.frame_id += 1;
     }
 

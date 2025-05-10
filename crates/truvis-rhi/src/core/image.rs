@@ -138,7 +138,7 @@ impl RhiImage2D {
     }
 
     /// 根据 RGBA8_UNORM 的 data 创建 image
-    pub fn from_rgba8(rhi: &Rhi, width: u32, height: u32, data: &[u8], name: &str) -> Self {
+    pub fn from_rgba8(rhi: &Rhi, width: u32, height: u32, data: &[u8], name: impl AsRef<str>) -> Self {
         let image = Self::new(
             rhi,
             Rc::new(RhiImageCreateInfo::new_image_2d_info(
@@ -150,15 +150,15 @@ impl RhiImage2D {
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
             },
-            name,
+            name.as_ref(),
         );
 
-        let stage_buffer = RhiCommandBuffer::one_time_exec(
+        RhiCommandBuffer::one_time_exec(
             rhi,
             rhi.graphics_command_pool.clone(),
             &rhi.graphics_queue,
             |cmd| image.transfer_data(rhi, cmd, data),
-            name,
+            name.as_ref(),
         );
 
         image

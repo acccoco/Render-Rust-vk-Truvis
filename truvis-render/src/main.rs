@@ -7,6 +7,7 @@ use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
 use model_manager::vertex::vertex_pnu::VertexLayoutAosPosNormalUv;
 use model_manager::vertex::VertexLayout;
 use shader_binding::shader;
+use std::cell::RefCell;
 use std::mem::offset_of;
 use std::rc::Rc;
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
@@ -153,10 +154,10 @@ impl SimpleMainPass {
 
 struct Simple3DMainPass {
     pipeline: RhiGraphicsPipeline,
-    bindless_manager: Rc<BindlessManager>,
+    bindless_manager: Rc<RefCell<BindlessManager>>,
 }
 impl Simple3DMainPass {
-    pub fn new(rhi: &Rhi, frame_context: &FrameContext, bindless_manager: Rc<BindlessManager>) -> Self {
+    pub fn new(rhi: &Rhi, frame_context: &FrameContext, bindless_manager: Rc<RefCell<BindlessManager>>) -> Self {
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
         ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv".to_string(), "main".to_string());
         ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv".to_string(), "main".to_string());
@@ -168,7 +169,7 @@ impl Simple3DMainPass {
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
             .offset(0)
             .size(size_of::<shader::DrawData>() as u32)]);
-        ci.descriptor_set_layouts(vec![bindless_manager.bindless_layout.layout]);
+        ci.descriptor_set_layouts(vec![bindless_manager.borrow().bindless_layout.layout]);
         ci.attach_info(vec![frame_context.color_format()], Some(frame_context.depth_format()), None);
         ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(false)
@@ -182,7 +183,7 @@ impl Simple3DMainPass {
         }
     }
 
-    fn bind(&self, cmd: &RhiCommandBuffer, viewport: &vk::Rect2D, push_constant: &shader::DrawData) {
+    fn bind(&self, cmd: &RhiCommandBuffer, viewport: &vk::Rect2D, push_constant: &shader::DrawData, frame_idx: usize) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
         cmd.cmd_set_viewport(
             0,
@@ -203,12 +204,11 @@ impl Simple3DMainPass {
             bytemuck::bytes_of(push_constant),
         );
 
-        // TODO 这里多帧暂时使用同一个 descriptor set
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline.pipeline_layout,
             0,
-            &[self.bindless_manager.bindless_set.handle],
+            &[self.bindless_manager.borrow().bindless_sets[frame_idx].handle],
             &[],
         );
     }
@@ -219,8 +219,9 @@ impl Simple3DMainPass {
         app_ctx: &AppCtx,
         push_constant: &shader::DrawData,
         scene_data: &FrameScene,
+        frame_idx: usize,
     ) {
-        self.bind(cmd, &app_ctx.render_context.swapchain_extent().into(), push_constant);
+        self.bind(cmd, &app_ctx.render_context.swapchain_extent().into(), push_constant, frame_idx);
 
         scene_data.draw(cmd, &mut |ins_idx| {
             cmd.cmd_push_constants(
@@ -234,11 +235,11 @@ impl Simple3DMainPass {
 }
 
 struct PhongApp {
-    bindless_mgr: Rc<BindlessManager>,
+    bindless_mgr: Rc<RefCell<BindlessManager>>,
+    scene_mgr: Rc<RefCell<SceneManager>>,
+
     frame_data_buffers: Vec<RhiBDABuffer<shader::FrameData>>,
     frame_data_stage_buffers: Vec<RhiStageBuffer<shader::FrameData>>,
-
-    scene_mgr: Rc<SceneManager>,
 
     main_pass: Simple3DMainPass,
     frame_scene: FrameScene,
@@ -253,16 +254,18 @@ impl PhongApp {}
 
 impl OuterApp for PhongApp {
     fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
-        let bindless_mgr = Rc::new(BindlessManager::new(rhi));
+        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(rhi, render_context.frame_cnt_in_flight)));
+        bindless_mgr.borrow_mut().register_texture(rhi, "assets/uv_checker.png".to_string());
+
         let main_pass = Simple3DMainPass::new(rhi, render_context, bindless_mgr.clone());
 
         let cube = VertexLayoutAosPosNormalUv::cube(rhi);
 
-        let frame_data_buffers = (0..render_context.frames_cnt)
+        let frame_data_buffers = (0..render_context.frame_cnt_in_flight)
             .into_iter()
             .map(|idx| RhiBDABuffer::<shader::FrameData>::new_ubo(rhi, format!("frame-data-buffer-{idx}")))
             .collect_vec();
-        let frame_data_stage_buffers = (0..render_context.frames_cnt)
+        let frame_data_stage_buffers = (0..render_context.frame_cnt_in_flight)
             .into_iter()
             .map(|idx| RhiStageBuffer::<shader::FrameData>::new(rhi, format!("frame-data-buffer-{idx}-stage-buffer")))
             .collect_vec();
@@ -296,7 +299,7 @@ impl OuterApp for PhongApp {
             color: (glam::vec3(5.0, 1.0, 8.0) * 3.0).into(),
             ..Default::default()
         });
-        let scene_mgr = Rc::new(scene_mgr);
+        let scene_mgr = Rc::new(RefCell::new(scene_mgr));
 
         let rot =
             glam::Mat4::from_euler(glam::EulerRot::XYZ, 30f32.to_radians(), 40f32.to_radians(), 50f32.to_radians());
@@ -314,7 +317,7 @@ impl OuterApp for PhongApp {
             ..Default::default()
         };
 
-        let frame_scene = FrameScene::new(scene_mgr.clone());
+        let frame_scene = FrameScene::new(scene_mgr.clone(), bindless_mgr.clone());
 
         Self {
             bindless_mgr,
@@ -365,7 +368,7 @@ impl OuterApp for PhongApp {
             }
         }
 
-        self.frame_scene.prepare_render_data();
+        self.frame_scene.prepare_render_data(app_ctx.render_context.current_frame_index());
         let frame_data_stage_buffer = &mut self.frame_data_stage_buffers[frame_idx];
         frame_data_stage_buffer.transfer(&|data: &mut shader::FrameData| {
             let mouse_pos = app_ctx.input_state.crt_mouse_pos;
@@ -448,6 +451,7 @@ impl OuterApp for PhongApp {
                     ..Default::default()
                 },
                 &self.frame_scene,
+                app_ctx.render_context.current_frame_index(),
             );
             cmd.end_label();
 

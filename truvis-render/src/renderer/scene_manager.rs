@@ -3,6 +3,7 @@ use model_manager::component::instance::SimpleInstance;
 use model_manager::component::mat::SimpleMaterial;
 use model_manager::component::mesh::SimpleMesh;
 use shader_binding::shader;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_assimp::AssimpSceneLoader;
@@ -15,11 +16,11 @@ pub struct SceneManager {
 
     pub point_light_map: HashMap<uuid::Uuid, shader::PointLight>,
 
-    pub bindless_mgr: Rc<BindlessManager>,
+    bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
 
 impl SceneManager {
-    pub fn new(bindless_mgr: Rc<BindlessManager>) -> Self {
+    pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         Self {
             instance_map: HashMap::new(),
             mat_map: HashMap::new(),
@@ -54,6 +55,13 @@ impl SceneManager {
             },
             &mut |mat| {
                 let guid = uuid::Uuid::new_v4();
+
+                // 注册纹理
+                let mut bindless_mgr = self.bindless_mgr.borrow_mut();
+                if !mat.diffuse_map.is_empty() {
+                    bindless_mgr.register_texture(rhi, mat.diffuse_map.clone());
+                }
+
                 self.mat_map.insert(guid, mat);
                 guid
             },

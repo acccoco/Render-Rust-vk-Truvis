@@ -18,7 +18,7 @@ struct HelloTriangle {
 
     pipeline: RhiGraphicsPipeline,
 
-    frame_id: u64,
+    frame_id: usize,
 }
 
 impl HelloTriangle {
@@ -125,7 +125,7 @@ impl OuterApp for HelloTriangle {
     }
 
     fn update(&mut self, app_ctx: &mut AppCtx) {
-        self.frame_id = app_ctx.render_context.frame_id;
+        self.frame_id = app_ctx.render_context.current_frame_num();
     }
 
     fn draw(&self, app_ctx: &mut AppCtx) {
