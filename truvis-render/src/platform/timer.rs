@@ -6,6 +6,7 @@ pub struct Timer {
     pub delta_time_s: f32,
     pub total_time_s: f32,
     pub total_frame: i32,
+    pub duration: std::time::Duration,
 }
 
 impl Default for Timer {
@@ -16,6 +17,7 @@ impl Default for Timer {
             total_frame: 0,
             delta_time_s: 0.0,
             total_time_s: 0.0,
+            duration: std::time::Duration::new(0, 0),
         }
     }
 }
@@ -31,11 +33,11 @@ impl Timer {
 
     pub fn update(&mut self) {
         let now = std::time::SystemTime::now();
-        let total_time = now.duration_since(self.start_time).unwrap().as_secs_f32();
+        self.duration = now.duration_since(self.start_time).unwrap();
         let delta_time = now.duration_since(self.last_time).unwrap().as_secs_f32();
         self.last_time = now;
         self.total_frame += 1;
-        self.total_time_s = total_time;
+        self.total_time_s = self.duration.as_secs_f32();
         self.delta_time_s = delta_time;
     }
 }

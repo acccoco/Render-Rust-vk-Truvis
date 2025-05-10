@@ -2,19 +2,29 @@ use itertools::Itertools;
 use model_manager::component::instance::SimpleInstance;
 use model_manager::component::mat::SimpleMaterial;
 use model_manager::component::mesh::SimpleMesh;
-use model_manager::manager::instance_manager::InstanceManager;
-use model_manager::manager::mat_manager::MatManager;
-use model_manager::manager::mesh_manager::MeshManager;
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
 use truvis_rhi::core::buffer::RhiBuffer;
 use truvis_rhi::rhi::Rhi;
 
-pub mod ffi_bindings;
-use ffi_bindings::*;
+pub mod _ffi_bindings;
+use crate::_ffi_bindings::*;
 
-pub struct SceneLoader {
+/// 确保 Vertex3D 的布局和 C++ 中的 Vertex3D 一致
+fn validate_vertex_memory_layout() {
+    debug_assert!(size_of::<Vertex3D>() == size_of::<CxxVertex3D>());
+    debug_assert!(offset_of!(Vertex3D, position) == offset_of!(CxxVertex3D, position));
+    debug_assert!(offset_of!(Vertex3D, normal) == offset_of!(CxxVertex3D, normal));
+    debug_assert!(offset_of!(Vertex3D, tangent) == offset_of!(CxxVertex3D, tangent));
+    debug_assert!(offset_of!(Vertex3D, bitangent) == offset_of!(CxxVertex3D, bitangent));
+    debug_assert!(offset_of!(Vertex3D, uv) == offset_of!(CxxVertex3D, uv));
+
+    debug_assert!(size_of::<glam::Vec4>() == size_of::<CxxVec4f>());
+    debug_assert!(size_of::<glam::Mat4>() == size_of::<CxxMat4f>());
+}
+
+pub struct AssimpSceneLoader {
     loader: *mut c_void,
     model_name: String,
 
@@ -23,29 +33,16 @@ pub struct SceneLoader {
     instances: Vec<uuid::Uuid>,
 }
 
-impl SceneLoader {
-    /// 确保 Vertex3D 的布局和 C++ 中的 Vertex3D 一致
-    fn validate_vertex_memory_layout() {
-        debug_assert!(size_of::<Vertex3D>() == size_of::<CxxVertex3D>());
-        debug_assert!(offset_of!(Vertex3D, position) == offset_of!(CxxVertex3D, position));
-        debug_assert!(offset_of!(Vertex3D, normal) == offset_of!(CxxVertex3D, normal));
-        debug_assert!(offset_of!(Vertex3D, tangent) == offset_of!(CxxVertex3D, tangent));
-        debug_assert!(offset_of!(Vertex3D, bitangent) == offset_of!(CxxVertex3D, bitangent));
-        debug_assert!(offset_of!(Vertex3D, uv) == offset_of!(CxxVertex3D, uv));
-
-        debug_assert!(size_of::<glam::Vec4>() == size_of::<CxxVec4f>());
-        debug_assert!(size_of::<glam::Mat4>() == size_of::<CxxMat4f>());
-    }
-
+impl AssimpSceneLoader {
     /// return: instance
     pub fn load_model(
         rhi: &Rhi,
         model_file: &std::path::Path,
-        instance_manager: &mut InstanceManager,
-        mesh_manager: &mut MeshManager,
-        mat_manager: &mut MatManager,
+        instance_register: &mut dyn FnMut(SimpleInstance) -> uuid::Uuid,
+        mesh_register: &mut dyn FnMut(SimpleMesh) -> uuid::Uuid,
+        mat_register: &mut dyn FnMut(SimpleMaterial) -> uuid::Uuid,
     ) -> Vec<uuid::Uuid> {
-        Self::validate_vertex_memory_layout();
+        validate_vertex_memory_layout();
 
         let model_file = model_file.to_str().unwrap();
         let c_model_file = std::ffi::CString::new(model_file).unwrap();
@@ -54,7 +51,7 @@ impl SceneLoader {
             let loader = load_scene(c_model_file.as_ptr());
             let model_name = model_file.split('/').next_back().unwrap();
 
-            let mut scene_loader = SceneLoader {
+            let mut scene_loader = AssimpSceneLoader {
                 loader,
                 model_name: model_name.to_string(),
                 meshes: vec![],
@@ -62,9 +59,9 @@ impl SceneLoader {
                 instances: vec![],
             };
 
-            scene_loader.load_mesh(rhi, mesh_manager);
-            scene_loader.load_mats(rhi, mat_manager);
-            scene_loader.load_instance(instance_manager);
+            scene_loader.load_mesh(rhi, mesh_register);
+            scene_loader.load_mats(rhi, mat_register);
+            scene_loader.load_instance(instance_register);
 
             free_scene(loader);
 
@@ -72,7 +69,7 @@ impl SceneLoader {
         }
     }
 
-    fn load_mesh(&mut self, rhi: &Rhi, mesh_manager: &mut MeshManager) {
+    fn load_mesh(&mut self, rhi: &Rhi, mesh_register: &mut dyn FnMut(SimpleMesh) -> uuid::Uuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -109,14 +106,14 @@ impl SceneLoader {
                     index_cnt: mesh.face_cnt_ * 3,
                 };
 
-                mesh_manager.register_mesh(mesh)
+                mesh_register(mesh)
             })
             .collect_vec();
 
         self.meshes = mesh_uuids;
     }
 
-    fn load_mats(&mut self, _rhi: &Rhi, mat_manager: &mut MatManager) {
+    fn load_mats(&mut self, _rhi: &Rhi, mat_register: &mut dyn FnMut(SimpleMaterial) -> uuid::Uuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)
@@ -124,7 +121,7 @@ impl SceneLoader {
                 let mat = get_mat(self.loader, mat_idx);
                 let mat = &*mat;
 
-                let mat_uuid = mat_manager.register_mat(SimpleMaterial {
+                let mat_uuid = mat_register(SimpleMaterial {
                     ambient: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.ambient),
                     diffuse: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.diffuse),
                     specular: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.specular),
@@ -144,7 +141,7 @@ impl SceneLoader {
         self.mats = mat_uuids;
     }
 
-    fn load_instance(&mut self, instance_manager: &mut InstanceManager) {
+    fn load_instance(&mut self, instance_register: &mut dyn FnMut(SimpleInstance) -> uuid::Uuid) {
         let instance_cnt = unsafe { get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)
             .map(|instance_idx| unsafe {
@@ -172,7 +169,7 @@ impl SceneLoader {
                     mats: mat_ids,
                 };
 
-                instance_manager.register_instance(instance)
+                instance_register(instance)
             })
             .collect_vec();
 

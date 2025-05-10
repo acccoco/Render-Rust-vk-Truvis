@@ -28,3 +28,27 @@ struct float4x4 {
   float4 col2;
   float4 col3;
 };
+
+struct int2 {
+  int x, y;
+};
+
+struct int3 {
+  int x, y, z;
+};
+
+struct int4 {
+  int x, y, z, w;
+};
+
+struct uint2 {
+  uint x, y;
+};
+
+struct uint3 {
+  uint x, y, z;
+};
+
+struct uint4 {
+  uint x, y, z, w;
+};

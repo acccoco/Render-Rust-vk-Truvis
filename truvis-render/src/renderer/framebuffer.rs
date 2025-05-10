@@ -1,9 +1,9 @@
 use ash::vk;
 
 /// 等价于 framebuffer
-pub struct RenderBuffer {}
+pub struct FrameBuffer {}
 
-impl RenderBuffer {
+impl FrameBuffer {
     pub fn get_depth_attachment(depth_image_view: vk::ImageView) -> vk::RenderingAttachmentInfo<'static> {
         vk::RenderingAttachmentInfo::default()
             .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)

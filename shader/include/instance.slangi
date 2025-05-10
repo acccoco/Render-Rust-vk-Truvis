@@ -1,0 +1,19 @@
+#pragma once
+#include "common.slangi"
+
+struct SubMesh
+{
+    float4x4 model;
+    float4x4 inv_model;
+
+    uint mat_id;
+    uint _padding_1;
+    uint _padding_2;
+    uint _padding_3;
+};
+
+struct InstanceData
+{
+    uint4 instance_count;
+    SubMesh instances[256];
+};

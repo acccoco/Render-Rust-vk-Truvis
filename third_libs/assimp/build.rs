@@ -122,6 +122,6 @@ fn gen_rust_binding() {
         .expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_path = std::path::PathBuf::from("src").join("ffi_bindings.rs");
+    let out_path = std::path::PathBuf::from("src").join("_ffi_bindings.rs");
     bindings.write_to_file(out_path).expect("Couldn't write bindings!");
 }

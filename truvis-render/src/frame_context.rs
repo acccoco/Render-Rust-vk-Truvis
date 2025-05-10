@@ -1,8 +1,6 @@
-use std::rc::Rc;
-
 use ash::vk;
 use itertools::Itertools;
-use truvis_rhi::core::descriptor_pool::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo};
+use std::rc::Rc;
 use truvis_rhi::{
     basic::{color::LabelColor, FRAME_ID_MAP},
     core::{
@@ -22,10 +20,14 @@ pub struct FrameContext {
 
     swapchain_image_index: usize,
 
+    /// 当前处在 in-flight 的第几帧：A, B, C
     current_frame: usize,
+
+    /// frames in flight
     pub frames_cnt: usize,
 
-    pub frame_id: u64,
+    /// 当前的帧序号，一直累加
+    frame_id: usize,
 
     /// 为每个 frame 分配一个 command pool
     graphics_command_pools: Vec<Rc<RhiCommandPool>>,
@@ -135,7 +137,7 @@ impl FrameContext {
     }
 
     fn init_command_pool(rhi: &Rhi, init_info: &RenderContextInitInfo) -> Vec<Rc<RhiCommandPool>> {
-        let graphics_command_pools = (0..init_info.frames_in_flight)
+        (0..init_info.frames_in_flight)
             .map(|i| {
                 Rc::new(RhiCommandPool::new(
                     rhi,
@@ -144,9 +146,7 @@ impl FrameContext {
                     &format!("render_context_graphics_command_pool_{}", i),
                 ))
             })
-            .collect();
-
-        graphics_command_pools
+            .collect_vec()
     }
 
     /// getter
@@ -297,6 +297,11 @@ impl FrameContext {
     #[inline]
     pub fn current_frame_index(&self) -> usize {
         self.current_frame
+    }
+
+    #[inline]
+    pub fn current_frame_num(&self) -> usize {
+        self.frame_id
     }
 
     /// 当前帧的 debug prefix，例如：`[frame-A-113]`

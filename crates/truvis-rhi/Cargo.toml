@@ -25,3 +25,4 @@ cstr = { workspace = true }
 vk-mem = { workspace = true }
 log = { workspace = true }
 image = { workspace = true }
+bytemuck = { workspace = true }

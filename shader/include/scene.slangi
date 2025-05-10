@@ -1,59 +1,39 @@
 #pragma once
+#include "common.slangi"
 
-#ifdef __SLANG__
-#define Ptr(T) T *
-#else
-#define Ptr(T) uint64_t
-#endif
+#include "instance.slangi"
+#include "light.slangi"
+#include "mat.slangi"
 
-struct Light
-{
-    float3 pos;
-    float pos_padding__;
-    float3 color;
-    float color_padding__;
-};
-
-struct SceneData
+struct FrameData
 {
     float4x4 projection;
     float4x4 view;
 
-    Light light_1;
-    Light light_2;
-    Light light_3;
-};
-
-struct PushConstants
-{
-    // offset = 0 Byte
     float3 camera_pos;
-    int camera_pos_padding__;
+    float time_ms;
 
-    // offset = 16 Byte
-    float3 camera_dir;
-    int camera_dir_padding__;
+    float3 camera_forward;
+    float delta_time_ms;
 
-    // offset = 32 Byte
-    float2 mouse;
+    float2 mouse_pos;
     float2 resolution;
 
-    // offset = 48 Byte
-    uint frame_id;
-    float delta_time_ms;
-    float time;
-    float frame_rate;
+    uint64_t frame_id;
+    uint64_t _padding_1;
 
-    // TODO temp solution
-    // offset = 64 Byte
-    float4x4 model;
+    LightData light_data;
+    MatData mat_data;
+    InstanceData ins_data;
+};
 
-    // offset = 128 Byte
-    float4x4 inv_model;
+struct DrawData
+{
+    Ptr(FrameData) frame_data;
 
-    // offset = 192 Byte
-    // uint64_t scene_buffer_addr;
-    const Ptr(SceneData) scene_buffer_ptr;
-    uint64_t scene_buffer_addr_padding__1;
+    uint instance_id;
+    uint _padding_1;
+    uint _padding_2;
+    uint _padding_3;
 };
 

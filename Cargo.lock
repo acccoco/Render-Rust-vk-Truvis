@@ -263,6 +263,7 @@ dependencies = [
 name = "build-shader"
 version = "0.1.0"
 dependencies = [
+ "anstyle",
  "chrono",
  "env_logger",
  "log",
@@ -2400,6 +2401,7 @@ dependencies = [
  "tobj",
  "truvis-assimp",
  "truvis-rhi",
+ "uuid",
  "vk-mem",
  "winit",
 ]
@@ -2410,6 +2412,7 @@ version = "0.1.0"
 dependencies = [
  "ash",
  "ash-window",
+ "bytemuck",
  "cstr",
  "derive-getters",
  "glam",

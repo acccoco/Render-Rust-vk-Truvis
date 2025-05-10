@@ -1,4 +1,6 @@
 use ash::vk;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::{ffi::c_void, rc::Rc};
 use vk_mem::Alloc;
 
@@ -67,7 +69,7 @@ pub struct RhiBuffer {
 // constructor & getter & builder
 impl RhiBuffer {
     /// # param
-    /// * align: 对 memory 的 offset align 限制
+    /// * align: 当 buffer 处于一个大的 memory block 中时，align 用来指定 buffer 的起始 offset
     pub fn new(
         rhi: &Rhi,
         buffer_ci: Rc<RhiBufferCreateInfo>,
@@ -213,6 +215,11 @@ impl RhiBuffer {
             self.device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.handle))
         })
     }
+
+    #[inline]
+    pub fn size(&self) -> vk::DeviceSize {
+        self.size
+    }
 }
 
 impl RhiBuffer {
@@ -302,5 +309,91 @@ impl Drop for RhiBuffer {
         unsafe {
             self.allocator.destroy_buffer(self.handle, &mut self.allocation);
         }
+    }
+}
+
+pub struct RhiBDABuffer<T: bytemuck::Pod> {
+    inner: RhiBuffer,
+    _phantom: PhantomData<T>,
+}
+impl<T: bytemuck::Pod> Deref for RhiBDABuffer<T> {
+    type Target = RhiBuffer;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+impl<T: bytemuck::Pod> DerefMut for RhiBDABuffer<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<T: bytemuck::Pod> RhiBDABuffer<T> {
+    #[inline]
+    pub fn new_ubo(rhi: &Rhi, debug_name: impl AsRef<str>) -> Self {
+        let aligned_size = rhi.device.aligned_ubo_size::<T>();
+        Self {
+            inner: RhiBuffer::new(
+                rhi,
+                Rc::new(RhiBufferCreateInfo::new(
+                    aligned_size,
+                    vk::BufferUsageFlags::UNIFORM_BUFFER
+                        | vk::BufferUsageFlags::TRANSFER_DST
+                        | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                )),
+                Rc::new(vk_mem::AllocationCreateInfo {
+                    usage: vk_mem::MemoryUsage::AutoPreferDevice,
+                    ..Default::default()
+                }),
+                Some(rhi.device.min_ubo_offset_align()),
+                debug_name,
+            ),
+            _phantom: PhantomData,
+        }
+    }
+}
+
+pub struct RhiStageBuffer<T: bytemuck::Pod> {
+    inner: RhiBuffer,
+    _phantom: PhantomData<T>,
+}
+impl<T: bytemuck::Pod> Deref for RhiStageBuffer<T> {
+    type Target = RhiBuffer;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T: bytemuck::Pod> RhiStageBuffer<T> {
+    pub fn new(rhi: &Rhi, debug_name: impl AsRef<str>) -> Self {
+        let aligned_size = rhi.device.aligned_ubo_size::<T>();
+        Self {
+            inner: RhiBuffer::new(
+                rhi,
+                Rc::new(RhiBufferCreateInfo::new(aligned_size, vk::BufferUsageFlags::TRANSFER_SRC)),
+                Rc::new(vk_mem::AllocationCreateInfo {
+                    usage: vk_mem::MemoryUsage::Auto,
+                    flags: vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM,
+                    ..Default::default()
+                }),
+                None,
+                debug_name,
+            ),
+            _phantom: PhantomData,
+        }
+    }
+
+    // BUG 可能需要考虑内存对齐
+    pub fn transfer(&mut self, trans_func: &dyn Fn(&mut T)) {
+        self.inner.map();
+        unsafe {
+            let ptr = self.inner.map_ptr.unwrap() as *mut T;
+
+            trans_func(&mut *ptr);
+        }
+        self.inner.allocator.flush_allocation(&self.inner.allocation, 0, size_of::<T>() as vk::DeviceSize).unwrap();
+        self.inner.unmap();
     }
 }

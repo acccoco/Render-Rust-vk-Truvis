@@ -9,3 +9,4 @@ bindings.rs
 .cache
 *.pdb
 ffi_bindings.rs
+_ffi_bindings.rs

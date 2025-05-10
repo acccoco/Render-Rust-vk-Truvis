@@ -1,0 +1,10 @@
+#pragma once
+
+#ifndef Ptr
+#ifdef __SLANG__
+#define Ptr(T) T *
+#else
+#define Ptr(T) uint64_t
+#endif // __SLANG__
+#endif // Ptr
+

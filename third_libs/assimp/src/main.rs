@@ -1,22 +1,35 @@
-use model_manager::manager::instance_manager::InstanceManager;
-use model_manager::manager::mat_manager::MatManager;
-use model_manager::manager::mesh_manager::MeshManager;
-use truvis_assimp::SceneLoader;
+use model_manager::component::instance::SimpleInstance;
+use model_manager::component::mat::SimpleMaterial;
+use model_manager::component::mesh::SimpleMesh;
+use std::collections::HashMap;
+use truvis_assimp::AssimpSceneLoader;
 use truvis_rhi::rhi::Rhi;
 
 fn main() {
     let rhi = Rhi::new("test".to_string(), vec![]);
 
-    let mut mesh_manager = MeshManager::default();
-    let mut mat_manager = MatManager::default();
-    let mut instance_manager = InstanceManager::default();
+    let mut mesh_map: HashMap<uuid::Uuid, SimpleMesh> = HashMap::new();
+    let mut mat_map: HashMap<uuid::Uuid, SimpleMaterial> = HashMap::new();
+    let mut ins_map: HashMap<uuid::Uuid, SimpleInstance> = HashMap::new();
 
-    let uuids = SceneLoader::load_model(
+    let uuids = AssimpSceneLoader::load_model(
         &rhi,
         std::path::Path::new("assets/obj/spot.obj"),
-        &mut instance_manager,
-        &mut mesh_manager,
-        &mut mat_manager,
+        &mut (|ins: SimpleInstance| {
+            let uuid = uuid::Uuid::new_v4();
+            ins_map.insert(uuid, ins);
+            uuid
+        }),
+        &mut (|mesh: SimpleMesh| {
+            let uuid = uuid::Uuid::new_v4();
+            mesh_map.insert(uuid, mesh);
+            uuid
+        }),
+        &mut (|mat: SimpleMaterial| {
+            let uuid = uuid::Uuid::new_v4();
+            mat_map.insert(uuid, mat);
+            uuid
+        }),
     );
 
     println!("uuids: {:?}", uuids);

@@ -233,19 +233,37 @@ fn compile_all_shader() {
 }
 
 fn main() {
+    // init logger
     env_logger::Builder::new()
         .format(|buf, record| {
+            let mut info_style = buf
+                .default_level_style(log::Level::Info)
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Green)));
+            let mut warn_style = buf
+                .default_level_style(log::Level::Warn)
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Yellow)));
+            let mut error_style = buf
+                .default_level_style(log::Level::Error)
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Red)));
+
+            let style = match record.level() {
+                log::Level::Info => info_style,
+                log::Level::Warn => warn_style,
+                log::Level::Error => error_style,
+                _ => buf.default_level_style(record.level()),
+            };
+
             writeln!(
                 buf,
-                "{}:{} {} [{}] - {}",
-                record.file().unwrap_or("unknown"),
-                record.line().unwrap_or(0),
+                "{style}{}:{} {} [{}]{style:#}\n{}",
+                record.file().unwrap(),
+                record.line().unwrap(),
                 chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
                 record.level(),
                 record.args()
             )
         })
-        .filter(None, log::LevelFilter::Debug)
+        .filter(None, log::LevelFilter::Info)
         .init();
 
     compile_all_shader()

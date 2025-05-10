@@ -6,7 +6,7 @@ use model_manager::vertex::VertexLayout;
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
 use truvis_render::frame_context::FrameContext;
 use truvis_render::render::Renderer;
-use truvis_render::renderer::framebuffer::RenderBuffer;
+use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
@@ -43,9 +43,9 @@ impl HelloTriangle {
     }
 
     fn my_update(&self, rhi: &Rhi, render_context: &mut FrameContext) {
-        let color_attach = RenderBuffer::get_color_attachment(render_context.current_present_image_view());
-        let depth_attach = RenderBuffer::get_depth_attachment(render_context.depth_view.handle());
-        let render_info = RenderBuffer::get_render_info(
+        let color_attach = FrameBuffer::get_color_attachment(render_context.current_present_image_view());
+        let depth_attach = FrameBuffer::get_depth_attachment(render_context.depth_view.handle());
+        let render_info = FrameBuffer::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
                 extent: render_context.swapchain_extent(),

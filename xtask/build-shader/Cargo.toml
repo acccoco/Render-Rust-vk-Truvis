@@ -8,3 +8,4 @@ edition = "2021"
 log = { workspace = true }
 chrono = { workspace = true }
 env_logger = { workspace = true }
+anstyle = { workspace = true }

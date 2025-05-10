@@ -208,9 +208,15 @@ impl RhiDevice {
 impl RhiDevice {
     /// 将 UBO 的尺寸和 min_UBO_Offset_Align 对齐，使得得到的尺寸是 min_UBO_Offset_Align 的整数倍
     #[inline]
-    pub fn align_ubo_size(&self, ubo_size: vk::DeviceSize) -> vk::DeviceSize {
+    pub fn aligned_ubo_size<T: bytemuck::Pod>(&self) -> vk::DeviceSize {
         let min_ubo_align = self.pdevice.properties.limits.min_uniform_buffer_offset_alignment;
+        let ubo_size = size_of::<T>() as vk::DeviceSize;
         (ubo_size + min_ubo_align - 1) & !(min_ubo_align - 1)
+    }
+
+    #[inline]
+    pub fn min_ubo_offset_align(&self) -> vk::DeviceSize {
+        self.pdevice.properties.limits.min_uniform_buffer_offset_alignment
     }
 
     #[inline]
