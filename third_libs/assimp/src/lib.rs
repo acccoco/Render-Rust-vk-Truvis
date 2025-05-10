@@ -144,11 +144,15 @@ impl AssimpSceneLoader {
     fn load_instance(&mut self, instance_register: &mut dyn FnMut(SimpleInstance) -> uuid::Uuid) {
         let instance_cnt = unsafe { get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)
-            .map(|instance_idx| unsafe {
+            .filter_map(|instance_idx| unsafe {
                 let instance = get_instance(self.loader, instance_idx);
                 let instance = &*instance;
 
                 let mesh_cnt = instance.mesh_cnt_;
+                if mesh_cnt == 0 {
+                    return None;
+                }
+
                 let mat_indices = if !instance.mat_indices_.is_null() {
                     std::slice::from_raw_parts(instance.mat_indices_, mesh_cnt as usize)
                 } else {
@@ -169,7 +173,7 @@ impl AssimpSceneLoader {
                     mats: mat_ids,
                 };
 
-                instance_register(instance)
+                Some(instance_register(instance))
             })
             .collect_vec();
 

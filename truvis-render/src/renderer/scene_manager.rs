@@ -29,13 +29,22 @@ impl SceneManager {
         }
     }
 
-    pub fn register_model(&mut self, rhi: &Rhi, model_path: &std::path::Path) {
+    pub fn register_model(
+        &mut self,
+        rhi: &Rhi,
+        model_path: &std::path::Path,
+        transform: &glam::Mat4,
+    ) -> Vec<uuid::Uuid> {
+        let mut ins_guids = vec![];
+
         AssimpSceneLoader::load_model(
             rhi,
             model_path,
-            &mut |ins| {
+            &mut |mut ins| {
                 let guid = uuid::Uuid::new_v4();
+                ins.transform = *transform * ins.transform;
                 self.instance_map.insert(guid, ins);
+                ins_guids.push(guid);
                 guid
             },
             &mut |mesh| {
@@ -49,6 +58,8 @@ impl SceneManager {
                 guid
             },
         );
+
+        ins_guids
     }
 
     pub fn register_mat(&mut self, mat: SimpleMaterial) -> uuid::Uuid {

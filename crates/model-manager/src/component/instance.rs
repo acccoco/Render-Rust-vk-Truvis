@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct SimpleInstance {
     pub transform: glam::Mat4,
 

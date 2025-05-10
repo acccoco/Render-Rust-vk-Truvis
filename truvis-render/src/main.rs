@@ -1,6 +1,7 @@
 use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
+use model_manager::component::instance::SimpleInstance;
 use model_manager::component::mesh::SimpleMesh;
 use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
 use model_manager::vertex::vertex_pnu::VertexLayoutAosPosNormalUv;
@@ -267,7 +268,19 @@ impl OuterApp for PhongApp {
             .collect_vec();
 
         let mut scene_mgr = SceneManager::new(bindless_mgr.clone());
-        scene_mgr.register_model(rhi, std::path::Path::new("assets/obj/spot.obj"));
+        // 复制多个 instance
+        let ins_id = scene_mgr.register_model(rhi, std::path::Path::new("assets/obj/spot.obj"), &glam::Mat4::IDENTITY);
+        let ins = scene_mgr.instance_map.get(&ins_id[0]).unwrap().clone();
+        let ins_1 = SimpleInstance {
+            transform: glam::Mat4::from_translation(glam::vec3(5.0, 0.0, 0.0)),
+            ..ins.clone()
+        };
+        scene_mgr.register_instance(ins_1);
+        let ins_2 = SimpleInstance {
+            transform: glam::Mat4::from_translation(glam::vec3(0.0, 5.0, 0.0)),
+            ..ins.clone()
+        };
+        scene_mgr.register_instance(ins_2);
         scene_mgr.register_point_light(shader::PointLight {
             pos: glam::vec3(-20.0, 40.0, 0.0).into(),
             color: (glam::vec3(5.0, 6.0, 1.0) * 2.0).into(),
