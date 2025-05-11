@@ -58,7 +58,7 @@ bool MeshLoader::load_scene()
         node_queue.pop_front();
 
         // 处理当前节点
-        this->instances_.push_back({});
+        this->instances_.emplace_back();
         auto& instance = this->instances_.back();
         (void) process_node(instance, *node, parent_transform);
 
@@ -75,7 +75,7 @@ bool MeshLoader::load_scene()
     for (int i = 0; i < ai_scene_->mNumMaterials; ++i)
     {
         const auto ai_mat = ai_scene_->mMaterials[i];
-        this->materials_.push_back({});
+        this->materials_.emplace_back();
         auto& mat = this->materials_.back();
         (void) process_material(mat, *ai_mat);
     }
@@ -85,7 +85,7 @@ bool MeshLoader::load_scene()
     for (int i = 0; i < ai_scene_->mNumMeshes; ++i)
     {
         const auto ai_mesh = ai_scene_->mMeshes[i];
-        this->geometries_.push_back({});
+        this->geometries_.emplace_back();
         auto& geo = this->geometries_.back();
         (void) process_geometry(geo, *ai_mesh);
     }

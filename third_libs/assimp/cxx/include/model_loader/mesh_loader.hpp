@@ -22,24 +22,24 @@ struct MeshLoader
 
     bool load_scene();
 
-    const CxxInstance* get_instance(const size_t index) const
+    [[nodiscard]] const CxxInstance* get_instance(const size_t index) const
     {
         return index < instances_.size() ? &instances_[index] : nullptr;
     }
 
-    const CxxRasterGeometry* get_geometry(const size_t index) const
+    [[nodiscard]] const CxxRasterGeometry* get_geometry(const size_t index) const
     {
         return index < geometries_.size() ? &geometries_[index] : nullptr;
     }
 
-    const CxxMaterial* get_material(const size_t index) const
+    [[nodiscard]] const CxxMaterial* get_material(const size_t index) const
     {
         return index < materials_.size() ? &materials_[index] : nullptr;
     }
 
-    size_t get_instance_count() const { return instances_.size(); }
-    size_t get_geometry_count() const { return geometries_.size(); }
-    size_t get_material_count() const { return materials_.size(); }
+    [[nodiscard]] size_t get_instance_count() const { return instances_.size(); }
+    [[nodiscard]] size_t get_geometry_count() const { return geometries_.size(); }
+    [[nodiscard]] size_t get_material_count() const { return materials_.size(); }
 
 private:
     /// 递归地处理节点，节点中包括多个 mesh，包含子节点

@@ -4,7 +4,7 @@
 
 int main()
 {
-    auto loader = load_scene("D:/code/Render-Rust-vk-Truvis/assets/obj/spot.obj");
+    auto loader = load_scene("C:/Users/bigso/OneDrive/Library/AssetsLib/model/gltf/dancing-girl/scene.gltf");
     if (!loader)
     {
         std::cerr << "Failed to load scene." << std::endl;

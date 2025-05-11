@@ -3,236 +3,21 @@ use imgui::Ui;
 use itertools::Itertools;
 use model_manager::component::instance::SimpleInstance;
 use model_manager::component::mesh::SimpleMesh;
-use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
 use model_manager::vertex::vertex_pnu::VertexLayoutAosPosNormalUv;
-use model_manager::vertex::VertexLayout;
 use shader_binding::shader;
 use std::cell::RefCell;
-use std::mem::offset_of;
 use std::rc::Rc;
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
 use truvis_render::frame_context::FrameContext;
-use truvis_render::platform::camera::Camera;
+use truvis_render::platform::camera_controller::CameraController;
+use truvis_render::render_pass::phong::Simple3DMainPass;
 use truvis_render::renderer::bindless::BindlessManager;
 use truvis_render::renderer::frame_scene::FrameScene;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_render::renderer::scene_manager::SceneManager;
 use truvis_rhi::core::buffer::{RhiBDABuffer, RhiStageBuffer};
-use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
-use truvis_rhi::{
-    basic::color::LabelColor,
-    core::{command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
-    rhi::Rhi,
-};
-
-struct SimpleMainPass {
-    pipeline: RhiGraphicsPipeline,
-
-    bindless_manager: Rc<BindlessManager>,
-}
-impl SimpleMainPass {
-    pub fn new(rhi: &Rhi, frame_context: &FrameContext, bindless_manager: Rc<BindlessManager>) -> Self {
-        let mut ci = RhiGraphicsPipelineCreateInfo::default();
-        ci.vertex_shader_stage("shader/build/phong/phong.vs.slang.spv".to_string(), "main".to_string());
-        ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv".to_string(), "main".to_string());
-        ci.push_constant_ranges(vec![vk::PushConstantRange::default()
-            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
-            .offset(0)
-            .size(size_of::<shader::DrawData>() as u32)]);
-        // ci.descriptor_set_layouts(vec![bindless_manager.bindless_layout.layout]);
-        ci.attach_info(vec![frame_context.color_format()], Some(frame_context.depth_format()), None);
-        ci.vertex_binding(VertexLayoutAosPosNormalUv::vertex_input_bindings());
-        ci.vertex_attribute(VertexLayoutAosPosNormalUv::vertex_input_attributes());
-        ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
-            .blend_enable(false)
-            .color_write_mask(vk::ColorComponentFlags::RGBA)]);
-
-        let simple_pipe = RhiGraphicsPipeline::new(rhi.device.clone(), &ci, "phong-simple-pipe");
-
-        Self {
-            pipeline: simple_pipe,
-            bindless_manager,
-        }
-    }
-
-    pub fn bind(&self, cmd: &RhiCommandBuffer, viewport: &vk::Rect2D, push_constant: &shader::DrawData) {
-        cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
-        cmd.cmd_set_viewport(
-            0,
-            &[vk::Viewport {
-                x: viewport.offset.x as f32,
-                y: viewport.offset.y as f32 + viewport.extent.height as f32,
-                width: viewport.extent.width as f32,
-                height: -(viewport.extent.height as f32),
-                min_depth: 0.0,
-                max_depth: 1.0,
-            }],
-        );
-        cmd.cmd_push_constants(
-            self.pipeline.pipeline_layout,
-            vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-            0,
-            bytemuck::bytes_of(push_constant),
-        );
-        // cmd.bind_descriptor_sets(
-        //     vk::PipelineBindPoint::GRAPHICS,
-        //     self.pipeline.pipeline_layout,
-        //     0,
-        //     &[self.bindless_manager.bindless_set.handle],
-        //     &[0],
-        // );
-    }
-
-    pub fn draw(&self, cmd: &RhiCommandBuffer, app_ctx: &mut AppCtx) {
-        // cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline_simple.pipeline);
-
-        let swapchain_extend = app_ctx.render_context.swapchain_extent();
-        cmd.cmd_set_viewport(
-            0,
-            &[vk::Viewport {
-                x: 0.0,
-                y: swapchain_extend.height as f32,
-                width: swapchain_extend.width as f32,
-                height: -(swapchain_extend.height as f32),
-                min_depth: 0.0,
-                max_depth: 1.0,
-            }],
-        );
-        cmd.cmd_set_scissor(
-            0,
-            &[vk::Rect2D {
-                offset: vk::Offset2D::default(),
-                extent: swapchain_extend,
-            }],
-        );
-
-        // cmd.cmd_push_constants(
-        //     self.pipeline_simple.pipeline_layout,
-        //     vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-        //     0,
-        //     bytemuck::bytes_of(&self.push),
-        // );
-        //
-        // // scene data
-        // cmd.bind_descriptor_sets(
-        //     vk::PipelineBindPoint::GRAPHICS,
-        //     self.pipeline_simple.pipeline_layout,
-        //     0,
-        //     &[self.descriptor_sets[frame_id].scene_set.handle],
-        //     &[0],
-        // );
-        //
-        // // per mat
-        // cmd.bind_descriptor_sets(
-        //     vk::PipelineBindPoint::GRAPHICS,
-        //     self.pipeline_simple.pipeline_layout,
-        //     2,
-        //     &[self.descriptor_sets[frame_id].material_set.handle],
-        //     // TODO 只使用一个材质
-        //     &[0],
-        // );
-
-        // index 和 vertex 暂且就用同一个
-        // cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.cube.vertex_buffer), &[0]);
-        // cmd.cmd_bind_index_buffer(&self.cube.index_buffer, 0, vk::IndexType::UINT32);
-        //
-        // for (mesh_idx, _) in self.mesh_ubo.iter().enumerate() {
-        //     cmd.bind_descriptor_sets(
-        //         vk::PipelineBindPoint::GRAPHICS,
-        //         self.pipeline_simple.pipeline_layout,
-        //         1,
-        //         &[self.descriptor_sets[frame_id].mesh_set.handle],
-        //         &[(self.mesh_ubo_offset_align * mesh_idx as u64) as u32],
-        //     );
-        //     cmd.draw_indexed(self.cube.index_cnt, 0, 1, 0, 0);
-        //     // cmd.cmd_draw(VertexPosNormalUvAoS::shape_box().len() as u32, 1, 0, 0);
-        // }
-    }
-}
-
-struct Simple3DMainPass {
-    pipeline: RhiGraphicsPipeline,
-    bindless_manager: Rc<RefCell<BindlessManager>>,
-}
-impl Simple3DMainPass {
-    pub fn new(rhi: &Rhi, frame_context: &FrameContext, bindless_manager: Rc<RefCell<BindlessManager>>) -> Self {
-        let mut ci = RhiGraphicsPipelineCreateInfo::default();
-        ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv".to_string(), "main".to_string());
-        ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv".to_string(), "main".to_string());
-
-        ci.vertex_binding(VertexLayoutAos3D::vertex_input_bindings());
-        ci.vertex_attribute(VertexLayoutAos3D::vertex_input_attributes());
-
-        ci.push_constant_ranges(vec![vk::PushConstantRange::default()
-            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
-            .offset(0)
-            .size(size_of::<shader::DrawData>() as u32)]);
-        ci.descriptor_set_layouts(vec![bindless_manager.borrow().bindless_layout.layout]);
-        ci.attach_info(vec![frame_context.color_format()], Some(frame_context.depth_format()), None);
-        ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
-            .blend_enable(false)
-            .color_write_mask(vk::ColorComponentFlags::RGBA)]);
-
-        let d3_pipe = RhiGraphicsPipeline::new(rhi.device.clone(), &ci, "phong-d3-pipe");
-
-        Self {
-            pipeline: d3_pipe,
-            bindless_manager,
-        }
-    }
-
-    fn bind(&self, cmd: &RhiCommandBuffer, viewport: &vk::Rect2D, push_constant: &shader::DrawData, frame_idx: usize) {
-        cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
-        cmd.cmd_set_viewport(
-            0,
-            &[vk::Viewport {
-                x: viewport.offset.x as f32,
-                y: viewport.offset.y as f32 + viewport.extent.height as f32,
-                width: viewport.extent.width as f32,
-                height: -(viewport.extent.height as f32),
-                min_depth: 0.0,
-                max_depth: 1.0,
-            }],
-        );
-        cmd.cmd_set_scissor(0, &[*viewport]);
-        cmd.cmd_push_constants(
-            self.pipeline.pipeline_layout,
-            vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-            0,
-            bytemuck::bytes_of(push_constant),
-        );
-
-        cmd.bind_descriptor_sets(
-            vk::PipelineBindPoint::GRAPHICS,
-            self.pipeline.pipeline_layout,
-            0,
-            &[self.bindless_manager.borrow().bindless_sets[frame_idx].handle],
-            &[],
-        );
-    }
-
-    pub fn draw(
-        &self,
-        cmd: &RhiCommandBuffer,
-        app_ctx: &AppCtx,
-        push_constant: &shader::DrawData,
-        scene_data: &FrameScene,
-        frame_idx: usize,
-    ) {
-        self.bind(cmd, &app_ctx.render_context.swapchain_extent().into(), push_constant, frame_idx);
-
-        scene_data.draw(cmd, &mut |ins_idx| {
-            cmd.cmd_push_constants(
-                self.pipeline.pipeline_layout,
-                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                offset_of!(shader::DrawData, instance_id) as u32,
-                bytemuck::bytes_of(&ins_idx),
-            );
-        });
-    }
-}
+use truvis_rhi::{basic::color::LabelColor, core::command_queue::RhiSubmitInfo, rhi::Rhi};
 
 struct PhongApp {
     bindless_mgr: Rc<RefCell<BindlessManager>>,
@@ -247,13 +32,14 @@ struct PhongApp {
     /// BOX
     cube: SimpleMesh,
 
-    camera: Camera,
+    // 保存共享的相机控制器
+    camera_controller: Rc<RefCell<CameraController>>,
 }
 
 impl PhongApp {}
 
 impl OuterApp for PhongApp {
-    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
+    fn init(rhi: &Rhi, render_context: &mut FrameContext, camera_controller: Rc<RefCell<CameraController>>) -> Self {
         let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(rhi, render_context.frame_cnt_in_flight)));
         bindless_mgr.borrow_mut().register_texture(rhi, "assets/uv_checker.png".to_string());
 
@@ -299,6 +85,11 @@ impl OuterApp for PhongApp {
             color: (glam::vec3(5.0, 1.0, 8.0) * 3.0).into(),
             ..Default::default()
         });
+        scene_mgr.register_model(
+            rhi,
+            std::path::Path::new("C:/Users/bigso/OneDrive/Library/AssetsLib/model/gltf/dancing-girl/scene.gltf"),
+            &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
+        );
         let scene_mgr = Rc::new(RefCell::new(scene_mgr));
 
         let rot =
@@ -311,13 +102,15 @@ impl OuterApp for PhongApp {
             glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
 
-        let camera = Camera {
-            position: glam::vec3(20.0, 0.0, 0.0),
-            euler_yaw_deg: 90.0,
-            ..Default::default()
-        };
-
         let frame_scene = FrameScene::new(scene_mgr.clone(), bindless_mgr.clone());
+
+        // 更新相机的初始状态
+        {
+            let mut camera_controller = camera_controller.borrow_mut();
+            let camera = camera_controller.camera_mut();
+            camera.position = glam::vec3(20.0, 0.0, 0.0);
+            camera.euler_yaw_deg = 90.0;
+        }
 
         Self {
             bindless_mgr,
@@ -327,7 +120,7 @@ impl OuterApp for PhongApp {
             scene_mgr,
             main_pass,
             cube,
-            camera,
+            camera_controller,
         }
     }
 
@@ -335,49 +128,25 @@ impl OuterApp for PhongApp {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
     }
-
     fn update(&mut self, app_ctx: &mut AppCtx) {
         let frame_idx = app_ctx.render_context.current_frame_index();
 
-        // camera controller
-        if app_ctx.input_state.right_button_pressed {
-            let delta = app_ctx.input_state.crt_mouse_pos - app_ctx.input_state.last_mouse_pos;
-            let delta = delta * (app_ctx.timer.delta_time_s as f64) * 100.0;
+        // 直接使用 TruvisApp 中的 camera_controller，无需再创建新的实例
 
-            self.camera.rotate_yaw(delta.x as f32);
-            self.camera.rotate_pitch(delta.y as f32);
-
-            let move_speed = 10_f32;
-            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyW) {
-                self.camera.move_forward(app_ctx.timer.delta_time_s * move_speed);
-            }
-            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyS) {
-                self.camera.move_forward(-app_ctx.timer.delta_time_s * move_speed);
-            }
-            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyA) {
-                self.camera.move_right(-app_ctx.timer.delta_time_s * move_speed);
-            }
-            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyD) {
-                self.camera.move_right(app_ctx.timer.delta_time_s * move_speed);
-            }
-            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyE) {
-                self.camera.move_up(-app_ctx.timer.delta_time_s * move_speed);
-            }
-            if let Some(true) = app_ctx.input_state.key_pressed.get(&winit::keyboard::KeyCode::KeyQ) {
-                self.camera.move_up(app_ctx.timer.delta_time_s * move_speed);
-            }
-        }
-
+        // 将场景数据写入到帧缓冲区
         self.frame_scene.prepare_render_data(app_ctx.render_context.current_frame_index());
         let frame_data_stage_buffer = &mut self.frame_data_stage_buffers[frame_idx];
         frame_data_stage_buffer.transfer(&|data: &mut shader::FrameData| {
             let mouse_pos = app_ctx.input_state.crt_mouse_pos;
-            let render_extent = app_ctx.render_context.swapchain_extent();
+            let extent = app_ctx.render_context.swapchain_extent();
 
-            data.projection = self.camera.get_projection_matrix().into();
-            data.view = self.camera.get_view_matrix().into();
-            data.camera_pos = self.camera.position.into();
-            data.camera_forward = self.camera.camera_forward().into();
+            // 从共享的相机控制器获取相机数据
+            let camera_controller = self.camera_controller.borrow();
+            let camera = camera_controller.camera();
+            data.projection = camera.get_projection_matrix().into();
+            data.view = camera.get_view_matrix().into();
+            data.camera_pos = camera.position.into();
+            data.camera_forward = camera.camera_forward().into();
             data.time_ms = app_ctx.timer.duration.as_millis() as f32;
             data.delta_time_ms = app_ctx.timer.delta_time_s * 1000.0;
             data.frame_id = app_ctx.render_context.current_frame_num() as u64;
@@ -386,8 +155,8 @@ impl OuterApp for PhongApp {
                 y: mouse_pos.y as f32,
             };
             data.resolution = shader::float2 {
-                x: render_extent.width as f32,
-                y: render_extent.height as f32,
+                x: extent.width as f32,
+                y: extent.height as f32,
             };
 
             self.frame_scene.write_to_buffer(data);
@@ -461,9 +230,10 @@ impl OuterApp for PhongApp {
 
         app_ctx.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
-
     fn rebuild(&mut self, _rhi: &Rhi, render_context: &mut FrameContext) {
-        self.camera.asp =
+        // 更新相机的宽高比
+        let mut controller = self.camera_controller.borrow_mut();
+        controller.camera_mut().asp =
             render_context.swapchain_extent().width as f32 / render_context.swapchain_extent().height as f32;
     }
 }

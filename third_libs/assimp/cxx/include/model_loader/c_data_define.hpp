@@ -63,6 +63,17 @@ struct CxxRasterGeometry
         face_array_ = nullptr;
     }
 
+    /// 移动构造会在 vector 扩容的时候被调用，避免调用 destructor 导致内存异常释放
+    CxxRasterGeometry(CxxRasterGeometry&& other) noexcept
+        : vertex_cnt_(other.vertex_cnt_),
+          vertex_array_(other.vertex_array_),
+          face_cnt_(other.face_cnt_),
+          face_array_(other.face_array_)
+    {
+        other.vertex_array_ = nullptr;
+        other.face_array_ = nullptr;
+    }
+
     void init(const unsigned int vertex_cnt, const unsigned int face_cnt)
     {
         this->vertex_cnt_ = vertex_cnt;
@@ -78,10 +89,10 @@ struct CxxRasterGeometry
         }
     }
 
-    unsigned int vertex_cnt() const { return vertex_cnt_; }
-    unsigned int face_cnt() const { return face_cnt_; }
-    CxxVertex3D* vertices() const { return vertex_array_; }
-    CxxTriangleFace* faces() const { return face_array_; }
+    [[nodiscard]] unsigned int vertex_cnt() const { return vertex_cnt_; }
+    [[nodiscard]] unsigned int face_cnt() const { return face_cnt_; }
+    [[nodiscard]] CxxVertex3D* vertices() const { return vertex_array_; }
+    [[nodiscard]] CxxTriangleFace* faces() const { return face_array_; }
 
 private:
     unsigned int vertex_cnt_ = 0;
@@ -110,6 +121,18 @@ struct CxxInstance
 {
     CxxInstance() = default;
 
+    /// 移动构造会在 vector 扩容的时候被调用，避免调用 destructor 导致内存异常释放
+    CxxInstance(CxxInstance&& other) noexcept
+        : world_transform(other.world_transform),
+          mesh_cnt_(other.mesh_cnt_),
+          mat_indices_(other.mat_indices_),
+          mesh_indices_(other.mesh_indices_)
+    {
+        other.mat_indices_ = nullptr;
+        other.mesh_indices_ = nullptr;
+    }
+
+
     ~CxxInstance()
     {
         delete[] mat_indices_;
@@ -129,9 +152,9 @@ struct CxxInstance
         }
     }
 
-    unsigned int* mat_indices() const { return mat_indices_; }
-    unsigned int* mesh_indices() const { return mesh_indices_; }
-    unsigned int mesh_cnt() const { return mesh_cnt_; }
+    [[nodiscard]] unsigned int* mat_indices() const { return mat_indices_; }
+    [[nodiscard]] unsigned int* mesh_indices() const { return mesh_indices_; }
+    [[nodiscard]] unsigned int mesh_cnt() const { return mesh_cnt_; }
 
     /// 坐标系：右手系，X-Right，Y-Up
     CxxMat4f world_transform = {};
