@@ -1,5 +1,6 @@
 [![Lines of Code](https://tokei.rs/b1/github/acccoco/Render-Rust-vk-Truvis)](https://github.com/acccoco/Render-Rust-vk-Truvis)
 [![CI Status](https://github.com/acccoco/Render-Rust-vk-Truvis/workflows/Rust/badge.svg)](https://github.com/acccoco/Render-Rust-vk-Truvis/actions)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/acccoco/Render-Rust-vk-Truvis)
 
 # TODO
 
@@ -40,7 +41,7 @@
 * camera: 右手，Y-Up。相机朝向 -Z
 * NDC: LeftHand, Y-Up
 * framebuffer：原点在左上角
-* viewport：确保 `height < 0` 
+* viewport：确保 `height < 0`
 
 ![坐标系](doc/img/coords.png)
 
