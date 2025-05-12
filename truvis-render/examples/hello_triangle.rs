@@ -3,8 +3,11 @@ use imgui::Ui;
 use model_manager::component::mesh::SimpleMesh;
 use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
 use model_manager::vertex::VertexLayout;
+use std::cell::RefCell;
+use std::rc::Rc;
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
 use truvis_render::frame_context::FrameContext;
+use truvis_render::platform::camera_controller::CameraController;
 use truvis_render::render::Renderer;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
@@ -102,7 +105,7 @@ impl HelloTriangle {
 }
 
 impl OuterApp for HelloTriangle {
-    fn init(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
+    fn init(rhi: &Rhi, render_context: &mut FrameContext, _camera_controller: Rc<RefCell<CameraController>>) -> Self {
         log::info!("hello triangle init.");
         HelloTriangle::new(rhi, render_context)
     }

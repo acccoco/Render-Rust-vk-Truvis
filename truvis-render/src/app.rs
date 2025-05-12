@@ -10,6 +10,7 @@ use std::cell::{OnceCell, RefCell};
 use std::io::Write;
 use std::rc::Rc;
 use std::sync::OnceLock;
+use truvis_crate_tools::init_log::init_log;
 use truvis_rhi::core::window_system::{MainWindow, WindowCreateInfo};
 use truvis_rhi::rhi::Rhi;
 use winit::application::ApplicationHandler;
@@ -41,7 +42,7 @@ pub trait OuterApp {
     fn draw(&self, app_ctx: &mut AppCtx);
 
     /// window 发生改变后，重建
-    fn rebuild(&mut self, rhi: &Rhi, render_context: &mut FrameContext) {}
+    fn rebuild(&mut self, _rhi: &Rhi, _render_context: &mut FrameContext) {}
 }
 
 pub struct TruvisApp<T: OuterApp> {
@@ -61,38 +62,7 @@ impl<T: OuterApp> TruvisApp<T> {
     pub fn run() {
         std::panic::set_hook(Box::new(panic_handler));
 
-        // init logger
-        env_logger::Builder::new()
-            .format(|buf, record| {
-                let info_style = buf
-                    .default_level_style(log::Level::Info)
-                    .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Green)));
-                let warn_style = buf
-                    .default_level_style(log::Level::Warn)
-                    .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Yellow)));
-                let error_style = buf
-                    .default_level_style(log::Level::Error)
-                    .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Red)));
-
-                let style = match record.level() {
-                    log::Level::Info => info_style,
-                    log::Level::Warn => warn_style,
-                    log::Level::Error => error_style,
-                    _ => buf.default_level_style(record.level()),
-                };
-
-                writeln!(
-                    buf,
-                    "{style}{}:{} {} [{}]{style:#}\n{}",
-                    record.file().unwrap(),
-                    record.line().unwrap(),
-                    chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
-                    record.level(),
-                    record.args()
-                )
-            })
-            .filter(None, log::LevelFilter::Info)
-            .init();
+        init_log();
 
         // 创建输入管理器和计时器
         let input_manager = Rc::new(RefCell::new(InputManager::new()));
@@ -180,7 +150,7 @@ impl<T: OuterApp> TruvisApp<T> {
         renderer.after_frame();
     }
 
-    pub fn rebuild(&mut self, width: u32, height: u32) {
+    pub fn rebuild(&mut self, _width: u32, _height: u32) {
         let renderer = self.renderer.get_mut().unwrap();
         let outer_app = self.outer_app.get_mut().unwrap();
 

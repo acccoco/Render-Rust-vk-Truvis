@@ -319,6 +319,7 @@ dependencies = [
  "chrono",
  "env_logger",
  "log",
+ "truvis-crate-tools",
 ]
 
 [[package]]
@@ -2669,7 +2670,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e672c95779cf947c5311f83787af4fa8fffd12fb27e4993211a84bdfd9610f9c"
 
 [[package]]
-name = "truvis-assimp"
+name = "truvis-crate-tools"
+version = "0.1.0"
+dependencies = [
+ "anstyle",
+ "chrono",
+ "env_logger",
+ "log",
+]
+
+[[package]]
+name = "truvis-cxx"
 version = "0.1.0"
 dependencies = [
  "bindgen",
@@ -2720,7 +2731,8 @@ dependencies = [
  "shader-layout-trait",
  "static_init",
  "tobj",
- "truvis-assimp",
+ "truvis-crate-tools",
+ "truvis-cxx",
  "truvis-rhi",
  "uuid",
  "vk-mem",

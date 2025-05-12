@@ -2,6 +2,7 @@
 name = "shader-gen"
 version = "0.1.0"
 edition = "2021"
+description = "通过模板引擎 tera，生成 rust 代码和 shader 代码"
 
 [dependencies]
 tera = "1.0"

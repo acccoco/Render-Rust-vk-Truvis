@@ -6,7 +6,7 @@ use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use truvis_assimp::AssimpSceneLoader;
+use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::rhi::Rhi;
 
 pub struct SceneManager {

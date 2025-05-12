@@ -2,7 +2,7 @@ use model_manager::component::instance::SimpleInstance;
 use model_manager::component::mat::SimpleMaterial;
 use model_manager::component::mesh::SimpleMesh;
 use std::collections::HashMap;
-use truvis_assimp::AssimpSceneLoader;
+use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::rhi::Rhi;
 
 fn main() {

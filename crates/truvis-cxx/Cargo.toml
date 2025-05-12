@@ -1,5 +1,5 @@
 [package]
-name = "truvis-assimp"
+name = "truvis-cxx"
 version = "0.1.0"
 edition = "2021"
 description = "为 Truvis 提供 Assimp 绑定"

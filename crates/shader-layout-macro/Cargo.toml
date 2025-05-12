@@ -2,7 +2,7 @@
 name = "shader-layout-macro"
 version = "0.1.0"
 edition = "2021"
-description = "简化 shader binding"
+description = "简化 shader binding，通过属性宏来生成 descriptor bindings"
 
 [lib]
 proc-macro = true
