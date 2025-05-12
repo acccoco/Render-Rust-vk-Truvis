@@ -44,8 +44,10 @@ pub struct RhiSubmitInfo {
 
 impl RhiSubmitInfo {
     pub fn new(commands: &[RhiCommandBuffer]) -> Self {
-        let command_buffers =
-            commands.iter().map(|cmd| vk::CommandBufferSubmitInfo::default().command_buffer(cmd.handle)).collect_vec();
+        let command_buffers = commands
+            .iter()
+            .map(|cmd| vk::CommandBufferSubmitInfo::default().command_buffer(cmd.handle()))
+            .collect_vec();
 
         let inner = vk::SubmitInfo2 {
             // 暂时不使用该 flag

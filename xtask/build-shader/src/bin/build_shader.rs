@@ -1,5 +1,4 @@
 //! 将指定目录下的所有 shader 文件编译为 spv 文件，输出到同一目录下
-use std::io::Write;
 use truvis_crate_tools::init_log::init_log;
 
 #[derive(Debug)]
@@ -7,26 +6,26 @@ enum ShaderStage {
     Vertex,
 
     /// hlsl Hull shader
-    TessellationControl,
+    _TessellationControl,
 
     /// hlsl Domain shader
-    TessellationEvaluation,
-    Geometry,
+    _TessellationEvaluation,
+    _Geometry,
 
     /// hlsl Pixel shader
     Fragment,
     Compute,
 
     RayGen,
-    AnyHit,
+    _AnyHit,
     ClosestHit,
     Miss,
-    Intersection,
-    RayCallable,
+    _Intersection,
+    _RayCallable,
 
     /// hlsl Amplification shader
-    Task,
-    Mesh,
+    _Task,
+    _Mesh,
 
     /// slang 不需要明确的 shader stage
     Slang,
@@ -134,19 +133,19 @@ impl ShaderCompileTask {
         // dxc.exe -spirv -T vs_6_1 -E main .\input.vert -Fo .\output.vert.spv -fspv-extension=SPV_EXT_descriptor_indexing
         let shader_stage_tag = match self.shader_stage {
             ShaderStage::Vertex => "vs",
-            ShaderStage::TessellationControl => "hs",
-            ShaderStage::TessellationEvaluation => "ds",
-            ShaderStage::Geometry => "gs",
+            ShaderStage::_TessellationControl => "hs",
+            ShaderStage::_TessellationEvaluation => "ds",
+            ShaderStage::_Geometry => "gs",
             ShaderStage::Fragment => "ps",
             ShaderStage::Compute => "cs",
             ShaderStage::RayGen
-            | ShaderStage::AnyHit
+            | ShaderStage::_AnyHit
             | ShaderStage::ClosestHit
             | ShaderStage::Miss
-            | ShaderStage::Intersection
-            | ShaderStage::RayCallable => "lib",
-            ShaderStage::Task => "as",
-            ShaderStage::Mesh => "ms",
+            | ShaderStage::_Intersection
+            | ShaderStage::_RayCallable => "lib",
+            ShaderStage::_Task => "as",
+            ShaderStage::_Mesh => "ms",
             ShaderStage::Slang => panic!("dxc does not support slang"),
         };
         let shader_model = "6_7";

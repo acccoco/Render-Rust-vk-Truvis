@@ -20,8 +20,8 @@ use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::{basic::color::LabelColor, core::command_queue::RhiSubmitInfo, rhi::Rhi};
 
 struct PhongApp {
-    bindless_mgr: Rc<RefCell<BindlessManager>>,
-    scene_mgr: Rc<RefCell<SceneManager>>,
+    _bindless_mgr: Rc<RefCell<BindlessManager>>,
+    _scene_mgr: Rc<RefCell<SceneManager>>,
 
     frame_data_buffers: Vec<RhiBDABuffer<shader::FrameData>>,
     frame_data_stage_buffers: Vec<RhiStageBuffer<shader::FrameData>>,
@@ -30,7 +30,7 @@ struct PhongApp {
     frame_scene: FrameScene,
 
     /// BOX
-    cube: SimpleMesh,
+    _cube: SimpleMesh,
 
     // 保存共享的相机控制器
     camera_controller: Rc<RefCell<CameraController>>,
@@ -113,13 +113,13 @@ impl OuterApp for PhongApp {
         }
 
         Self {
-            bindless_mgr,
+            _bindless_mgr: bindless_mgr,
             frame_data_buffers,
             frame_data_stage_buffers,
             frame_scene,
-            scene_mgr,
+            _scene_mgr: scene_mgr,
             main_pass,
-            cube,
+            _cube: cube,
             camera_controller,
         }
     }

@@ -12,7 +12,7 @@ use crate::{
 
 pub struct RhiAcceleration {
     acceleration_structure: vk::AccelerationStructureKHR,
-    buffer: RhiBuffer,
+    _buffer: RhiBuffer,
 
     device: Rc<RhiDevice>,
 }
@@ -258,7 +258,7 @@ impl RhiAcceleration {
         Self {
             device: rhi.device.clone(),
             acceleration_structure,
-            buffer,
+            _buffer: buffer,
         }
     }
 

@@ -19,7 +19,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct RhiCommandBuffer {
-    pub handle: vk::CommandBuffer,
+    handle: vk::CommandBuffer,
 
     /// command buffer 在需要通过 command pool 进行 free，因此需要保存 command pool 的引用
     pub command_pool: Rc<RhiCommandPool>,
@@ -49,7 +49,7 @@ impl RhiCommandBuffer {
 
     /// getter
     #[inline]
-    fn handle(&self) -> vk::CommandBuffer {
+    pub fn handle(&self) -> vk::CommandBuffer {
         self.handle
     }
 

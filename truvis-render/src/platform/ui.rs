@@ -5,7 +5,7 @@ use ash::vk;
 use image::EncodableLayout;
 use shader_layout_macro::ShaderLayout;
 use std::mem::offset_of;
-use std::{cell::RefCell, ffi::CString, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 use truvis_rhi::core::descriptor::RhiDescriptorSetLayout;
 use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
@@ -68,11 +68,11 @@ impl ImGuiVertex {
 struct GuiMesh {
     vertex_buffer: RhiBuffer,
     _vertex_count: usize,
-    vertex_stage_buffer: RhiBuffer,
+    _vertex_stage_buffer: RhiBuffer,
 
-    index_buffer: RhiBuffer,
-    index_count: usize,
-    index_stage_buffer: RhiBuffer,
+    _index_buffer: RhiBuffer,
+    _index_count: usize,
+    _index_stage_buffer: RhiBuffer,
 }
 
 impl GuiMesh {
@@ -109,11 +109,11 @@ impl GuiMesh {
         Self {
             vertex_buffer,
             _vertex_count: vertex_cnt,
-            vertex_stage_buffer,
+            _vertex_stage_buffer: vertex_stage_buffer,
 
-            index_buffer,
-            index_count: index_cnt,
-            index_stage_buffer,
+            _index_buffer: index_buffer,
+            _index_count: index_cnt,
+            _index_stage_buffer: index_stage_buffer,
         }
     }
 
@@ -219,16 +219,16 @@ pub struct Gui {
     pipeline_layout: vk::PipelineLayout,
     _descriptor_set_layout: RhiDescriptorSetLayout<UiShaderLayout>,
 
-    descriptor_pool: Rc<RhiDescriptorPool>,
+    _descriptor_pool: Rc<RhiDescriptorPool>,
 
-    fonts_texture: RhiTexture2D,
+    _fonts_texture: RhiTexture2D,
     font_descriptor_set: vk::DescriptorSet,
 
     meshes: Vec<Option<GuiMesh>>,
 
-    device: Rc<RhiDevice>,
+    _device: Rc<RhiDevice>,
 
-    cmd: Option<RhiCommandBuffer>,
+    _cmd: Option<RhiCommandBuffer>,
 }
 
 // constructor & getter
@@ -305,15 +305,15 @@ impl Gui {
             pipeline_layout,
 
             _descriptor_set_layout: descriptor_set_layout,
-            fonts_texture,
-            descriptor_pool,
+            _fonts_texture: fonts_texture,
+            _descriptor_pool: descriptor_pool,
             font_descriptor_set: descriptor_set,
 
             meshes: (0..options.frames_in_flight).map(|_| None).collect(),
 
-            device: rhi.device.clone(),
+            _device: rhi.device.clone(),
 
-            cmd: None,
+            _cmd: None,
         }
     }
 
@@ -585,7 +585,7 @@ impl Gui {
         let projection =
             glam::Mat4::orthographic_rh(0.0, draw_data.display_size[0], 0.0, draw_data.display_size[1], -1.0, 1.0);
         cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::VERTEX, 0, projection.as_ref().as_bytes());
-        cmd.cmd_bind_index_buffer(&mesh.index_buffer, 0, vk::IndexType::UINT16);
+        cmd.cmd_bind_index_buffer(&mesh._index_buffer, 0, vk::IndexType::UINT16);
         cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&mesh.vertex_buffer), &[0]);
 
         let mut index_offset = 0;

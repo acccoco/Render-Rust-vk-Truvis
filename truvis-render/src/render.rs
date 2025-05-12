@@ -1,9 +1,8 @@
 use crate::frame_context::{FrameContext, RenderContextInitInfo};
 use ash::vk;
-use raw_window_handle::HasRawDisplayHandle;
+use raw_window_handle::HasDisplayHandle;
 use std::ffi::CStr;
 use std::rc::Rc;
-use truvis_rhi::core::descriptor_pool::RhiDescriptorPool;
 use truvis_rhi::{
     basic::color::LabelColor,
     core::{
@@ -33,7 +32,7 @@ impl Renderer {
         let rhi = {
             // 追加 window system 需要的 extension，在 windows 下也就是 khr::Surface
             let extra_instance_ext =
-                ash_window::enumerate_required_extensions(window_system.window().raw_display_handle().unwrap())
+                ash_window::enumerate_required_extensions(window_system.window().display_handle().unwrap().as_raw())
                     .unwrap()
                     .iter()
                     .map(|ext| unsafe { CStr::from_ptr(*ext) })
@@ -68,7 +67,7 @@ impl Renderer {
             LabelColor::COLOR_PASS,
         );
         {
-            let mut barrier_cmd = self.render_context.alloc_command_buffer("ui pipeline barrier");
+            let barrier_cmd = self.render_context.alloc_command_buffer("ui pipeline barrier");
             barrier_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]color-attach-barrier");
             {
                 barrier_cmd.image_memory_barrier(

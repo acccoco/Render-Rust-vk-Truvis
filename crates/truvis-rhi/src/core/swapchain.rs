@@ -1,8 +1,5 @@
 use std::rc::Rc;
 
-use ash::vk;
-use itertools::Itertools;
-
 use crate::core::device::RhiDevice;
 use crate::{
     basic::FRAME_ID_MAP,
@@ -13,6 +10,9 @@ use crate::{
     },
     rhi::Rhi,
 };
+use ash::vk;
+use itertools::Itertools;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 pub struct RhiSwapchainInitInfo {
     format: vk::SurfaceFormatKHR,
@@ -51,16 +51,14 @@ struct RhiSurface {
 
 impl RhiSurface {
     fn new(rhi: &Rhi, window: Rc<MainWindow>) -> Self {
-        use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
-
         let surface_pf = ash::khr::surface::Instance::new(&rhi.vk_pf, rhi.instance());
 
         let surface = unsafe {
             ash_window::create_surface(
                 &rhi.vk_pf,
                 rhi.instance(),
-                window.window().raw_display_handle().unwrap(),
-                window.window().raw_window_handle().unwrap(),
+                window.window().display_handle().unwrap().as_raw(),
+                window.window().window_handle().unwrap().as_raw(),
                 None,
             )
             .unwrap()
@@ -111,7 +109,7 @@ impl RhiSwapchain {
         let surface_capabilities =
             unsafe { surface.pf.get_physical_device_surface_capabilities(pdevice, surface.handle).unwrap() };
 
-        let mut extent = surface_capabilities.current_extent;
+        let extent = surface_capabilities.current_extent;
         log::info!("surface capability extent: {:?}", extent);
 
         let (swapchain_handle, swapchain_pf) =

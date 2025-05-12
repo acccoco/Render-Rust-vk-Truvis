@@ -17,7 +17,7 @@ use truvis_rhi::rhi::Rhi;
 pub struct SimpleMainPass {
     pipeline: RhiGraphicsPipeline,
 
-    bindless_manager: Rc<BindlessManager>,
+    _bindless_manager: Rc<BindlessManager>,
 }
 impl SimpleMainPass {
     pub fn new(rhi: &Rhi, frame_context: &FrameContext, bindless_manager: Rc<BindlessManager>) -> Self {
@@ -40,7 +40,7 @@ impl SimpleMainPass {
 
         Self {
             pipeline: simple_pipe,
-            bindless_manager,
+            _bindless_manager: bindless_manager,
         }
     }
 

@@ -7,9 +7,9 @@ use crate::core::{device::RhiDevice, instance::RhiInstance, physical_device::Rhi
 pub struct RhiAllocator {
     inner: vk_mem::Allocator,
 
-    instance: Rc<RhiInstance>,
-    pdevice: Rc<RhiPhysicalDevice>,
-    device: Rc<RhiDevice>,
+    _instance: Rc<RhiInstance>,
+    _pdevice: Rc<RhiPhysicalDevice>,
+    _device: Rc<RhiDevice>,
 }
 
 impl Deref for RhiAllocator {
@@ -31,9 +31,9 @@ impl RhiAllocator {
 
         Self {
             inner: vma,
-            instance,
-            pdevice,
-            device,
+            _instance: instance,
+            _pdevice: pdevice,
+            _device: device,
         }
     }
 }
