@@ -90,6 +90,12 @@ impl OuterApp for PhongApp {
             std::path::Path::new("C:/Users/bigso/OneDrive/Library/AssetsLib/model/gltf/dancing-girl/scene.gltf"),
             &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         );
+        scene_mgr.register_model(
+            rhi,
+            std::path::Path::new("C:/Users/bigso/Downloads/DeferredTexturing-master/Content/Models/Sponza/Sponza.fbx"),
+            &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
+        );
+
         let scene_mgr = Rc::new(RefCell::new(scene_mgr));
 
         let rot =

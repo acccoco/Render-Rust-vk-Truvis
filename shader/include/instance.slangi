@@ -15,5 +15,5 @@ struct SubMesh
 struct InstanceData
 {
     uint4 instance_count;
-    SubMesh instances[256];
+    SubMesh instances[1024];
 };

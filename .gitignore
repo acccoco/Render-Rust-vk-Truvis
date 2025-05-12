@@ -7,7 +7,7 @@
 
 # IDE
 .idea
-.vs_code
+.vscode
 
 # Nsignt
 *.ngfx-proj

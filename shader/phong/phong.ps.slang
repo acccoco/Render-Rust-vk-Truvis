@@ -68,7 +68,7 @@ PsOutput main(PsInput input)
         light_term += phong_light(draw_data.frame_data.camera_pos, input.coarse_vertex.world_pos, normal, point_light, object_color);
     }
 
-    const float3 min_color = float3(0.1, 0.1, 0.1);
+    const float3 min_color = object_color.xyz * 0.5;
 
     PsOutput output = (PsOutput)0;
     output.color = float4(max(light_term, min_color), 1.0f);

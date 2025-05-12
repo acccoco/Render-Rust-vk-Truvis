@@ -8,7 +8,6 @@ use std::rc::Rc;
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
 use truvis_render::frame_context::FrameContext;
 use truvis_render::platform::camera_controller::CameraController;
-use truvis_render::render::Renderer;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
@@ -114,11 +113,13 @@ impl OuterApp for HelloTriangle {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
         ui.text_wrapped(format!("Frame ID: {}", self.frame_id));
+        static mut UI_VALUE: usize = 0;
         let choices = ["test test this is 1", "test test this is 2"];
-        let mut value = 0;
-        if ui.button(choices[value]) {
-            value += 1;
-            value %= 2;
+        unsafe {
+            if ui.button(choices[UI_VALUE]) {
+                UI_VALUE += 1;
+                UI_VALUE %= 2;
+            }
         }
 
         ui.button("This...is...imgui-rs!");
