@@ -43,7 +43,7 @@ impl Rhi {
 
         let instance = Rc::new(RhiInstance::new(&vk_pf, app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts));
 
-        let physical_device = Rc::new(RhiPhysicalDevice::new_descrete_gpu(&instance.handle));
+        let physical_device = Rc::new(RhiPhysicalDevice::new_descrete_physical_device(&instance.handle));
         let (device, graphics_queue, compute_queue, transfer_queue) =
             RhiDevice::new(&vk_pf, &instance, physical_device.clone());
 

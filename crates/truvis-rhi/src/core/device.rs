@@ -86,20 +86,20 @@ impl RhiDevice {
         }
         log::info!("device exts: {}", exts_str);
 
-        let mut features = vk::PhysicalDeviceFeatures2::default().features(Self::basic_gpu_core_features());
-        let mut gpu_ext_features = Self::basic_gpu_ext_features();
+        let mut all_features = vk::PhysicalDeviceFeatures2::default().features(Self::physical_device_basic_features());
+        let mut physical_device_ext_features = Self::physical_device_extra_features();
         unsafe {
-            gpu_ext_features.iter_mut().for_each(|f| {
+            physical_device_ext_features.iter_mut().for_each(|f| {
                 let ptr = <*mut dyn vk::ExtendsPhysicalDeviceFeatures2>::cast::<vk::BaseOutStructure>(f.as_mut());
-                (*ptr).p_next = features.p_next as _;
-                features.p_next = ptr as _;
+                (*ptr).p_next = all_features.p_next as _;
+                all_features.p_next = ptr as _;
             });
         }
 
         let device_create_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_create_infos)
             .enabled_extension_names(&device_exts)
-            .push_next(&mut features);
+            .push_next(&mut all_features);
 
         let device = unsafe { instance.handle.create_device(pdevice.handle, &device_create_info, None).unwrap() };
 
@@ -148,7 +148,7 @@ impl RhiDevice {
     }
 
     /// 必要的 physical device core features
-    fn basic_gpu_core_features() -> vk::PhysicalDeviceFeatures {
+    fn physical_device_basic_features() -> vk::PhysicalDeviceFeatures {
         vk::PhysicalDeviceFeatures::default()
             .sampler_anisotropy(true)
             .fragment_stores_and_atomics(true)
@@ -157,7 +157,7 @@ impl RhiDevice {
     }
 
     /// 必要的 physical device extension features
-    fn basic_gpu_ext_features() -> Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>> {
+    fn physical_device_extra_features() -> Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>> {
         vec![
             Box::new(vk::PhysicalDeviceDynamicRenderingFeatures::default().dynamic_rendering(true)),
             Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::default().buffer_device_address(true)),
@@ -209,14 +209,14 @@ impl RhiDevice {
     /// 将 UBO 的尺寸和 min_UBO_Offset_Align 对齐，使得得到的尺寸是 min_UBO_Offset_Align 的整数倍
     #[inline]
     pub fn aligned_ubo_size<T: bytemuck::Pod>(&self) -> vk::DeviceSize {
-        let min_ubo_align = self.pdevice.properties.limits.min_uniform_buffer_offset_alignment;
+        let min_ubo_align = self.pdevice.basic_props.limits.min_uniform_buffer_offset_alignment;
         let ubo_size = size_of::<T>() as vk::DeviceSize;
         (ubo_size + min_ubo_align - 1) & !(min_ubo_align - 1)
     }
 
     #[inline]
     pub fn min_ubo_offset_align(&self) -> vk::DeviceSize {
-        self.pdevice.properties.limits.min_uniform_buffer_offset_alignment
+        self.pdevice.basic_props.limits.min_uniform_buffer_offset_alignment
     }
 
     #[inline]
