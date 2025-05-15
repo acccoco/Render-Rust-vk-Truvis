@@ -87,12 +87,7 @@ impl OuterApp for PhongApp {
         });
         scene_mgr.register_model(
             rhi,
-            std::path::Path::new("C:/Users/bigso/OneDrive/Library/AssetsLib/model/gltf/dancing-girl/scene.gltf"),
-            &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
-        );
-        scene_mgr.register_model(
-            rhi,
-            std::path::Path::new("C:/Users/bigso/Downloads/DeferredTexturing-master/Content/Models/Sponza/Sponza.fbx"),
+            std::path::Path::new("assets/fbx/sponza/Sponza.fbx"),
             &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         );
 
