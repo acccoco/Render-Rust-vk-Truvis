@@ -1,7 +1,7 @@
 use ash::vk;
 use itertools::Itertools;
 use std::ffi::CStr;
-use std::ptr::{null, null_mut};
+use std::ptr::null_mut;
 
 /// 表示一张物理显卡
 pub struct RhiPhysicalDevice {

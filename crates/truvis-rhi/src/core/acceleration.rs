@@ -20,52 +20,61 @@ pub struct RhiAcceleration {
 impl RhiAcceleration {
     /// 需要指定每个 geometry 的信息，以及每个 geometry 拥有的 max primitives 数量
     /// 会自动添加 compact 和 trace 的 flag
+    ///
+    /// # 构建过程
+    ///
+    /// 1. 查询构建 blas 所需的尺寸
+    /// 2. 构建 blas
+    /// 3. 查询 blas 的 compact size
+    /// 4. 将 blas copy 到 compact 的 blas
+    ///
+    /// # params
+    /// - primitives 每个 geometry 的 max primitives 数量
     pub fn build_blas(
         rhi: &Rhi,
-        data: Vec<(vk::AccelerationStructureGeometryTrianglesDataKHR, u32)>,
-        flags: vk::BuildAccelerationStructureFlagsKHR,
+        triangle_datas: Vec<vk::AccelerationStructureGeometryTrianglesDataKHR>,
+        primitives: Vec<u32>,
+        build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: &str,
     ) -> Self {
-        let mut geometries = Vec::with_capacity(data.len());
-        let mut range_infos = Vec::with_capacity(data.len());
-        data.into_iter().for_each(|(triangle_data, primitive_cnt)| {
-            geometries.push(vk::AccelerationStructureGeometryKHR {
-                geometry_type: vk::GeometryTypeKHR::TRIANGLES,
-                flags: vk::GeometryFlagsKHR::OPAQUE,
-                geometry: vk::AccelerationStructureGeometryDataKHR {
-                    triangles: triangle_data,
-                },
-                ..Default::default()
-            });
+        assert_eq!(triangle_datas.len(), primitives.len());
 
-            range_infos.push(vk::AccelerationStructureBuildRangeInfoKHR {
-                first_vertex: 0,
-                primitive_count: primitive_cnt,
-                primitive_offset: 0,
-                transform_offset: 0,
-            });
-        });
+        let geometries = triangle_datas
+            .into_iter()
+            .map(|triangle_data| {
+                vk::AccelerationStructureGeometryKHR::default()
+                    .geometry_type(vk::GeometryTypeKHR::TRIANGLES)
+                    // 暂不考虑透明的情形
+                    .flags(vk::GeometryFlagsKHR::OPAQUE)
+                    .geometry(vk::AccelerationStructureGeometryDataKHR {
+                        triangles: triangle_data,
+                    })
+            })
+            .collect_vec();
+
+        let range_infos = primitives
+            .iter()
+            .map(|primitive_cnt| vk::AccelerationStructureBuildRangeInfoKHR::default().primitive_count(*primitive_cnt))
+            .collect_vec();
 
         // 使用部分完整的 AccelerationStructureBuildGeometryInfo 来查询所需的资源大小
-        let mut build_geometry_info = vk::AccelerationStructureBuildGeometryInfoKHR {
-            ty: vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
-            flags: flags
-                | vk::BuildAccelerationStructureFlagsKHR::ALLOW_COMPACTION
-                | vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE,
-            geometry_count: geometries.len() as u32,
-            p_geometries: geometries.as_ptr(),
-            mode: vk::BuildAccelerationStructureModeKHR::BUILD,
+        let mut build_geometry_info = vk::AccelerationStructureBuildGeometryInfoKHR::default()
+            .ty(vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL)
+            .flags(
+                build_flags
+                    | vk::BuildAccelerationStructureFlagsKHR::ALLOW_COMPACTION
+                    | vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE,
+            )
+            .geometries(&geometries)
+            .mode(vk::BuildAccelerationStructureModeKHR::BUILD);
 
-            // 在查询 size 时，其他字段暂时会被忽略
-            ..Default::default()
-        };
-
+        // blas 所需的尺寸信息
         let size_info = unsafe {
             let mut size_info = vk::AccelerationStructureBuildSizesInfoKHR::default();
             rhi.device().vk_acceleration_struct_pf.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &build_geometry_info,
-                &range_infos.iter().map(|r| r.primitive_count).collect_vec(),
+                &primitives, // 每一个 geometry 里面的最大 primitive 数量
                 &mut size_info,
             );
             size_info
@@ -84,7 +93,7 @@ impl RhiAcceleration {
             &format!("{}-blas-scratch-buffer", debug_name),
         );
 
-        // 填充 build geometry info 的剩余部分以 build AccelerationStructure
+        // 填充 build geometry info 的剩余部分以 build blas
         build_geometry_info.dst_acceleration_structure = uncompact_acceleration.acceleration_structure;
         build_geometry_info.scratch_data = vk::DeviceOrHostAddressKHR {
             device_address: scratch_buffer.device_address(),
@@ -101,6 +110,7 @@ impl RhiAcceleration {
             &rhi.compute_queue,
             |cmd| {
                 cmd.build_acceleration_structure(&build_geometry_info, &range_infos);
+                // 查询 compact size 属于 read 操作，需要同步
                 cmd.memory_barrier(std::slice::from_ref(&vk::MemoryBarrier2 {
                     src_stage_mask: vk::PipelineStageFlags2::ACCELERATION_STRUCTURE_BUILD_KHR,
                     dst_stage_mask: vk::PipelineStageFlags2::ACCELERATION_STRUCTURE_BUILD_KHR,
@@ -131,13 +141,12 @@ impl RhiAcceleration {
             rhi.compute_command_pool.clone(),
             &rhi.compute_queue,
             |cmd| {
-                let copy_info = vk::CopyAccelerationStructureInfoKHR {
-                    src: uncompact_acceleration.acceleration_structure,
-                    dst: compact_acceleration.acceleration_structure,
-                    mode: vk::CopyAccelerationStructureModeKHR::COMPACT,
-                    ..Default::default()
-                };
-                cmd.cmd_copy_acceleration_structure(&copy_info);
+                cmd.cmd_copy_acceleration_structure(
+                    &vk::CopyAccelerationStructureInfoKHR::default()
+                        .src(uncompact_acceleration.acceleration_structure)
+                        .dst(compact_acceleration.acceleration_structure)
+                        .mode(vk::CopyAccelerationStructureModeKHR::COMPACT),
+                );
             },
             "compact-blas",
         );
@@ -151,10 +160,13 @@ impl RhiAcceleration {
         compact_acceleration
     }
 
+    /// # 构建过程
+    /// 1. 查询构建 tlas 所需的尺寸
+    /// 2. 构建 tlas
     pub fn build_tlas(
         rhi: &Rhi,
         instances: &[vk::AccelerationStructureInstanceKHR],
-        flags: vk::BuildAccelerationStructureFlagsKHR,
+        build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: &str,
     ) -> Self {
         let mut acceleration_instance_buffer = RhiBuffer::new_acceleration_instance_buffer(
@@ -164,37 +176,31 @@ impl RhiAcceleration {
         );
         acceleration_instance_buffer.transfer_data_sync(rhi, instances);
 
-        let geometry = vk::AccelerationStructureGeometryKHR {
-            geometry_type: vk::GeometryTypeKHR::INSTANCES,
-            geometry: vk::AccelerationStructureGeometryDataKHR {
-                instances: vk::AccelerationStructureGeometryInstancesDataKHR {
+        let geometry = vk::AccelerationStructureGeometryKHR::default()
+            .geometry_type(vk::GeometryTypeKHR::INSTANCES)
+            .geometry(vk::AccelerationStructureGeometryDataKHR {
+                instances: vk::AccelerationStructureGeometryInstancesDataKHR::default()
                     // true: data 是 &[vk::AccelerationStructureInstanceKHR]
                     // false: data 是 &[&vk::AccelerationStructureInstanceKHR]
-                    array_of_pointers: vk::FALSE,
-                    data: vk::DeviceOrHostAddressConstKHR {
+                    .array_of_pointers(false)
+                    .data(vk::DeviceOrHostAddressConstKHR {
                         device_address: acceleration_instance_buffer.device_address(),
-                    },
-                    ..Default::default()
-                },
-            },
-            ..Default::default()
-        };
+                    }),
+            });
+        let range_info = vk::AccelerationStructureBuildRangeInfoKHR::default().primitive_count(instances.len() as u32);
 
-        let mut geometry_info = vk::AccelerationStructureBuildGeometryInfoKHR {
-            flags: flags | vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE,
-            geometry_count: 1,
-            p_geometries: (&geometry) as _,
-            mode: vk::BuildAccelerationStructureModeKHR::BUILD,
-            ty: vk::AccelerationStructureTypeKHR::TOP_LEVEL,
-            ..Default::default()
-        };
+        let mut build_geometry_info = vk::AccelerationStructureBuildGeometryInfoKHR::default()
+            .ty(vk::AccelerationStructureTypeKHR::TOP_LEVEL)
+            .mode(vk::BuildAccelerationStructureModeKHR::BUILD)
+            .flags(build_flags | vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE)
+            .geometries(std::slice::from_ref(&geometry));
 
         // 获得 AccelerationStructure 所需的尺寸
         let size_info = unsafe {
             let mut size_info = vk::AccelerationStructureBuildSizesInfoKHR::default();
             rhi.device().vk_acceleration_struct_pf.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
-                &geometry_info,
+                &build_geometry_info,
                 &[instances.len() as u32],
                 &mut size_info,
             );
@@ -216,14 +222,8 @@ impl RhiAcceleration {
         );
 
         // 补全剩下的 build info
-        geometry_info.dst_acceleration_structure = acceleration.acceleration_structure;
-        geometry_info.scratch_data.device_address = scratch_buffer.device_address();
-
-        // range info
-        let range_info = vk::AccelerationStructureBuildRangeInfoKHR {
-            primitive_count: instances.len() as u32,
-            ..Default::default()
-        };
+        build_geometry_info.dst_acceleration_structure = acceleration.acceleration_structure;
+        build_geometry_info.scratch_data.device_address = scratch_buffer.device_address();
 
         // 正式构建 TLAS
         RhiCommandBuffer::one_time_exec(
@@ -231,7 +231,7 @@ impl RhiAcceleration {
             rhi.compute_command_pool.clone(),
             &rhi.compute_queue,
             |cmd| {
-                cmd.build_acceleration_structure(&geometry_info, std::slice::from_ref(&range_info));
+                cmd.build_acceleration_structure(&build_geometry_info, std::slice::from_ref(&range_info));
             },
             "build-tlas",
         );
@@ -243,12 +243,10 @@ impl RhiAcceleration {
     fn new(rhi: &Rhi, size: vk::DeviceSize, ty: vk::AccelerationStructureTypeKHR, debug_name: &str) -> Self {
         let buffer = RhiBuffer::new_accleration_buffer(rhi, size as usize, debug_name);
 
-        let create_info = vk::AccelerationStructureCreateInfoKHR {
-            ty,
-            size,
-            buffer: buffer.handle(),
-            ..Default::default()
-        };
+        let create_info = vk::AccelerationStructureCreateInfoKHR::default() //
+            .ty(ty)
+            .size(size)
+            .buffer(buffer.handle());
 
         let acceleration_structure = unsafe {
             rhi.device().vk_acceleration_struct_pf.create_acceleration_structure(&create_info, None).unwrap()

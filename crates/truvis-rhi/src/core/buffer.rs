@@ -120,10 +120,7 @@ impl RhiBuffer {
     }
 
     #[inline]
-    pub fn new_acceleration_instance_buffer<S>(rhi: &Rhi, size: vk::DeviceSize, debug_name: S) -> Self
-    where
-        S: AsRef<str>,
-    {
+    pub fn new_acceleration_instance_buffer(rhi: &Rhi, size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
             rhi,
             size,

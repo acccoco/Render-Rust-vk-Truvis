@@ -305,6 +305,8 @@ impl RhiCommandBuffer {
     }
 
     /// 注：仅支持 compute queue
+    ///
+    /// 这里涉及到对加速结构的 read，需要同步
     #[inline]
     pub fn write_acceleration_structure_properties(
         &self,
