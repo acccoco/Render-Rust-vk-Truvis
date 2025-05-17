@@ -84,13 +84,13 @@ impl RhiAcceleration {
             rhi,
             size_info.acceleration_structure_size,
             vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
-            &format!("{}-uncompact-blas", debug_name),
+            format!("{}-uncompact-blas", debug_name),
         );
 
         let scratch_buffer = RhiBuffer::new_accleration_scratch_buffer(
             rhi,
             size_info.build_scratch_size,
-            &format!("{}-blas-scratch-buffer", debug_name),
+            format!("{}-blas-scratch-buffer", debug_name),
         );
 
         // 填充 build geometry info 的剩余部分以 build blas
@@ -218,7 +218,7 @@ impl RhiAcceleration {
         let scratch_buffer = RhiBuffer::new_accleration_scratch_buffer(
             rhi,
             size_info.build_scratch_size,
-            &format!("{}-tlas-scratch-buffer", debug_name),
+            format!("{}-tlas-scratch-buffer", debug_name),
         );
 
         // 补全剩下的 build info
@@ -240,8 +240,8 @@ impl RhiAcceleration {
     }
 
     /// 创建 AccelerationStructure 以及 buffer    
-    fn new(rhi: &Rhi, size: vk::DeviceSize, ty: vk::AccelerationStructureTypeKHR, debug_name: &str) -> Self {
-        let buffer = RhiBuffer::new_accleration_buffer(rhi, size as usize, debug_name);
+    fn new(rhi: &Rhi, size: vk::DeviceSize, ty: vk::AccelerationStructureTypeKHR, debug_name: impl AsRef<str>) -> Self {
+        let buffer = RhiBuffer::new_accleration_buffer(rhi, size as usize, debug_name.as_ref());
 
         let create_info = vk::AccelerationStructureCreateInfoKHR::default() //
             .ty(ty)

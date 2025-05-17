@@ -38,7 +38,9 @@ impl RhiCommandPool {
         let pool = unsafe {
             device
                 .create_command_pool(
-                    &vk::CommandPoolCreateInfo::default().queue_family_index(queue_family.queue_family_index).flags(flags),
+                    &vk::CommandPoolCreateInfo::default()
+                        .queue_family_index(queue_family.queue_family_index)
+                        .flags(flags),
                     None,
                 )
                 .unwrap()
@@ -61,7 +63,7 @@ impl RhiCommandPool {
     /// 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
     ///
     /// reset 之后，pool 内的 command buffer 又可以重新录制命令
-    pub fn reset(&self) {
+    pub fn reset_all_buffers(&self) {
         unsafe {
             self.device.reset_command_pool(self.handle, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();
         }

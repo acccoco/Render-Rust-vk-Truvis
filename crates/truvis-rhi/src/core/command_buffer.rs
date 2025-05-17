@@ -17,6 +17,8 @@ use crate::{
     rhi::Rhi,
 };
 
+/// 不能实现 Drop，因为需要手动去 free；cmd 支持 clone，不应该在意外的地方 free
+/// impl Drop for RhiCommandBuffer {}
 #[derive(Clone)]
 pub struct RhiCommandBuffer {
     handle: vk::CommandBuffer,
@@ -27,9 +29,7 @@ pub struct RhiCommandBuffer {
     pub device: Rc<RhiDevice>,
 }
 
-// 不能实现 Drop，因为需要手动去 free；cmd 支持 clone，不应该在意外的地方 free
-// impl Drop for RhiCommandBuffer {}
-
+// basic 命令
 impl RhiCommandBuffer {
     pub fn new(device: Rc<RhiDevice>, command_pool: Rc<RhiCommandPool>, debug_name: &str) -> Self {
         let info = vk::CommandBufferAllocateInfo::default()
@@ -106,6 +106,8 @@ impl RhiCommandBuffer {
 
 // transfer 类型的命令
 impl RhiCommandBuffer {
+    /// - command type: action
+    /// - 支持的 queue：transfer，graphics，compute
     #[inline]
     pub fn cmd_copy_buffer(&self, src: &RhiBuffer, dst: &mut RhiBuffer, regions: &[vk::BufferCopy]) {
         unsafe {
@@ -113,14 +115,8 @@ impl RhiCommandBuffer {
         }
     }
 
-    /// 注：仅支持 compute queue
-    #[inline]
-    pub fn cmd_copy_acceleration_structure(&self, copy_info: &vk::CopyAccelerationStructureInfoKHR) {
-        unsafe {
-            self.device.vk_acceleration_struct_pf.cmd_copy_acceleration_structure(self.handle, copy_info);
-        }
-    }
-
+    /// - command type: action
+    /// - 支持的 queue：transfer，graphics，compute
     #[inline]
     pub fn cmd_copy_buffer_to_image(&self, copy_info: &vk::CopyBufferToImageInfo2) {
         unsafe { self.device.cmd_copy_buffer_to_image2(self.handle, copy_info) }
@@ -131,11 +127,17 @@ impl RhiCommandBuffer {
     /// 首先将 data copy 到 cmd buffer 中，然后再 transfer 到指定 buffer 中，这是一个  transfer op
     ///
     /// 需要在 render pass 之外进行，注意同步
+    ///
+    ///
+    /// - command type: action
+    /// - supported queue types: transfer, graphics, compute
     #[inline]
     pub fn cmd_update_buffer(&self, buffer: vk::Buffer, offset: vk::DeviceSize, data: &[u8]) {
         unsafe { self.device.cmd_update_buffer(self.handle, buffer, offset, data) }
     }
 
+    /// - command type: state
+    /// - 支持的 queue: graphics, compute
     #[inline]
     pub fn cmd_push_constants(
         &self,
@@ -152,6 +154,8 @@ impl RhiCommandBuffer {
 
 // 绘制类型命令
 impl RhiCommandBuffer {
+    /// - command type: action, state
+    /// - supported queue types: graphics
     #[inline]
     pub fn cmd_begin_rendering(&self, render_info: &vk::RenderingInfo) {
         unsafe {
@@ -159,6 +163,8 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// - command type: action, state
+    /// - supported queue types: graphics
     #[inline]
     pub fn end_rendering(&self) {
         unsafe {
@@ -166,6 +172,8 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// - command type: action
+    /// - supported queue types: graphics
     #[inline]
     pub fn draw_indexed(
         &self,
@@ -187,6 +195,8 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// - command type: action
+    /// - supported queue types: graphics
     /// 不使用 index buffer 的绘制
     #[inline]
     pub fn cmd_draw(&self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
@@ -195,6 +205,8 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// - command type: state
+    /// - supported queue types: graphics, compute
     #[inline]
     pub fn bind_descriptor_sets(
         &self,
@@ -216,6 +228,8 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// - command type: state
+    /// - supported queue types: graphics, compute
     #[inline]
     pub fn cmd_bind_pipeline(&self, bind_point: vk::PipelineBindPoint, pipeline: vk::Pipeline) {
         unsafe {
@@ -224,6 +238,8 @@ impl RhiCommandBuffer {
     }
 
     /// buffers 每个 vertex buffer 以及 offset
+    /// - command type: state
+    /// - supported queue types: graphics
     #[inline]
     pub fn cmd_bind_vertex_buffers(&self, first_bind: u32, buffers: &[RhiBuffer], offsets: &[vk::DeviceSize]) {
         unsafe {
@@ -232,6 +248,8 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// - command type: state
+    /// - supported queue types: graphics
     #[inline]
     pub fn cmd_bind_index_buffer(&self, buffer: &RhiBuffer, offset: vk::DeviceSize, index_type: vk::IndexType) {
         unsafe {
@@ -239,6 +257,8 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// - command type: state
+    /// - supported queue types: graphics
     #[inline]
     pub fn cmd_set_viewport(&self, first_viewport: u32, viewports: &[vk::Viewport]) {
         unsafe {
@@ -246,6 +266,8 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// - command type: state
+    /// - supported queue types: graphics
     #[inline]
     pub fn cmd_set_scissor(&self, first_scissor: u32, scissors: &[vk::Rect2D]) {
         unsafe {
@@ -256,6 +278,8 @@ impl RhiCommandBuffer {
 
 // 同步命令
 impl RhiCommandBuffer {
+    /// - command type: synchronize
+    /// - supported queue types: graphics, compute, transfer
     #[inline]
     pub fn memory_barrier(&self, barriers: &[vk::MemoryBarrier2]) {
         let dependency_info = vk::DependencyInfo::default().memory_barriers(barriers);
@@ -264,6 +288,8 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// - command type: synchronize
+    /// - supported queue types: graphics, compute, transfer
     #[inline]
     pub fn image_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[RhiImageBarrier]) {
         let barriers = barriers.iter().map(|b| *b.inner()).collect_vec();
@@ -274,6 +300,8 @@ impl RhiCommandBuffer {
         }
     }
 
+    /// - command type: synchronize
+    /// - supported queue types: graphics, compute, transfer
     #[inline]
     pub fn buffer_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[RhiBufferBarrier]) {
         let barriers = barriers.iter().map(|b| *b.inner()).collect_vec();
@@ -287,7 +315,17 @@ impl RhiCommandBuffer {
 
 // RayTracing 相关的命令
 impl RhiCommandBuffer {
-    /// 注：仅支持 compute queue
+    /// - command type: action
+    /// - supported queue types: compute
+    #[inline]
+    pub fn cmd_copy_acceleration_structure(&self, copy_info: &vk::CopyAccelerationStructureInfoKHR) {
+        unsafe {
+            self.device.vk_acceleration_struct_pf.cmd_copy_acceleration_structure(self.handle, copy_info);
+        }
+    }
+
+    /// - command type: action
+    /// - supported queue types: compute
     #[inline]
     pub fn build_acceleration_structure(
         &self,
@@ -304,9 +342,9 @@ impl RhiCommandBuffer {
         }
     }
 
-    /// 注：仅支持 compute queue
-    ///
     /// 这里涉及到对加速结构的 read，需要同步
+    /// - command type: action
+    /// - supported queue types: compute
     #[inline]
     pub fn write_acceleration_structure_properties(
         &self,
@@ -324,20 +362,52 @@ impl RhiCommandBuffer {
             )
         }
     }
+
+    /// 光追的入口
+    /// - command type: action
+    /// - supported queue types: compute
+    #[inline]
+    pub fn trace_rays(
+        &self,
+        raygen_table: &vk::StridedDeviceAddressRegionKHR,
+        miss_table: &vk::StridedDeviceAddressRegionKHR,
+        hit_table: &vk::StridedDeviceAddressRegionKHR,
+        callable_table: &vk::StridedDeviceAddressRegionKHR,
+        thread_size: [u32; 3],
+    ) {
+        unsafe {
+            self.device.vk_rt_pipeline_pf.cmd_trace_rays(
+                self.handle,
+                raygen_table,
+                miss_table,
+                hit_table,
+                callable_table,
+                thread_size[0],
+                thread_size[1],
+                thread_size[2],
+            );
+        }
+    }
 }
 
 // debug 相关的指令
 impl RhiCommandBuffer {
+    /// - command type: state, action
+    /// - supported queue type: graphics, compute
     #[inline]
     pub fn begin_label(&self, label_name: &str, label_color: glam::Vec4) {
         self.device.debug_utils.cmd_begin_debug_label(self.handle, label_name, label_color);
     }
 
+    /// - command type: state, action
+    /// - supported queue type: graphics, compute
     #[inline]
     pub fn end_label(&self) {
         self.device.debug_utils.cmd_end_debug_label(self.handle);
     }
 
+    /// - command type: action
+    /// - supported queue type: graphics, compute
     #[inline]
     pub fn insert_label(&self, label_name: &str, label_color: glam::Vec4) {
         self.device.debug_utils.cmd_insert_debug_label(self.handle, label_name, label_color);

@@ -12,7 +12,7 @@ use truvis_render::frame_context::FrameContext;
 use truvis_render::platform::camera_controller::CameraController;
 use truvis_render::render_pass::phong::Simple3DMainPass;
 use truvis_render::renderer::bindless::BindlessManager;
-use truvis_render::renderer::frame_scene::FrameScene;
+use truvis_render::renderer::frame_scene::GpuScene;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_render::renderer::scene_manager::SceneManager;
 use truvis_rhi::core::buffer::{RhiBDABuffer, RhiStageBuffer};
@@ -27,7 +27,7 @@ struct PhongApp {
     frame_data_stage_buffers: Vec<RhiStageBuffer<shader::FrameData>>,
 
     main_pass: Simple3DMainPass,
-    frame_scene: FrameScene,
+    frame_scene: GpuScene,
 
     /// BOX
     _cube: SimpleMesh,
@@ -103,7 +103,7 @@ impl OuterApp for PhongApp {
             glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
 
-        let frame_scene = FrameScene::new(scene_mgr.clone(), bindless_mgr.clone());
+        let frame_scene = GpuScene::new(scene_mgr.clone(), bindless_mgr.clone());
 
         // 更新相机的初始状态
         {

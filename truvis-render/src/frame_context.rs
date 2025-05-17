@@ -173,10 +173,10 @@ impl FrameContext {
             // 释放当前 frame 的 command buffer 的资源
             std::mem::take(&mut self.allocated_command_buffers[self.current_frame]) //
                 .into_iter()
-                .for_each(|c| c.free());
+                .for_each(|cmd| cmd.free());
 
             // 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
-            self.graphics_command_pools[self.current_frame].reset();
+            self.graphics_command_pools[self.current_frame].reset_all_buffers();
         }
         self.device.debug_utils.end_queue_label(self.graphics_queue.handle);
 

@@ -16,7 +16,7 @@ struct DrawMesh {
 }
 
 /// 每一帧的场景数据
-pub struct FrameScene {
+pub struct GpuScene {
     gpu_meshes: Vec<DrawMesh>,
 
     gpu_mats: Vec<uuid::Uuid>,
@@ -32,7 +32,7 @@ pub struct FrameScene {
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
 
-impl FrameScene {
+impl GpuScene {
     /// 准备场景数据，将 CPU 侧的数据转换为 GPU 侧的数据
     pub fn new(scene_mgr: Rc<RefCell<SceneManager>>, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         Self {

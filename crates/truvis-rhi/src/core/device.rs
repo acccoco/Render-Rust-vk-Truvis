@@ -14,6 +14,7 @@ pub struct RhiDevice {
 
     pub vk_dynamic_render_pf: Rc<ash::khr::dynamic_rendering::Device>,
     pub vk_acceleration_struct_pf: Rc<ash::khr::acceleration_structure::Device>,
+    pub vk_rt_pipeline_pf: Rc<ash::khr::ray_tracing_pipeline::Device>,
 
     pub debug_utils: Rc<RhiDebugUtils>,
 }
@@ -66,6 +67,7 @@ impl RhiDevice {
         let vk_dynamic_render_pf = Rc::new(ash::khr::dynamic_rendering::Device::new(&instance.handle, &device));
         let vk_acceleration_struct_pf =
             Rc::new(ash::khr::acceleration_structure::Device::new(&instance.handle, &device));
+        let vk_rt_pipeline_pf = Rc::new(ash::khr::ray_tracing_pipeline::Device::new(&instance.handle, &device));
 
         Self {
             handle: device,
@@ -73,6 +75,7 @@ impl RhiDevice {
 
             vk_dynamic_render_pf,
             vk_acceleration_struct_pf,
+            vk_rt_pipeline_pf,
 
             debug_utils,
         }

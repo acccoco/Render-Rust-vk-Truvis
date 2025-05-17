@@ -116,6 +116,8 @@ impl RhiDebugUtils {
         todo!("暂时还不知道这个有什么作用")
     }
 
+    /// - command type: state, action
+    /// - supported queue type: graphics, compute
     #[inline]
     pub fn cmd_begin_debug_label<S>(&self, command_buffer: vk::CommandBuffer, label_name: S, label_color: glam::Vec4)
     where
@@ -130,6 +132,8 @@ impl RhiDebugUtils {
         }
     }
 
+    /// - command type: state, action
+    /// - supported queue type: graphics, compute
     #[inline]
     pub fn cmd_end_debug_label(&self, command_buffer: vk::CommandBuffer) {
         unsafe {
@@ -137,6 +141,8 @@ impl RhiDebugUtils {
         }
     }
 
+    /// - command type: action
+    /// - supported queue type: graphics, compute
     #[inline]
     pub fn cmd_insert_debug_label<S>(&self, command_buffer: vk::CommandBuffer, label_name: S, label_color: glam::Vec4)
     where

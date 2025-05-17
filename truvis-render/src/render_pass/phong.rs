@@ -1,7 +1,7 @@
 use crate::app::AppCtx;
 use crate::frame_context::FrameContext;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_scene::FrameScene;
+use crate::renderer::frame_scene::GpuScene;
 use ash::vk;
 use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
 use model_manager::vertex::vertex_pnu::VertexLayoutAosPosNormalUv;
@@ -205,7 +205,7 @@ impl Simple3DMainPass {
         cmd: &RhiCommandBuffer,
         app_ctx: &AppCtx,
         push_constant: &shader::DrawData,
-        scene_data: &FrameScene,
+        scene_data: &GpuScene,
         frame_idx: usize,
     ) {
         self.bind(cmd, &app_ctx.render_context.swapchain_extent().into(), push_constant, frame_idx);
