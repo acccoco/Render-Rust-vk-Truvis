@@ -1,3 +1,4 @@
+use crate::core::command_queue::RhiQueueFamily;
 use ash::vk;
 use itertools::Itertools;
 use std::ffi::CStr;
@@ -22,9 +23,11 @@ pub struct RhiPhysicalDevice {
     /// 当前 gpu 的加速结构属性
     pub acc_props: vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'static>,
 
-    pub memory_properties: vk::PhysicalDeviceMemoryProperties,
+    pub mem_props: vk::PhysicalDeviceMemoryProperties,
 
-    pub queue_family_properties: Vec<vk::QueueFamilyProperties>,
+    pub graphics_queue_family: RhiQueueFamily,
+    pub compute_queue_family: RhiQueueFamily,
+    pub transfer_queue_family: RhiQueueFamily,
 }
 
 impl RhiPhysicalDevice {
@@ -44,7 +47,7 @@ impl RhiPhysicalDevice {
         }
     }
 
-    pub fn new(pdevice: vk::PhysicalDevice, instance: &ash::Instance) -> Self {
+    fn new(pdevice: vk::PhysicalDevice, instance: &ash::Instance) -> Self {
         unsafe {
             // 找到符合 ray tracing 条件的 gpu
             let rt_props;
@@ -58,35 +61,90 @@ impl RhiPhysicalDevice {
                     .push_next(&mut pdevice_acc_props);
                 instance.get_physical_device_properties2(pdevice, &mut pdevice_props2);
 
+                // 基础的 props
                 basic_props = pdevice_props2.properties;
                 let physical_device_name = CStr::from_ptr(basic_props.device_name.as_ptr());
                 log::info!("found gpu: {:?}", physical_device_name);
 
+                // ray tracing props
                 pdevice_raytracing_props.p_next = null_mut();
                 rt_props = pdevice_raytracing_props;
-                log::info!("gpu ray tracing props: {:#?}", rt_props);
+                log::info!("physical deviceray tracing props:\n{:#?}", rt_props);
 
+                // 加速结构 props
                 pdevice_acc_props.p_next = null_mut();
                 acc_props = pdevice_acc_props;
-                log::info!("gpu acceleration structure props: {:#?}", acc_props);
+                log::info!("physical deivceacceleration structure props:\n{:#?}", acc_props);
             }
 
             // 找到当前 gpu 支持的 extensions，并打印出来
             let device_extensions = instance.enumerate_device_extension_properties(pdevice).unwrap();
-            log::debug!("device supports extensions: ");
+            log::debug!("physical device supports extensions: ");
             for ext in &device_extensions {
                 let ext_name = CStr::from_ptr(ext.extension_name.as_ptr());
                 log::debug!("\t{:?}", ext_name.to_str().unwrap());
             }
 
+            // 找到所有的队列信息并打印出来
+            let queue_familiy_props = instance.get_physical_device_queue_family_properties(pdevice);
+            log::debug!("physical device: queue family props:\n{:#?}", queue_familiy_props);
+
+            // graphics queue family: 需要支持 graphics
+            let graphics_queue_family = queue_familiy_props
+                .iter()
+                .enumerate()
+                .find(|(_, props)| !(props.queue_flags & vk::QueueFlags::GRAPHICS).is_empty())
+                .map(|(idx, props)| RhiQueueFamily {
+                    name: "graphics".to_string(),
+                    queue_family_index: idx as u32,
+                    queue_flags: props.queue_flags,
+                    queue_count: props.queue_count,
+                })
+                .unwrap();
+
+            // compute queue family: 需要支持 compute，且和前面的 graphics queue family 不是同一个
+            let compute_queue_family = queue_familiy_props
+                .iter()
+                .enumerate()
+                .find(|(idx, props)| {
+                    !(props.queue_flags & vk::QueueFlags::COMPUTE).is_empty()
+                        && *idx as u32 != graphics_queue_family.queue_family_index
+                })
+                .map(|(idx, props)| RhiQueueFamily {
+                    name: "compute".to_string(),
+                    queue_family_index: idx as u32,
+                    queue_flags: props.queue_flags,
+                    queue_count: props.queue_count,
+                })
+                .unwrap();
+
+            // transfer queue family: 需要支持 transfer，且和前面的 graphics queue family, compute queue family 不是同一个
+            let transfer_queue_family = queue_familiy_props
+                .iter()
+                .enumerate()
+                .find(|(idx, props)| {
+                    !(props.queue_flags & vk::QueueFlags::TRANSFER).is_empty()
+                        && *idx as u32 != graphics_queue_family.queue_family_index
+                        && *idx as u32 != compute_queue_family.queue_family_index
+                })
+                .map(|(idx, props)| RhiQueueFamily {
+                    name: "transfer".to_string(),
+                    queue_family_index: idx as u32,
+                    queue_flags: props.queue_flags,
+                    queue_count: props.queue_count,
+                })
+                .unwrap();
+
             Self {
-                memory_properties: instance.get_physical_device_memory_properties(pdevice),
+                mem_props: instance.get_physical_device_memory_properties(pdevice),
                 features: instance.get_physical_device_features(pdevice),
                 handle: pdevice,
                 basic_props,
                 rt_props,
                 acc_props,
-                queue_family_properties: instance.get_physical_device_queue_family_properties(pdevice),
+                graphics_queue_family,
+                compute_queue_family,
+                transfer_queue_family,
                 device_extensions,
             }
         }
@@ -96,14 +154,5 @@ impl RhiPhysicalDevice {
     /// 当前 gpu 是否是独立显卡
     pub fn is_descrete_gpu(&self) -> bool {
         self.basic_props.device_type == vk::PhysicalDeviceType::DISCRETE_GPU
-    }
-
-    /// 找到满足条件的 queue family 的 index
-    pub fn find_queue_family_index(&self, queue_flags: vk::QueueFlags) -> Option<u32> {
-        self.queue_family_properties
-            .iter()
-            .enumerate()
-            .find(|(_, prop)| prop.queue_flags.contains(queue_flags))
-            .map(|(index, _)| index as u32)
     }
 }

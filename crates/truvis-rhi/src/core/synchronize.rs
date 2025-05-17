@@ -51,7 +51,7 @@ impl RhiFence {
 
 #[derive(Clone)]
 pub struct RhiSemaphore {
-    pub(crate) semaphore: vk::Semaphore,
+    pub semaphore: vk::Semaphore,
     device: Rc<RhiDevice>,
 }
 

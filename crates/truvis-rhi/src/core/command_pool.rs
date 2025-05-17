@@ -2,11 +2,13 @@ use std::rc::Rc;
 
 use ash::vk;
 
+use crate::core::command_queue::RhiQueueFamily;
 use crate::{core::device::RhiDevice, rhi::Rhi};
 
+/// command pool 是和 queue family 绑定的，而不是和 queue 绑定的
 pub struct RhiCommandPool {
     handle: vk::CommandPool,
-    _queue_family_index: u32,
+    _queue_family: RhiQueueFamily,
 
     device: Rc<RhiDevice>,
 }
@@ -21,22 +23,22 @@ impl Drop for RhiCommandPool {
 
 impl RhiCommandPool {
     #[inline]
-    pub fn new(rhi: &Rhi, queue_family_index: u32, flags: vk::CommandPoolCreateFlags, debug_name: &str) -> Self {
-        Self::new_before_rhi(rhi.device.clone(), queue_family_index, flags, debug_name)
+    pub fn new(rhi: &Rhi, queue_family: RhiQueueFamily, flags: vk::CommandPoolCreateFlags, debug_name: &str) -> Self {
+        Self::new_before_rhi(rhi.device.clone(), queue_family, flags, debug_name)
     }
 
     /// 用于在 rhi 初始化完成之前创建 command pool
     #[inline]
     pub fn new_before_rhi(
         device: Rc<RhiDevice>,
-        queue_family_index: u32,
+        queue_family: RhiQueueFamily,
         flags: vk::CommandPoolCreateFlags,
         debug_name: &str,
     ) -> Self {
         let pool = unsafe {
             device
                 .create_command_pool(
-                    &vk::CommandPoolCreateInfo::default().queue_family_index(queue_family_index).flags(flags),
+                    &vk::CommandPoolCreateInfo::default().queue_family_index(queue_family.queue_family_index).flags(flags),
                     None,
                 )
                 .unwrap()
@@ -45,7 +47,7 @@ impl RhiCommandPool {
         device.debug_utils.set_object_debug_name(pool, debug_name);
         Self {
             handle: pool,
-            _queue_family_index: queue_family_index,
+            _queue_family: queue_family,
             device,
         }
     }

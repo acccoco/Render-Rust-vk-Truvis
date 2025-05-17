@@ -1,19 +1,16 @@
 use ash::vk;
 use itertools::Itertools;
-use std::{collections::HashMap, ffi::CStr, ops::Deref, rc::Rc};
+use std::{ffi::CStr, ops::Deref, rc::Rc};
 
+use crate::core::command_queue::RhiQueueFamily;
 use crate::core::debug_utils::RhiDebugUtils;
-use crate::core::{command_queue::RhiQueue, instance::RhiInstance, physical_device::RhiPhysicalDevice};
+use crate::core::{instance::RhiInstance, physical_device::RhiPhysicalDevice};
 use crate::shader_cursor::RhiWriteDescriptorSet;
 
 pub struct RhiDevice {
     pub handle: ash::Device,
 
     pub pdevice: Rc<RhiPhysicalDevice>,
-
-    pub graphics_queue_family_index: u32,
-    pub compute_queue_family_index: u32,
-    pub transfer_queue_family_index: u32,
 
     pub vk_dynamic_render_pf: Rc<ash::khr::dynamic_rendering::Device>,
     pub vk_acceleration_struct_pf: Rc<ash::khr::acceleration_structure::Device>,
@@ -36,49 +33,9 @@ impl RhiDevice {
         vk_pf: &ash::Entry,
         instance: &RhiInstance,
         pdevice: Rc<RhiPhysicalDevice>,
-    ) -> (Rc<RhiDevice>, Rc<RhiQueue>, Rc<RhiQueue>, Rc<RhiQueue>) {
-        let graphics_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::GRAPHICS).unwrap();
-        let compute_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::COMPUTE).unwrap();
-        let transfer_queue_family_index = pdevice.find_queue_family_index(vk::QueueFlags::TRANSFER).unwrap();
-
-        // 记录每个 queue family index 应该创建多少个 queue
-        // queue family index <-> queue num
-        // hash map 会自动去重
-        let mut queues = HashMap::from([
-            (graphics_queue_family_index, 0),
-            (compute_queue_family_index, 0),
-            (transfer_queue_family_index, 0),
-        ]);
-
-        // 计算得到每个 queue 在同类 queue family 中的 index，用于从 device 中取出 queue
-        let mut graphics_queue_index = 0;
-        let mut compute_queue_index = 0;
-        let mut transfer_queue_index = 0;
-        queues.entry(graphics_queue_family_index).and_modify(|num| {
-            graphics_queue_index = *num;
-            *num += 1;
-        });
-        queues.entry(compute_queue_family_index).and_modify(|num| {
-            compute_queue_index = *num;
-            *num += 1;
-        });
-        queues.entry(transfer_queue_family_index).and_modify(|num| {
-            transfer_queue_index = *num;
-            *num += 1;
-        });
-
-        // 每个 queue family 的 queue 数量和 priority 数组长度保持一直
-        let queue_priorities =
-            queues.values().map(|count| vec![1.0 /* priority = 1.0 */; *count as usize]).collect_vec();
-        let queue_create_infos = queues
-            .keys()
-            .map(|index| {
-                vk::DeviceQueueCreateInfo::default()
-                    .queue_family_index(*index)
-                    .queue_priorities(&queue_priorities[*index as usize])
-            })
-            .collect_vec();
-
+        queue_create_info: &[vk::DeviceQueueCreateInfo],
+    ) -> Self {
+        // device 所需的所有 extension
         let device_exts = Self::basic_device_exts().iter().map(|e| e.as_ptr()).collect_vec();
         let mut exts_str = String::new();
         for ext in &device_exts {
@@ -86,6 +43,7 @@ impl RhiDevice {
         }
         log::info!("device exts: {}", exts_str);
 
+        // device 所需的所有 features
         let mut all_features = vk::PhysicalDeviceFeatures2::default().features(Self::physical_device_basic_features());
         let mut physical_device_ext_features = Self::physical_device_extra_features();
         unsafe {
@@ -97,7 +55,7 @@ impl RhiDevice {
         }
 
         let device_create_info = vk::DeviceCreateInfo::default()
-            .queue_create_infos(&queue_create_infos)
+            .queue_create_infos(queue_create_info)
             .enabled_extension_names(&device_exts)
             .push_next(&mut all_features);
 
@@ -109,42 +67,15 @@ impl RhiDevice {
         let vk_acceleration_struct_pf =
             Rc::new(ash::khr::acceleration_structure::Device::new(&instance.handle, &device));
 
-        let device = Rc::new(Self {
+        Self {
             handle: device,
             pdevice: pdevice.clone(),
-
-            graphics_queue_family_index,
-            compute_queue_family_index,
-            transfer_queue_family_index,
 
             vk_dynamic_render_pf,
             vk_acceleration_struct_pf,
 
             debug_utils,
-        });
-
-        let graphics_queue = unsafe { device.get_device_queue(graphics_queue_family_index, graphics_queue_index) };
-        let compute_queue = unsafe { device.get_device_queue(compute_queue_family_index, compute_queue_index) };
-        let transfer_queue = unsafe { device.get_device_queue(transfer_queue_family_index, transfer_queue_index) };
-
-        (
-            device.clone(),
-            Rc::new(RhiQueue {
-                handle: graphics_queue,
-                queue_family_index: graphics_queue_family_index,
-                device: device.clone(),
-            }),
-            Rc::new(RhiQueue {
-                handle: compute_queue,
-                queue_family_index: compute_queue_family_index,
-                device: device.clone(),
-            }),
-            Rc::new(RhiQueue {
-                handle: transfer_queue,
-                queue_family_index: transfer_queue_family_index,
-                device: device.clone(),
-            }),
-        )
+        }
     }
 
     /// 必要的 physical device core features
@@ -217,6 +148,21 @@ impl RhiDevice {
     #[inline]
     pub fn min_ubo_offset_align(&self) -> vk::DeviceSize {
         self.pdevice.basic_props.limits.min_uniform_buffer_offset_alignment
+    }
+
+    #[inline]
+    pub fn graphics_queue_family(&self) -> RhiQueueFamily {
+        self.pdevice.graphics_queue_family.clone()
+    }
+
+    #[inline]
+    pub fn compute_queue_family(&self) -> RhiQueueFamily {
+        self.pdevice.compute_queue_family.clone()
+    }
+
+    #[inline]
+    pub fn transfer_queue_family(&self) -> RhiQueueFamily {
+        self.pdevice.transfer_queue_family.clone()
     }
 
     #[inline]

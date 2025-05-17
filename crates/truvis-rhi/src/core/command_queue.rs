@@ -9,9 +9,17 @@ use crate::core::{
     synchronize::{RhiFence, RhiSemaphore},
 };
 
+#[derive(Clone, Debug)]
+pub struct RhiQueueFamily {
+    pub name: String,
+    pub queue_family_index: u32,
+    pub queue_flags: vk::QueueFlags,
+    pub queue_count: u32,
+}
+
 pub struct RhiQueue {
     pub handle: vk::Queue,
-    pub queue_family_index: u32,
+    pub queue_family: RhiQueueFamily,
 
     pub device: Rc<RhiDevice>,
 }

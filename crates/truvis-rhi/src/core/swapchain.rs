@@ -75,7 +75,6 @@ impl RhiSurface {
 
 impl Drop for RhiSurface {
     fn drop(&mut self) {
-        log::info!("destroying surface");
         unsafe { self.pf.destroy_surface(self.handle, None) }
     }
 }
@@ -110,7 +109,6 @@ impl RhiSwapchain {
             unsafe { surface.pf.get_physical_device_surface_capabilities(pdevice, surface.handle).unwrap() };
 
         let extent = surface_capabilities.current_extent;
-        log::info!("surface capability extent: {:?}", extent);
 
         let (swapchain_handle, swapchain_pf) =
             Self::create_handle(rhi, &surface, &surface_capabilities, format, color_space, extent, present_mode);
@@ -147,11 +145,6 @@ impl RhiSwapchain {
         } else {
             u32::min(surface_capabilities.max_image_count, surface_capabilities.min_image_count + 1)
         };
-
-        log::info!("swapchain image count: {}", image_count);
-        log::info!("swapchain format: {:?}", format);
-        log::info!("swapchain color space: {:?}", color_space);
-        log::info!("swapchain present mode: {:?}", present_mode);
 
         let create_info = vk::SwapchainCreateInfoKHR::default()
             .surface(surface.handle)
@@ -292,7 +285,6 @@ impl RhiSwapchain {
 
 impl Drop for RhiSwapchain {
     fn drop(&mut self) {
-        log::info!("destroying swapchain");
         unsafe {
             for view in &self.image_views {
                 self.device.destroy_image_view(*view, None);

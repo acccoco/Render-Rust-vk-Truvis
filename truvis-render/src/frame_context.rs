@@ -141,7 +141,7 @@ impl FrameContext {
             .map(|i| {
                 Rc::new(RhiCommandPool::new(
                     rhi,
-                    rhi.device.graphics_queue_family_index,
+                    rhi.graphics_queue_family(),
                     vk::CommandPoolCreateFlags::TRANSIENT,
                     &format!("render_context_graphics_command_pool_{}", i),
                 ))
@@ -339,7 +339,7 @@ impl FrameContext {
 
 impl Drop for FrameContext {
     fn drop(&mut self) {
-        log::info!("RenderContext drop.");
+        //
     }
 }
 
