@@ -1,14 +1,8 @@
 use crate::core::device::RhiDevice;
-use crate::core::shader::RhiShaderModule;
+use crate::core::shader::{RhiShaderModule, RhiShaderStageInfo};
 use ash::vk;
 use std::ffi::CString;
 use std::rc::Rc;
-
-pub struct RhiShaderStageInfo {
-    pub stage: vk::ShaderStageFlags,
-    pub entry_point: String,
-    pub path: std::path::PathBuf,
-}
 
 pub struct RhiGraphicsPipelineCreateInfo {
     descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,

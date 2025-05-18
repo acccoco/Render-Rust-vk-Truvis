@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::mem::offset_of;
 use std::rc::Rc;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo};
+use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo};
 use truvis_rhi::rhi::Rhi;
 
 pub struct SimpleMainPass {

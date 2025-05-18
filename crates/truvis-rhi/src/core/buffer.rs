@@ -221,6 +221,13 @@ impl RhiBuffer {
 
 impl RhiBuffer {
     #[inline]
+    pub fn mapped_ptr(&self) -> *mut u8 {
+        self.map_ptr.unwrap_or_else(|| {
+            panic!("Buffer is not mapped, please call map() before using mapped_ptr()");
+        })
+    }
+
+    #[inline]
     pub fn map(&mut self) {
         if self.map_ptr.is_some() {
             return;
@@ -228,6 +235,11 @@ impl RhiBuffer {
         unsafe {
             self.map_ptr = Some(self.allocator.map_memory(&mut self.allocation).unwrap());
         }
+    }
+
+    #[inline]
+    pub fn flush(&mut self, offset: vk::DeviceSize, size: vk::DeviceSize) {
+        self.allocator.flush_allocation(&self.allocation, offset, size).unwrap();
     }
 
     #[inline]
@@ -242,6 +254,8 @@ impl RhiBuffer {
     }
 
     /// 通过 mem map 的方式将 data 传入到 buffer 中
+    ///
+    /// 注：确保 buffer 内存的对齐方式和 T 保持一致
     pub fn transfer_data_by_mem_map<T>(&mut self, data: &[T])
     where
         T: Sized + Copy,
@@ -249,7 +263,7 @@ impl RhiBuffer {
         self.map();
         unsafe {
             // 这里的 size 是目标内存的最大 size
-            // align 表示目标内存位置额外的内存对齐要求，这里使用 align_of 表示和 rust 中 [T; n] 的保持一致
+            // align 表示目标内存位置额外的内存对齐要求，这里使用 align_of 表示和 rust 中 T 保持一致
             let mut slice =
                 ash::util::Align::new(self.map_ptr.unwrap() as *mut c_void, align_of::<T>() as u64, self.size);
             slice.copy_from_slice(data);
@@ -329,12 +343,11 @@ impl<T: bytemuck::Pod> DerefMut for RhiBDABuffer<T> {
 impl<T: bytemuck::Pod> RhiBDABuffer<T> {
     #[inline]
     pub fn new_ubo(rhi: &Rhi, debug_name: impl AsRef<str>) -> Self {
-        let aligned_size = rhi.device.aligned_ubo_size::<T>();
         Self {
             inner: RhiBuffer::new(
                 rhi,
                 Rc::new(RhiBufferCreateInfo::new(
-                    aligned_size,
+                    size_of::<T>() as vk::DeviceSize,
                     vk::BufferUsageFlags::UNIFORM_BUFFER
                         | vk::BufferUsageFlags::TRANSFER_DST
                         | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
@@ -365,13 +378,12 @@ impl<T: bytemuck::Pod> Deref for RhiStageBuffer<T> {
 
 impl<T: bytemuck::Pod> RhiStageBuffer<T> {
     pub fn new(rhi: &Rhi, debug_name: impl AsRef<str>) -> Self {
-        let aligned_size = rhi.device.aligned_ubo_size::<T>();
         Self {
             inner: RhiBuffer::new(
                 rhi,
-                Rc::new(RhiBufferCreateInfo::new(aligned_size, vk::BufferUsageFlags::TRANSFER_SRC)),
+                Rc::new(RhiBufferCreateInfo::new(size_of::<T>() as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC)),
                 Rc::new(vk_mem::AllocationCreateInfo {
-                    usage: vk_mem::MemoryUsage::Auto,
+                    usage: vk_mem::MemoryUsage::AutoPreferDevice,
                     flags: vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM,
                     ..Default::default()
                 }),
@@ -392,5 +404,48 @@ impl<T: bytemuck::Pod> RhiStageBuffer<T> {
         }
         self.inner.allocator.flush_allocation(&self.inner.allocation, 0, size_of::<T>() as vk::DeviceSize).unwrap();
         self.inner.unmap();
+    }
+}
+
+pub struct RhiSBTBuffer {
+    _inner: RhiBuffer,
+}
+impl RhiSBTBuffer {
+    pub fn new(rhi: &Rhi, size: vk::DeviceSize, name: impl AsRef<str>) -> Self {
+        Self {
+            _inner: RhiBuffer::new(
+                rhi,
+                Rc::new(RhiBufferCreateInfo::new(
+                    size,
+                    vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
+                        | vk::BufferUsageFlags::TRANSFER_SRC
+                        | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                )),
+                Rc::new(vk_mem::AllocationCreateInfo {
+                    usage: vk_mem::MemoryUsage::AutoPreferDevice,
+                    flags: vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM,
+                    ..Default::default()
+                }),
+                None,
+                format!("SBTBuffer::{}", name.as_ref()),
+            ),
+        }
+    }
+
+    #[inline]
+    pub fn handle(&self) -> vk::Buffer {
+        self._inner.handle
+    }
+}
+impl Deref for RhiSBTBuffer {
+    type Target = RhiBuffer;
+
+    fn deref(&self) -> &Self::Target {
+        &self._inner
+    }
+}
+impl DerefMut for RhiSBTBuffer {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self._inner
     }
 }

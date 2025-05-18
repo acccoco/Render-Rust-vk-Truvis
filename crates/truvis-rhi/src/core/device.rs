@@ -139,18 +139,19 @@ impl RhiDevice {
     }
 }
 
+// getters
 impl RhiDevice {
-    /// 将 UBO 的尺寸和 min_UBO_Offset_Align 对齐，使得得到的尺寸是 min_UBO_Offset_Align 的整数倍
-    #[inline]
-    pub fn aligned_ubo_size<T: bytemuck::Pod>(&self) -> vk::DeviceSize {
-        let min_ubo_align = self.pdevice.basic_props.limits.min_uniform_buffer_offset_alignment;
-        let ubo_size = size_of::<T>() as vk::DeviceSize;
-        (ubo_size + min_ubo_align - 1) & !(min_ubo_align - 1)
-    }
-
+    /// 当 uniform buffer 的 descriptor 在更新时，其 offset 比如是这个值的整数倍
+    ///
+    /// 注：这个值一定是 power of 2
     #[inline]
     pub fn min_ubo_offset_align(&self) -> vk::DeviceSize {
         self.pdevice.basic_props.limits.min_uniform_buffer_offset_alignment
+    }
+
+    #[inline]
+    pub fn rt_pipeline_props(&self) -> &vk::PhysicalDeviceRayTracingPipelinePropertiesKHR {
+        &self.pdevice.rt_pipeline_props
     }
 
     #[inline]
@@ -167,7 +168,9 @@ impl RhiDevice {
     pub fn transfer_queue_family(&self) -> RhiQueueFamily {
         self.pdevice.transfer_queue_family.clone()
     }
+}
 
+impl RhiDevice {
     #[inline]
     pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str) -> vk::RenderPass {
         let render_pass = unsafe { self.handle.create_render_pass(render_pass_ci, None).unwrap() };

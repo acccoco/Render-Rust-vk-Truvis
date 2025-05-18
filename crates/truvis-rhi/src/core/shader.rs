@@ -35,3 +35,9 @@ impl RhiShaderModule {
         }
     }
 }
+
+pub struct RhiShaderStageInfo {
+    pub stage: vk::ShaderStageFlags,
+    pub entry_point: String,
+    pub path: std::path::PathBuf,
+}

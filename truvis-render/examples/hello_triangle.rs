@@ -9,9 +9,9 @@ use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
 use truvis_render::frame_context::FrameContext;
 use truvis_render::platform::camera_controller::CameraController;
 use truvis_render::renderer::framebuffer::FrameBuffer;
-use truvis_rhi::core::pipeline::RhiGraphicsPipelineCreateInfo;
+use truvis_rhi::core::graphics_pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
-    core::{command_queue::RhiSubmitInfo, pipeline::RhiGraphicsPipeline},
+    core::{command_queue::RhiSubmitInfo, graphics_pipeline::RhiGraphicsPipeline},
     rhi::Rhi,
 };
 

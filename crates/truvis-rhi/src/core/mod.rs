@@ -11,7 +11,7 @@ pub mod device;
 pub mod image;
 pub mod instance;
 pub mod physical_device;
-pub mod pipeline;
+pub mod graphics_pipeline;
 pub mod query_pool;
 pub mod sampler;
 pub mod shader;

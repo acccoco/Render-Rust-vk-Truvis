@@ -294,11 +294,13 @@ impl FrameContext {
         self.render_swapchain.color_format
     }
 
+    /// 当前处在第几帧：A, B, C
     #[inline]
     pub fn current_frame_index(&self) -> usize {
         self.current_frame
     }
 
+    /// 当前帧的编号，一直增加
     #[inline]
     pub fn current_frame_num(&self) -> usize {
         self.frame_id

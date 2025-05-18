@@ -18,10 +18,10 @@ pub struct RhiPhysicalDevice {
     pub basic_props: vk::PhysicalDeviceProperties,
 
     /// 当前 gpu 的 ray tracing 属性
-    pub rt_props: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>,
+    pub rt_pipeline_props: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>,
 
     /// 当前 gpu 的加速结构属性
-    pub acc_props: vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'static>,
+    pub acc_struct_props: vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'static>,
 
     pub mem_props: vk::PhysicalDeviceMemoryProperties,
 
@@ -140,8 +140,8 @@ impl RhiPhysicalDevice {
                 features: instance.get_physical_device_features(pdevice),
                 handle: pdevice,
                 basic_props,
-                rt_props,
-                acc_props,
+                rt_pipeline_props: rt_props,
+                acc_struct_props: acc_props,
                 graphics_queue_family,
                 compute_queue_family,
                 transfer_queue_family,
