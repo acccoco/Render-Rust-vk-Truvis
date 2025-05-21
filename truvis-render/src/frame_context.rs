@@ -21,7 +21,7 @@ pub struct FrameContext {
     swapchain_image_index: usize,
 
     /// 当前处在 in-flight 的第几帧：A, B, C
-    current_frame: usize,
+    frame_label: usize,
 
     /// frames in flight
     pub frame_cnt_in_flight: usize,
@@ -75,7 +75,7 @@ impl FrameContext {
             render_swapchain,
 
             swapchain_image_index: 0,
-            current_frame: 0,
+            frame_label: 0,
             frame_id: 0,
             frame_cnt_in_flight: init_info.frames_in_flight,
 
@@ -166,22 +166,22 @@ impl FrameContext {
             LabelColor::COLOR_STAGE,
         );
         {
-            let current_fence = &self.fence_frame_in_flight[self.current_frame];
+            let current_fence = &self.fence_frame_in_flight[self.frame_label];
             current_fence.wait();
             current_fence.reset();
 
             // 释放当前 frame 的 command buffer 的资源
-            std::mem::take(&mut self.allocated_command_buffers[self.current_frame]) //
+            std::mem::take(&mut self.allocated_command_buffers[self.frame_label]) //
                 .into_iter()
                 .for_each(|cmd| cmd.free());
 
             // 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
-            self.graphics_command_pools[self.current_frame].reset_all_buffers();
+            self.graphics_command_pools[self.frame_label].reset_all_buffers();
         }
         self.device.debug_utils.end_queue_label(self.graphics_queue.handle);
 
         self.swapchain_image_index =
-            self.render_swapchain.acquire_next_frame(&self.present_complete_semaphores[self.current_frame], None)
+            self.render_swapchain.acquire_next_frame(&self.present_complete_semaphores[self.frame_label], None)
                 as usize;
 
         self.device.debug_utils.begin_queue_label(
@@ -252,7 +252,7 @@ impl FrameContext {
                     self.current_render_complete_semaphore(),
                     vk::PipelineStageFlags2::BOTTOM_OF_PIPE, /*TODO 需要确认 signal 的 stage*/
                 )])],
-                Some(self.fence_frame_in_flight[self.current_frame].clone()),
+                Some(self.fence_frame_in_flight[self.frame_label].clone()),
             );
         }
         // queue label 不能跨过 submit，否则会导致 Nsight mismatch label
@@ -264,17 +264,17 @@ impl FrameContext {
             &[self.current_render_complete_semaphore()],
         );
 
-        self.current_frame = (self.current_frame + 1) % self.frame_cnt_in_flight;
+        self.frame_label = (self.frame_label + 1) % self.frame_cnt_in_flight;
         self.frame_id += 1;
     }
 
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer(&mut self, debug_name: &str) -> RhiCommandBuffer {
-        let name = format!("[frame-{}-{}]{}", FRAME_ID_MAP[self.current_frame], self.frame_id, debug_name);
+        let name = format!("[frame-{}-{}]{}", FRAME_ID_MAP[self.frame_label], self.frame_id, debug_name);
         let cmd =
-            RhiCommandBuffer::new(self.device.clone(), self.graphics_command_pools[self.current_frame].clone(), &name);
+            RhiCommandBuffer::new(self.device.clone(), self.graphics_command_pools[self.frame_label].clone(), &name);
 
-        self.allocated_command_buffers[self.current_frame].push(cmd.clone());
+        self.allocated_command_buffers[self.frame_label].push(cmd.clone());
         cmd
     }
 
@@ -286,7 +286,7 @@ impl FrameContext {
 
     #[inline]
     pub fn current_fence(&self) -> &RhiFence {
-        &self.fence_frame_in_flight[self.current_frame]
+        &self.fence_frame_in_flight[self.frame_label]
     }
 
     #[inline]
@@ -296,8 +296,8 @@ impl FrameContext {
 
     /// 当前处在第几帧：A, B, C
     #[inline]
-    pub fn current_frame_index(&self) -> usize {
-        self.current_frame
+    pub fn current_frame_label(&self) -> usize {
+        self.frame_label
     }
 
     /// 当前帧的编号，一直增加
@@ -309,7 +309,7 @@ impl FrameContext {
     /// 当前帧的 debug prefix，例如：`[frame-A-113]`
     #[inline]
     pub fn current_frame_prefix(&self) -> String {
-        format!("[frame-{}-{}]", FRAME_ID_MAP[self.current_frame], self.frame_id)
+        format!("[frame-{}-{}]", FRAME_ID_MAP[self.frame_label], self.frame_id)
     }
 
     #[inline]
@@ -319,12 +319,12 @@ impl FrameContext {
 
     #[inline]
     pub fn current_render_complete_semaphore(&self) -> RhiSemaphore {
-        self.render_complete_semaphores[self.current_frame].clone()
+        self.render_complete_semaphores[self.frame_label].clone()
     }
 
     #[inline]
     pub fn current_present_complete_semaphore(&self) -> RhiSemaphore {
-        self.present_complete_semaphores[self.current_frame].clone()
+        self.present_complete_semaphores[self.frame_label].clone()
     }
 
     /// 当前帧从 swapchain 获取到的用于 present 的 image

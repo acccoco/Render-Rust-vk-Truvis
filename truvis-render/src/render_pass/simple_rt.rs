@@ -283,7 +283,7 @@ impl SimlpeRtPass {
     }
 
     pub fn ray_trace(&self, cmd: &RhiCommandBuffer, render_ctx: &FrameContext, push_constant: &shader::DrawData) {
-        let frame_idx = render_ctx.current_frame_index();
+        let frame_idx = render_ctx.current_frame_label();
         let frame_size = render_ctx.swapchain_extent();
 
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));

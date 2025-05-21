@@ -130,12 +130,12 @@ impl OuterApp for PhongApp {
         ui.text_wrapped("こんにちは世界！");
     }
     fn update(&mut self, app_ctx: &mut AppCtx) {
-        let frame_idx = app_ctx.render_context.current_frame_index();
+        let frame_idx = app_ctx.render_context.current_frame_label();
 
         // 直接使用 TruvisApp 中的 camera_controller，无需再创建新的实例
 
         // 将场景数据写入到帧缓冲区
-        self.frame_scene.prepare_render_data(app_ctx.render_context.current_frame_index());
+        self.frame_scene.prepare_render_data(app_ctx.render_context.current_frame_label());
         let frame_data_stage_buffer = &mut self.frame_data_stage_buffers[frame_idx];
         frame_data_stage_buffer.transfer(&|data: &mut shader::FrameData| {
             let mouse_pos = app_ctx.input_state.crt_mouse_pos;
@@ -190,7 +190,7 @@ impl OuterApp for PhongApp {
     }
 
     fn draw(&self, app_ctx: &mut AppCtx) {
-        let frame_id = app_ctx.render_context.current_frame_index();
+        let frame_id = app_ctx.render_context.current_frame_label();
 
         let color_attach = FrameBuffer::get_color_attachment(app_ctx.render_context.current_present_image_view());
         let depth_attach = FrameBuffer::get_depth_attachment(app_ctx.render_context.depth_view.handle());
@@ -221,7 +221,7 @@ impl OuterApp for PhongApp {
                     ..Default::default()
                 },
                 &self.frame_scene,
-                app_ctx.render_context.current_frame_index(),
+                app_ctx.render_context.current_frame_label(),
             );
             cmd.end_label();
 

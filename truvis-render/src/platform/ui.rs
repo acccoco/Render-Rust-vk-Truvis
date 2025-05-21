@@ -521,7 +521,7 @@ impl Gui {
             return;
         }
 
-        let frame_index = render_ctx.current_frame_index();
+        let frame_index = render_ctx.current_frame_label();
 
         rhi.device.debug_utils.begin_queue_label(
             rhi.graphics_queue.handle,
