@@ -34,8 +34,9 @@ pub struct AssimpSceneLoader {
 }
 
 impl AssimpSceneLoader {
-    /// return: instance
-    pub fn load_model(
+    /// # return
+    /// 返回整个场景的所有 instance id
+    pub fn load_scene(
         rhi: &Rhi,
         model_file: &std::path::Path,
         instance_register: &mut dyn FnMut(SimpleInstance) -> uuid::Uuid,
@@ -59,7 +60,7 @@ impl AssimpSceneLoader {
                 instances: vec![],
             };
 
-            scene_loader.load_mesh(rhi, mesh_register);
+            scene_loader.load_geometry(rhi, mesh_register);
             scene_loader.load_mats(rhi, mat_register);
             scene_loader.load_instance(instance_register);
 
@@ -69,7 +70,8 @@ impl AssimpSceneLoader {
         }
     }
 
-    fn load_mesh(&mut self, rhi: &Rhi, mesh_register: &mut dyn FnMut(SimpleMesh) -> uuid::Uuid) {
+    /// 加载一个场景中最基础的几何体
+    fn load_geometry(&mut self, rhi: &Rhi, mesh_register: &mut dyn FnMut(SimpleMesh) -> uuid::Uuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -113,6 +115,7 @@ impl AssimpSceneLoader {
         self.meshes = mesh_uuids;
     }
 
+    /// 加载场景中的所有材质
     fn load_mats(&mut self, _rhi: &Rhi, mat_register: &mut dyn FnMut(SimpleMaterial) -> uuid::Uuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
@@ -141,6 +144,7 @@ impl AssimpSceneLoader {
         self.mats = mat_uuids;
     }
 
+    /// 加载场景中的所有 instance
     fn load_instance(&mut self, instance_register: &mut dyn FnMut(SimpleInstance) -> uuid::Uuid) {
         let instance_cnt = unsafe { get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)

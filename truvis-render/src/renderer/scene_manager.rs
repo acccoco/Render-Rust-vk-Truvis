@@ -38,7 +38,7 @@ impl SceneManager {
     ) -> Vec<uuid::Uuid> {
         let mut ins_guids = vec![];
 
-        AssimpSceneLoader::load_model(
+        AssimpSceneLoader::load_scene(
             rhi,
             model_path,
             &mut |mut ins| {

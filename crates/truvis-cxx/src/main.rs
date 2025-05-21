@@ -12,7 +12,7 @@ fn main() {
     let mut mat_map: HashMap<uuid::Uuid, SimpleMaterial> = HashMap::new();
     let mut ins_map: HashMap<uuid::Uuid, SimpleInstance> = HashMap::new();
 
-    let uuids = AssimpSceneLoader::load_model(
+    let uuids = AssimpSceneLoader::load_scene(
         &rhi,
         std::path::Path::new("assets/obj/spot.obj"),
         &mut (|ins: SimpleInstance| {
