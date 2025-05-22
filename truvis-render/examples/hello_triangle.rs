@@ -1,6 +1,6 @@
 use ash::vk;
 use imgui::Ui;
-use model_manager::component::mesh::SimpleMesh;
+use model_manager::component::Geometry;
 use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
 use model_manager::vertex::VertexLayout;
 use std::cell::RefCell;
@@ -16,7 +16,7 @@ use truvis_rhi::{
 };
 
 struct HelloTriangle {
-    triangle: SimpleMesh,
+    triangle: Geometry,
 
     pipeline: RhiGraphicsPipeline,
 

@@ -1,9 +1,9 @@
+use crate::component::Geometry;
 use crate::vertex::VertexLayout;
 use ash::vk;
 use std::mem::offset_of;
 use truvis_rhi::core::buffer::RhiBuffer;
 use truvis_rhi::rhi::Rhi;
-use crate::component::mesh::SimpleMesh;
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
@@ -49,28 +49,28 @@ impl VertexAosLayoutPosColor {
     }
 
     /// return: (vertex_buffer, index_buffer)
-    pub fn triangle(rhi: &Rhi) -> SimpleMesh {
+    pub fn triangle(rhi: &Rhi) -> Geometry {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::TRIANGLE_VERTEX_DATA, "triangle-vertex-buffer");
 
         let mut index_buffer =
             RhiBuffer::new_index_buffer(rhi, size_of_val(&shape::TRIANGLE_INDEX_DATA), "triangle-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::TRIANGLE_INDEX_DATA);
 
-        SimpleMesh {
+        Geometry {
             vertex_buffer,
             index_buffer,
             index_cnt: shape::TRIANGLE_INDEX_DATA.len() as u32,
         }
     }
 
-    pub fn rectangle(rhi: &Rhi) -> SimpleMesh {
+    pub fn rectangle(rhi: &Rhi) -> Geometry {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::RECTANGLE_VERTEX_DATA, "rectangle-vertex-buffer");
 
         let mut index_buffer =
             RhiBuffer::new_index_buffer(rhi, size_of_val(&shape::RECTANGLE_INDEX_DATA), "rectangle-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::RECTANGLE_INDEX_DATA);
 
-        SimpleMesh {
+        Geometry {
             vertex_buffer,
             index_buffer,
             index_cnt: shape::RECTANGLE_INDEX_DATA.len() as u32,

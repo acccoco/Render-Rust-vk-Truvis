@@ -1,10 +1,8 @@
 use itertools::Itertools;
-use model_manager::component::instance::SimpleInstance;
-use model_manager::component::mat::{Geometry, Instance, Mesh, SimpleMaterial};
-use model_manager::component::mesh::SimpleMesh;
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
+use model_manager::component::{Geometry, Instance, Mesh, Material};
 use truvis_rhi::core::buffer::RhiBuffer;
 use truvis_rhi::rhi::Rhi;
 
@@ -39,9 +37,9 @@ impl AssimpSceneLoader {
     pub fn load_scene(
         rhi: &Rhi,
         model_file: &std::path::Path,
-        instance_register: &mut dyn FnMut(SimpleInstance) -> uuid::Uuid,
-        mesh_register: &mut dyn FnMut(SimpleMesh) -> uuid::Uuid,
-        mat_register: &mut dyn FnMut(SimpleMaterial) -> uuid::Uuid,
+        instance_register: impl FnMut(Instance) -> uuid::Uuid,
+        mesh_register: impl FnMut(Mesh) -> uuid::Uuid,
+        mat_register: impl FnMut(Material) -> uuid::Uuid,
     ) -> Vec<uuid::Uuid> {
         validate_vertex_memory_layout();
 
@@ -60,9 +58,9 @@ impl AssimpSceneLoader {
                 instances: vec![],
             };
 
-            scene_loader.load_geometry_old(rhi, mesh_register);
+            scene_loader.load_mesh(rhi, mesh_register);
             scene_loader.load_mats(rhi, mat_register);
-            scene_loader.load_instance_old(instance_register);
+            scene_loader.load_instance(instance_register);
 
             free_scene(loader);
 
@@ -70,52 +68,8 @@ impl AssimpSceneLoader {
         }
     }
 
-    /// 加载一个场景中最基础的几何体
-    fn load_geometry_old(&mut self, rhi: &Rhi, mesh_register: &mut dyn FnMut(SimpleMesh) -> uuid::Uuid) {
-        let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
-
-        let mesh_uuids = (0..mesh_cnt)
-            .map(|mesh_idx| unsafe {
-                let mesh = get_mesh(self.loader, mesh_idx);
-                let mesh = &*mesh;
-
-                if mesh.vertex_array_.is_null() {
-                    panic!("Mesh {} has no vertex data", mesh_idx);
-                }
-                let vertex_data =
-                    std::slice::from_raw_parts(mesh.vertex_array_ as *const Vertex3D, mesh.vertex_cnt_ as usize);
-
-                let vertex_buffer = VertexLayoutAos3D::create_vertex_buffer(
-                    rhi,
-                    vertex_data,
-                    format!("{}-mesh-{}", self.model_name, mesh_idx),
-                );
-
-                if mesh.face_array_.is_null() {
-                    panic!("Mesh {} has no index data", mesh_idx);
-                }
-                let index_data =
-                    std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
-                let index_buffer = RhiBuffer::new_index_buffer_sync(
-                    rhi,
-                    index_data,
-                    format!("{}-mesh-{}-indices", self.model_name, mesh_idx),
-                );
-
-                let mesh = SimpleMesh {
-                    vertex_buffer,
-                    index_buffer,
-                    index_cnt: mesh.face_cnt_ * 3,
-                };
-
-                mesh_register(mesh)
-            })
-            .collect_vec();
-
-        self.meshes = mesh_uuids;
-    }
-
-    fn load_mesh(&mut self, rhi: &Rhi, mesh_register: &mut dyn FnMut(Mesh) -> uuid::Uuid) {
+    /// 加载场景中基础的几何体
+    fn load_mesh(&mut self, rhi: &Rhi, mut mesh_register: impl FnMut(Mesh) -> uuid::Uuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -163,7 +117,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中的所有材质
-    fn load_mats(&mut self, _rhi: &Rhi, mat_register: &mut dyn FnMut(SimpleMaterial) -> uuid::Uuid) {
+    fn load_mats(&mut self, _rhi: &Rhi, mut mat_register: impl FnMut(Material) -> uuid::Uuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)
@@ -171,7 +125,7 @@ impl AssimpSceneLoader {
                 let mat = get_mat(self.loader, mat_idx);
                 let mat = &*mat;
 
-                let mat_uuid = mat_register(SimpleMaterial {
+                let mat_uuid = mat_register(Material {
                     ambient: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.ambient),
                     diffuse: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.diffuse),
                     specular: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.specular),
@@ -189,46 +143,6 @@ impl AssimpSceneLoader {
             .collect_vec();
 
         self.mats = mat_uuids;
-    }
-
-    /// 加载场景中的所有 instance
-    fn load_instance_old(&mut self, instance_register: &mut dyn FnMut(SimpleInstance) -> uuid::Uuid) {
-        let instance_cnt = unsafe { get_instance_cnt(self.loader) };
-        let instances = (0..instance_cnt)
-            .filter_map(|instance_idx| unsafe {
-                let instance = get_instance(self.loader, instance_idx);
-                let instance = &*instance;
-
-                let mesh_cnt = instance.mesh_cnt_;
-                if mesh_cnt == 0 {
-                    return None;
-                }
-
-                let mat_indices = if !instance.mat_indices_.is_null() {
-                    std::slice::from_raw_parts(instance.mat_indices_, mesh_cnt as usize)
-                } else {
-                    &[]
-                };
-                let mesh_indices = if !instance.mesh_indices_.is_null() {
-                    std::slice::from_raw_parts(instance.mesh_indices_, mesh_cnt as usize)
-                } else {
-                    &[]
-                };
-
-                let mesh_ids = mesh_indices.iter().map(|mesh_idx| self.meshes[*mesh_idx as usize]).collect_vec();
-                let mat_ids = mat_indices.iter().map(|mat_idx| self.mats[*mat_idx as usize]).collect_vec();
-
-                let instance = SimpleInstance {
-                    transform: std::mem::transmute::<CxxMat4f, glam::Mat4>(instance.world_transform),
-                    meshes: mesh_ids,
-                    mats: mat_ids,
-                };
-
-                Some(instance_register(instance))
-            })
-            .collect_vec();
-
-        self.instances = instances
     }
 
     /// 加载场景中的所有 instance

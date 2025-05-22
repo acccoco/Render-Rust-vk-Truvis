@@ -1,12 +1,11 @@
 use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
-use model_manager::component::instance::SimpleInstance;
-use model_manager::component::mesh::SimpleMesh;
 use model_manager::vertex::vertex_pnu::VertexLayoutAosPosNormalUv;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::rc::Rc;
+use model_manager::component::{Geometry, Instance};
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
 use truvis_render::frame_context::FrameContext;
 use truvis_render::platform::camera_controller::CameraController;
@@ -30,7 +29,7 @@ struct PhongApp {
     gpu_scene_builder: GpuScene,
 
     /// BOX
-    _cube: SimpleMesh,
+    _cube: Geometry,
 
     // 保存共享的相机控制器
     camera_controller: Rc<RefCell<CameraController>>,
@@ -59,17 +58,17 @@ impl OuterApp for PhongApp {
         let mut scene_mgr = TheWorld::new(bindless_mgr.clone());
         // 复制多个 instance
         let ins_id = scene_mgr.load_scene(rhi, std::path::Path::new("assets/obj/spot.obj"), &glam::Mat4::IDENTITY);
-        let ins = scene_mgr._instance_map.get(&ins_id[0]).unwrap().clone();
-        let ins_1 = SimpleInstance {
+        let ins = scene_mgr.get_instance(&ins_id[0]).unwrap().clone();
+        let ins_1 = Instance {
             transform: glam::Mat4::from_translation(glam::vec3(5.0, 0.0, 0.0)),
             ..ins.clone()
         };
-        scene_mgr.register_instance_old(ins_1);
-        let ins_2 = SimpleInstance {
+        scene_mgr.register_instance(ins_1);
+        let ins_2 = Instance {
             transform: glam::Mat4::from_translation(glam::vec3(0.0, 5.0, 0.0)),
             ..ins.clone()
         };
-        scene_mgr.register_instance_old(ins_2);
+        scene_mgr.register_instance(ins_2);
         scene_mgr.register_point_light(shader::PointLight {
             pos: glam::vec3(-20.0, 40.0, 0.0).into(),
             color: (glam::vec3(5.0, 6.0, 1.0) * 2.0).into(),

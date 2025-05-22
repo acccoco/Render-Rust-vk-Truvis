@@ -1,23 +1,23 @@
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::scene_manager::TheWorld;
 use glam::Vec4Swizzles;
-use model_manager::component::mesh::SimpleMesh;
+use model_manager::component::Geometry;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::iter::zip;
 use std::rc::Rc;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 
-struct DrawMesh {
+struct DrawGeometry {
     ins_id: uuid::Uuid,
     mesh_id: uuid::Uuid,
+    submesh_idx: usize,
     mat_id: uuid::Uuid,
 }
 
 /// 用于构建传输到 GPU 的场景数据
 pub struct GpuScene {
-    gpu_meshes: Vec<DrawMesh>,
+    gpu_meshes: Vec<DrawGeometry>,
 
     gpu_mats: Vec<uuid::Uuid>,
 
@@ -43,6 +43,7 @@ impl GpuScene {
         }
     }
 
+    /// 在每一帧开始时调用，将场景数据转换为 GPU 可读的形式
     pub fn prepare_render_data(&mut self, frame_idx: usize) {
         self.bindless_mgr.borrow_mut().prepare_render_data(frame_idx);
 
@@ -50,38 +51,40 @@ impl GpuScene {
         self.gen_draw_mesh();
     }
 
-    /// 将场景数据写入 Device Buffer 中
+    /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
     pub fn write_to_buffer(&self, buffer: &mut shader::FrameData) {
         self.write_instance_buffer(&mut buffer.ins_data);
         self.write_mesh_buffer(&mut buffer.mat_data);
         self.write_light_buffer(&mut buffer.light_data);
     }
 
+    /// 绘制场景中的所有示例
     pub fn draw(&self, cmd: &RhiCommandBuffer, before_draw: &mut dyn FnMut(u32)) {
         for (ins_idx, sub_mesh) in self.gpu_meshes.iter().enumerate() {
             let scene_mgr = self.scene_mgr.borrow();
-            let mesh = scene_mgr._mesh_map.get(&sub_mesh.mesh_id).unwrap();
+            let mesh = scene_mgr.mesh_map.get(&sub_mesh.mesh_id).unwrap();
+            let geometry = mesh.geometries.get(sub_mesh.submesh_idx).unwrap();
 
-            cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&mesh.vertex_buffer), &[0]);
-            cmd.cmd_bind_index_buffer(&mesh.index_buffer, 0, SimpleMesh::index_type());
+            cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&geometry.vertex_buffer), &[0]);
+            cmd.cmd_bind_index_buffer(&geometry.index_buffer, 0, Geometry::index_type());
 
             before_draw(ins_idx as u32);
-            cmd.draw_indexed(mesh.index_cnt, 0, 1, 0, 0);
+            cmd.draw_indexed(geometry.index_cnt, 0, 1, 0, 0);
         }
     }
 
     /// 将所有的实例转换为 Vector，准备上传到 GPU
     fn gen_draw_mesh(&mut self) {
-        self.gpu_meshes = self
-            .scene_mgr
-            .borrow()
-            ._instance_map
+        let scene_mgr = self.scene_mgr.borrow();
+        self.gpu_meshes = scene_mgr
+            .instance_map
             .iter()
             .flat_map(|(ins_id, ins)| {
-                zip(ins.meshes.iter(), ins.mats.iter()).map(|(mesh_id, mat_id)| DrawMesh {
+                ins.materials.iter().enumerate().map(|(submesh_idx, mat_id)| DrawGeometry {
                     ins_id: *ins_id,
-                    mesh_id: *mesh_id,
+                    mesh_id: ins.mesh,
                     mat_id: *mat_id,
+                    submesh_idx,
                 })
             })
             .collect();
@@ -110,7 +113,7 @@ impl GpuScene {
         buffer.instance_count.x = self.gpu_meshes.len() as u32;
         for (ins_idx, draw_mesh) in self.gpu_meshes.iter().enumerate() {
             let scene_mgr = self.scene_mgr.borrow();
-            let instance = scene_mgr._instance_map.get(&draw_mesh.ins_id).unwrap();
+            let instance = scene_mgr.instance_map.get(&draw_mesh.ins_id).unwrap();
             buffer.instances[ins_idx] = shader::SubMesh {
                 model: instance.transform.into(),
                 inv_model: instance.transform.inverse().into(),

@@ -1,19 +1,14 @@
 use crate::renderer::bindless::BindlessManager;
-use model_manager::component::instance::SimpleInstance;
-use model_manager::component::mat::{Instance, Mesh, SimpleMaterial};
-use model_manager::component::mesh::SimpleMesh;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use model_manager::component::{Instance, Mesh, Material};
 use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::rhi::Rhi;
 
 pub struct TheWorld {
-    pub _instance_map: HashMap<uuid::Uuid, SimpleInstance>,
-    pub _mesh_map: HashMap<uuid::Uuid, SimpleMesh>,
-
-    pub mat_map: HashMap<uuid::Uuid, SimpleMaterial>,
+    pub mat_map: HashMap<uuid::Uuid, Material>,
     pub instance_map: HashMap<uuid::Uuid, Instance>,
     pub mesh_map: HashMap<uuid::Uuid, Mesh>,
 
@@ -25,9 +20,7 @@ pub struct TheWorld {
 impl TheWorld {
     pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         Self {
-            _instance_map: HashMap::new(),
             mat_map: HashMap::new(),
-            _mesh_map: HashMap::new(),
             point_light_map: HashMap::new(),
             instance_map: HashMap::new(),
             mesh_map: HashMap::new(),
@@ -35,31 +28,32 @@ impl TheWorld {
         }
     }
 
+    /// getter
+    #[inline]
+    pub fn get_instance(&self, guid: &uuid::Uuid) -> Option<&Instance> {
+        self.instance_map.get(guid)
+    }
+
     /// 向世界中添加一个外部场景
-    pub fn load_scene(
-        &mut self,
-        rhi: &Rhi,
-        model_path: &std::path::Path,
-        transform: &glam::Mat4,
-    ) -> Vec<uuid::Uuid> {
+    pub fn load_scene(&mut self, rhi: &Rhi, model_path: &std::path::Path, transform: &glam::Mat4) -> Vec<uuid::Uuid> {
         let mut ins_guids = vec![];
 
         AssimpSceneLoader::load_scene(
             rhi,
             model_path,
-            &mut |mut ins| {
+            |mut ins| {
                 let guid = uuid::Uuid::new_v4();
                 ins.transform = *transform * ins.transform;
-                self._instance_map.insert(guid, ins);
+                self.instance_map.insert(guid, ins);
                 ins_guids.push(guid);
                 guid
             },
-            &mut |mesh| {
+            |mesh| {
                 let guid = uuid::Uuid::new_v4();
-                self._mesh_map.insert(guid, mesh);
+                self.mesh_map.insert(guid, mesh);
                 guid
             },
-            &mut |mat| {
+            |mat| {
                 let guid = uuid::Uuid::new_v4();
 
                 // 注册纹理
@@ -77,16 +71,9 @@ impl TheWorld {
     }
 
     /// 向场景中添加材质
-    pub fn register_mat(&mut self, mat: SimpleMaterial) -> uuid::Uuid {
+    pub fn register_mat(&mut self, mat: Material) -> uuid::Uuid {
         let guid = uuid::Uuid::new_v4();
         self.mat_map.insert(guid, mat);
-        guid
-    }
-
-    /// 向场景中添加 mesh
-    pub fn register_mesh_old(&mut self, mesh: SimpleMesh) -> uuid::Uuid {
-        let guid = uuid::Uuid::new_v4();
-        self._mesh_map.insert(guid, mesh);
         guid
     }
 
@@ -94,13 +81,6 @@ impl TheWorld {
     pub fn register_mesh(&mut self, mesh: Mesh) -> uuid::Uuid {
         let guid = uuid::Uuid::new_v4();
         self.mesh_map.insert(guid, mesh);
-        guid
-    }
-
-    /// 向场景中添加 instance
-    pub fn register_instance_old(&mut self, instance: SimpleInstance) -> uuid::Uuid {
-        let guid = uuid::Uuid::new_v4();
-        self._instance_map.insert(guid, instance);
         guid
     }
 

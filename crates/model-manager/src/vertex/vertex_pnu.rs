@@ -1,9 +1,9 @@
+use crate::component::Geometry;
 use crate::vertex::VertexLayout;
 use ash::vk;
 use std::mem::offset_of;
 use truvis_rhi::core::buffer::RhiBuffer;
 use truvis_rhi::rhi::Rhi;
-use crate::component::mesh::SimpleMesh;
 
 /// AoS: Array of structures
 #[repr(C)]
@@ -61,28 +61,28 @@ impl VertexLayoutAosPosNormalUv {
         vertex_buffer
     }
 
-    pub fn cube(rhi: &Rhi) -> SimpleMesh {
+    pub fn cube(rhi: &Rhi) -> Geometry {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::Cube::VERTICES, "cube-vertex-buffer");
 
         let mut index_buffer =
             RhiBuffer::new_index_buffer(rhi, size_of_val(&shape::Cube::INDICES), "cube-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::Cube::INDICES);
 
-        SimpleMesh {
+        Geometry {
             vertex_buffer,
             index_buffer,
             index_cnt: shape::Cube::INDICES.len() as u32,
         }
     }
 
-    pub fn floor(rhi: &Rhi) -> SimpleMesh {
+    pub fn floor(rhi: &Rhi) -> Geometry {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::Floor::VERTICES, "floor-vertex-buffer");
 
         let mut index_buffer =
             RhiBuffer::new_index_buffer(rhi, size_of_val(&shape::Floor::INDICES), "floor-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::Floor::INDICES);
 
-        SimpleMesh {
+        Geometry {
             vertex_buffer,
             index_buffer,
             index_cnt: shape::Floor::INDICES.len() as u32,

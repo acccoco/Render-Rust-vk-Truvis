@@ -1,7 +1,7 @@
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use imgui::Ui;
-use model_manager::component::mesh::SimpleMesh;
+use model_manager::component::Geometry;
 use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
 use model_manager::vertex::VertexLayout;
 use std::cell::RefCell;
@@ -37,7 +37,7 @@ pub struct PushConstants {
 }
 
 struct ShaderToy {
-    rectangle: SimpleMesh,
+    rectangle: Geometry,
     pipeline: RhiGraphicsPipeline,
 }
 
