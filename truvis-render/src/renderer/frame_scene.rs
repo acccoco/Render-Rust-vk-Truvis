@@ -1,5 +1,5 @@
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::scene_manager::SceneManager;
+use crate::renderer::scene_manager::TheWorld;
 use glam::Vec4Swizzles;
 use model_manager::component::mesh::SimpleMesh;
 use shader_binding::shader;
@@ -15,7 +15,7 @@ struct DrawMesh {
     mat_id: uuid::Uuid,
 }
 
-/// 每一帧的场景数据
+/// 用于构建传输到 GPU 的场景数据
 pub struct GpuScene {
     gpu_meshes: Vec<DrawMesh>,
 
@@ -28,13 +28,12 @@ pub struct GpuScene {
     /// 📦：index in mats
     mat_map: HashMap<uuid::Uuid, usize>,
 
-    scene_mgr: Rc<RefCell<SceneManager>>,
+    scene_mgr: Rc<RefCell<TheWorld>>,
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
 
 impl GpuScene {
-    /// 准备场景数据，将 CPU 侧的数据转换为 GPU 侧的数据
-    pub fn new(scene_mgr: Rc<RefCell<SceneManager>>, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new(scene_mgr: Rc<RefCell<TheWorld>>, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         Self {
             gpu_meshes: Vec::new(),
             gpu_mats: Vec::new(),
@@ -61,7 +60,7 @@ impl GpuScene {
     pub fn draw(&self, cmd: &RhiCommandBuffer, before_draw: &mut dyn FnMut(u32)) {
         for (ins_idx, sub_mesh) in self.gpu_meshes.iter().enumerate() {
             let scene_mgr = self.scene_mgr.borrow();
-            let mesh = scene_mgr.mesh_map.get(&sub_mesh.mesh_id).unwrap();
+            let mesh = scene_mgr._mesh_map.get(&sub_mesh.mesh_id).unwrap();
 
             cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&mesh.vertex_buffer), &[0]);
             cmd.cmd_bind_index_buffer(&mesh.index_buffer, 0, SimpleMesh::index_type());
@@ -76,7 +75,7 @@ impl GpuScene {
         self.gpu_meshes = self
             .scene_mgr
             .borrow()
-            .instance_map
+            ._instance_map
             .iter()
             .flat_map(|(ins_id, ins)| {
                 zip(ins.meshes.iter(), ins.mats.iter()).map(|(mesh_id, mat_id)| DrawMesh {
@@ -111,7 +110,7 @@ impl GpuScene {
         buffer.instance_count.x = self.gpu_meshes.len() as u32;
         for (ins_idx, draw_mesh) in self.gpu_meshes.iter().enumerate() {
             let scene_mgr = self.scene_mgr.borrow();
-            let instance = scene_mgr.instance_map.get(&draw_mesh.ins_id).unwrap();
+            let instance = scene_mgr._instance_map.get(&draw_mesh.ins_id).unwrap();
             buffer.instances[ins_idx] = shader::SubMesh {
                 model: instance.transform.into(),
                 inv_model: instance.transform.inverse().into(),

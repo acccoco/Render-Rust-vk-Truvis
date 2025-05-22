@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use model_manager::component::instance::SimpleInstance;
-use model_manager::component::mat::SimpleMaterial;
+use model_manager::component::mat::{Geometry, Instance, Mesh, SimpleMaterial};
 use model_manager::component::mesh::SimpleMesh;
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
@@ -60,9 +60,9 @@ impl AssimpSceneLoader {
                 instances: vec![],
             };
 
-            scene_loader.load_geometry(rhi, mesh_register);
+            scene_loader.load_geometry_old(rhi, mesh_register);
             scene_loader.load_mats(rhi, mat_register);
-            scene_loader.load_instance(instance_register);
+            scene_loader.load_instance_old(instance_register);
 
             free_scene(loader);
 
@@ -71,7 +71,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载一个场景中最基础的几何体
-    fn load_geometry(&mut self, rhi: &Rhi, mesh_register: &mut dyn FnMut(SimpleMesh) -> uuid::Uuid) {
+    fn load_geometry_old(&mut self, rhi: &Rhi, mesh_register: &mut dyn FnMut(SimpleMesh) -> uuid::Uuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -115,6 +115,53 @@ impl AssimpSceneLoader {
         self.meshes = mesh_uuids;
     }
 
+    fn load_mesh(&mut self, rhi: &Rhi, mesh_register: &mut dyn FnMut(Mesh) -> uuid::Uuid) {
+        let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
+
+        let mesh_uuids = (0..mesh_cnt)
+            .map(|mesh_idx| unsafe {
+                let mesh = get_mesh(self.loader, mesh_idx);
+                let mesh = &*mesh;
+
+                if mesh.vertex_array_.is_null() {
+                    panic!("Mesh {} has no vertex data", mesh_idx);
+                }
+                let vertex_data =
+                    std::slice::from_raw_parts(mesh.vertex_array_ as *const Vertex3D, mesh.vertex_cnt_ as usize);
+
+                let vertex_buffer = VertexLayoutAos3D::create_vertex_buffer(
+                    rhi,
+                    vertex_data,
+                    format!("{}-mesh-{}", self.model_name, mesh_idx),
+                );
+
+                if mesh.face_array_.is_null() {
+                    panic!("Mesh {} has no index data", mesh_idx);
+                }
+                let index_data =
+                    std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
+                let index_buffer = RhiBuffer::new_index_buffer_sync(
+                    rhi,
+                    index_data,
+                    format!("{}-mesh-{}-indices", self.model_name, mesh_idx),
+                );
+
+                // 只有 single geometry 的 mesh
+                let mesh = Mesh {
+                    geometries: vec![Geometry {
+                        vertex_buffer,
+                        index_buffer,
+                        index_cnt: mesh.face_cnt_ * 3,
+                    }],
+                };
+
+                mesh_register(mesh)
+            })
+            .collect_vec();
+
+        self.meshes = mesh_uuids;
+    }
+
     /// 加载场景中的所有材质
     fn load_mats(&mut self, _rhi: &Rhi, mat_register: &mut dyn FnMut(SimpleMaterial) -> uuid::Uuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
@@ -145,7 +192,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中的所有 instance
-    fn load_instance(&mut self, instance_register: &mut dyn FnMut(SimpleInstance) -> uuid::Uuid) {
+    fn load_instance_old(&mut self, instance_register: &mut dyn FnMut(SimpleInstance) -> uuid::Uuid) {
         let instance_cnt = unsafe { get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)
             .filter_map(|instance_idx| unsafe {
@@ -178,6 +225,60 @@ impl AssimpSceneLoader {
                 };
 
                 Some(instance_register(instance))
+            })
+            .collect_vec();
+
+        self.instances = instances
+    }
+
+    /// 加载场景中的所有 instance
+    ///
+    /// 由于 Assimp 的复用层级是 geometry，而应用需要的复用层级是 mesh
+    ///
+    /// 因此将 Assimp 中的一个 Instance 拆分为多个 Instance，将其 geometry 提升为 mesh
+    fn load_instance(&mut self, mut instance_register: impl FnMut(Instance) -> uuid::Uuid) {
+        let instance_cnt = unsafe { get_instance_cnt(self.loader) };
+        let instances = (0..instance_cnt)
+            .filter_map(|instance_idx| unsafe {
+                let instance = get_instance(self.loader, instance_idx);
+                let instance = &*instance;
+
+                let mesh_cnt = instance.mesh_cnt_;
+                if mesh_cnt == 0 {
+                    None
+                } else {
+                    Some(instance)
+                }
+            })
+            .flat_map(|instance| unsafe {
+                let mesh_cnt = instance.mesh_cnt_;
+
+                let mat_indices = if !instance.mat_indices_.is_null() {
+                    std::slice::from_raw_parts(instance.mat_indices_, mesh_cnt as usize)
+                } else {
+                    &[]
+                };
+                let mesh_indices = if !instance.mesh_indices_.is_null() {
+                    std::slice::from_raw_parts(instance.mesh_indices_, mesh_cnt as usize)
+                } else {
+                    &[]
+                };
+
+                let mesh_uuids = mesh_indices.iter().map(|mesh_idx| self.meshes[*mesh_idx as usize]);
+                let mat_uuids = mat_indices.iter().map(|mat_idx| self.mats[*mat_idx as usize]);
+
+                let mut ins_uuids = vec![];
+                ins_uuids.reserve(mesh_cnt as usize);
+                for (mesh_uuid, mat_uuid) in std::iter::zip(mesh_uuids, mat_uuids) {
+                    let instance = Instance {
+                        transform: std::mem::transmute::<CxxMat4f, glam::Mat4>(instance.world_transform),
+                        mesh: mesh_uuid,
+                        materials: vec![mat_uuid],
+                    };
+                    ins_uuids.push(instance_register(instance));
+                }
+
+                ins_uuids.into_iter()
             })
             .collect_vec();
 

@@ -14,20 +14,20 @@ use truvis_render::render_pass::phong::Simple3DMainPass;
 use truvis_render::renderer::bindless::BindlessManager;
 use truvis_render::renderer::frame_scene::GpuScene;
 use truvis_render::renderer::framebuffer::FrameBuffer;
-use truvis_render::renderer::scene_manager::SceneManager;
+use truvis_render::renderer::scene_manager::TheWorld;
 use truvis_rhi::core::buffer::{RhiBDABuffer, RhiStageBuffer};
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::{basic::color::LabelColor, core::command_queue::RhiSubmitInfo, rhi::Rhi};
 
 struct PhongApp {
     _bindless_mgr: Rc<RefCell<BindlessManager>>,
-    _scene_mgr: Rc<RefCell<SceneManager>>,
+    _scene_mgr: Rc<RefCell<TheWorld>>,
 
     frame_data_buffers: Vec<RhiBDABuffer<shader::FrameData>>,
     frame_data_stage_buffers: Vec<RhiStageBuffer<shader::FrameData>>,
 
     main_pass: Simple3DMainPass,
-    frame_scene: GpuScene,
+    gpu_scene_builder: GpuScene,
 
     /// BOX
     _cube: SimpleMesh,
@@ -56,20 +56,20 @@ impl OuterApp for PhongApp {
             .map(|idx| RhiStageBuffer::<shader::FrameData>::new(rhi, format!("frame-data-buffer-{idx}-stage-buffer")))
             .collect_vec();
 
-        let mut scene_mgr = SceneManager::new(bindless_mgr.clone());
+        let mut scene_mgr = TheWorld::new(bindless_mgr.clone());
         // 复制多个 instance
-        let ins_id = scene_mgr.register_model(rhi, std::path::Path::new("assets/obj/spot.obj"), &glam::Mat4::IDENTITY);
-        let ins = scene_mgr.instance_map.get(&ins_id[0]).unwrap().clone();
+        let ins_id = scene_mgr.load_scene(rhi, std::path::Path::new("assets/obj/spot.obj"), &glam::Mat4::IDENTITY);
+        let ins = scene_mgr._instance_map.get(&ins_id[0]).unwrap().clone();
         let ins_1 = SimpleInstance {
             transform: glam::Mat4::from_translation(glam::vec3(5.0, 0.0, 0.0)),
             ..ins.clone()
         };
-        scene_mgr.register_instance(ins_1);
+        scene_mgr.register_instance_old(ins_1);
         let ins_2 = SimpleInstance {
             transform: glam::Mat4::from_translation(glam::vec3(0.0, 5.0, 0.0)),
             ..ins.clone()
         };
-        scene_mgr.register_instance(ins_2);
+        scene_mgr.register_instance_old(ins_2);
         scene_mgr.register_point_light(shader::PointLight {
             pos: glam::vec3(-20.0, 40.0, 0.0).into(),
             color: (glam::vec3(5.0, 6.0, 1.0) * 2.0).into(),
@@ -85,7 +85,7 @@ impl OuterApp for PhongApp {
             color: (glam::vec3(5.0, 1.0, 8.0) * 3.0).into(),
             ..Default::default()
         });
-        scene_mgr.register_model(
+        scene_mgr.load_scene(
             rhi,
             std::path::Path::new("assets/fbx/sponza/Sponza.fbx"),
             &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
@@ -103,7 +103,7 @@ impl OuterApp for PhongApp {
             glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
 
-        let frame_scene = GpuScene::new(scene_mgr.clone(), bindless_mgr.clone());
+        let gpu_scene_builder = GpuScene::new(scene_mgr.clone(), bindless_mgr.clone());
 
         // 更新相机的初始状态
         {
@@ -117,7 +117,7 @@ impl OuterApp for PhongApp {
             _bindless_mgr: bindless_mgr,
             frame_data_buffers,
             frame_data_stage_buffers,
-            frame_scene,
+            gpu_scene_builder,
             _scene_mgr: scene_mgr,
             main_pass,
             _cube: cube,
@@ -135,7 +135,7 @@ impl OuterApp for PhongApp {
         // 直接使用 TruvisApp 中的 camera_controller，无需再创建新的实例
 
         // 将场景数据写入到帧缓冲区
-        self.frame_scene.prepare_render_data(app_ctx.render_context.current_frame_label());
+        self.gpu_scene_builder.prepare_render_data(app_ctx.render_context.current_frame_label());
         let frame_data_stage_buffer = &mut self.frame_data_stage_buffers[frame_idx];
         frame_data_stage_buffer.transfer(&|data: &mut shader::FrameData| {
             let mouse_pos = app_ctx.input_state.crt_mouse_pos;
@@ -160,7 +160,7 @@ impl OuterApp for PhongApp {
                 y: extent.height as f32,
             };
 
-            self.frame_scene.write_to_buffer(data);
+            self.gpu_scene_builder.write_to_buffer(data);
         });
 
         // 将数据从 stage buffe 传输到 uniform buffer
@@ -220,7 +220,7 @@ impl OuterApp for PhongApp {
                     frame_data: self.frame_data_buffers[frame_id].device_address(),
                     ..Default::default()
                 },
-                &self.frame_scene,
+                &self.gpu_scene_builder,
                 app_ctx.render_context.current_frame_label(),
             );
             cmd.end_label();
