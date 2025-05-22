@@ -1,12 +1,79 @@
 #pragma once
 #include "common.slangi"
-
-#include "instance.slangi"
 #include "light.slangi"
-#include "mat.slangi"
 
-struct FrameData
+
+struct Instance {
+    uint geometry_start_idx;
+    uint geometry_count;
+    uint material_start_idx;
+    uint material_count;
+
+    float4x4 model;
+    float4x4 inv_model;
+};
+
+
+struct Geometry {
+    PTR(float3) position_buffer;
+    PTR(uint) index_buffer;
+
+    PTR(float3) normal_buffer;
+    PTR(float2) uv_buffer;
+};
+
+struct PBRMaterial
 {
+    float3 base_color;
+    float metallic;
+
+    float3 emissive;
+    float roughness;
+
+    uint diffuse_map;
+    uint normal_map;
+    uint _padding_1;
+    uint _padding_2;
+};
+
+
+struct Scene {
+    PTR(PBRMaterial) all_mats;
+    PTR(Geometry) all_geometries;
+
+    PTR(uint) instance_material_map;
+    PTR(uint) instance_geometry_map;
+
+    PTR(PointLight) point_lights;
+    PTR(SpotLight) spot_lights;
+
+    PTR(Instance) all_instances;
+    uint point_light_count;
+    uint spot_light_count;
+
+#ifdef __SLANG__
+    /// 根据 instance idx 和 submesh idx 获取 geometry
+    PTR(Geometry) get_geometry(uint instance_idx, uint submesh_idx)  {
+        PTR(Instance) instance = all_instances + instance_idx;
+        uint geometry_map_idx = instance->geometry_start_idx + submesh_idx;
+        uint geometry_idx = instance_geometry_map[geometry_map_idx];
+        PTR(Geometry) geometry = all_geometries + geometry_idx;
+        return geometry;
+    }
+
+    /// 根据 instance idx 和 submesh idx 获取 material
+    PTR(PBRMaterial) get_material(uint instance_idx, uint submesh_idx)  {
+        PTR(Instance) instance = all_instances + instance_idx;
+        uint material_map_idx = instance->material_start_idx + submesh_idx;
+        uint material_idx = instance_material_map[material_map_idx];
+        PTR(PBRMaterial) material = all_mats + material_idx;
+        return material;
+    }
+#endif
+};
+
+/// 渲染需要的一些公用参数，每帧更新
+struct PerFrameData {
     float4x4 projection;
     float4x4 view;
 
@@ -21,19 +88,12 @@ struct FrameData
 
     uint64_t frame_id;
     uint64_t _padding_1;
-
-    LightData light_data;
-    MatData mat_data;
-    InstanceData ins_data;
 };
 
-struct DrawData
-{
-    Ptr(FrameData) frame_data;
+struct PushConstants {
+    PTR(PerFrameData) frame_data;
+    PTR(Scene) scene;
 
-    uint instance_id;
-    uint _padding_1;
-    uint _padding_2;
-    uint _padding_3;
+    uint instance_idx;
+    uint submesh_idx;
 };
-

@@ -14,7 +14,7 @@ use truvis_render::renderer::bindless::BindlessManager;
 use truvis_render::renderer::frame_scene::GpuScene;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_render::renderer::scene_manager::TheWorld;
-use truvis_rhi::core::buffer::{RhiBDABuffer, RhiStageBuffer};
+use truvis_rhi::core::buffer::{RhiStructuredBuffer, RhiStageBuffer};
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::{basic::color::LabelColor, core::command_queue::RhiSubmitInfo, rhi::Rhi};
 
@@ -22,7 +22,7 @@ struct PhongApp {
     _bindless_mgr: Rc<RefCell<BindlessManager>>,
     _scene_mgr: Rc<RefCell<TheWorld>>,
 
-    frame_data_buffers: Vec<RhiBDABuffer<shader::FrameData>>,
+    frame_data_buffers: Vec<RhiStructuredBuffer<shader::FrameData>>,
     frame_data_stage_buffers: Vec<RhiStageBuffer<shader::FrameData>>,
 
     main_pass: Simple3DMainPass,
@@ -48,7 +48,7 @@ impl OuterApp for PhongApp {
 
         let frame_data_buffers = (0..render_context.frame_cnt_in_flight)
             .into_iter()
-            .map(|idx| RhiBDABuffer::<shader::FrameData>::new_ubo(rhi, format!("frame-data-buffer-{idx}")))
+            .map(|idx| RhiStructuredBuffer::<shader::FrameData>::new_ubo(rhi, format!("frame-data-buffer-{idx}")))
             .collect_vec();
         let frame_data_stage_buffers = (0..render_context.frame_cnt_in_flight)
             .into_iter()
@@ -159,7 +159,7 @@ impl OuterApp for PhongApp {
                 y: extent.height as f32,
             };
 
-            self.gpu_scene_builder.write_to_buffer(data);
+            self.gpu_scene_builder.upload_to_buffer(data);
         });
 
         // 将数据从 stage buffe 传输到 uniform buffer

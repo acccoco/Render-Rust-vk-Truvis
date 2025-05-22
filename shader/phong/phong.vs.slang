@@ -21,20 +21,21 @@ struct VsOutput
 };
 
 [[vk::push_constant]]
-DrawData draw_data;
+PushConstants push_const;
 
 [shader("vertex")]
 VsOutput main(VsInput input)
 {
-    const SubMesh mesh = draw_data.frame_data.ins_data.instances[draw_data.instance_id];
+    Instance* instance = push_const.scene.all_instances + push_const.instance_idx;
+    PerFrameData* frame_data = push_const.frame_data;
 
     VsOutput output = (VsOutput)0;
 
-    const float4x4 mvp = mul(draw_data.frame_data.projection, mul(draw_data.frame_data.view, mesh.model));
+    const float4x4 mvp = mul(frame_data->projection, mul(frame_data->view, instance->model));
     output.pos = mul(mvp, float4(input.pos, 1.0));
-    output.coarse_vertex.world_pos = mul(mesh.model, float4(input.pos, 1.0)).xyz;
+    output.coarse_vertex.world_pos = mul(instance->model, float4(input.pos, 1.0)).xyz;
     output.coarse_vertex.uv = input.uv;
-    output.coarse_vertex.frag_normal = mul(mesh.inv_model, float4(input.normal, 0.0)).xyz;
+    output.coarse_vertex.frag_normal = mul(instance->inv_model, float4(input.normal, 0.0)).xyz;
 
     return output;
 }

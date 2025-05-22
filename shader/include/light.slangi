@@ -23,11 +23,3 @@ struct SpotLight
     float _dir_padding;
 };
 
-/// 场景中所有的点光源
-struct LightData
-{
-    /// 0: point light, 1: spot light
-    uint4 light_count;
-    PointLight lights[256];
-    SpotLight spot_lights[256];
-};

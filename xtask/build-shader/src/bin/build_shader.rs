@@ -205,7 +205,7 @@ fn compile_one_dir(dir: &std::path::Path) {
             need_re_compile
         })
         .for_each(|entry| {
-            log::info!("compile shader: \n{:#?}", entry);
+            log::info!("compile shader: {:?}", entry.shader_path);
             // 确保 entry.output_path 是存在的
             std::fs::create_dir_all(entry.output_path.parent().unwrap()).unwrap();
             match entry.shader_type {
@@ -227,7 +227,7 @@ fn compile_all_shader() {
         })
         .filter(|entry| entry.as_ref().unwrap().path().is_dir())
         .for_each(|entry| {
-            log::info!("compile shader in dir: {:#?}", entry.as_ref().unwrap().path());
+            log::info!("in dir: {:#?}", entry.as_ref().unwrap().path());
             compile_one_dir(&entry.unwrap().path())
         });
 }

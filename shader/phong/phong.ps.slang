@@ -13,7 +13,7 @@ struct PsOutput
 };
 
 [[vk::push_constant]]
-DrawData draw_data;
+PushConstants push_const;
 
 // TODO 可能需要 nonuniform，表示同一个 wavefront 的下标是不同的
 [[vk::binding(0, 0)]]
@@ -53,9 +53,12 @@ PsOutput main(PsInput input)
 {
     const float3 normal = normalize(input.coarse_vertex.frag_normal);
 
-    const uint light_cnt = draw_data.frame_data.light_data.light_count.x;
-    const uint mat_id = draw_data.frame_data.ins_data.instances[draw_data.instance_id].mat_id;
-    const PBRMaterial mat = draw_data.frame_data.mat_data.materials[mat_id];
+    PerFrameData* frame_data = push_const.frame_data;
+    Scene* scene = push_const.scene;
+    Instance* instance = scene.all_instances + push_const.instance_idx;
+    PBRMaterial* mat = scene->get_material(push_const.instance_idx, push_const.submesh_idx);
+
+    const uint light_cnt = scene.point_light_count.x;
     const uint diffuse_map_id = mat.diffuse_map;
 
     const float2 uv = input.coarse_vertex.uv;
@@ -64,8 +67,8 @@ PsOutput main(PsInput input)
     float3 light_term = float3(0.0, 0.0, 0.0);
     for (uint i = 0; i < light_cnt; i++)
     {
-        const PointLight point_light = draw_data.frame_data.light_data.lights[i];
-        light_term += phong_light(draw_data.frame_data.camera_pos, input.coarse_vertex.world_pos, normal, point_light, object_color);
+        const PointLight point_light = scene.point_lights[i];
+        light_term += phong_light(frame_data.camera_pos, input.coarse_vertex.world_pos, normal, point_light, object_color);
     }
 
     const float3 min_color = object_color.xyz * 0.5;
