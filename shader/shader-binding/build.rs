@@ -5,11 +5,28 @@ fn main() {
 fn gen_rust_binding() {
     // 创建自定义回调实现
     #[derive(Debug)]
-    struct PodTraitAdder;
+    struct ModifyAdder;
 
-    impl bindgen::callbacks::ParseCallbacks for PodTraitAdder {
+    impl bindgen::callbacks::ParseCallbacks for ModifyAdder {
         fn item_name(&self, _original_name: &str) -> Option<String> {
-            None
+            match _original_name {
+                "uint" => Some("Uint".to_string()),
+                "uint2" => Some("Uint2".to_string()),
+                "uint3" => Some("Uint3".to_string()),
+                "uint4" => Some("Uint4".to_string()),
+
+                "int2" => Some("Int2".to_string()),
+                "int3" => Some("Int3".to_string()),
+                "int4" => Some("Int4".to_string()),
+
+                "float2" => Some("Float2".to_string()),
+                "float3" => Some("Float3".to_string()),
+                "float4" => Some("Float4".to_string()),
+
+                "float4x4" => Some("Float4x4".to_string()),
+
+                &_ => None,
+            }
         }
 
         fn add_derives(&self, info: &bindgen::callbacks::DeriveInfo) -> Vec<String> {
@@ -33,10 +50,10 @@ fn gen_rust_binding() {
     let bindings = bindgen::Builder::default()
         .header("rust_ffi.hpp")
         .derive_default(true)
-        // 添加 bytemuck 的 Pod 和 Zeroable traits
-        // .raw_line("use bytemuck::{Pod, Zeroable};")
+        // 禁用 clippy 的检查
+        .raw_line("#![allow(clippy::all)]")
         // 添加自定义回调
-        .parse_callbacks(Box::new(PodTraitAdder))
+        .parse_callbacks(Box::new(ModifyAdder))
         // 同时保留 cargo 回调
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()

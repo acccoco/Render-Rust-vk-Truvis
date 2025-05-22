@@ -7,15 +7,15 @@ pub mod shader {
 mod slang_traits {
     use crate::_shader_bindings::*;
 
-    impl From<glam::UVec2> for uint2 {
+    impl From<glam::UVec2> for Uint2 {
         fn from(value: glam::UVec2) -> Self {
-            uint2 { x: value.x, y: value.y }
+            Uint2 { x: value.x, y: value.y }
         }
     }
 
-    impl From<glam::UVec3> for uint3 {
+    impl From<glam::UVec3> for Uint3 {
         fn from(value: glam::UVec3) -> Self {
-            uint3 {
+            Uint3 {
                 x: value.x,
                 y: value.y,
                 z: value.z,
@@ -23,9 +23,9 @@ mod slang_traits {
         }
     }
 
-    impl From<glam::UVec4> for uint4 {
+    impl From<glam::UVec4> for Uint4 {
         fn from(value: glam::UVec4) -> Self {
-            uint4 {
+            Uint4 {
                 x: value.x,
                 y: value.y,
                 z: value.z,
@@ -34,15 +34,15 @@ mod slang_traits {
         }
     }
 
-    impl From<glam::IVec2> for int2 {
+    impl From<glam::IVec2> for Int2 {
         fn from(value: glam::IVec2) -> Self {
-            int2 { x: value.x, y: value.y }
+            Int2 { x: value.x, y: value.y }
         }
     }
 
-    impl From<glam::IVec3> for int3 {
+    impl From<glam::IVec3> for Int3 {
         fn from(value: glam::IVec3) -> Self {
-            int3 {
+            Int3 {
                 x: value.x,
                 y: value.y,
                 z: value.z,
@@ -50,9 +50,9 @@ mod slang_traits {
         }
     }
 
-    impl From<glam::IVec4> for int4 {
+    impl From<glam::IVec4> for Int4 {
         fn from(value: glam::IVec4) -> Self {
-            int4 {
+            Int4 {
                 x: value.x,
                 y: value.y,
                 z: value.z,
@@ -61,15 +61,15 @@ mod slang_traits {
         }
     }
 
-    impl From<glam::Vec2> for float2 {
+    impl From<glam::Vec2> for Float2 {
         fn from(value: glam::Vec2) -> Self {
-            float2 { x: value.x, y: value.y }
+            Float2 { x: value.x, y: value.y }
         }
     }
 
-    impl From<glam::Vec3> for float3 {
+    impl From<glam::Vec3> for Float3 {
         fn from(value: glam::Vec3) -> Self {
-            float3 {
+            Float3 {
                 x: value.x,
                 y: value.y,
                 z: value.z,
@@ -77,9 +77,9 @@ mod slang_traits {
         }
     }
 
-    impl From<glam::Vec4> for float4 {
+    impl From<glam::Vec4> for Float4 {
         fn from(value: glam::Vec4) -> Self {
-            float4 {
+            Float4 {
                 x: value.x,
                 y: value.y,
                 z: value.z,
@@ -88,13 +88,13 @@ mod slang_traits {
         }
     }
 
-    impl From<glam::Mat4> for float4x4 {
+    impl From<glam::Mat4> for Float4x4 {
         fn from(value: glam::Mat4) -> Self {
-            float4x4 {
-                col0: float4::from(value.x_axis),
-                col1: float4::from(value.y_axis),
-                col2: float4::from(value.z_axis),
-                col3: float4::from(value.w_axis),
+            Float4x4 {
+                col0: Float4::from(value.x_axis),
+                col1: Float4::from(value.y_axis),
+                col2: Float4::from(value.z_axis),
+                col3: Float4::from(value.w_axis),
             }
         }
     }

@@ -151,11 +151,11 @@ impl OuterApp for PhongApp {
             data.time_ms = app_ctx.timer.duration.as_millis() as f32;
             data.delta_time_ms = app_ctx.timer.delta_time_s * 1000.0;
             data.frame_id = app_ctx.render_context.current_frame_num() as u64;
-            data.mouse_pos = shader::float2 {
+            data.mouse_pos = shader::Float2 {
                 x: mouse_pos.x as f32,
                 y: mouse_pos.y as f32,
             };
-            data.resolution = shader::float2 {
+            data.resolution = shader::Float2 {
                 x: extent.width as f32,
                 y: extent.height as f32,
             };
