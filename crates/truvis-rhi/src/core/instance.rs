@@ -136,7 +136,8 @@ impl RhiInstance {
     fn get_layers(vk_entry: &ash::Entry) -> Vec<*const c_char> {
         let all_layer_props = unsafe { vk_entry.enumerate_instance_layer_properties().unwrap() };
 
-        let mut validation_layers = Vec::new();
+        // 存储所有支持的 layers
+        let mut valid_layers = Vec::new();
 
         // 检查并启用某个 instance layer
         let mut enable_layer = |layer: &'static CStr| {
@@ -144,7 +145,7 @@ impl RhiInstance {
                 .iter()
                 .any(|available_layer| layer == unsafe { CStr::from_ptr(available_layer.layer_name.as_ptr()) });
             if is_layer_supported {
-                validation_layers.push(layer);
+                valid_layers.push(layer);
             } else {
                 panic!("Required instance layers ({:?}) are missing", layer);
             }
@@ -154,7 +155,7 @@ impl RhiInstance {
             enable_layer(layer);
         }
 
-        validation_layers.iter().map(|ext| ext.as_ptr()).collect_vec()
+        valid_layers.iter().map(|ext| ext.as_ptr()).collect_vec()
     }
 
     /// 必须要开启的 instance layers
