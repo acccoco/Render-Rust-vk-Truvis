@@ -122,7 +122,7 @@ impl OuterApp for PhongApp {
         ui.text_wrapped("こんにちは世界！");
     }
     fn update(&mut self, app_ctx: &mut AppCtx) {
-        let frame_label = app_ctx.render_context.current_frame_label();
+        let crt_frame_label = app_ctx.render_context.current_frame_label();
 
         // 准备好当前帧的数据
         let per_frame_data = {
@@ -153,9 +153,6 @@ impl OuterApp for PhongApp {
             }
         };
 
-        // 将场景数据写入到帧缓冲区
-        self.gpu_scene.prepare_render_data(app_ctx.render_context.current_frame_label());
-
         // 将数据上传到 gpu buffer 中
         let cmd = app_ctx.render_context.alloc_command_buffer("update-draw-buffer");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
@@ -167,13 +164,18 @@ impl OuterApp for PhongApp {
             dst_access: vk::AccessFlags2::SHADER_READ,
         };
 
-        self.gpu_scene.upload_to_buffer(frame_label, &cmd, transfer_barrier_mask);
+        self.gpu_scene.prepare_render_data(crt_frame_label);
+        self.gpu_scene.upload_to_buffer(crt_frame_label, &cmd, transfer_barrier_mask);
 
-        cmd.cmd_update_buffer(self.frame_data_buffers[frame_label].handle(), 0, bytemuck::bytes_of(&per_frame_data));
+        cmd.cmd_update_buffer(
+            self.frame_data_buffers[crt_frame_label].handle(),
+            0,
+            bytemuck::bytes_of(&per_frame_data),
+        );
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
             &[RhiBufferBarrier::default()
-                .buffer(self.frame_data_buffers[frame_label].handle(), 0, vk::WHOLE_SIZE)
+                .buffer(self.frame_data_buffers[crt_frame_label].handle(), 0, vk::WHOLE_SIZE)
                 .mask(transfer_barrier_mask)],
         );
         cmd.end();
@@ -181,7 +183,7 @@ impl OuterApp for PhongApp {
     }
 
     fn draw(&self, app_ctx: &mut AppCtx) {
-        let frame_label = app_ctx.render_context.current_frame_label();
+        let crt_frame_label = app_ctx.render_context.current_frame_label();
 
         let color_attach = FrameBuffer::get_color_attachment(app_ctx.render_context.current_present_image_view());
         let depth_attach = FrameBuffer::get_depth_attachment(app_ctx.render_context.depth_view.handle());
@@ -208,12 +210,12 @@ impl OuterApp for PhongApp {
                 &cmd,
                 app_ctx,
                 &shader::PushConstants {
-                    frame_data: self.frame_data_buffers[frame_label].device_address(),
-                    scene: self.gpu_scene.scene_device_address(frame_label),
+                    frame_data: self.frame_data_buffers[crt_frame_label].device_address(),
+                    scene: self.gpu_scene.scene_device_address(crt_frame_label),
                     ..Default::default()
                 },
                 &self.gpu_scene,
-                app_ctx.render_context.current_frame_label(),
+                crt_frame_label,
             );
             cmd.end_label();
 

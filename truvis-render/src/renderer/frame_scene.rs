@@ -80,15 +80,15 @@ pub struct GpuScene {
     /// GPU 中以顺序存储的 instance
     ///
     /// CPU 执行绘制时，会使用这个顺序来绘制实例
-    gpu_instances: Vec<uuid::Uuid>,
+    flatten_instances: Vec<uuid::Uuid>,
 
     /// GPU 中以顺序存储的材质信息
-    gpu_mats: FlattenMap<uuid::Uuid>,
+    flatten_materials: FlattenMap<uuid::Uuid>,
 
     /// GPU 中以顺序存储的 mesh 信息
     ///
     /// 每个 mesh 会被分为多个 submesh，且每个 mesh 的 submesh 会被顺序存储
-    gpu_meshes: FlattenMap<uuid::Uuid>,
+    flatten_meshes: FlattenMap<uuid::Uuid>,
 
     /// mesh 在 geometry buffer 中的 idx
     mesh_geometry_map: HashMap<uuid::Uuid, usize>,
@@ -175,9 +175,9 @@ impl GpuScene {
             scene_mgr,
             bindless_mgr,
 
-            gpu_instances: vec![],
-            gpu_mats: FlattenMap::default(),
-            gpu_meshes: FlattenMap::default(),
+            flatten_instances: vec![],
+            flatten_materials: FlattenMap::default(),
+            flatten_meshes: FlattenMap::default(),
             mesh_geometry_map: HashMap::new(),
 
             gpu_buffers: (0..frame_in_flight)
@@ -198,9 +198,9 @@ impl GpuScene {
     pub fn prepare_render_data(&mut self, frame_idx: usize) {
         self.bindless_mgr.borrow_mut().prepare_render_data(frame_idx);
 
-        self.prepare_mat_data();
-        self.prepare_mesh_data();
-        self.prepare_instance_data();
+        self.flatten_material_data();
+        self.flatten_mesh_data();
+        self.flatten_instance_data();
     }
 
     /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
@@ -217,7 +217,7 @@ impl GpuScene {
     /// before_draw(instance_idx, submesh_idx)
     pub fn draw(&self, cmd: &RhiCommandBuffer, mut before_draw: impl FnMut(u32, u32)) {
         let scene_mgr = self.scene_mgr.borrow();
-        for (instance_idx, instance_uuid) in self.gpu_instances.iter().enumerate() {
+        for (instance_idx, instance_uuid) in self.flatten_instances.iter().enumerate() {
             let instance = scene_mgr.get_instance(instance_uuid).unwrap();
             let mesh = scene_mgr.get_mesh(&instance.mesh).unwrap();
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
@@ -235,44 +235,44 @@ impl GpuScene {
     /// # 注
     ///
     /// 后续绘制时，也会使用 instance vector 中的顺序和 index
-    fn prepare_instance_data(&mut self) {
+    fn flatten_instance_data(&mut self) {
         let scene_mgr = self.scene_mgr.borrow();
 
-        self.gpu_instances.clear();
-        self.gpu_instances.reserve(scene_mgr.instance_map.len());
+        self.flatten_instances.clear();
+        self.flatten_instances.reserve(scene_mgr.instance_map.len());
 
         for (instance_uuid, _) in scene_mgr.instance_map.iter() {
-            self.gpu_mats.insert(*instance_uuid);
+            self.flatten_instances.push(*instance_uuid);
         }
     }
 
     /// 在每一帧绘制之前，将所有的 mesh 转换为 Vector，准备上传到 GPU
     ///
     /// 记录每个 mesh 在 geometry buffer 中的起始 idx 和长度
-    fn prepare_mesh_data(&mut self) {
+    fn flatten_mesh_data(&mut self) {
         let scene_mgr = self.scene_mgr.borrow();
 
         self.mesh_geometry_map.clear();
-        self.gpu_meshes.clear();
-        self.gpu_meshes.reserve(scene_mgr.mesh_map.len());
+        self.flatten_meshes.clear();
+        self.flatten_meshes.reserve(scene_mgr.mesh_map.len());
 
         let mut geometry_idx = 0;
         for (mesh_id, mesh) in scene_mgr.mesh_map.iter() {
-            self.gpu_meshes.insert(*mesh_id);
+            self.flatten_meshes.insert(*mesh_id);
             self.mesh_geometry_map.insert(*mesh_id, geometry_idx);
             geometry_idx += mesh.geometries.len();
         }
     }
 
     /// 在每一帧的绘制之前，将所有的材质转换为 Vector，准备上传到 GPU
-    fn prepare_mat_data(&mut self) {
+    fn flatten_material_data(&mut self) {
         let scene_mgr = self.scene_mgr.borrow();
 
-        self.gpu_mats.clear();
-        self.gpu_mats.reserve(scene_mgr.mat_map.len());
+        self.flatten_materials.clear();
+        self.flatten_materials.reserve(scene_mgr.mat_map.len());
 
         for (mat_id, _) in scene_mgr.mat_map.iter() {
-            self.gpu_mats.insert(*mat_id);
+            self.flatten_materials.insert(*mat_id);
         }
     }
 
@@ -321,7 +321,7 @@ impl GpuScene {
         let material_indirect_buffer_slices = crt_material_indirect_stage_buffer.mapped_slice();
         let geometry_indirect_buffer_slices = crt_geometry_indirect_stage_buffer.mapped_slice();
 
-        if instance_buffer_slices.len() < self.gpu_instances.len() {
+        if instance_buffer_slices.len() < self.flatten_instances.len() {
             panic!("instance cnt can not be larger than buffer");
         }
 
@@ -329,7 +329,7 @@ impl GpuScene {
 
         let mut crt_geometry_indirect_idx = 0;
         let mut crt_material_indirect_idx = 0;
-        for (instance_idx, instance_uuid) in self.gpu_instances.iter().enumerate() {
+        for (instance_idx, instance_uuid) in self.flatten_instances.iter().enumerate() {
             let instance = scene_mgr.get_instance(instance_uuid).unwrap();
             let submesh_cnt = instance.materials.len();
             if geometry_indirect_buffer_slices.len() < crt_geometry_indirect_idx + submesh_cnt {
@@ -359,7 +359,7 @@ impl GpuScene {
             crt_geometry_indirect_idx += submesh_cnt;
 
             for material_uuid in instance.materials.iter() {
-                let material_idx = self.gpu_mats.at(material_uuid).unwrap();
+                let material_idx = self.flatten_materials.at(material_uuid).unwrap();
                 material_indirect_buffer_slices[crt_material_indirect_idx] = material_idx as u32;
                 crt_material_indirect_idx += 1;
             }
@@ -391,13 +391,13 @@ impl GpuScene {
         let crt_material_stage_buffer = &mut crt_gpu_buffers.material_stage_buffer;
         crt_material_stage_buffer.map();
         let material_buffer_slices = crt_material_stage_buffer.mapped_slice();
-        if material_buffer_slices.len() < self.gpu_mats.len() {
+        if material_buffer_slices.len() < self.flatten_materials.len() {
             panic!("material cnt can not be larger than buffer");
         }
 
         let scene_mgr = self.scene_mgr.borrow();
         let bindless_mgr = self.bindless_mgr.borrow();
-        for (mat_idx, mat_uuid) in self.gpu_mats.linear_storage.iter().enumerate() {
+        for (mat_idx, mat_uuid) in self.flatten_materials.linear_storage.iter().enumerate() {
             let mat = scene_mgr.mat_map.get(mat_uuid).unwrap();
             material_buffer_slices[mat_idx] = shader::PBRMaterial {
                 base_color: mat.diffuse.xyz().into(),
@@ -449,7 +449,7 @@ impl GpuScene {
         let scene_mgr = self.scene_mgr.borrow();
 
         let mut crt_geometry_idx = 0;
-        for mesh_uuid in self.gpu_meshes.linear_storage.iter() {
+        for mesh_uuid in self.flatten_meshes.linear_storage.iter() {
             let mesh = scene_mgr.mesh_map.get(mesh_uuid).unwrap();
             if geometry_buffer_slices.len() < crt_geometry_idx + mesh.geometries.len() {
                 panic!("geometry cnt can not be larger than buffer");
