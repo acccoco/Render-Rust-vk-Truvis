@@ -1,9 +1,9 @@
 use crate::renderer::bindless::BindlessManager;
+use model_manager::component::{Instance, Material, Mesh};
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use model_manager::component::{Instance, Mesh, Material};
 use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::rhi::Rhi;
 
@@ -32,6 +32,16 @@ impl TheWorld {
     #[inline]
     pub fn get_instance(&self, guid: &uuid::Uuid) -> Option<&Instance> {
         self.instance_map.get(guid)
+    }
+
+    #[inline]
+    pub fn get_mesh(&self, guid: &uuid::Uuid) -> Option<&Mesh> {
+        self.mesh_map.get(guid)
+    }
+
+    #[inline]
+    pub fn get_material(&self, guid: &uuid::Uuid) -> Option<&Material> {
+        self.mat_map.get(guid)
     }
 
     /// 向世界中添加一个外部场景

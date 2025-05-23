@@ -29,6 +29,8 @@ pub struct BindlessTextureBindings {
 
 pub struct BindlessManager {
     pub bindless_layout: RhiDescriptorSetLayout<BindlessTextureBindings>,
+
+    /// 每一个 frame in flights 都有一个 descriptor set
     pub bindless_sets: Vec<RhiDescriptorSet<BindlessTextureBindings>>,
 
     /// key: texture path

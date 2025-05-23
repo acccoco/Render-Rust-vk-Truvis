@@ -162,6 +162,15 @@ impl RhiImageBarrier {
     }
 }
 
+/// barrier 使用的 src 和 dst 访问 mask
+#[derive(Copy, Clone)]
+pub struct RhiBarrierMask {
+    pub src_stage: vk::PipelineStageFlags2,
+    pub dst_stage: vk::PipelineStageFlags2,
+    pub src_access: vk::AccessFlags2,
+    pub dst_access: vk::AccessFlags2,
+}
+
 pub struct RhiBufferBarrier {
     inner: vk::BufferMemoryBarrier2<'static>,
 }
@@ -180,11 +189,6 @@ impl Default for RhiBufferBarrier {
 
 impl RhiBufferBarrier {
     #[inline]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    #[inline]
     pub fn inner(&self) -> &vk::BufferMemoryBarrier2 {
         &self.inner
     }
@@ -200,6 +204,15 @@ impl RhiBufferBarrier {
     pub fn dst_mask(mut self, dst_stage_mask: vk::PipelineStageFlags2, dst_access_mask: vk::AccessFlags2) -> Self {
         self.inner.dst_stage_mask = dst_stage_mask;
         self.inner.dst_access_mask = dst_access_mask;
+        self
+    }
+
+    #[inline]
+    pub fn mask(mut self, mask: RhiBarrierMask) -> Self {
+        self.inner.src_stage_mask = mask.src_stage;
+        self.inner.dst_stage_mask = mask.dst_stage;
+        self.inner.src_access_mask = mask.src_access;
+        self.inner.dst_access_mask = mask.dst_access;
         self
     }
 

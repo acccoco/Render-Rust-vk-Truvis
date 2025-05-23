@@ -51,3 +51,4 @@ chrono = { workspace = true }
 env_logger = { workspace = true, features = ["default"] }
 anstyle = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
+scopeguard = { workspace = true }

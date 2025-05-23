@@ -1,11 +1,11 @@
 use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
+use model_manager::component::{Geometry, Instance};
 use model_manager::vertex::vertex_pnu::VertexLayoutAosPosNormalUv;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::rc::Rc;
-use model_manager::component::{Geometry, Instance};
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
 use truvis_render::frame_context::FrameContext;
 use truvis_render::platform::camera_controller::CameraController;
@@ -14,19 +14,18 @@ use truvis_render::renderer::bindless::BindlessManager;
 use truvis_render::renderer::frame_scene::GpuScene;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_render::renderer::scene_manager::TheWorld;
-use truvis_rhi::core::buffer::{RhiStructuredBuffer, RhiStageBuffer};
-use truvis_rhi::core::synchronize::RhiBufferBarrier;
+use truvis_rhi::core::buffer::RhiStructuredBuffer;
+use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 use truvis_rhi::{basic::color::LabelColor, core::command_queue::RhiSubmitInfo, rhi::Rhi};
 
 struct PhongApp {
     _bindless_mgr: Rc<RefCell<BindlessManager>>,
     _scene_mgr: Rc<RefCell<TheWorld>>,
 
-    frame_data_buffers: Vec<RhiStructuredBuffer<shader::FrameData>>,
-    frame_data_stage_buffers: Vec<RhiStageBuffer<shader::FrameData>>,
+    gpu_scene: GpuScene,
+    frame_data_buffers: Vec<RhiStructuredBuffer<shader::PerFrameData>>,
 
     main_pass: Simple3DMainPass,
-    gpu_scene_builder: GpuScene,
 
     /// BOX
     _cube: Geometry,
@@ -47,12 +46,7 @@ impl OuterApp for PhongApp {
         let cube = VertexLayoutAosPosNormalUv::cube(rhi);
 
         let frame_data_buffers = (0..render_context.frame_cnt_in_flight)
-            .into_iter()
-            .map(|idx| RhiStructuredBuffer::<shader::FrameData>::new_ubo(rhi, format!("frame-data-buffer-{idx}")))
-            .collect_vec();
-        let frame_data_stage_buffers = (0..render_context.frame_cnt_in_flight)
-            .into_iter()
-            .map(|idx| RhiStageBuffer::<shader::FrameData>::new(rhi, format!("frame-data-buffer-{idx}-stage-buffer")))
+            .map(|idx| RhiStructuredBuffer::<shader::PerFrameData>::new_ubo(rhi, 1, format!("frame-data-buffer-{idx}")))
             .collect_vec();
 
         let mut scene_mgr = TheWorld::new(bindless_mgr.clone());
@@ -102,7 +96,7 @@ impl OuterApp for PhongApp {
             glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
 
-        let gpu_scene_builder = GpuScene::new(scene_mgr.clone(), bindless_mgr.clone());
+        let gpu_scene = GpuScene::new(rhi, scene_mgr.clone(), bindless_mgr.clone(), render_context.frame_cnt_in_flight);
 
         // 更新相机的初始状态
         {
@@ -115,8 +109,7 @@ impl OuterApp for PhongApp {
         Self {
             _bindless_mgr: bindless_mgr,
             frame_data_buffers,
-            frame_data_stage_buffers,
-            gpu_scene_builder,
+            gpu_scene,
             _scene_mgr: scene_mgr,
             main_pass,
             _cube: cube,
@@ -129,67 +122,66 @@ impl OuterApp for PhongApp {
         ui.text_wrapped("こんにちは世界！");
     }
     fn update(&mut self, app_ctx: &mut AppCtx) {
-        let frame_idx = app_ctx.render_context.current_frame_label();
+        let frame_label = app_ctx.render_context.current_frame_label();
 
-        // 直接使用 TruvisApp 中的 camera_controller，无需再创建新的实例
-
-        // 将场景数据写入到帧缓冲区
-        self.gpu_scene_builder.prepare_render_data(app_ctx.render_context.current_frame_label());
-        let frame_data_stage_buffer = &mut self.frame_data_stage_buffers[frame_idx];
-        frame_data_stage_buffer.transfer(&|data: &mut shader::FrameData| {
+        // 准备好当前帧的数据
+        let per_frame_data = {
             let mouse_pos = app_ctx.input_state.crt_mouse_pos;
             let extent = app_ctx.render_context.swapchain_extent();
 
             // 从共享的相机控制器获取相机数据
             let camera_controller = self.camera_controller.borrow();
             let camera = camera_controller.camera();
-            data.projection = camera.get_projection_matrix().into();
-            data.view = camera.get_view_matrix().into();
-            data.camera_pos = camera.position.into();
-            data.camera_forward = camera.camera_forward().into();
-            data.time_ms = app_ctx.timer.duration.as_millis() as f32;
-            data.delta_time_ms = app_ctx.timer.delta_time_s * 1000.0;
-            data.frame_id = app_ctx.render_context.current_frame_num() as u64;
-            data.mouse_pos = shader::Float2 {
-                x: mouse_pos.x as f32,
-                y: mouse_pos.y as f32,
-            };
-            data.resolution = shader::Float2 {
-                x: extent.width as f32,
-                y: extent.height as f32,
-            };
 
-            self.gpu_scene_builder.upload_to_buffer(data);
-        });
+            shader::PerFrameData {
+                projection: camera.get_projection_matrix().into(),
+                view: camera.get_view_matrix().into(),
+                camera_pos: camera.position.into(),
+                camera_forward: camera.camera_forward().into(),
+                time_ms: app_ctx.timer.duration.as_millis() as f32,
+                delta_time_ms: app_ctx.timer.delta_time_s * 1000.0,
+                frame_id: app_ctx.render_context.current_frame_num() as u64,
+                mouse_pos: shader::Float2 {
+                    x: mouse_pos.x as f32,
+                    y: mouse_pos.y as f32,
+                },
+                resolution: shader::Float2 {
+                    x: extent.width as f32,
+                    y: extent.height as f32,
+                },
+                ..Default::default()
+            }
+        };
 
-        // 将数据从 stage buffe 传输到 uniform buffer
+        // 将场景数据写入到帧缓冲区
+        self.gpu_scene.prepare_render_data(app_ctx.render_context.current_frame_label());
+
+        // 将数据上传到 gpu buffer 中
         let cmd = app_ctx.render_context.alloc_command_buffer("update-draw-buffer");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
-        cmd.cmd_copy_buffer(
-            &self.frame_data_stage_buffers[frame_idx],
-            &mut self.frame_data_buffers[frame_idx],
-            &[vk::BufferCopy {
-                src_offset: 0,
-                dst_offset: 0,
-                size: self.frame_data_stage_buffers[frame_idx].size(),
-            }],
-        );
+
+        let transfer_barrier_mask = RhiBarrierMask {
+            src_stage: vk::PipelineStageFlags2::TRANSFER,
+            src_access: vk::AccessFlags2::TRANSFER_WRITE,
+            dst_stage: vk::PipelineStageFlags2::VERTEX_SHADER | vk::PipelineStageFlags2::FRAGMENT_SHADER,
+            dst_access: vk::AccessFlags2::SHADER_READ,
+        };
+
+        self.gpu_scene.upload_to_buffer(frame_label, &cmd, transfer_barrier_mask);
+
+        cmd.cmd_update_buffer(self.frame_data_buffers[frame_label].handle(), 0, bytemuck::bytes_of(&per_frame_data));
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
             &[RhiBufferBarrier::default()
-                .buffer(self.frame_data_buffers[frame_idx].handle(), 0, vk::WHOLE_SIZE)
-                .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
-                .dst_mask(
-                    vk::PipelineStageFlags2::VERTEX_SHADER | vk::PipelineStageFlags2::FRAGMENT_SHADER,
-                    vk::AccessFlags2::SHADER_READ,
-                )],
+                .buffer(self.frame_data_buffers[frame_label].handle(), 0, vk::WHOLE_SIZE)
+                .mask(transfer_barrier_mask)],
         );
         cmd.end();
         app_ctx.render_context.graphics_queue().submit(vec![RhiSubmitInfo::new(std::slice::from_ref(&cmd))], None);
     }
 
     fn draw(&self, app_ctx: &mut AppCtx) {
-        let frame_id = app_ctx.render_context.current_frame_label();
+        let frame_label = app_ctx.render_context.current_frame_label();
 
         let color_attach = FrameBuffer::get_color_attachment(app_ctx.render_context.current_present_image_view());
         let depth_attach = FrameBuffer::get_depth_attachment(app_ctx.render_context.depth_view.handle());
@@ -214,12 +206,13 @@ impl OuterApp for PhongApp {
             cmd.begin_label("[phong-pass]3d-draw", LabelColor::COLOR_PASS);
             self.main_pass.draw(
                 &cmd,
-                &app_ctx,
-                &shader::DrawData {
-                    frame_data: self.frame_data_buffers[frame_id].device_address(),
+                app_ctx,
+                &shader::PushConstants {
+                    frame_data: self.frame_data_buffers[frame_label].device_address(),
+                    scene: self.gpu_scene.scene_device_address(frame_label),
                     ..Default::default()
                 },
-                &self.gpu_scene_builder,
+                &self.gpu_scene,
                 app_ctx.render_context.current_frame_label(),
             );
             cmd.end_label();

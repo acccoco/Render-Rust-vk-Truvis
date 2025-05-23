@@ -4,9 +4,9 @@
 
 
 struct Instance {
-    uint geometry_start_idx;
+    uint geometry_indirect_idx;
     uint geometry_count;
-    uint material_start_idx;
+    uint material_indirect_idx;
     uint material_count;
 
     float4x4 model;
@@ -55,7 +55,7 @@ struct Scene {
     /// 根据 instance idx 和 submesh idx 获取 geometry
     PTR(Geometry) get_geometry(uint instance_idx, uint submesh_idx)  {
         PTR(Instance) instance = all_instances + instance_idx;
-        uint geometry_map_idx = instance->geometry_start_idx + submesh_idx;
+        uint geometry_map_idx = instance->geometry_indirect_idx + submesh_idx;
         uint geometry_idx = instance_geometry_map[geometry_map_idx];
         PTR(Geometry) geometry = all_geometries + geometry_idx;
         return geometry;
@@ -64,7 +64,7 @@ struct Scene {
     /// 根据 instance idx 和 submesh idx 获取 material
     PTR(PBRMaterial) get_material(uint instance_idx, uint submesh_idx)  {
         PTR(Instance) instance = all_instances + instance_idx;
-        uint material_map_idx = instance->material_start_idx + submesh_idx;
+        uint material_map_idx = instance->material_indirect_idx + submesh_idx;
         uint material_idx = instance_material_map[material_map_idx];
         PTR(PBRMaterial) material = all_mats + material_idx;
         return material;
@@ -96,4 +96,6 @@ struct PushConstants {
 
     uint instance_idx;
     uint submesh_idx;
+    uint _padding_1;
+    uint _padding_2;
 };

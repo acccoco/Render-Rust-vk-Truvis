@@ -138,7 +138,7 @@ impl SimlpeRtPass {
                     | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
             )
             .offset(0)
-            .size(size_of::<shader::DrawData>() as u32);
+            .size(size_of::<shader::PushConstants>() as u32);
 
         let borrowed_bindless_mgr = bindless_mgr.borrow();
         let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
@@ -282,7 +282,7 @@ impl SimlpeRtPass {
         }
     }
 
-    pub fn ray_trace(&self, cmd: &RhiCommandBuffer, render_ctx: &FrameContext, push_constant: &shader::DrawData) {
+    pub fn ray_trace(&self, cmd: &RhiCommandBuffer, render_ctx: &FrameContext, push_constant: &shader::PushConstants) {
         let frame_idx = render_ctx.current_frame_label();
         let frame_size = render_ctx.swapchain_extent();
 

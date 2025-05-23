@@ -24,10 +24,10 @@ shader-layout-trait = { path = "crates/shader-layout-trait" }
 truvis-rhi = { path = "crates/truvis-rhi" }
 model-manager = { path = "crates/model-manager" }
 build-shader = { path = "xtask/build-shader" }
-truvis-cxx= { path = "crates/truvis-cxx" }
+truvis-cxx = { path = "crates/truvis-cxx" }
 truvis-render = { path = "truvis-render" }
 shader-binding = { path = "shader/shader-binding" }
-truvis-crate-tools = {path = "crates/truvis-crate-tools"}
+truvis-crate-tools = { path = "crates/truvis-crate-tools" }
 
 
 # 图形相关的库
@@ -82,6 +82,12 @@ chrono = "0.4.38"
 
 uuid = "1.16.0"
 
+# 编译相关
+######################################################
+cmake = "0.1.54"
+bindgen = "0.71.1"
+
+
 
 # 语言便利性工具
 ######################################################
@@ -122,7 +128,5 @@ bitflags = "2.3.2"
 
 # 简化错误处理
 anyhow = "1.0.84"
-
-cmake = "0.1.54"
-bindgen = "0.71.1"
+scopeguard = "1.2.0"
 
