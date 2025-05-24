@@ -30,11 +30,10 @@ impl CameraController {
         let input_manager = self.input_manager.borrow();
 
         if input_manager.is_right_button_pressed() {
-            let delta = input_manager.get_mouse_delta();
-            let delta = delta * (delta_time_s as f64) * 100.0;
+            let mouse_delta = input_manager.get_mouse_delta() / 7.0;
 
-            self.camera.rotate_yaw(delta.x as f32);
-            self.camera.rotate_pitch(delta.y as f32);
+            self.camera.rotate_yaw(mouse_delta.x as f32);
+            self.camera.rotate_pitch(mouse_delta.y as f32);
 
             let move_speed = 10_f32;
             if input_manager.is_key_pressed(KeyCode::KeyW) {
