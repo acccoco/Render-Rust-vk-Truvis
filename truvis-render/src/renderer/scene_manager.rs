@@ -1,5 +1,5 @@
 use crate::renderer::bindless::BindlessManager;
-use model_manager::component::{Instance, Material, Mesh};
+use model_manager::component::{TruInstance, TruMaterial, TruMesh};
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -8,15 +8,33 @@ use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::rhi::Rhi;
 
 pub struct TheWorld {
-    pub mat_map: HashMap<uuid::Uuid, Material>,
-    pub instance_map: HashMap<uuid::Uuid, Instance>,
-    pub mesh_map: HashMap<uuid::Uuid, Mesh>,
+    mat_map: HashMap<uuid::Uuid, TruMaterial>,
+    instance_map: HashMap<uuid::Uuid, TruInstance>,
+    mesh_map: HashMap<uuid::Uuid, TruMesh>,
 
-    pub point_light_map: HashMap<uuid::Uuid, shader::PointLight>,
+    point_light_map: HashMap<uuid::Uuid, shader::PointLight>,
 
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
-
+// getter
+impl TheWorld {
+    #[inline]
+    pub fn mat_map(&self) -> &HashMap<uuid::Uuid, TruMaterial> {
+        &self.mat_map
+    }
+    #[inline]
+    pub fn instance_map(&self) -> &HashMap<uuid::Uuid, TruInstance> {
+        &self.instance_map
+    }
+    #[inline]
+    pub fn mesh_map(&self) -> &HashMap<uuid::Uuid, TruMesh> {
+        &self.mesh_map
+    }
+    #[inline]
+    pub fn point_light_map(&self) -> &HashMap<uuid::Uuid, shader::PointLight> {
+        &self.point_light_map
+    }
+}
 impl TheWorld {
     pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         Self {
@@ -30,17 +48,17 @@ impl TheWorld {
 
     /// getter
     #[inline]
-    pub fn get_instance(&self, guid: &uuid::Uuid) -> Option<&Instance> {
+    pub fn get_instance(&self, guid: &uuid::Uuid) -> Option<&TruInstance> {
         self.instance_map.get(guid)
     }
 
     #[inline]
-    pub fn get_mesh(&self, guid: &uuid::Uuid) -> Option<&Mesh> {
+    pub fn get_mesh(&self, guid: &uuid::Uuid) -> Option<&TruMesh> {
         self.mesh_map.get(guid)
     }
 
     #[inline]
-    pub fn get_material(&self, guid: &uuid::Uuid) -> Option<&Material> {
+    pub fn get_material(&self, guid: &uuid::Uuid) -> Option<&TruMaterial> {
         self.mat_map.get(guid)
     }
 
@@ -58,8 +76,9 @@ impl TheWorld {
                 ins_guids.push(guid);
                 guid
             },
-            |mesh| {
+            |mut mesh| {
                 let guid = uuid::Uuid::new_v4();
+                mesh.build_blas(rhi);
                 self.mesh_map.insert(guid, mesh);
                 guid
             },
@@ -81,21 +100,21 @@ impl TheWorld {
     }
 
     /// 向场景中添加材质
-    pub fn register_mat(&mut self, mat: Material) -> uuid::Uuid {
+    pub fn register_mat(&mut self, mat: TruMaterial) -> uuid::Uuid {
         let guid = uuid::Uuid::new_v4();
         self.mat_map.insert(guid, mat);
         guid
     }
 
     /// 向场景中添加 mesh
-    pub fn register_mesh(&mut self, mesh: Mesh) -> uuid::Uuid {
+    pub fn register_mesh(&mut self, mesh: TruMesh) -> uuid::Uuid {
         let guid = uuid::Uuid::new_v4();
         self.mesh_map.insert(guid, mesh);
         guid
     }
 
     /// 向场景中添加 instance
-    pub fn register_instance(&mut self, instance: Instance) -> uuid::Uuid {
+    pub fn register_instance(&mut self, instance: TruInstance) -> uuid::Uuid {
         let guid = uuid::Uuid::new_v4();
         self.instance_map.insert(guid, instance);
         guid

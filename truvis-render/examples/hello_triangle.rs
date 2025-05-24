@@ -1,7 +1,7 @@
 use ash::vk;
 use imgui::Ui;
-use model_manager::component::Geometry;
-use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
+use model_manager::component::TruGeometry;
+use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -16,7 +16,7 @@ use truvis_rhi::{
 };
 
 struct HelloTriangle {
-    triangle: Geometry,
+    triangle: TruGeometry<VertexPosColor>,
 
     pipeline: RhiGraphicsPipeline,
 
@@ -26,10 +26,8 @@ struct HelloTriangle {
 impl HelloTriangle {
     fn init_pipeline(rhi: &Rhi, render_context: &mut FrameContext) -> RhiGraphicsPipeline {
         let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
-        pipeline_ci
-            .vertex_shader_stage("shader/build/hello_triangle/triangle.slang.spv".to_string(), "vsmain".to_string());
-        pipeline_ci
-            .fragment_shader_stage("shader/build/hello_triangle/triangle.slang.spv".to_string(), "psmain".to_string());
+        pipeline_ci.vertex_shader_stage("shader/build/hello_triangle/triangle.slang.spv", cstr::cstr!("vsmain"));
+        pipeline_ci.fragment_shader_stage("shader/build/hello_triangle/triangle.slang.spv", cstr::cstr!("psmain"));
         pipeline_ci.attach_info(
             vec![render_context.color_format()],
             Some(render_context.depth_format()),
@@ -84,7 +82,7 @@ impl HelloTriangle {
 
             cmd.cmd_bind_index_buffer(&self.triangle.index_buffer, 0, vk::IndexType::UINT32);
             cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.triangle.vertex_buffer), &[0]);
-            cmd.draw_indexed(self.triangle.index_cnt, 0, 1, 0, 0);
+            cmd.draw_indexed(self.triangle.index_cnt(), 0, 1, 0, 0);
             cmd.end_rendering();
         }
         cmd.end();

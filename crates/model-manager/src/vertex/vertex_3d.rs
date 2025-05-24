@@ -1,11 +1,11 @@
 use crate::vertex::VertexLayout;
 use ash::vk;
 use std::mem::offset_of;
-use truvis_rhi::core::buffer::RhiBuffer;
+use truvis_rhi::core::buffer::RhiVertexBuffer;
 use truvis_rhi::rhi::Rhi;
 
 #[repr(C)]
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex3D {
     pub position: [f32; 3],
     pub normal: [f32; 3],
@@ -61,8 +61,8 @@ impl VertexLayout for VertexLayoutAos3D {
 }
 
 impl VertexLayoutAos3D {
-    pub fn create_vertex_buffer(rhi: &Rhi, data: &[Vertex3D], name: impl AsRef<str>) -> RhiBuffer {
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, size_of_val(data), name.as_ref());
+    pub fn create_vertex_buffer(rhi: &Rhi, data: &[Vertex3D], name: impl AsRef<str>) -> RhiVertexBuffer<Vertex3D> {
+        let mut vertex_buffer = RhiVertexBuffer::new(rhi, data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(rhi, data);
 
         vertex_buffer

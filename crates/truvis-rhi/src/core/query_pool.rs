@@ -72,8 +72,6 @@ impl QueryPool {
 
     #[inline]
     pub fn destroy(self) {
-        unsafe {
-            self.device.destroy_query_pool(self.handle, None);
-        }
+        drop(self)
     }
 }

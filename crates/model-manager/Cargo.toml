@@ -11,3 +11,5 @@ truvis-rhi = { workspace = true }
 ash = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
+bytemuck = { workspace = true, features = ["derive"] }
+itertools = { workspace = true }

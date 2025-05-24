@@ -10,22 +10,20 @@ use crate::{
     rhi::Rhi,
 };
 
+pub struct BlasInputInfo<'a> {
+    pub geometry: vk::AccelerationStructureGeometryKHR<'a>,
+    pub range: vk::AccelerationStructureBuildRangeInfoKHR,
+}
+
 pub struct RhiAcceleration {
     acceleration_structure: vk::AccelerationStructureKHR,
     _buffer: RhiBuffer,
 
     device: Rc<RhiDevice>,
 }
-
-impl Drop for RhiAcceleration {
-    fn drop(&mut self) {
-        unsafe {
-            self.device.acceleration_structure_pf().destroy_acceleration_structure(self.acceleration_structure, None);
-        }
-    }
-}
-
 impl RhiAcceleration {
+    /// 同步构建 blas
+    /// 
     /// 需要指定每个 geometry 的信息，以及每个 geometry 拥有的 max primitives 数量
     /// 会自动添加 compact 和 trace 的 flag
     ///
@@ -38,32 +36,15 @@ impl RhiAcceleration {
     ///
     /// # params
     /// - primitives 每个 geometry 的 max primitives 数量
-    pub fn build_blas(
+    pub fn build_blas_sync(
         rhi: &Rhi,
-        triangle_datas: Vec<vk::AccelerationStructureGeometryTrianglesDataKHR>,
-        primitives: Vec<u32>,
+        blas_inputs: &[BlasInputInfo],
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
-        debug_name: &str,
+        debug_name: impl AsRef<str>,
     ) -> Self {
-        assert_eq!(triangle_datas.len(), primitives.len());
-
-        let geometries = triangle_datas
-            .into_iter()
-            .map(|triangle_data| {
-                vk::AccelerationStructureGeometryKHR::default()
-                    .geometry_type(vk::GeometryTypeKHR::TRIANGLES)
-                    // 暂不考虑透明的情形
-                    .flags(vk::GeometryFlagsKHR::OPAQUE)
-                    .geometry(vk::AccelerationStructureGeometryDataKHR {
-                        triangles: triangle_data,
-                    })
-            })
-            .collect_vec();
-
-        let range_infos = primitives
-            .iter()
-            .map(|primitive_cnt| vk::AccelerationStructureBuildRangeInfoKHR::default().primitive_count(*primitive_cnt))
-            .collect_vec();
+        let geometries = blas_inputs.iter().map(|blas_input| blas_input.geometry).collect_vec();
+        let range_infos = blas_inputs.iter().map(|blas_input| blas_input.range).collect_vec();
+        let max_primitives = blas_inputs.iter().map(|blas_input| blas_input.range.primitive_count).collect_vec();
 
         // 使用部分完整的 AccelerationStructureBuildGeometryInfo 来查询所需的资源大小
         let mut build_geometry_info = vk::AccelerationStructureBuildGeometryInfoKHR::default()
@@ -82,7 +63,7 @@ impl RhiAcceleration {
             rhi.device().acceleration_structure_pf().get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &build_geometry_info,
-                &primitives, // 每一个 geometry 里面的最大 primitive 数量
+                &max_primitives, // 每一个 geometry 里面的最大 primitive 数量
                 &mut size_info,
             );
             size_info
@@ -92,13 +73,13 @@ impl RhiAcceleration {
             rhi,
             size_info.acceleration_structure_size,
             vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
-            format!("{}-uncompact-blas", debug_name),
+            format!("{}-uncompact-blas", debug_name.as_ref()),
         );
 
         let scratch_buffer = RhiBuffer::new_accleration_scratch_buffer(
             rhi,
             size_info.build_scratch_size,
-            format!("{}-blas-scratch-buffer", debug_name),
+            format!("{}-blas-scratch-buffer", debug_name.as_ref()),
         );
 
         // 填充 build geometry info 的剩余部分以 build blas
@@ -141,7 +122,7 @@ impl RhiAcceleration {
             rhi,
             compact_size[0],
             vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
-            format!("{}-compact-blas", debug_name),
+            format!("{}-compact-blas", debug_name.as_ref()),
         );
 
         RhiCommandBuffer::one_time_exec(
@@ -168,19 +149,20 @@ impl RhiAcceleration {
         compact_acceleration
     }
 
+    /// 同步构建 tlas
     /// # 构建过程
     /// 1. 查询构建 tlas 所需的尺寸
     /// 2. 构建 tlas
-    pub fn build_tlas(
+    pub fn build_tlas_sync(
         rhi: &Rhi,
         instances: &[vk::AccelerationStructureInstanceKHR],
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
-        debug_name: &str,
+        debug_name: impl AsRef<str>,
     ) -> Self {
         let mut acceleration_instance_buffer = RhiBuffer::new_acceleration_instance_buffer(
             rhi,
             size_of_val(instances) as vk::DeviceSize,
-            format!("{}-acceleration-instance-buffer", debug_name),
+            format!("{}-acceleration-instance-buffer", debug_name.as_ref()),
         );
         acceleration_instance_buffer.transfer_data_sync(rhi, instances);
 
@@ -220,13 +202,13 @@ impl RhiAcceleration {
             rhi,
             size_info.acceleration_structure_size,
             vk::AccelerationStructureTypeKHR::TOP_LEVEL,
-            format!("{}-tlas", debug_name),
+            format!("{}-tlas", debug_name.as_ref()),
         );
 
         let scratch_buffer = RhiBuffer::new_accleration_scratch_buffer(
             rhi,
             size_info.build_scratch_size,
-            format!("{}-tlas-scratch-buffer", debug_name),
+            format!("{}-tlas-scratch-buffer", debug_name.as_ref()),
         );
 
         // 补全剩下的 build info
@@ -280,6 +262,11 @@ impl RhiAcceleration {
 
     #[inline]
     pub fn destroy(self) {
+        drop(self)
+    }
+}
+impl Drop for RhiAcceleration {
+    fn drop(&mut self) {
         unsafe {
             self.device.acceleration_structure_pf().destroy_acceleration_structure(self.acceleration_structure, None);
         }

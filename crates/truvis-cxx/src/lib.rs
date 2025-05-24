@@ -1,9 +1,9 @@
 use itertools::Itertools;
-use model_manager::component::{Geometry, Instance, Material, Mesh};
+use model_manager::component::{TruGeometry, TruInstance, TruMaterial, TruMesh};
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
-use truvis_rhi::core::buffer::RhiBuffer;
+use truvis_rhi::core::buffer::RhiIndexBuffer;
 use truvis_rhi::rhi::Rhi;
 
 pub mod _ffi_bindings;
@@ -37,9 +37,9 @@ impl AssimpSceneLoader {
     pub fn load_scene(
         rhi: &Rhi,
         model_file: &std::path::Path,
-        instance_register: impl FnMut(Instance) -> uuid::Uuid,
-        mesh_register: impl FnMut(Mesh) -> uuid::Uuid,
-        mat_register: impl FnMut(Material) -> uuid::Uuid,
+        instance_register: impl FnMut(TruInstance) -> uuid::Uuid,
+        mesh_register: impl FnMut(TruMesh) -> uuid::Uuid,
+        mat_register: impl FnMut(TruMaterial) -> uuid::Uuid,
     ) -> Vec<uuid::Uuid> {
         validate_vertex_memory_layout();
 
@@ -69,7 +69,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中基础的几何体
-    fn load_mesh(&mut self, rhi: &Rhi, mut mesh_register: impl FnMut(Mesh) -> uuid::Uuid) {
+    fn load_mesh(&mut self, rhi: &Rhi, mut mesh_register: impl FnMut(TruMesh) -> uuid::Uuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -94,19 +94,22 @@ impl AssimpSceneLoader {
                 }
                 let index_data =
                     std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
-                let index_buffer = RhiBuffer::new_index_buffer_sync(
+                let mut index_buffer = RhiIndexBuffer::new(
                     rhi,
-                    index_data,
+                    index_data.len(),
                     format!("{}-mesh-{}-indices", self.model_name, mesh_idx),
                 );
+                index_buffer.transfer_data_sync(rhi, index_data);
 
                 // 只有 single geometry 的 mesh
-                let mesh = Mesh {
-                    geometries: vec![Geometry {
+                let mesh = TruMesh {
+                    geometries: vec![TruGeometry {
                         vertex_buffer,
                         index_buffer,
-                        index_cnt: mesh.face_cnt_ * 3,
                     }],
+                    blas: None,
+                    blas_device_address: None,
+                    name: format!("{}-{}", self.model_name, mesh_idx),
                 };
 
                 mesh_register(mesh)
@@ -117,7 +120,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中的所有材质
-    fn load_mats(&mut self, _rhi: &Rhi, mut mat_register: impl FnMut(Material) -> uuid::Uuid) {
+    fn load_mats(&mut self, _rhi: &Rhi, mut mat_register: impl FnMut(TruMaterial) -> uuid::Uuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)
@@ -125,7 +128,7 @@ impl AssimpSceneLoader {
                 let mat = get_mat(self.loader, mat_idx);
                 let mat = &*mat;
 
-                let mat_uuid = mat_register(Material {
+                let mat_uuid = mat_register(TruMaterial {
                     ambient: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.ambient),
                     diffuse: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.diffuse),
                     specular: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.specular),
@@ -150,7 +153,7 @@ impl AssimpSceneLoader {
     /// 由于 Assimp 的复用层级是 geometry，而应用需要的复用层级是 mesh
     ///
     /// 因此将 Assimp 中的一个 Instance 拆分为多个 Instance，将其 geometry 提升为 mesh
-    fn load_instance(&mut self, mut instance_register: impl FnMut(Instance) -> uuid::Uuid) {
+    fn load_instance(&mut self, mut instance_register: impl FnMut(TruInstance) -> uuid::Uuid) {
         let instance_cnt = unsafe { get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)
             .filter_map(|instance_idx| unsafe {
@@ -183,7 +186,7 @@ impl AssimpSceneLoader {
 
                 let mut ins_uuids = Vec::with_capacity(mesh_cnt as usize);
                 for (mesh_uuid, mat_uuid) in std::iter::zip(mesh_uuids, mat_uuids) {
-                    let instance = Instance {
+                    let instance = TruInstance {
                         transform: std::mem::transmute::<CxxMat4f, glam::Mat4>(instance.world_transform),
                         mesh: mesh_uuid,
                         materials: vec![mat_uuid],

@@ -1,13 +1,13 @@
-use crate::component::Geometry;
+use crate::component::TruGeometry;
 use crate::vertex::VertexLayout;
 use ash::vk;
 use std::mem::offset_of;
-use truvis_rhi::core::buffer::RhiBuffer;
+use truvis_rhi::core::buffer::{RhiIndexBuffer, RhiVertexBuffer};
 use truvis_rhi::rhi::Rhi;
 
 /// AoS: Array of structures
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct VertexPosNormalUv {
     pub pos: [f32; 3],
     pub normal: [f32; 3],
@@ -54,38 +54,38 @@ impl VertexLayout for VertexLayoutAosPosNormalUv {
 }
 
 impl VertexLayoutAosPosNormalUv {
-    pub fn create_vertex_buffer(rhi: &Rhi, data: &[VertexPosNormalUv], name: impl AsRef<str>) -> RhiBuffer {
-        let mut vertex_buffer = RhiBuffer::new_vertex_buffer(rhi, size_of_val(data), name.as_ref());
+    pub fn create_vertex_buffer(
+        rhi: &Rhi,
+        data: &[VertexPosNormalUv],
+        name: impl AsRef<str>,
+    ) -> RhiVertexBuffer<VertexPosNormalUv> {
+        let mut vertex_buffer = RhiVertexBuffer::new(rhi, data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(rhi, data);
 
         vertex_buffer
     }
 
-    pub fn cube(rhi: &Rhi) -> Geometry {
+    pub fn cube(rhi: &Rhi) -> TruGeometry<VertexPosNormalUv> {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::Cube::VERTICES, "cube-vertex-buffer");
 
-        let mut index_buffer =
-            RhiBuffer::new_index_buffer(rhi, size_of_val(&shape::Cube::INDICES), "cube-index-buffer");
+        let mut index_buffer = RhiIndexBuffer::new(rhi, shape::Cube::INDICES.len(), "cube-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::Cube::INDICES);
 
-        Geometry {
+        TruGeometry {
             vertex_buffer,
             index_buffer,
-            index_cnt: shape::Cube::INDICES.len() as u32,
         }
     }
 
-    pub fn floor(rhi: &Rhi) -> Geometry {
+    pub fn floor(rhi: &Rhi) -> TruGeometry<VertexPosNormalUv> {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::Floor::VERTICES, "floor-vertex-buffer");
 
-        let mut index_buffer =
-            RhiBuffer::new_index_buffer(rhi, size_of_val(&shape::Floor::INDICES), "floor-index-buffer");
+        let mut index_buffer = RhiIndexBuffer::new(rhi, shape::Floor::INDICES.len(), "floor-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::Floor::INDICES);
 
-        Geometry {
+        TruGeometry {
             vertex_buffer,
             index_buffer,
-            index_cnt: shape::Floor::INDICES.len() as u32,
         }
     }
 }

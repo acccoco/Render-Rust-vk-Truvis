@@ -1,8 +1,8 @@
 use ash::vk;
 use imgui::Ui;
 use itertools::Itertools;
-use model_manager::component::{Geometry, Instance};
-use model_manager::vertex::vertex_pnu::VertexLayoutAosPosNormalUv;
+use model_manager::component::{TruGeometry, TruInstance};
+use model_manager::vertex::vertex_pnu::{VertexLayoutAosPosNormalUv, VertexPosNormalUv};
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -28,7 +28,7 @@ struct PhongApp {
     main_pass: Simple3DMainPass,
 
     /// BOX
-    _cube: Geometry,
+    _cube: TruGeometry<VertexPosNormalUv>,
 
     // 保存共享的相机控制器
     camera_controller: Rc<RefCell<CameraController>>,
@@ -53,12 +53,12 @@ impl OuterApp for PhongApp {
         // 复制多个 instance
         let ins_id = scene_mgr.load_scene(rhi, std::path::Path::new("assets/obj/spot.obj"), &glam::Mat4::IDENTITY);
         let ins = scene_mgr.get_instance(&ins_id[0]).unwrap().clone();
-        let ins_1 = Instance {
+        let ins_1 = TruInstance {
             transform: glam::Mat4::from_translation(glam::vec3(5.0, 0.0, 0.0)),
             ..ins.clone()
         };
         scene_mgr.register_instance(ins_1);
-        let ins_2 = Instance {
+        let ins_2 = TruInstance {
             transform: glam::Mat4::from_translation(glam::vec3(0.0, 5.0, 0.0)),
             ..ins.clone()
         };
@@ -165,7 +165,7 @@ impl OuterApp for PhongApp {
         };
 
         self.gpu_scene.prepare_render_data(crt_frame_label);
-        self.gpu_scene.upload_to_buffer(crt_frame_label, &cmd, transfer_barrier_mask);
+        self.gpu_scene.upload_to_buffer(app_ctx.rhi, crt_frame_label, &cmd, transfer_barrier_mask);
 
         cmd.cmd_update_buffer(
             self.frame_data_buffers[crt_frame_label].handle(),

@@ -1,3 +1,4 @@
+use std::ffi::CStr;
 use std::rc::Rc;
 
 use ash::vk;
@@ -47,6 +48,34 @@ impl RhiShaderModule {
 
 pub struct RhiShaderStageInfo {
     pub stage: vk::ShaderStageFlags,
-    pub entry_point: String,
-    pub path: std::path::PathBuf,
+    pub entry_point: &'static CStr,
+    pub path: &'static str,
+}
+impl RhiShaderStageInfo {
+    #[inline]
+    pub fn path(&self) -> &std::path::Path {
+        std::path::Path::new(self.path)
+    }
+}
+
+/// 在 pipeline create info 的 groups 中，每个 shader group 的 index
+///
+/// 每个 shader group 可以由多个 shader 组成，每个 shader group 都是独一无二的
+pub struct ShaderGroupInfo {
+    pub ty: vk::RayTracingShaderGroupTypeKHR,
+    pub general: u32,
+    pub closest_hit: u32,
+    pub any_hit: u32,
+    pub intersection: u32,
+}
+impl ShaderGroupInfo {
+    pub const fn unused() -> Self {
+        Self {
+            ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
+            general: vk::SHADER_UNUSED_KHR,
+            closest_hit: vk::SHADER_UNUSED_KHR,
+            any_hit: vk::SHADER_UNUSED_KHR,
+            intersection: vk::SHADER_UNUSED_KHR,
+        }
+    }
 }

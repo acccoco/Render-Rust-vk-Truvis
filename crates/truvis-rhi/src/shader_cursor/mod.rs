@@ -1,6 +1,5 @@
 use ash::vk;
 use shader_layout_trait::ShaderBindingItem;
-use std::usize;
 
 pub struct RhiWriteDescriptorSet {
     pub dst_set: vk::DescriptorSet,
@@ -28,6 +27,7 @@ impl RhiWriteDescriptorSet {
     }
 }
 
+/// 用于通过 DescriptorBinding Item 来操作对应 descriptor set 的对应 binding
 pub trait ShaderCursor {
     fn get_binding(&self) -> &ShaderBindingItem;
 
@@ -70,6 +70,6 @@ pub trait ShaderCursor {
 
 impl ShaderCursor for ShaderBindingItem {
     fn get_binding(&self) -> &ShaderBindingItem {
-        &self
+        self
     }
 }

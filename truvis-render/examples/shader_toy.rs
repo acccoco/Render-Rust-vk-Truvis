@@ -1,8 +1,8 @@
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use imgui::Ui;
-use model_manager::component::Geometry;
-use model_manager::vertex::vertex_pc::VertexAosLayoutPosColor;
+use model_manager::component::TruGeometry;
+use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -37,7 +37,7 @@ pub struct PushConstants {
 }
 
 struct ShaderToy {
-    rectangle: Geometry,
+    rectangle: TruGeometry<VertexPosColor>,
     pipeline: RhiGraphicsPipeline,
 }
 
@@ -49,8 +49,8 @@ impl ShaderToy {
             offset: 0,
             size: size_of::<PushConstants>() as u32,
         }]);
-        ci.vertex_shader_stage("shader/build/shadertoy-glsl/shadertoy.vert.spv".to_string(), "main".to_string());
-        ci.fragment_shader_stage("shader/build/shadertoy-glsl/shadertoy.frag.spv".to_string(), "main".to_string());
+        ci.vertex_shader_stage("shader/build/shadertoy-glsl/shadertoy.vert.spv", cstr::cstr!("main"));
+        ci.fragment_shader_stage("shader/build/shadertoy-glsl/shadertoy.frag.spv", cstr::cstr!("main"));
         ci.attach_info(vec![render_context.color_format()], Some(render_context.depth_format()), None);
         ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
         ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
@@ -126,7 +126,7 @@ impl ShaderToy {
 
             cmd.cmd_bind_index_buffer(&self.rectangle.index_buffer, 0, vk::IndexType::UINT32);
             cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&self.rectangle.vertex_buffer), &[0]);
-            cmd.draw_indexed(self.rectangle.index_cnt, 0, 1, 0, 0);
+            cmd.draw_indexed(self.rectangle.index_cnt(), 0, 1, 0, 0);
             cmd.end_rendering();
         }
         cmd.end();

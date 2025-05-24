@@ -1,7 +1,8 @@
 use crate::core::device::RhiDevice;
 use crate::core::shader::{RhiShaderModule, RhiShaderStageInfo};
 use ash::vk;
-use std::ffi::CString;
+use itertools::Itertools;
+use std::ffi::CStr;
 use std::rc::Rc;
 
 pub struct RhiGraphicsPipelineCreateInfo {
@@ -16,8 +17,7 @@ pub struct RhiGraphicsPipelineCreateInfo {
     /// dynamic render 需要的 framebuffer 信息
     stencil_attach_format: vk::Format,
 
-    vertex_shader_stage: Option<RhiShaderStageInfo>,
-    fragment_shader_stage: Option<RhiShaderStageInfo>,
+    shader_stages: Vec<RhiShaderStageInfo>,
 
     vertex_binding_desc: Vec<vk::VertexInputBindingDescription>,
     vertex_attribute_desec: Vec<vk::VertexInputAttributeDescription>,
@@ -49,8 +49,7 @@ impl Default for RhiGraphicsPipelineCreateInfo {
             stencil_attach_format: vk::Format::UNDEFINED,
 
             descriptor_set_layouts: vec![],
-            vertex_shader_stage: None,
-            fragment_shader_stage: None,
+            shader_stages: vec![],
 
             vertex_binding_desc: vec![],
             vertex_attribute_desec: vec![],
@@ -102,22 +101,22 @@ impl RhiGraphicsPipelineCreateInfo {
 
     /// builder
     #[inline]
-    pub fn vertex_shader_stage(&mut self, path: String, entry_point: String) -> &mut Self {
-        self.vertex_shader_stage = Some(RhiShaderStageInfo {
+    pub fn vertex_shader_stage(&mut self, path: &'static str, entry_point: &'static CStr) -> &mut Self {
+        self.shader_stages.push(RhiShaderStageInfo {
             stage: vk::ShaderStageFlags::VERTEX,
             entry_point,
-            path: std::path::PathBuf::from(path),
+            path,
         });
         self
     }
 
     /// builder
     #[inline]
-    pub fn fragment_shader_stage(&mut self, path: String, entry_point: String) -> &mut Self {
-        self.fragment_shader_stage = Some(RhiShaderStageInfo {
+    pub fn fragment_shader_stage(&mut self, path: &'static str, entry_point: &'static CStr) -> &mut Self {
+        self.shader_stages.push(RhiShaderStageInfo {
             stage: vk::ShaderStageFlags::FRAGMENT,
             entry_point,
-            path: std::path::PathBuf::from(path),
+            path,
         });
         self
     }
@@ -191,25 +190,22 @@ impl RhiGraphicsPipeline {
         };
         device.debug_utils().set_object_debug_name(pipeline_layout, debug_name);
 
-        // vertex shader 和 fragment shader 是必须的，入口都是 main
-        let vertex_shader_module =
-            RhiShaderModule::new(device.clone(), &create_info.vertex_shader_stage.as_ref().unwrap().path);
-        let fragment_shader_module =
-            RhiShaderModule::new(device.clone(), &create_info.fragment_shader_stage.as_ref().unwrap().path);
-        let vertex_entry_point =
-            CString::new(create_info.vertex_shader_stage.as_ref().unwrap().entry_point.clone()).unwrap();
-        let fragment_entry_point =
-            CString::new(create_info.fragment_shader_stage.as_ref().unwrap().entry_point.clone()).unwrap();
-        let shader_stages_info = [
-            vk::PipelineShaderStageCreateInfo::default()
-                .stage(vk::ShaderStageFlags::VERTEX)
-                .module(vertex_shader_module.handle())
-                .name(&vertex_entry_point),
-            vk::PipelineShaderStageCreateInfo::default()
-                .stage(vk::ShaderStageFlags::FRAGMENT)
-                .module(fragment_shader_module.handle())
-                .name(&fragment_entry_point),
-        ];
+        let shader_modules = create_info
+            .shader_stages
+            .iter()
+            .map(|stage| RhiShaderModule::new(device.clone(), stage.path()))
+            .collect_vec();
+        let shader_stages_info = create_info
+            .shader_stages
+            .iter()
+            .zip(shader_modules.iter())
+            .map(|(stage, module)| {
+                vk::PipelineShaderStageCreateInfo::default()
+                    .stage(stage.stage)
+                    .module(module.handle())
+                    .name(stage.entry_point)
+            })
+            .collect_vec();
 
         // 顶点和 index
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::default()
@@ -263,8 +259,9 @@ impl RhiGraphicsPipeline {
         };
         device.debug_utils().set_object_debug_name(pipeline, debug_name);
 
-        vertex_shader_module.destroy();
-        fragment_shader_module.destroy();
+        shader_modules.into_iter().for_each(|module| {
+            module.destroy();
+        });
 
         RhiGraphicsPipeline {
             pipeline,
