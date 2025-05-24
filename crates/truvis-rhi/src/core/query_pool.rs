@@ -5,13 +5,21 @@ use ash::vk;
 use crate::{core::device::RhiDevice, rhi::Rhi};
 
 pub struct QueryPool {
-    pub(crate) handle: vk::QueryPool,
-    pub(crate) query_type: vk::QueryType,
+    handle: vk::QueryPool,
+    query_type: vk::QueryType,
 
     /// pool 的容量
     _cnt: u32,
 
     device: Rc<RhiDevice>,
+}
+impl Drop for QueryPool {
+    fn drop(&mut self) {
+        unsafe {
+            log::info!("Destroying QueryPool: {:?}", self.handle);
+            self.device.destroy_query_pool(self.handle, None);
+        }
+    }
 }
 
 impl QueryPool {
@@ -25,7 +33,7 @@ impl QueryPool {
 
         unsafe {
             let handle = rhi.device.create_query_pool(&create_info, None).unwrap();
-            rhi.device.debug_utils.set_object_debug_name(handle, debug_name);
+            rhi.device.debug_utils().set_object_debug_name(handle, debug_name);
 
             Self {
                 device: rhi.device.clone(),
@@ -36,11 +44,18 @@ impl QueryPool {
         }
     }
 
-    // #[inline]
-    pub fn get_query_result<T>(&mut self, first_index: u32, query_cnt: u32) -> Vec<T>
-    where
-        T: Default + Sized + Clone,
-    {
+    #[inline]
+    pub fn handle(&self) -> vk::QueryPool {
+        self.handle
+    }
+
+    #[inline]
+    pub fn query_type(&self) -> vk::QueryType {
+        self.query_type
+    }
+
+    #[inline]
+    pub fn get_query_result<T: Default + Sized + Clone>(&mut self, first_index: u32, query_cnt: u32) -> Vec<T> {
         unsafe {
             let mut res = vec![Default::default(); query_cnt as usize];
             self.device.get_query_pool_results(self.handle, first_index, &mut res, vk::QueryResultFlags::WAIT).unwrap();

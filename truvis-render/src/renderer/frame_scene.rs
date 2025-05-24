@@ -29,6 +29,11 @@ impl<T: std::hash::Hash + Eq + Copy> FlattenMap<T> {
     }
 
     #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.linear_storage.iter()
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         self.linear_storage.len()
     }
@@ -397,7 +402,7 @@ impl GpuScene {
 
         let scene_mgr = self.scene_mgr.borrow();
         let bindless_mgr = self.bindless_mgr.borrow();
-        for (mat_idx, mat_uuid) in self.flatten_materials.linear_storage.iter().enumerate() {
+        for (mat_idx, mat_uuid) in self.flatten_materials.iter().enumerate() {
             let mat = scene_mgr.mat_map.get(mat_uuid).unwrap();
             material_buffer_slices[mat_idx] = shader::PBRMaterial {
                 base_color: mat.diffuse.xyz().into(),
@@ -449,7 +454,7 @@ impl GpuScene {
         let scene_mgr = self.scene_mgr.borrow();
 
         let mut crt_geometry_idx = 0;
-        for mesh_uuid in self.flatten_meshes.linear_storage.iter() {
+        for mesh_uuid in self.flatten_meshes.iter() {
             let mesh = scene_mgr.mesh_map.get(mesh_uuid).unwrap();
             if geometry_buffer_slices.len() < crt_geometry_idx + mesh.geometries.len() {
                 panic!("geometry cnt can not be larger than buffer");

@@ -30,7 +30,7 @@ impl Simple3DMainPass {
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
             .offset(0)
             .size(size_of::<shader::PushConstants>() as u32)]);
-        ci.descriptor_set_layouts(vec![bindless_manager.borrow().bindless_layout.layout]);
+        ci.descriptor_set_layouts(vec![bindless_manager.borrow().bindless_layout.handle()]);
         ci.attach_info(vec![frame_context.color_format()], Some(frame_context.depth_format()), None);
         ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(false)
@@ -51,7 +51,7 @@ impl Simple3DMainPass {
         push_constant: &shader::PushConstants,
         frame_idx: usize,
     ) {
-        cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
+        cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline());
         cmd.cmd_set_viewport(
             0,
             &[vk::Viewport {
@@ -65,7 +65,7 @@ impl Simple3DMainPass {
         );
         cmd.cmd_set_scissor(0, &[*viewport]);
         cmd.cmd_push_constants(
-            self.pipeline.pipeline_layout,
+            self.pipeline.layout(),
             vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
             0,
             bytemuck::bytes_of(push_constant),
@@ -73,9 +73,9 @@ impl Simple3DMainPass {
 
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::GRAPHICS,
-            self.pipeline.pipeline_layout,
+            self.pipeline.layout(),
             0,
-            &[self.bindless_manager.borrow().bindless_sets[frame_idx].handle],
+            &[self.bindless_manager.borrow().bindless_sets[frame_idx].handle()],
             &[],
         );
     }
@@ -94,7 +94,7 @@ impl Simple3DMainPass {
             // NOTE 这个数据和 PushConstant 中的内存布局是一致的
             let data = [ins_idx, submesh_idx];
             cmd.cmd_push_constants(
-                self.pipeline.pipeline_layout,
+                self.pipeline.layout(),
                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 offset_of!(shader::PushConstants, instance_idx) as u32,
                 bytemuck::bytes_of(&data),

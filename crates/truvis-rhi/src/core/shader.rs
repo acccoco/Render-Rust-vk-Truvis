@@ -4,8 +4,11 @@ use ash::vk;
 
 use crate::core::device::RhiDevice;
 
+/// # Destroy
+///
+/// 需要手动调用 `destroy` 方法来释放资源。
 pub struct RhiShaderModule {
-    pub handle: vk::ShaderModule,
+    handle: vk::ShaderModule,
 
     device: Rc<RhiDevice>,
 }
@@ -21,7 +24,7 @@ impl RhiShaderModule {
 
         unsafe {
             let shader_module = device.create_shader_module(&shader_module_info, None).unwrap();
-            device.debug_utils.set_object_debug_name(shader_module, path.to_str().unwrap());
+            device.debug_utils().set_object_debug_name(shader_module, path.to_str().unwrap());
             Self {
                 handle: shader_module,
                 device,
@@ -29,6 +32,12 @@ impl RhiShaderModule {
         }
     }
 
+    #[inline]
+    pub fn handle(&self) -> vk::ShaderModule {
+        self.handle
+    }
+
+    #[inline]
     pub fn destroy(self) {
         unsafe {
             self.device.destroy_shader_module(self.handle, None);

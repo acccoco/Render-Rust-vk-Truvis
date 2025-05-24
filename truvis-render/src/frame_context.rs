@@ -115,7 +115,7 @@ impl FrameContext {
         let depth_image = Rc::new(RhiImage2D::new(
             rhi,
             Rc::new(RhiImageCreateInfo::new_image_2d_info(
-                swapchain.extent,
+                swapchain.extent(),
                 depth_format,
                 vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
             )),
@@ -160,8 +160,8 @@ impl FrameContext {
     /// * 通过 fence 等待当前 frame 资源释放
     /// * 为 image 进行 layout transition 的操作
     pub fn acquire_frame(&mut self) {
-        self.device.debug_utils.begin_queue_label(
-            self.graphics_queue.handle,
+        self.device.debug_utils().begin_queue_label(
+            self.graphics_queue.handle(),
             "[acquire-frame]",
             LabelColor::COLOR_STAGE,
         );
@@ -178,14 +178,14 @@ impl FrameContext {
             // 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
             self.graphics_command_pools[self.frame_label].reset_all_buffers();
         }
-        self.device.debug_utils.end_queue_label(self.graphics_queue.handle);
+        self.device.debug_utils().end_queue_label(self.graphics_queue.handle());
 
         self.swapchain_image_index =
             self.render_swapchain.acquire_next_frame(&self.present_complete_semaphores[self.frame_label], None)
                 as usize;
 
-        self.device.debug_utils.begin_queue_label(
-            self.graphics_queue.handle,
+        self.device.debug_utils().begin_queue_label(
+            self.graphics_queue.handle(),
             "[acquire-frame]color-attach-transfer",
             LabelColor::COLOR_STAGE,
         );
@@ -219,14 +219,18 @@ impl FrameContext {
                 None,
             );
         }
-        self.device.debug_utils.end_queue_label(self.graphics_queue.handle);
+        self.device.debug_utils().end_queue_label(self.graphics_queue.handle());
     }
 
     /// 提交当前 frame
     ///
     /// * 在提交之前，为 image 进行 layout transition
     pub fn submit_frame(&mut self) {
-        self.device.debug_utils.begin_queue_label(self.graphics_queue.handle, "[submit-frame]", LabelColor::COLOR_PASS);
+        self.device.debug_utils().begin_queue_label(
+            self.graphics_queue.handle(),
+            "[submit-frame]",
+            LabelColor::COLOR_PASS,
+        );
         {
             let cmd = self.alloc_command_buffer(&format!(
                 "{}-[submit-frame]color-attach-layout-transfer",
@@ -256,7 +260,7 @@ impl FrameContext {
             );
         }
         // queue label 不能跨过 submit，否则会导致 Nsight mismatch label
-        self.device.debug_utils.end_queue_label(self.graphics_queue.handle);
+        self.device.debug_utils().end_queue_label(self.graphics_queue.handle());
 
         self.render_swapchain.submit_frame(
             &self.graphics_queue,
@@ -281,7 +285,7 @@ impl FrameContext {
     /// 直接从 swapchain 获取 extent
     #[inline]
     pub fn swapchain_extent(&self) -> vk::Extent2D {
-        self.render_swapchain.extent
+        self.render_swapchain.extent()
     }
 
     #[inline]
@@ -291,7 +295,7 @@ impl FrameContext {
 
     #[inline]
     pub fn color_format(&self) -> vk::Format {
-        self.render_swapchain.color_format
+        self.render_swapchain.color_format()
     }
 
     /// 当前处在第几帧：A, B, C
@@ -330,18 +334,28 @@ impl FrameContext {
     /// 当前帧从 swapchain 获取到的用于 present 的 image
     #[inline]
     pub fn current_present_image(&self) -> vk::Image {
-        self.render_swapchain.images[self.swapchain_image_index]
+        self.render_swapchain.images()[self.swapchain_image_index]
     }
 
     #[inline]
     pub fn current_present_image_view(&self) -> vk::ImageView {
-        self.render_swapchain.image_views[self.swapchain_image_index]
+        self.render_swapchain.image_views()[self.swapchain_image_index]
     }
 }
 
 impl Drop for FrameContext {
     fn drop(&mut self) {
-        //
+        log::info!("destroy frame context.");
+
+        for semaphore in std::mem::take(&mut self.present_complete_semaphores).into_iter() {
+            semaphore.destroy();
+        }
+        for semaphore in std::mem::take(&mut self.render_complete_semaphores).into_iter() {
+            semaphore.destroy();
+        }
+        for fence in std::mem::take(&mut self.fence_frame_in_flight).into_iter() {
+            fence.destroy();
+        }
     }
 }
 

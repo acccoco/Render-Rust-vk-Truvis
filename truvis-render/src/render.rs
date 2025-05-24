@@ -17,13 +17,21 @@ pub struct Renderer {
     /// window 需要在 event loop 中创建，因此使用 option 包装
     pub window: Rc<MainWindow>,
 
-    /// Rhi 需要在 window 之后创建，因为需要获取 window 相关的 extension
-    pub rhi: Rc<Rhi>,
-
     /// render context 需要在 event loop 中创建，因此使用 option 包装
     ///
     /// 依赖于 window
     pub render_context: FrameContext,
+
+    /// Rhi 需要在 window 之后创建，因为需要获取 window 相关的 extension
+    pub rhi: Rc<Rhi>,
+}
+
+impl Drop for Renderer {
+    fn drop(&mut self) {
+        log::info!("Dropping Renderer");
+        // 在 Renderer 被销毁时，等待 Rhi 设备空闲
+        self.wait_idle();
+    }
 }
 
 impl Renderer {
@@ -61,8 +69,8 @@ impl Renderer {
 
     pub fn after_frame(&mut self) {
         // ui pass
-        self.rhi.device.debug_utils.begin_queue_label(
-            self.rhi.graphics_queue.handle,
+        self.rhi.device.debug_utils().begin_queue_label(
+            self.rhi.graphics_queue.handle(),
             "[ui-pass]",
             LabelColor::COLOR_PASS,
         );
@@ -93,22 +101,22 @@ impl Renderer {
 
             self.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[barrier_cmd])], None);
         }
-        self.rhi.device.debug_utils.end_queue_label(self.rhi.graphics_queue.handle);
+        self.rhi.device.debug_utils().end_queue_label(self.rhi.graphics_queue.handle());
 
         self.render_context.submit_frame();
     }
 
     pub fn before_render(&mut self) {
         // main pass
-        self.rhi.device.debug_utils.begin_queue_label(
-            self.rhi.graphics_queue.handle,
+        self.rhi.device.debug_utils().begin_queue_label(
+            self.rhi.graphics_queue.handle(),
             "[render]",
             LabelColor::COLOR_PASS,
         );
     }
 
     pub fn after_render(&mut self) {
-        self.rhi.device.debug_utils.end_queue_label(self.rhi.graphics_queue.handle);
+        self.rhi.device.debug_utils().end_queue_label(self.rhi.graphics_queue.handle());
     }
 
     pub fn wait_idle(&self) {
@@ -118,7 +126,12 @@ impl Renderer {
     }
 
     /// 在窗口大小改变是，重建 swapchain
-    pub fn rebuild_swapchain(&mut self) {
+    pub fn rebuild_render_context(&mut self) {
+        // 需要先销毁旧的 RenderContext，然后再创建新的 RenderContext。
+        // 如果直接使用 self.render_context = FrameContext::new(...)
+        // 会导致新的 RenderContext 先被创建，老的 RenderContext 才会被 drop
+        // 然而仅允许有一个 Swapchain 存在，因此需要先销毁旧的 RenderContext，再创建新的 RenderContext。
+
         // 首先获取旧的 render_context，将其从 self 中取出
         let old_render_context = unsafe {
             // 使用 std::ptr::read 从 self.render_context 的位置读取值

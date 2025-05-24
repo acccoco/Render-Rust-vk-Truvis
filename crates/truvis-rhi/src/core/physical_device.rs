@@ -29,6 +29,13 @@ pub struct RhiPhysicalDevice {
     pub compute_queue_family: RhiQueueFamily,
     pub transfer_queue_family: RhiQueueFamily,
 }
+impl Drop for RhiPhysicalDevice {
+    fn drop(&mut self) {
+        // 物理设备不需要手动释放
+        log::info!("no need to destroy physical device manually, it will be destroyed when instance is destroyed");
+        // unsafe { self.handle.destroy_physical_device(None); }
+    }
+}
 
 impl RhiPhysicalDevice {
     /// 创建一个新的物理显卡实例
@@ -74,7 +81,7 @@ impl RhiPhysicalDevice {
                 // 加速结构 props
                 pdevice_acc_props.p_next = null_mut();
                 acc_props = pdevice_acc_props;
-                log::info!("physical deivceacceleration structure props:\n{:#?}", acc_props);
+                log::info!("physical deivce acceleration structure props:\n{:#?}", acc_props);
             }
 
             // 找到当前 gpu 支持的 extensions，并打印出来

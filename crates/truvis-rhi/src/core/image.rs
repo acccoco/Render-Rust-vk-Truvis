@@ -95,7 +95,7 @@ impl RhiImageViewCreateInfo {
 }
 
 pub struct RhiImage2D {
-    pub handle: vk::Image,
+    handle: vk::Image,
 
     allocation: vk_mem::Allocation,
 
@@ -103,6 +103,11 @@ pub struct RhiImage2D {
     image_info: Rc<RhiImageCreateInfo>,
 
     allocator: Rc<RhiAllocator>,
+}
+impl Drop for RhiImage2D {
+    fn drop(&mut self) {
+        unsafe { self.allocator.destroy_image(self.handle, &mut self.allocation) }
+    }
 }
 
 impl RhiImage2D {
@@ -114,7 +119,7 @@ impl RhiImage2D {
     ) -> Self {
         let (image, alloc) = unsafe { rhi.allocator.create_image(image_info.creat_info(), alloc_info).unwrap() };
 
-        rhi.device.debug_utils.set_object_debug_name(image, debug_name);
+        rhi.device.debug_utils().set_object_debug_name(image, debug_name);
 
         Self {
             _name: debug_name.to_string(),
@@ -245,12 +250,6 @@ impl RhiImage2D {
     }
 }
 
-impl Drop for RhiImage2D {
-    fn drop(&mut self) {
-        unsafe { self.allocator.destroy_image(self.handle, &mut self.allocation) }
-    }
-}
-
 pub struct RhiImage2DView {
     handle: vk::ImageView,
 
@@ -260,12 +259,19 @@ pub struct RhiImage2DView {
 
     device: Rc<RhiDevice>,
 }
+impl Drop for RhiImage2DView {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.destroy_image_view(self.handle, None);
+        }
+    }
+}
 
 impl RhiImage2DView {
     pub fn new(rhi: &Rhi, image: Rc<RhiImage2D>, mut info: RhiImageViewCreateInfo, name: String) -> Self {
         info.inner.image = image.handle;
         let handle = unsafe { rhi.device.create_image_view(&info.inner, None).unwrap() };
-        rhi.device.debug_utils.set_object_debug_name(handle, &name);
+        rhi.device.debug_utils().set_object_debug_name(handle, &name);
         Self {
             handle,
             _image: image,
@@ -279,13 +285,5 @@ impl RhiImage2DView {
     #[inline]
     pub fn handle(&self) -> vk::ImageView {
         self.handle
-    }
-}
-
-impl Drop for RhiImage2DView {
-    fn drop(&mut self) {
-        unsafe {
-            self.device.destroy_image_view(self.handle, None);
-        }
     }
 }

@@ -5,14 +5,13 @@ use std::rc::Rc;
 use crate::{core::device::RhiDevice, rhi::Rhi};
 use ash::vk;
 
+/// # Destroy
+/// 不应该实现 Fence，因为可以 Clone，需要手动 destroy
 #[derive(Clone)]
 pub struct RhiFence {
-    pub fence: vk::Fence,
+    fence: vk::Fence,
     device: Rc<RhiDevice>,
 }
-
-// 不应该实现 Fence，因为可以 Clone，需要手动 destroy
-// impl Drop for RhiFence {}
 
 impl RhiFence {
     /// # param
@@ -22,26 +21,34 @@ impl RhiFence {
         let fence =
             unsafe { rhi.device().create_fence(&vk::FenceCreateInfo::default().flags(fence_flags), None).unwrap() };
 
-        rhi.device.debug_utils.set_object_debug_name(fence, debug_name);
+        rhi.device.debug_utils().set_object_debug_name(fence, debug_name);
         Self {
             fence,
             device: rhi.device.clone(),
         }
     }
 
+    #[inline]
+    pub fn handle(&self) -> vk::Fence {
+        self.fence
+    }
+
     /// 阻塞等待 fence
+    #[inline]
     pub fn wait(&self) {
         unsafe {
             self.device.wait_for_fences(std::slice::from_ref(&self.fence), true, u64::MAX).unwrap();
         }
     }
 
+    #[inline]
     pub fn reset(&self) {
         unsafe {
             self.device.reset_fences(std::slice::from_ref(&self.fence)).unwrap();
         }
     }
 
+    #[inline]
     pub fn destroy(self) {
         unsafe {
             self.device.destroy_fence(self.fence, None);
@@ -49,26 +56,31 @@ impl RhiFence {
     }
 }
 
+/// # Destroy
+/// 不应该实现 Semaphore，因为可以 Clone，需要手动 destroy
 #[derive(Clone)]
 pub struct RhiSemaphore {
-    pub semaphore: vk::Semaphore,
+    semaphore: vk::Semaphore,
     device: Rc<RhiDevice>,
 }
-
-// 不应该实现 Semaphore，因为可以 Clone，需要手动 destroy
-// impl Drop for RhiSemaphore {}
 
 impl RhiSemaphore {
     pub fn new(rhi: &Rhi, debug_name: &str) -> Self {
         let semaphore = unsafe { rhi.device().create_semaphore(&vk::SemaphoreCreateInfo::default(), None).unwrap() };
 
-        rhi.device.debug_utils.set_object_debug_name(semaphore, debug_name);
+        rhi.device.debug_utils().set_object_debug_name(semaphore, debug_name);
         Self {
             semaphore,
             device: rhi.device.clone(),
         }
     }
 
+    #[inline]
+    pub fn handle(&self) -> vk::Semaphore {
+        self.semaphore
+    }
+
+    #[inline]
     pub fn destroy(self) {
         unsafe {
             self.device.destroy_semaphore(self.semaphore, None);

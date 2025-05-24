@@ -231,6 +231,18 @@ pub struct Gui {
     _cmd: Option<RhiCommandBuffer>,
 }
 
+impl Drop for Gui {
+    fn drop(&mut self) {
+        log::info!("Destroying Gui");
+        unsafe {
+            // 销毁 pipeline
+            self._device.destroy_pipeline(self.pipeline, None);
+            // 销毁 pipeline layout
+            self._device.destroy_pipeline_layout(self.pipeline_layout, None);
+        }
+    }
+}
+
 // constructor & getter
 impl Gui {
     pub fn new(rhi: &Rhi, render_ctx: &FrameContext, window: &winit::window::Window, options: &UiCreateInfo) -> Self {
@@ -241,10 +253,10 @@ impl Gui {
             vk::DescriptorSetLayoutCreateFlags::empty(),
             "[uipass]descriptor-set-layout",
         );
-        let pipeline_layout = Self::create_pipeline_layout(&rhi.device.handle, descriptor_set_layout.layout);
-        rhi.device.debug_utils.set_object_debug_name(pipeline_layout, "[uipass]pipeline-layout");
+        let pipeline_layout = Self::create_pipeline_layout(rhi.device.handle(), descriptor_set_layout.handle());
+        rhi.device.debug_utils().set_object_debug_name(pipeline_layout, "[uipass]pipeline-layout");
         let pipeline = Self::create_pipeline(rhi, render_ctx, pipeline_layout);
-        rhi.device.debug_utils.set_object_debug_name(pipeline, "[uipass]pipeline");
+        rhi.device.debug_utils().set_object_debug_name(pipeline, "[uipass]pipeline");
 
         let fonts_texture = {
             let fonts = imgui.fonts();
@@ -279,11 +291,11 @@ impl Gui {
                 .allocate_descriptor_sets(
                     &vk::DescriptorSetAllocateInfo::default()
                         .descriptor_pool(descriptor_pool.handle())
-                        .set_layouts(std::slice::from_ref(&descriptor_set_layout.layout)),
+                        .set_layouts(std::slice::from_ref(&descriptor_set_layout.handle())),
                 )
                 .unwrap()[0]
         };
-        rhi.device.debug_utils.set_object_debug_name(descriptor_set, "[uipass]descriptor");
+        rhi.device.debug_utils().set_object_debug_name(descriptor_set, "[uipass]descriptor");
 
         // write
         {
@@ -379,11 +391,11 @@ impl Gui {
         let shader_states_infos = [
             vk::PipelineShaderStageCreateInfo::default()
                 .stage(vk::ShaderStageFlags::VERTEX)
-                .module(vert_shader_module.handle)
+                .module(vert_shader_module.handle())
                 .name(cstr::cstr!("vsmain")),
             vk::PipelineShaderStageCreateInfo::default()
                 .stage(vk::ShaderStageFlags::FRAGMENT)
-                .module(frag_shader_module.handle)
+                .module(frag_shader_module.handle())
                 .name(cstr::cstr!("psmain")),
         ];
 
@@ -474,7 +486,7 @@ impl Gui {
 
         let pipeline = unsafe {
             rhi.device
-                .handle
+                .handle()
                 .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
                 .unwrap()[0]
         };
@@ -523,13 +535,13 @@ impl Gui {
 
         let frame_index = render_ctx.current_frame_label();
 
-        rhi.device.debug_utils.begin_queue_label(
-            rhi.graphics_queue.handle,
+        rhi.device.debug_utils().begin_queue_label(
+            rhi.graphics_queue.handle(),
             "[ui-pass]create-mesh",
             LabelColor::COLOR_STAGE,
         );
         self.meshes[frame_index].replace(GuiMesh::from_draw_data(rhi, render_ctx, draw_data));
-        rhi.device().debug_utils.end_queue_label(rhi.graphics_queue.handle);
+        rhi.device().debug_utils().end_queue_label(rhi.graphics_queue.handle());
 
         let cmd = render_ctx.alloc_command_buffer("uipass-render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]draw");

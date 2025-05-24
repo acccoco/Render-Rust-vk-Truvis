@@ -65,6 +65,13 @@ pub struct RhiBuffer {
     _buffer_info: Rc<RhiBufferCreateInfo>,
     _alloc_info: Rc<vk_mem::AllocationCreateInfo>,
 }
+impl Drop for RhiBuffer {
+    fn drop(&mut self) {
+        unsafe {
+            self.allocator.destroy_buffer(self.handle, &mut self.allocation);
+        }
+    }
+}
 
 // constructor & getter & builder
 impl RhiBuffer {
@@ -84,7 +91,7 @@ impl RhiBuffer {
                 rhi.allocator.create_buffer(buffer_ci.info(), &alloc_ci).unwrap()
             };
 
-            rhi.device.debug_utils.set_object_debug_name(buffer, debug_name.as_ref());
+            rhi.device.debug_utils().set_object_debug_name(buffer, debug_name.as_ref());
             Self {
                 handle: buffer,
                 allocation,
@@ -311,15 +318,6 @@ impl RhiBuffer {
     #[inline]
     pub fn get_descriptor_buffer_info_ubo<T: Sized>(&self) -> vk::DescriptorBufferInfo {
         vk::DescriptorBufferInfo::default().buffer(self.handle).offset(0).range(size_of::<T>() as vk::DeviceSize)
-    }
-}
-
-impl Drop for RhiBuffer {
-    fn drop(&mut self) {
-        self.unmap();
-        unsafe {
-            self.allocator.destroy_buffer(self.handle, &mut self.allocation);
-        }
     }
 }
 

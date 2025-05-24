@@ -159,8 +159,20 @@ impl RhiGraphicsPipelineCreateInfo {
 }
 
 pub struct RhiGraphicsPipeline {
-    pub pipeline: vk::Pipeline,
-    pub pipeline_layout: vk::PipelineLayout,
+    pipeline: vk::Pipeline,
+    pipeline_layout: vk::PipelineLayout,
+
+    device: Rc<RhiDevice>,
+}
+
+impl Drop for RhiGraphicsPipeline {
+    fn drop(&mut self) {
+        unsafe {
+            log::info!("Destroying RhiGraphicsPipeline");
+            self.device.destroy_pipeline(self.pipeline, None);
+            self.device.destroy_pipeline_layout(self.pipeline_layout, None);
+        }
+    }
 }
 
 impl RhiGraphicsPipeline {
@@ -177,7 +189,7 @@ impl RhiGraphicsPipeline {
                 .push_constant_ranges(&create_info.push_constant_ranges);
             unsafe { device.create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() }
         };
-        device.debug_utils.set_object_debug_name(pipeline_layout, debug_name);
+        device.debug_utils().set_object_debug_name(pipeline_layout, debug_name);
 
         // vertex shader 和 fragment shader 是必须的，入口都是 main
         let vertex_shader_module =
@@ -191,11 +203,11 @@ impl RhiGraphicsPipeline {
         let shader_stages_info = [
             vk::PipelineShaderStageCreateInfo::default()
                 .stage(vk::ShaderStageFlags::VERTEX)
-                .module(vertex_shader_module.handle)
+                .module(vertex_shader_module.handle())
                 .name(&vertex_entry_point),
             vk::PipelineShaderStageCreateInfo::default()
                 .stage(vk::ShaderStageFlags::FRAGMENT)
-                .module(fragment_shader_module.handle)
+                .module(fragment_shader_module.handle())
                 .name(&fragment_entry_point),
         ];
 
@@ -249,7 +261,7 @@ impl RhiGraphicsPipeline {
                 .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
                 .unwrap()[0]
         };
-        device.debug_utils.set_object_debug_name(pipeline, debug_name);
+        device.debug_utils().set_object_debug_name(pipeline, debug_name);
 
         vertex_shader_module.destroy();
         fragment_shader_module.destroy();
@@ -257,6 +269,17 @@ impl RhiGraphicsPipeline {
         RhiGraphicsPipeline {
             pipeline,
             pipeline_layout,
+            device,
         }
+    }
+
+    #[inline]
+    pub fn pipeline(&self) -> vk::Pipeline {
+        self.pipeline
+    }
+
+    #[inline]
+    pub fn layout(&self) -> vk::PipelineLayout {
+        self.pipeline_layout
     }
 }

@@ -17,19 +17,20 @@ use crate::{
     rhi::Rhi,
 };
 
+/// # destroy
+///
 /// 不能实现 Drop，因为需要手动去 free；cmd 支持 clone，不应该在意外的地方 free
-/// impl Drop for RhiCommandBuffer {}
 #[derive(Clone)]
 pub struct RhiCommandBuffer {
     handle: vk::CommandBuffer,
 
     /// command buffer 在需要通过 command pool 进行 free，因此需要保存 command pool 的引用
-    pub command_pool: Rc<RhiCommandPool>,
+    command_pool: Rc<RhiCommandPool>,
 
-    pub device: Rc<RhiDevice>,
+    device: Rc<RhiDevice>,
 }
 
-// basic 命令
+// Basic
 impl RhiCommandBuffer {
     pub fn new(device: Rc<RhiDevice>, command_pool: Rc<RhiCommandPool>, debug_name: &str) -> Self {
         let info = vk::CommandBufferAllocateInfo::default()
@@ -38,7 +39,7 @@ impl RhiCommandBuffer {
             .command_buffer_count(1);
 
         let command_buffer = unsafe { device.allocate_command_buffers(&info).unwrap()[0] };
-        device.debug_utils.set_object_debug_name(command_buffer, debug_name);
+        device.debug_utils().set_object_debug_name(command_buffer, debug_name);
         RhiCommandBuffer {
             handle: command_buffer,
             command_pool,
@@ -159,7 +160,7 @@ impl RhiCommandBuffer {
     #[inline]
     pub fn cmd_begin_rendering(&self, render_info: &vk::RenderingInfo) {
         unsafe {
-            self.device.vk_dynamic_render_pf.cmd_begin_rendering(self.handle, render_info);
+            self.device.dynamic_rendering_pf().cmd_begin_rendering(self.handle, render_info);
         }
     }
 
@@ -168,7 +169,7 @@ impl RhiCommandBuffer {
     #[inline]
     pub fn end_rendering(&self) {
         unsafe {
-            self.device.vk_dynamic_render_pf.cmd_end_rendering(self.handle);
+            self.device.dynamic_rendering_pf().cmd_end_rendering(self.handle);
         }
     }
 
@@ -197,6 +198,7 @@ impl RhiCommandBuffer {
 
     /// - command type: action
     /// - supported queue types: graphics
+    ///
     /// 不使用 index buffer 的绘制
     #[inline]
     pub fn cmd_draw(&self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
@@ -320,7 +322,7 @@ impl RhiCommandBuffer {
     #[inline]
     pub fn cmd_copy_acceleration_structure(&self, copy_info: &vk::CopyAccelerationStructureInfoKHR) {
         unsafe {
-            self.device.vk_acceleration_struct_pf.cmd_copy_acceleration_structure(self.handle, copy_info);
+            self.device.acceleration_structure_pf().cmd_copy_acceleration_structure(self.handle, copy_info);
         }
     }
 
@@ -334,7 +336,7 @@ impl RhiCommandBuffer {
     ) {
         unsafe {
             // 该函数可以一次构建多个 AccelerationStructure，这里只构建了 1 个
-            self.device.vk_acceleration_struct_pf.cmd_build_acceleration_structures(
+            self.device.acceleration_structure_pf().cmd_build_acceleration_structures(
                 self.handle,
                 std::slice::from_ref(geometry),
                 &[ranges],
@@ -353,11 +355,11 @@ impl RhiCommandBuffer {
         acceleration_structures: &[vk::AccelerationStructureKHR],
     ) {
         unsafe {
-            self.device.vk_acceleration_struct_pf.cmd_write_acceleration_structures_properties(
+            self.device.acceleration_structure_pf().cmd_write_acceleration_structures_properties(
                 self.handle,
                 acceleration_structures,
-                query_pool.query_type,
-                query_pool.handle,
+                query_pool.query_type(),
+                query_pool.handle(),
                 first_query,
             )
         }
@@ -376,7 +378,7 @@ impl RhiCommandBuffer {
         thread_size: [u32; 3],
     ) {
         unsafe {
-            self.device.vk_rt_pipeline_pf.cmd_trace_rays(
+            self.device.rt_pipeline_pf().cmd_trace_rays(
                 self.handle,
                 raygen_table,
                 miss_table,
@@ -396,20 +398,20 @@ impl RhiCommandBuffer {
     /// - supported queue type: graphics, compute
     #[inline]
     pub fn begin_label(&self, label_name: &str, label_color: glam::Vec4) {
-        self.device.debug_utils.cmd_begin_debug_label(self.handle, label_name, label_color);
+        self.device.debug_utils().cmd_begin_debug_label(self.handle, label_name, label_color);
     }
 
     /// - command type: state, action
     /// - supported queue type: graphics, compute
     #[inline]
     pub fn end_label(&self) {
-        self.device.debug_utils.cmd_end_debug_label(self.handle);
+        self.device.debug_utils().cmd_end_debug_label(self.handle);
     }
 
     /// - command type: action
     /// - supported queue type: graphics, compute
     #[inline]
     pub fn insert_label(&self, label_name: &str, label_color: glam::Vec4) {
-        self.device.debug_utils.cmd_insert_debug_label(self.handle, label_name, label_color);
+        self.device.debug_utils().cmd_insert_debug_label(self.handle, label_name, label_color);
     }
 }

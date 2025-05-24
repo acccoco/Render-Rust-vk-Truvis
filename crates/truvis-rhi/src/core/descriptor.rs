@@ -18,22 +18,24 @@ use shader_layout_trait::ShaderBindingLayout;
 ///
 /// # 泛型参数
 /// - T: 实现了 ShaderBindingLayout trait 的类型，定义了具体的绑定布局
-pub struct RhiDescriptorSetLayout<T>
-where
-    T: ShaderBindingLayout,
-{
+pub struct RhiDescriptorSetLayout<T: ShaderBindingLayout> {
     /// Vulkan 描述符集布局句柄
-    pub layout: vk::DescriptorSetLayout,
+    layout: vk::DescriptorSetLayout,
     /// 用于在编译时关联泛型参数 T
     phantom_data: std::marker::PhantomData<T>,
 
     _device: Rc<RhiDevice>,
 }
+impl<T: ShaderBindingLayout> Drop for RhiDescriptorSetLayout<T> {
+    fn drop(&mut self) {
+        unsafe {
+            log::info!("Destroying RhiDescriptorSetLayout");
+            self._device.destroy_descriptor_set_layout(self.layout, None);
+        }
+    }
+}
 
-impl<T> RhiDescriptorSetLayout<T>
-where
-    T: ShaderBindingLayout,
-{
+impl<T: ShaderBindingLayout> RhiDescriptorSetLayout<T> {
     /// 创建新的描述符集布局
     ///
     /// # 参数
@@ -53,12 +55,22 @@ where
 
         // 创建 Vulkan 描述符集布局
         let layout = unsafe { rhi.device().create_descriptor_set_layout(&create_info, None).unwrap() };
-        rhi.device.debug_utils.set_object_debug_name(layout, debug_name);
+        rhi.device.debug_utils().set_object_debug_name(layout, debug_name);
         Self {
             layout,
             phantom_data: std::marker::PhantomData,
             _device: rhi.device.clone(),
         }
+    }
+
+    #[inline]
+    pub fn handle(&self) -> vk::DescriptorSetLayout {
+        self.layout
+    }
+
+    #[inline]
+    pub fn handle_ref(&self) -> &vk::DescriptorSetLayout {
+        &self.layout
     }
 }
 
@@ -69,14 +81,17 @@ where
 ///
 /// # 泛型参数
 /// - T: 实现了 ShaderBindingLayout trait 的类型，定义了具体的绑定布局
-pub struct RhiDescriptorSet<T>
-where
-    T: ShaderBindingLayout,
-{
+///
+/// # Destroy
+///
+/// 跟随 descriptor pool 一起销毁
+pub struct RhiDescriptorSet<T: ShaderBindingLayout> {
     /// Vulkan 描述符集句柄
-    pub handle: vk::DescriptorSet,
+    handle: vk::DescriptorSet,
     /// 用于在编译时关联泛型参数 T
     phantom_data: std::marker::PhantomData<T>,
+
+    _device: Rc<RhiDevice>,
 }
 
 /// 描述符更新信息
@@ -91,10 +106,7 @@ pub enum RhiDescriptorUpdateInfo {
     Buffer(vk::DescriptorBufferInfo),
 }
 
-impl<T> RhiDescriptorSet<T>
-where
-    T: ShaderBindingLayout,
-{
+impl<T: ShaderBindingLayout> RhiDescriptorSet<T> {
     /// 创建新的描述符集
     ///
     /// # 参数
@@ -115,10 +127,16 @@ where
             .descriptor_pool(descriptor_pool.handle())
             .set_layouts(std::slice::from_ref(&layout.layout));
         let descriptor_set = unsafe { rhi.device.allocate_descriptor_sets(&alloc_info).unwrap()[0] };
-        rhi.device.debug_utils.set_object_debug_name(descriptor_set, debug_name);
+        rhi.device.debug_utils().set_object_debug_name(descriptor_set, debug_name);
         Self {
             handle: descriptor_set,
             phantom_data: std::marker::PhantomData,
+            _device: rhi.device.clone(),
         }
+    }
+
+    #[inline]
+    pub fn handle(&self) -> vk::DescriptorSet {
+        self.handle
     }
 }

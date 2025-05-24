@@ -61,7 +61,7 @@ impl HelloTriangle {
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);
-            cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
+            cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline());
 
             cmd.cmd_set_viewport(
                 0,

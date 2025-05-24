@@ -1,15 +1,25 @@
+use crate::core::debug_utils::RhiDebugUtils;
 use ash::vk;
 use itertools::Itertools;
 use std::ops::Deref;
+use std::rc::Rc;
 use std::{
     collections::HashSet,
     ffi::{CStr, CString, c_char},
 };
 
-use crate::core::debug_utils::RhiDebugUtils;
-
 pub struct RhiInstance {
-    pub handle: ash::Instance,
+    /// ash::Entry 的引用，确保在 RhiInstance 销毁之前不会被销毁
+    _vk_pf: Rc<ash::Entry>,
+    handle: ash::Instance,
+}
+impl Drop for RhiInstance {
+    fn drop(&mut self) {
+        unsafe {
+            log::info!("Destroying RhiInstance");
+            self.handle.destroy_instance(None);
+        }
+    }
 }
 
 impl Deref for RhiInstance {
@@ -23,7 +33,7 @@ impl Deref for RhiInstance {
 impl RhiInstance {
     /// 设置所需的 layers 和 extensions，创建 vk instance
     pub fn new(
-        vk_entry: &ash::Entry,
+        vk_entry: Rc<ash::Entry>,
         app_name: String,
         engine_name: String,
         extra_instance_exts: Vec<&'static CStr>,
@@ -37,7 +47,7 @@ impl RhiInstance {
             .engine_name(engine_name.as_ref())
             .engine_version(vk::make_api_version(0, 1, 0, 0));
 
-        let enabled_extensions = Self::get_extensions(vk_entry, &extra_instance_exts);
+        let enabled_extensions = Self::get_extensions(&vk_entry, &extra_instance_exts);
         // 多行输出到一个字符串
         let mut enabled_extensions_str = String::new();
         for ext in &enabled_extensions {
@@ -45,7 +55,7 @@ impl RhiInstance {
         }
         log::info!("instance extensions: {}", enabled_extensions_str);
 
-        let enabled_layers = Self::get_layers(vk_entry);
+        let enabled_layers = Self::get_layers(&vk_entry);
         let mut enabled_layers_str = String::new();
         for layer in &enabled_layers {
             enabled_layers_str.push_str(&format!("\n\t{:?}", unsafe { CStr::from_ptr(*layer) }));
@@ -63,7 +73,20 @@ impl RhiInstance {
 
         let handle = unsafe { vk_entry.create_instance(&instance_ci, None).unwrap() };
 
-        Self { handle }
+        Self {
+            handle,
+            _vk_pf: vk_entry,
+        }
+    }
+
+    #[inline]
+    pub fn handle(&self) -> &ash::Instance {
+        &self.handle
+    }
+
+    #[inline]
+    pub fn vk_handle(&self) -> vk::Instance {
+        self.handle.handle()
     }
 
     /// 用于在创建 instance 时设置 layer 的参数

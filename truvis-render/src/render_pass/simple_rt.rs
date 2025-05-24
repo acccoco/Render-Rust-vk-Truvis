@@ -107,15 +107,15 @@ impl SimlpeRtPass {
 
         let mut stages = vec![vk::PipelineShaderStageCreateInfo::default(); ShaderStageIndex::TOTAL_CNT];
         stages[ShaderStageIndex::RAYGEN] = vk::PipelineShaderStageCreateInfo::default()
-            .module(ray_gen_shader.handle)
+            .module(ray_gen_shader.handle())
             .stage(vk::ShaderStageFlags::RAYGEN_KHR)
             .name(cstr::cstr!("main"));
         stages[ShaderStageIndex::MISS] = vk::PipelineShaderStageCreateInfo::default()
-            .module(miss_shader.handle)
+            .module(miss_shader.handle())
             .stage(vk::ShaderStageFlags::MISS_KHR)
             .name(cstr::cstr!("main"));
         stages[ShaderStageIndex::CLOSEST_HIT] = vk::PipelineShaderStageCreateInfo::default()
-            .module(hit_shader.handle)
+            .module(hit_shader.handle())
             .stage(vk::ShaderStageFlags::CLOSEST_HIT_KHR)
             .name(cstr::cstr!("main"));
 
@@ -142,7 +142,7 @@ impl SimlpeRtPass {
 
         let borrowed_bindless_mgr = bindless_mgr.borrow();
         let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
-            .set_layouts(std::slice::from_ref(&borrowed_bindless_mgr.bindless_layout.layout))
+            .set_layouts(std::slice::from_ref(borrowed_bindless_mgr.bindless_layout.handle_ref()))
             .push_constant_ranges(std::slice::from_ref(&push_constant_range));
 
         let pipeline_layout = unsafe { rhi.device.create_pipeline_layout(&pipeline_layout_ci, None).unwrap() };
@@ -155,7 +155,7 @@ impl SimlpeRtPass {
 
         let pipeline = unsafe {
             rhi.device
-                .vk_rt_pipeline_pf
+                .rt_pipeline_pf()
                 .create_ray_tracing_pipelines(
                     vk::DeferredOperationKHR::null(),
                     vk::PipelineCache::null(),
@@ -232,7 +232,7 @@ impl SimlpeRtPass {
         {
             let shader_group_handle_data = unsafe {
                 self.device
-                    .vk_rt_pipeline_pf
+                    .rt_pipeline_pf()
                     .get_ray_tracing_shader_group_handles(
                         self.pipeline.pipeline,
                         0,
@@ -293,7 +293,7 @@ impl SimlpeRtPass {
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
             0,
-            &[self._bindless_mgr.borrow().bindless_sets[frame_idx].handle],
+            &[self._bindless_mgr.borrow().bindless_sets[frame_idx].handle()],
             &[],
         );
         cmd.cmd_push_constants(

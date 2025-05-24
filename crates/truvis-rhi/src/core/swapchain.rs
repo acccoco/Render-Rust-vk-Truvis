@@ -63,7 +63,7 @@ impl RhiSurface {
             )
             .unwrap()
         };
-        rhi.device.debug_utils.set_object_debug_name(surface, "main-surface");
+        rhi.device.debug_utils().set_object_debug_name(surface, "main-surface");
 
         RhiSurface {
             handle: surface,
@@ -72,9 +72,9 @@ impl RhiSurface {
         }
     }
 }
-
 impl Drop for RhiSurface {
     fn drop(&mut self) {
+        log::info!("Destroying RhiSurface");
         unsafe { self.pf.destroy_surface(self.handle, None) }
     }
 }
@@ -88,13 +88,46 @@ pub struct RhiSwapchain {
     _surface: RhiSurface,
 
     /// 这里的 image 并非手动创建的，因此无法使用 RhiImage 类型
-    pub images: Vec<vk::Image>,
-    pub image_views: Vec<vk::ImageView>,
+    images: Vec<vk::Image>,
+    image_views: Vec<vk::ImageView>,
 
-    pub extent: vk::Extent2D,
-    pub color_format: vk::Format,
-    pub color_space: vk::ColorSpaceKHR,
-    pub present_mode: vk::PresentModeKHR,
+    extent: vk::Extent2D,
+    color_format: vk::Format,
+    color_space: vk::ColorSpaceKHR,
+    present_mode: vk::PresentModeKHR,
+}
+
+// getter
+impl RhiSwapchain {
+    #[inline]
+    pub fn images(&self) -> &[vk::Image] {
+        &self.images
+    }
+
+    #[inline]
+    pub fn image_views(&self) -> &[vk::ImageView] {
+        &self.image_views
+    }
+
+    #[inline]
+    pub fn extent(&self) -> vk::Extent2D {
+        self.extent
+    }
+
+    #[inline]
+    pub fn color_format(&self) -> vk::Format {
+        self.color_format
+    }
+
+    #[inline]
+    pub fn color_space(&self) -> vk::ColorSpaceKHR {
+        self.color_space
+    }
+
+    #[inline]
+    pub fn present_mode(&self) -> vk::PresentModeKHR {
+        self.present_mode
+    }
 }
 
 impl RhiSwapchain {
@@ -164,7 +197,7 @@ impl RhiSwapchain {
         unsafe {
             let swapchain_pf = ash::khr::swapchain::Device::new(rhi.instance(), rhi.device());
             let swapchain_handle = swapchain_pf.create_swapchain(&create_info, None).unwrap();
-            rhi.device.debug_utils.set_object_debug_name(swapchain_handle, "main-swapchain");
+            rhi.device.debug_utils().set_object_debug_name(swapchain_handle, "main-swapchain");
 
             (swapchain_handle, swapchain_pf)
         }
@@ -200,9 +233,9 @@ impl RhiSwapchain {
 
         // 为 images 和 image_views 设置 debug name
         for i in 0..images.len() {
-            rhi.device.debug_utils.set_object_debug_name(images[i], format!("swapchain-image-{}", FRAME_ID_MAP[i]));
+            rhi.device.debug_utils().set_object_debug_name(images[i], format!("swapchain-image-{}", FRAME_ID_MAP[i]));
             rhi.device
-                .debug_utils
+                .debug_utils()
                 .set_object_debug_name(image_views[i], format!("swapchain-image-view-{}", FRAME_ID_MAP[i]));
         }
 
@@ -257,8 +290,8 @@ impl RhiSwapchain {
                 .acquire_next_image(
                     self.swapchain_handle,
                     u64::MAX,
-                    semaphore.semaphore,
-                    fence.map_or(vk::Fence::null(), |f| f.fence),
+                    semaphore.handle(),
+                    fence.map_or(vk::Fence::null(), |f| f.handle()),
                 )
                 .unwrap()
         };
@@ -273,18 +306,18 @@ impl RhiSwapchain {
 
     #[inline]
     pub fn submit_frame(&self, queue: &RhiQueue, image_index: u32, wait_semaphores: &[RhiSemaphore]) {
-        let wait_semaphores = wait_semaphores.iter().map(|s| s.semaphore).collect_vec();
+        let wait_semaphores = wait_semaphores.iter().map(|s| s.handle()).collect_vec();
         let present_info = vk::PresentInfoKHR::default()
             .wait_semaphores(&wait_semaphores)
             .image_indices(std::slice::from_ref(&image_index))
             .swapchains(std::slice::from_ref(&self.swapchain_handle));
 
-        unsafe { self.swapchain_pf.queue_present(queue.handle, &present_info).unwrap() };
+        unsafe { self.swapchain_pf.queue_present(queue.handle(), &present_info).unwrap() };
     }
 }
-
 impl Drop for RhiSwapchain {
     fn drop(&mut self) {
+        log::info!("Destroying RhiSwapchain");
         unsafe {
             for view in &self.image_views {
                 self.device.destroy_image_view(*view, None);

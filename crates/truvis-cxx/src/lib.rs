@@ -1,8 +1,8 @@
 use itertools::Itertools;
+use model_manager::component::{Geometry, Instance, Material, Mesh};
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
-use model_manager::component::{Geometry, Instance, Mesh, Material};
 use truvis_rhi::core::buffer::RhiBuffer;
 use truvis_rhi::rhi::Rhi;
 
@@ -181,8 +181,7 @@ impl AssimpSceneLoader {
                 let mesh_uuids = mesh_indices.iter().map(|mesh_idx| self.meshes[*mesh_idx as usize]);
                 let mat_uuids = mat_indices.iter().map(|mat_idx| self.mats[*mat_idx as usize]);
 
-                let mut ins_uuids = vec![];
-                ins_uuids.reserve(mesh_cnt as usize);
+                let mut ins_uuids = Vec::with_capacity(mesh_cnt as usize);
                 for (mesh_uuid, mat_uuid) in std::iter::zip(mesh_uuids, mat_uuids) {
                     let instance = Instance {
                         transform: std::mem::transmute::<CxxMat4f, glam::Mat4>(instance.world_transform),

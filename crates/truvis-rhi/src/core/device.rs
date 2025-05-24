@@ -8,15 +8,31 @@ use crate::core::{instance::RhiInstance, physical_device::RhiPhysicalDevice};
 use crate::shader_cursor::RhiWriteDescriptorSet;
 
 pub struct RhiDevice {
-    pub handle: ash::Device,
+    handle: ash::Device,
+    _vk_pf: Rc<ash::Entry>,
 
-    pub pdevice: Rc<RhiPhysicalDevice>,
+    /// 确保 RhiDevice 在 RhiInstance 销毁之前被销毁
+    _instance: Rc<RhiInstance>,
 
-    pub vk_dynamic_render_pf: Rc<ash::khr::dynamic_rendering::Device>,
-    pub vk_acceleration_struct_pf: Rc<ash::khr::acceleration_structure::Device>,
-    pub vk_rt_pipeline_pf: Rc<ash::khr::ray_tracing_pipeline::Device>,
+    pdevice: Rc<RhiPhysicalDevice>,
 
-    pub debug_utils: Rc<RhiDebugUtils>,
+    vk_dynamic_render_pf: Rc<ash::khr::dynamic_rendering::Device>,
+    vk_acceleration_struct_pf: Rc<ash::khr::acceleration_structure::Device>,
+    vk_rt_pipeline_pf: Rc<ash::khr::ray_tracing_pipeline::Device>,
+
+    /// 使用 Option 来控制 destroy 的时机
+    debug_utils: Option<RhiDebugUtils>,
+}
+impl Drop for RhiDevice {
+    fn drop(&mut self) {
+        unsafe {
+            log::info!("destroying device");
+
+            // 需要确保 debug_utils 在 handle 销毁之前被销毁
+            self.debug_utils = None;
+            self.handle.destroy_device(None);
+        }
+    }
 }
 
 impl Deref for RhiDevice {
@@ -27,12 +43,13 @@ impl Deref for RhiDevice {
     }
 }
 
+// ctor
 impl RhiDevice {
     /// # return
     /// * (device, graphics queue, compute queue, transfer queue)
     pub fn new(
-        vk_pf: &ash::Entry,
-        instance: &RhiInstance,
+        vk_pf: Rc<ash::Entry>,
+        instance: Rc<RhiInstance>,
         pdevice: Rc<RhiPhysicalDevice>,
         queue_create_info: &[vk::DeviceQueueCreateInfo],
     ) -> Self {
@@ -60,24 +77,26 @@ impl RhiDevice {
             .enabled_extension_names(&device_exts)
             .push_next(&mut all_features);
 
-        let device = unsafe { instance.handle.create_device(pdevice.handle, &device_create_info, None).unwrap() };
+        let device = unsafe { instance.handle().create_device(pdevice.handle, &device_create_info, None).unwrap() };
 
-        let debug_utils = Rc::new(RhiDebugUtils::new(vk_pf, &instance.handle, &device));
+        let debug_utils = RhiDebugUtils::new(&vk_pf, instance.handle(), &device);
 
-        let vk_dynamic_render_pf = Rc::new(ash::khr::dynamic_rendering::Device::new(&instance.handle, &device));
+        let vk_dynamic_render_pf = Rc::new(ash::khr::dynamic_rendering::Device::new(instance.handle(), &device));
         let vk_acceleration_struct_pf =
-            Rc::new(ash::khr::acceleration_structure::Device::new(&instance.handle, &device));
-        let vk_rt_pipeline_pf = Rc::new(ash::khr::ray_tracing_pipeline::Device::new(&instance.handle, &device));
+            Rc::new(ash::khr::acceleration_structure::Device::new(instance.handle(), &device));
+        let vk_rt_pipeline_pf = Rc::new(ash::khr::ray_tracing_pipeline::Device::new(instance.handle(), &device));
 
         Self {
             handle: device,
+            _vk_pf: vk_pf,
+            _instance: instance,
             pdevice: pdevice.clone(),
 
             vk_dynamic_render_pf,
             vk_acceleration_struct_pf,
             vk_rt_pipeline_pf,
 
-            debug_utils,
+            debug_utils: Some(debug_utils),
         }
     }
 
@@ -141,6 +160,16 @@ impl RhiDevice {
 
 // getters
 impl RhiDevice {
+    #[inline]
+    pub fn handle(&self) -> &ash::Device {
+        &self.handle
+    }
+
+    #[inline]
+    pub fn vk_handle(&self) -> vk::Device {
+        self.handle.handle()
+    }
+
     /// 当 uniform buffer 的 descriptor 在更新时，其 offset 比如是这个值的整数倍
     ///
     /// 注：这个值一定是 power of 2
@@ -168,13 +197,34 @@ impl RhiDevice {
     pub fn transfer_queue_family(&self) -> RhiQueueFamily {
         self.pdevice.transfer_queue_family.clone()
     }
+
+    #[inline]
+    pub fn debug_utils(&self) -> &RhiDebugUtils {
+        self.debug_utils.as_ref().unwrap()
+    }
+
+    #[inline]
+    pub fn dynamic_rendering_pf(&self) -> &ash::khr::dynamic_rendering::Device {
+        &self.vk_dynamic_render_pf
+    }
+
+    #[inline]
+    pub fn acceleration_structure_pf(&self) -> &ash::khr::acceleration_structure::Device {
+        &self.vk_acceleration_struct_pf
+    }
+
+    #[inline]
+    pub fn rt_pipeline_pf(&self) -> &ash::khr::ray_tracing_pipeline::Device {
+        &self.vk_rt_pipeline_pf
+    }
 }
 
+// tools
 impl RhiDevice {
     #[inline]
     pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str) -> vk::RenderPass {
         let render_pass = unsafe { self.handle.create_render_pass(render_pass_ci, None).unwrap() };
-        self.debug_utils.set_object_debug_name(render_pass, debug_name);
+        self.debug_utils().set_object_debug_name(render_pass, debug_name);
         render_pass
     }
 
@@ -185,7 +235,7 @@ impl RhiDevice {
         debug_name: &str,
     ) -> vk::PipelineCache {
         let pipeline_cache = unsafe { self.handle.create_pipeline_cache(pipeline_cache_ci, None).unwrap() };
-        self.debug_utils.set_object_debug_name(pipeline_cache, debug_name);
+        self.debug_utils().set_object_debug_name(pipeline_cache, debug_name);
         pipeline_cache
     }
 
@@ -196,7 +246,7 @@ impl RhiDevice {
         debug_name: &str,
     ) -> vk::Framebuffer {
         let frame_buffer = unsafe { self.handle.create_framebuffer(frame_buffer_ci, None).unwrap() };
-        self.debug_utils.set_object_debug_name(frame_buffer, debug_name);
+        self.debug_utils().set_object_debug_name(frame_buffer, debug_name);
         frame_buffer
     }
 

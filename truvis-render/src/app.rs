@@ -54,6 +54,16 @@ pub struct TruvisApp<T: OuterApp> {
     outer_app: OnceCell<T>,
 }
 
+impl<T: OuterApp> Drop for TruvisApp<T> {
+    fn drop(&mut self) {
+        log::info!("Dropping TruvisApp");
+        // 在 TruvisApp 被销毁时，等待 Renderer 设备空闲
+        if let Some(renderer) = self.renderer.get() {
+            renderer.wait_idle();
+        }
+    }
+}
+
 pub struct UserEvent;
 
 impl<T: OuterApp> TruvisApp<T> {
@@ -81,6 +91,8 @@ impl<T: OuterApp> TruvisApp<T> {
             outer_app: OnceCell::new(),
         };
         event_loop.run_app(&mut app).unwrap();
+
+        log::info!("end run.");
     }
     pub fn init(&mut self, event_loop: &ActiveEventLoop) {
         // TODO 抽离出参数来
@@ -154,8 +166,8 @@ impl<T: OuterApp> TruvisApp<T> {
 
         renderer.wait_idle();
 
-        renderer.rebuild_swapchain();
-
+        log::info!("try to rebuild render context");
+        renderer.rebuild_render_context();
         outer_app.rebuild(&renderer.rhi, &mut renderer.render_context);
     }
 }

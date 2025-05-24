@@ -7,6 +7,14 @@ pub struct RhiDebugUtils {
     pub vk_debug_utils_device: ash::ext::debug_utils::Device,
     pub vk_debug_utils_messenger: vk::DebugUtilsMessengerEXT,
 }
+impl Drop for RhiDebugUtils {
+    fn drop(&mut self) {
+        unsafe {
+            log::info!("Destroying RhiDebugUtils");
+            self.vk_debug_utils_instance.destroy_debug_utils_messenger(self.vk_debug_utils_messenger, None);
+        }
+    }
+}
 
 /// debug messenger 的回调函数
 /// # Safety
@@ -53,12 +61,12 @@ impl RhiDebugUtils {
         let create_info = Self::debug_utils_messenger_ci();
         let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None).unwrap() };
 
-        let debug_utils = ash::ext::debug_utils::Device::new(instance, device);
+        let vk_debug_utils_device = ash::ext::debug_utils::Device::new(instance, device);
 
         Self {
             vk_debug_utils_instance: loader,
             vk_debug_utils_messenger: debug_messenger,
-            vk_debug_utils_device: debug_utils,
+            vk_debug_utils_device,
         }
     }
 

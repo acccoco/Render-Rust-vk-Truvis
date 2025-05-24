@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
-use ash::vk;
-
+use crate::core::device::RhiDevice;
 use crate::rhi::Rhi;
+use ash::vk;
 
 pub struct RhiSamplerCreateInfo {
     inner: vk::SamplerCreateInfo<'static>,
@@ -43,15 +43,28 @@ pub struct RhiSampler {
     handle: vk::Sampler,
 
     _info: Rc<RhiSamplerCreateInfo>,
+    device: Rc<RhiDevice>,
+}
+impl Drop for RhiSampler {
+    fn drop(&mut self) {
+        unsafe {
+            log::info!("Destroying RhiSampler");
+            self.device.destroy_sampler(self.handle, None);
+        }
+    }
 }
 
 impl RhiSampler {
     #[inline]
     pub fn new(rhi: &Rhi, info: Rc<RhiSamplerCreateInfo>, debug_name: &str) -> Self {
         let handle = unsafe { rhi.device.create_sampler(&info.inner, None).unwrap() };
-        rhi.device.debug_utils.set_object_debug_name(handle, debug_name);
+        rhi.device.debug_utils().set_object_debug_name(handle, debug_name);
 
-        Self { handle, _info: info }
+        Self {
+            handle,
+            _info: info,
+            device: rhi.device.clone(),
+        }
     }
 
     /// getter

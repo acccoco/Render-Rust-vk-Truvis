@@ -13,7 +13,9 @@ use ash::vk;
 /// 与 VulkanSamples 的 VulkanSamle 及 ApiVulkanSample 作用类似
 pub struct Rhi {
     /// vk 基础函数的接口
-    pub vk_pf: ash::Entry,
+    ///
+    /// 在 drop 之后，会卸载 dll，因此需要确保该字段最后 drop
+    pub vk_pf: Rc<ash::Entry>,
     instance: Rc<RhiInstance>,
     physical_device: Rc<RhiPhysicalDevice>,
     pub device: Rc<RhiDevice>,
@@ -35,16 +37,23 @@ const DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
 const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
 const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
 
+impl Drop for Rhi {
+    fn drop(&mut self) {
+        log::info!("destroy rhi.");
+    }
+}
+
 // init 相关
 impl Rhi {
     const ENGINE_NAME: &'static str = "DruvisIII";
 
     pub fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
-        let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");
+        let vk_pf = Rc::new(unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry"));
 
-        let instance = Rc::new(RhiInstance::new(&vk_pf, app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts));
+        let instance =
+            Rc::new(RhiInstance::new(vk_pf.clone(), app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts));
 
-        let physical_device = Rc::new(RhiPhysicalDevice::new_descrete_physical_device(&instance.handle));
+        let physical_device = Rc::new(RhiPhysicalDevice::new_descrete_physical_device(instance.handle()));
 
         // graphics, compute, transfer 各创建一个
         let queue_create_infos = [
@@ -59,7 +68,8 @@ impl Rhi {
                 .queue_priorities(&[1.0]),
         ];
 
-        let device = Rc::new(RhiDevice::new(&vk_pf, &instance, physical_device.clone(), &queue_create_infos));
+        let device =
+            Rc::new(RhiDevice::new(vk_pf.clone(), instance.clone(), physical_device.clone(), &queue_create_infos));
 
         let graphics_queue = Rc::new(RhiQueue {
             handle: unsafe { device.get_device_queue(physical_device.graphics_queue_family.queue_family_index, 0) },
@@ -83,13 +93,13 @@ impl Rhi {
 
         // 在 device 以及 debug_utils 之前创建的 vk::Handle
         {
-            device.debug_utils.set_object_debug_name(instance.handle.handle(), "instance");
-            device.debug_utils.set_object_debug_name(physical_device.handle, "physical device");
+            device.debug_utils().set_object_debug_name(instance.vk_handle(), "instance");
+            device.debug_utils().set_object_debug_name(physical_device.handle, "physical device");
 
-            device.debug_utils.set_object_debug_name(device.handle.handle(), "device");
-            device.debug_utils.set_object_debug_name(graphics_queue.handle, "graphics-queue");
-            device.debug_utils.set_object_debug_name(compute_queue.handle, "compute-queue");
-            device.debug_utils.set_object_debug_name(transfer_queue.handle, "transfer-queue");
+            device.debug_utils().set_object_debug_name(device.vk_handle(), "device");
+            device.debug_utils().set_object_debug_name(graphics_queue.handle, "graphics-queue");
+            device.debug_utils().set_object_debug_name(compute_queue.handle, "compute-queue");
+            device.debug_utils().set_object_debug_name(transfer_queue.handle, "transfer-queue");
         }
 
         let graphics_command_pool = Rc::new(RhiCommandPool::new_before_rhi(
@@ -169,7 +179,7 @@ impl Rhi {
             pool_size,
         ));
 
-        RhiDescriptorPool::new(device, pool_ci, "ctx-descriptor-pool")
+        RhiDescriptorPool::new(device, pool_ci, "rhi-descriptor-pool")
     }
 }
 

@@ -49,7 +49,6 @@ impl BindlessManager {
             "bindless-layout",
         );
         let bindless_descriptor_sets = (0..frames_in_flight)
-            .into_iter()
             .map(|idx| {
                 RhiDescriptorSet::<BindlessTextureBindings>::new(
                     rhi,
@@ -73,8 +72,7 @@ impl BindlessManager {
 
     /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
     pub fn prepare_render_data(&mut self, frame_idx: usize) {
-        let mut image_infos = vec![];
-        image_infos.reserve(self.textures.iter().len());
+        let mut image_infos = Vec::with_capacity(self.textures.iter().len());
 
         self.texture_map.clear();
 
@@ -84,7 +82,7 @@ impl BindlessManager {
         }
 
         let write =
-            BindlessTextureBindings::textures().write_image(self.bindless_sets[frame_idx].handle, 0, image_infos);
+            BindlessTextureBindings::textures().write_image(self.bindless_sets[frame_idx].handle(), 0, image_infos);
         self.device.write_descriptor_sets(std::slice::from_ref(&write));
     }
 
@@ -98,7 +96,8 @@ impl BindlessManager {
         self.textures.insert(texture_path, texture);
     }
 
+    /// 获得纹理在当前帧的 bindless 索引
     pub fn get_texture_idx(&self, texture_path: &str) -> Option<u32> {
-        self.texture_map.get(texture_path).map(|idx| *idx)
+        self.texture_map.get(texture_path).copied()
     }
 }

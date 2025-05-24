@@ -17,19 +17,27 @@ pub struct RhiQueueFamily {
     pub queue_count: u32,
 }
 
+/// # destroy
+///
+/// RhiQueueFamily 在 RhiDevice 销毁时会被销毁
 pub struct RhiQueue {
-    pub handle: vk::Queue,
-    pub queue_family: RhiQueueFamily,
+    pub(crate) handle: vk::Queue,
+    pub(crate) queue_family: RhiQueueFamily,
 
-    pub device: Rc<RhiDevice>,
+    pub(crate) device: Rc<RhiDevice>,
 }
 
 impl RhiQueue {
+    #[inline]
+    pub fn handle(&self) -> vk::Queue {
+        self.handle
+    }
+
     pub fn submit(&self, batches: Vec<RhiSubmitInfo>, fence: Option<RhiFence>) {
         unsafe {
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = batches.iter().map(|b| *b.inner()).collect_vec();
-            self.device.queue_submit2(self.handle, &batches, fence.map_or(vk::Fence::null(), |f| f.fence)).unwrap()
+            self.device.queue_submit2(self.handle, &batches, fence.map_or(vk::Fence::null(), |f| f.handle())).unwrap()
         }
     }
 
@@ -84,7 +92,7 @@ impl RhiSubmitInfo {
     pub fn wait_infos(mut self, wait_semaphores: &[(RhiSemaphore, vk::PipelineStageFlags2)]) -> Self {
         self.wait_infos = wait_semaphores
             .iter()
-            .map(|(s, stage)| vk::SemaphoreSubmitInfo::default().semaphore(s.semaphore).stage_mask(*stage))
+            .map(|(s, stage)| vk::SemaphoreSubmitInfo::default().semaphore(s.handle()).stage_mask(*stage))
             .collect_vec();
         self.inner.wait_semaphore_info_count = self.wait_infos.len() as u32;
         self.inner.p_wait_semaphore_infos = self.wait_infos.as_ptr();
@@ -96,7 +104,7 @@ impl RhiSubmitInfo {
     pub fn signal_infos(mut self, signal_semaphores: &[(RhiSemaphore, vk::PipelineStageFlags2)]) -> Self {
         self.signal_infos = signal_semaphores
             .iter()
-            .map(|(s, stage)| vk::SemaphoreSubmitInfo::default().semaphore(s.semaphore).stage_mask(*stage))
+            .map(|(s, stage)| vk::SemaphoreSubmitInfo::default().semaphore(s.handle()).stage_mask(*stage))
             .collect_vec();
         self.inner.signal_semaphore_info_count = self.signal_infos.len() as u32;
         self.inner.p_signal_semaphore_infos = self.signal_infos.as_ptr();
