@@ -95,14 +95,14 @@ impl ShaderToy {
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.cmd_push_constants(
-                self.pipeline.pipeline_layout,
+                self.pipeline.layout(),
                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 0,
                 bytemuck::bytes_of(&push_constants),
             );
 
             cmd.cmd_begin_rendering(&render_info);
-            cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline);
+            cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline());
 
             let swapchain_extend = render_context.swapchain_extent();
             cmd.cmd_set_viewport(
