@@ -23,7 +23,7 @@ pub struct RhiAcceleration {
 }
 impl RhiAcceleration {
     /// 同步构建 blas
-    /// 
+    ///
     /// 需要指定每个 geometry 的信息，以及每个 geometry 拥有的 max primitives 数量
     /// 会自动添加 compact 和 trace 的 flag
     ///
@@ -95,8 +95,8 @@ impl RhiAcceleration {
         // 等待初步 build 完成
         RhiCommandBuffer::one_time_exec(
             rhi,
-            rhi.compute_command_pool.clone(),
-            &rhi.compute_queue,
+            rhi.graphics_command_pool.clone(),
+            &rhi.graphics_queue,
             |cmd| {
                 cmd.build_acceleration_structure(&build_geometry_info, &range_infos);
                 // 查询 compact size 属于 read 操作，需要同步
@@ -127,8 +127,8 @@ impl RhiAcceleration {
 
         RhiCommandBuffer::one_time_exec(
             rhi,
-            rhi.compute_command_pool.clone(),
-            &rhi.compute_queue,
+            rhi.graphics_command_pool.clone(),
+            &rhi.graphics_queue,
             |cmd| {
                 cmd.cmd_copy_acceleration_structure(
                     &vk::CopyAccelerationStructureInfoKHR::default()
@@ -218,8 +218,8 @@ impl RhiAcceleration {
         // 正式构建 TLAS
         RhiCommandBuffer::one_time_exec(
             rhi,
-            rhi.compute_command_pool.clone(),
-            &rhi.compute_queue,
+            rhi.graphics_command_pool.clone(),
+            &rhi.graphics_queue,
             |cmd| {
                 cmd.build_acceleration_structure(&build_geometry_info, std::slice::from_ref(&range_info));
             },
