@@ -1,14 +1,19 @@
 use crate::frame_context::FrameContext;
-use crate::platform::camera::Camera;
+use crate::platform::camera::TruCamera;
 use crate::platform::camera_controller::CameraController;
 use crate::platform::input_manager::{InputManager, InputState};
 use crate::platform::timer::Timer;
 use crate::platform::ui::{Gui, UiCreateInfo};
 use crate::render::Renderer;
+use crate::renderer::bindless::BindlessManager;
+use crate::renderer::frame_scene::GpuScene;
+use crate::renderer::scene_manager::TheWorld;
+use shader_binding::shader;
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 use std::sync::OnceLock;
 use truvis_crate_tools::init_log::init_log;
+use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::window_system::{MainWindow, WindowCreateInfo};
 use truvis_rhi::rhi::Rhi;
 use winit::application::ApplicationHandler;
@@ -22,6 +27,7 @@ pub struct AppCtx<'a> {
     pub render_context: &'a mut FrameContext,
     pub timer: &'a Timer,
     pub input_state: InputState,
+    pub camera: &'a TruCamera,
 }
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
@@ -30,14 +36,24 @@ pub fn panic_handler(info: &std::panic::PanicHookInfo) {
 }
 
 pub trait OuterApp {
-    fn init(rhi: &Rhi, render_context: &mut FrameContext, camera_controller: Rc<RefCell<CameraController>>) -> Self;
+    fn init(
+        rhi: &Rhi,
+        render_context: &mut FrameContext,
+        scene_mgr: Rc<RefCell<TheWorld>>,
+        bindless_mgr: Rc<RefCell<BindlessManager>>,
+    ) -> Self;
 
     fn draw_ui(&mut self, ui: &mut imgui::Ui);
 
-    fn update(&mut self, app_ctx: &mut AppCtx);
+    fn update(&mut self, _app_ctx: &mut AppCtx) {}
 
     /// 发生于 acquire_frame 之后，submit_frame 之前
-    fn draw(&self, app_ctx: &mut AppCtx);
+    fn draw(
+        &self,
+        app_ctx: &mut AppCtx,
+        per_frame_data_buffer: &RhiStructuredBuffer<shader::PerFrameData>,
+        gpu_scene: &GpuScene,
+    );
 
     /// window 发生改变后，重建
     fn rebuild(&mut self, _rhi: &Rhi, _render_context: &mut FrameContext) {}
@@ -49,7 +65,7 @@ pub struct TruvisApp<T: OuterApp> {
     input_manager: Rc<RefCell<InputManager>>,
     gui: OnceCell<Gui>,
     timer: Timer,
-    camera_controller: Rc<RefCell<CameraController>>,
+    camera_controller: CameraController,
 
     outer_app: OnceCell<T>,
 }
@@ -77,7 +93,7 @@ impl<T: OuterApp> TruvisApp<T> {
         let timer = Timer::default();
 
         // 创建相机控制器
-        let camera_controller = Rc::new(RefCell::new(CameraController::new(Camera::default(), input_manager.clone())));
+        let camera_controller = CameraController::new(TruCamera::default(), input_manager.clone());
 
         let event_loop = winit::event_loop::EventLoop::<UserEvent>::with_user_event().build().unwrap();
 
@@ -113,7 +129,12 @@ impl<T: OuterApp> TruvisApp<T> {
                 frames_in_flight: 3,
             },
         );
-        let outer_app = T::init(&renderer.rhi, &mut renderer.render_context, self.camera_controller.clone());
+        let outer_app = T::init(
+            &renderer.rhi,
+            &mut renderer.render_context,
+            renderer.scene_mgr.clone(),
+            renderer.bindless_mgr.clone(),
+        );
 
         self.window_system.set(window_system).map_err(|_| ()).unwrap();
         self.renderer.set(renderer).map_err(|_| ()).unwrap();
@@ -130,11 +151,22 @@ impl<T: OuterApp> TruvisApp<T> {
         // 更新输入状态
         self.input_manager.borrow_mut().update();
 
-        self.camera_controller.borrow_mut().update(self.timer.delta_time_s);
+        self.camera_controller.update(self.timer.delta_time_s);
 
         let renderer = self.renderer.get_mut().unwrap();
         renderer.before_frame();
         {
+            let crt_frame_label = renderer.render_context.current_frame_label();
+            let mut app_ctx = AppCtx {
+                rhi: &renderer.rhi,
+                render_context: &mut renderer.render_context,
+                timer: &self.timer,
+                input_state: self.input_manager.borrow().state.clone(),
+                camera: self.camera_controller.camera(),
+            };
+            self.outer_app.get_mut().unwrap().update(&mut app_ctx);
+
+            renderer.update_gpu_scene(&self.input_manager.borrow().state, &self.timer, self.camera_controller.camera());
             renderer.before_render();
             {
                 let mut app_ctx = AppCtx {
@@ -142,9 +174,13 @@ impl<T: OuterApp> TruvisApp<T> {
                     render_context: &mut renderer.render_context,
                     timer: &self.timer,
                     input_state: self.input_manager.borrow().state.clone(),
+                    camera: self.camera_controller.camera(),
                 };
-                self.outer_app.get_mut().unwrap().update(&mut app_ctx);
-                self.outer_app.get_mut().unwrap().draw(&mut app_ctx);
+                self.outer_app.get_mut().unwrap().draw(
+                    &mut app_ctx,
+                    &renderer.per_frame_data_buffers[crt_frame_label],
+                    &renderer.gpu_scene,
+                );
             }
             renderer.after_render();
 
@@ -159,8 +195,7 @@ impl<T: OuterApp> TruvisApp<T> {
         }
         renderer.after_frame();
     }
-
-    pub fn rebuild(&mut self, _width: u32, _height: u32) {
+    pub fn rebuild(&mut self, width: u32, height: u32) {
         let renderer = self.renderer.get_mut().unwrap();
         let outer_app = self.outer_app.get_mut().unwrap();
 
@@ -168,10 +203,13 @@ impl<T: OuterApp> TruvisApp<T> {
 
         log::info!("try to rebuild render context");
         renderer.rebuild_render_context();
+
+        // 更新相机的宽高比
+        self.camera_controller.camera_mut().asp = width as f32 / height as f32;
+
         outer_app.rebuild(&renderer.rhi, &mut renderer.render_context);
     }
 }
-
 impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
     fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: StartCause) {
         // TODO 确认一下发送时机

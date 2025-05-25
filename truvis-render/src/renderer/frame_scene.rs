@@ -508,9 +508,9 @@ impl GpuScene {
     }
 
     fn build_tlas(&mut self, rhi: &Rhi, frame_label: usize) {
-        // FIXME 暂时只在开始的时候构建一下
-        if self.gpu_scene_buffers[frame_label].tlas.is_some() {
-            // return;
+        if self.flatten_instances.is_empty() {
+            // 没有实例数据，直接返回
+            return;
         }
 
         let scene_mgr = self.scene_mgr.borrow();

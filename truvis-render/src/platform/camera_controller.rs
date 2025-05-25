@@ -1,27 +1,27 @@
-use crate::platform::camera::Camera;
+use crate::platform::camera::TruCamera;
 use crate::platform::input_manager::InputManager;
 use std::cell::RefCell;
 use std::rc::Rc;
 use winit::keyboard::KeyCode;
 
 pub struct CameraController {
-    camera: Camera,
+    camera: TruCamera,
     input_manager: Rc<RefCell<InputManager>>,
 }
 
 impl CameraController {
     /// 创建新的相机控制器
-    pub fn new(camera: Camera, input_manager: Rc<RefCell<InputManager>>) -> Self {
+    pub fn new(camera: TruCamera, input_manager: Rc<RefCell<InputManager>>) -> Self {
         Self { camera, input_manager }
     }
 
     /// 获取相机引用
-    pub fn camera(&self) -> &Camera {
+    pub fn camera(&self) -> &TruCamera {
         &self.camera
     }
 
     /// 获取相机可变引用
-    pub fn camera_mut(&mut self) -> &mut Camera {
+    pub fn camera_mut(&mut self) -> &mut TruCamera {
         &mut self.camera
     }
 

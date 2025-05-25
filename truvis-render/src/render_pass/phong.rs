@@ -1,4 +1,3 @@
-use crate::app::AppCtx;
 use crate::frame_context::FrameContext;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_scene::GpuScene;
@@ -9,15 +8,17 @@ use shader_binding::shader;
 use std::cell::RefCell;
 use std::mem::offset_of;
 use std::rc::Rc;
+use truvis_rhi::basic::color::LabelColor;
+use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo};
 use truvis_rhi::rhi::Rhi;
 
-pub struct Simple3DMainPass {
+pub struct PhongPass {
     pipeline: RhiGraphicsPipeline,
     bindless_manager: Rc<RefCell<BindlessManager>>,
 }
-impl Simple3DMainPass {
+impl PhongPass {
     pub fn new(rhi: &Rhi, frame_context: &FrameContext, bindless_manager: Rc<RefCell<BindlessManager>>) -> Self {
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
         ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv", cstr::cstr!("main"));
@@ -83,13 +84,25 @@ impl Simple3DMainPass {
     pub fn draw(
         &self,
         cmd: &RhiCommandBuffer,
-        app_ctx: &AppCtx,
-        push_constant: &shader::PushConstants,
+        render_info: &vk::RenderingInfo,
+        viewport: vk::Extent2D,
+        per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
-        frame_idx: usize,
+        frame_label: usize,
     ) {
-        self.bind(cmd, &app_ctx.render_context.swapchain_extent().into(), push_constant, frame_idx);
+        cmd.cmd_begin_rendering(render_info);
+        cmd.begin_label("[phong-pass]draw", LabelColor::COLOR_PASS);
 
+        self.bind(
+            cmd,
+            &viewport.into(),
+            &shader::PushConstants {
+                frame_data: per_frame_data.device_address(),
+                scene: gpu_scene.scene_device_address(frame_label),
+                ..Default::default()
+            },
+            frame_label,
+        );
         gpu_scene.draw(cmd, &mut |ins_idx, submesh_idx| {
             // NOTE 这个数据和 PushConstant 中的内存布局是一致的
             let data = [ins_idx, submesh_idx];
@@ -100,5 +113,8 @@ impl Simple3DMainPass {
                 bytemuck::bytes_of(&data),
             );
         });
+
+        cmd.end_label();
+        cmd.end_rendering();
     }
 }

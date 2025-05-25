@@ -1,4 +1,4 @@
-pub struct Camera {
+pub struct TruCamera {
     pub position: glam::Vec3,
 
     pub euler_yaw_deg: f32,
@@ -10,7 +10,7 @@ pub struct Camera {
     pub near: f32,
 }
 
-impl Camera {
+impl TruCamera {
     /// 相机的上参考向量
     const CAMERA_UP: glam::Vec3 = glam::Vec3::new(0.0, 1.0, 0.0);
 
@@ -99,7 +99,7 @@ impl Camera {
     }
 }
 
-impl Default for Camera {
+impl Default for TruCamera {
     fn default() -> Self {
         Self {
             position: glam::Vec3::new(0.0, 0.0, 0.0),

@@ -3,12 +3,16 @@ use imgui::Ui;
 use model_manager::component::TruGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
+use shader_binding::shader;
 use std::cell::RefCell;
 use std::rc::Rc;
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
 use truvis_render::frame_context::FrameContext;
-use truvis_render::platform::camera_controller::CameraController;
+use truvis_render::renderer::bindless::BindlessManager;
+use truvis_render::renderer::frame_scene::GpuScene;
 use truvis_render::renderer::framebuffer::FrameBuffer;
+use truvis_render::renderer::scene_manager::TheWorld;
+use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::graphics_pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, graphics_pipeline::RhiGraphicsPipeline},
@@ -102,8 +106,17 @@ impl HelloTriangle {
 }
 
 impl OuterApp for HelloTriangle {
-    fn init(rhi: &Rhi, render_context: &mut FrameContext, _camera_controller: Rc<RefCell<CameraController>>) -> Self {
+    fn init(
+        rhi: &Rhi,
+        render_context: &mut FrameContext,
+        _scene_mgr: Rc<RefCell<TheWorld>>,
+        bindless_mgr: Rc<RefCell<BindlessManager>>,
+    ) -> Self {
         log::info!("hello triangle init.");
+
+        // 至少注册一个纹理，否则 bindless layout 会没有纹理绑定点
+        bindless_mgr.borrow_mut().register_texture(rhi, "assets/uv_checker.png".to_string());
+
         HelloTriangle::new(rhi, render_context)
     }
 
@@ -130,7 +143,12 @@ impl OuterApp for HelloTriangle {
         self.frame_id = app_ctx.render_context.current_frame_num();
     }
 
-    fn draw(&self, app_ctx: &mut AppCtx) {
+    fn draw(
+        &self,
+        app_ctx: &mut AppCtx,
+        _per_frame_data_buffer: &RhiStructuredBuffer<shader::PerFrameData>,
+        _gpu_scene: &GpuScene,
+    ) {
         self.my_update(app_ctx.rhi, app_ctx.render_context);
     }
 }
