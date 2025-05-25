@@ -48,7 +48,6 @@ pub struct RhiSampler {
 impl Drop for RhiSampler {
     fn drop(&mut self) {
         unsafe {
-            log::info!("Destroying RhiSampler");
             self.device.destroy_sampler(self.handle, None);
         }
     }

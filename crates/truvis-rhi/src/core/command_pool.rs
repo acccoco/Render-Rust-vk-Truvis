@@ -11,12 +11,11 @@ pub struct RhiCommandPool {
     _queue_family: RhiQueueFamily,
 
     device: Rc<RhiDevice>,
-    debug_name: String,
+    _debug_name: String,
 }
 impl Drop for RhiCommandPool {
     fn drop(&mut self) {
         unsafe {
-            log::info!("Destroying RhiCommandPool: {}", self.debug_name);
             self.device.destroy_command_pool(self.handle, None);
         }
     }
@@ -52,7 +51,7 @@ impl RhiCommandPool {
             handle: pool,
             _queue_family: queue_family,
             device,
-            debug_name: debug_name.to_string(),
+            _debug_name: debug_name.to_string(),
         }
     }
 

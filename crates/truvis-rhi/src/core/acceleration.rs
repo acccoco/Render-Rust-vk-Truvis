@@ -251,6 +251,11 @@ impl RhiAcceleration {
     }
 
     #[inline]
+    pub fn handle(&self) -> vk::AccelerationStructureKHR {
+        self.acceleration_structure
+    }
+
+    #[inline]
     pub fn get_device_address(&self) -> vk::DeviceAddress {
         unsafe {
             self.device.acceleration_structure_pf().get_acceleration_structure_device_address(

@@ -74,7 +74,6 @@ impl RhiSurface {
 }
 impl Drop for RhiSurface {
     fn drop(&mut self) {
-        log::info!("Destroying RhiSurface");
         unsafe { self.pf.destroy_surface(self.handle, None) }
     }
 }
@@ -317,7 +316,6 @@ impl RhiSwapchain {
 }
 impl Drop for RhiSwapchain {
     fn drop(&mut self) {
-        log::info!("Destroying RhiSwapchain");
         unsafe {
             for view in &self.image_views {
                 self.device.destroy_image_view(*view, None);

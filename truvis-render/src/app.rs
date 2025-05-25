@@ -5,8 +5,9 @@ use crate::platform::input_manager::{InputManager, InputState};
 use crate::platform::timer::Timer;
 use crate::platform::ui::{Gui, UiCreateInfo};
 use crate::render::Renderer;
+use crate::renderer::acc_manager::AccManager;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_scene::GpuScene;
+use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::TheWorld;
 use shader_binding::shader;
 use std::cell::{OnceCell, RefCell};
@@ -32,7 +33,7 @@ pub struct AppCtx<'a> {
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     log::error!("{}", info);
-    // std::thread::sleep(std::time::Duration::from_secs(3));
+    std::thread::sleep(std::time::Duration::from_secs(30));
 }
 
 pub trait OuterApp {
@@ -41,6 +42,7 @@ pub trait OuterApp {
         render_context: &mut FrameContext,
         scene_mgr: Rc<RefCell<TheWorld>>,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
+        acc_mgr: Rc<RefCell<AccManager>>,
     ) -> Self;
 
     fn draw_ui(&mut self, ui: &mut imgui::Ui);
@@ -134,6 +136,7 @@ impl<T: OuterApp> TruvisApp<T> {
             &mut renderer.render_context,
             renderer.scene_mgr.clone(),
             renderer.bindless_mgr.clone(),
+            renderer.acc_mgr.clone(),
         );
 
         self.window_system.set(window_system).map_err(|_| ()).unwrap();

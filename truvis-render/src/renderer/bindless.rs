@@ -14,14 +14,14 @@ use truvis_rhi::shader_cursor::ShaderCursor;
 pub struct BindlessTextureBindings {
     #[binding = 0]
     #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
-    #[stage = "FRAGMENT"]
+    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR"]
     #[count = 128]
     #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
     _textures: (),
 
     #[binding = 1]
     #[descriptor_type = "STORAGE_IMAGE"]
-    #[stage = "FRAGMENT"]
+    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR"]
     #[count = 128]
     #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
     _images: (),
@@ -54,7 +54,7 @@ impl BindlessManager {
                     rhi,
                     rhi.descriptor_pool(),
                     &bindless_layout,
-                    &format!("bindless-descriptor-set-{idx}"),
+                    format!("bindless-descriptor-set-{idx}"),
                 )
             })
             .collect_vec();

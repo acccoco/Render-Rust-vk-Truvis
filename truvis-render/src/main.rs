@@ -7,15 +7,19 @@ use std::rc::Rc;
 use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
 use truvis_render::frame_context::FrameContext;
 use truvis_render::render_pass::phong::PhongPass;
+use truvis_render::render_pass::simple_rt::SimlpeRtPass;
+use truvis_render::renderer::acc_manager::AccManager;
 use truvis_render::renderer::bindless::BindlessManager;
-use truvis_render::renderer::frame_scene::GpuScene;
 use truvis_render::renderer::framebuffer::FrameBuffer;
+use truvis_render::renderer::gpu_scene::GpuScene;
 use truvis_render::renderer::scene_manager::TheWorld;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
+use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::{core::command_queue::RhiSubmitInfo, rhi::Rhi};
 
 struct PhongApp {
     phong_pass: PhongPass,
+    rt_pass: SimlpeRtPass,
 }
 
 impl PhongApp {}
@@ -26,10 +30,9 @@ impl OuterApp for PhongApp {
         render_context: &mut FrameContext,
         scene_mgr: Rc<RefCell<TheWorld>>,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
+        acc_mgr: Rc<RefCell<AccManager>>,
     ) -> Self {
         bindless_mgr.borrow_mut().register_texture(rhi, "assets/uv_checker.png".to_string());
-
-        let main_pass = PhongPass::new(rhi, render_context, bindless_mgr.clone());
 
         let mut scene_mgr = scene_mgr.borrow_mut();
         // 复制多个 instance
@@ -76,7 +79,10 @@ impl OuterApp for PhongApp {
             glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
 
-        Self { phong_pass: main_pass }
+        let rt_pass = SimlpeRtPass::new(rhi, bindless_mgr.clone(), acc_mgr.clone());
+        let phong_pass = PhongPass::new(rhi, render_context, bindless_mgr.clone());
+
+        Self { phong_pass, rt_pass }
     }
 
     fn draw_ui(&mut self, ui: &mut Ui) {
@@ -103,19 +109,29 @@ impl OuterApp for PhongApp {
             &depth_attach,
         );
 
-        let cmd = FrameContext::alloc_command_buffer(app_ctx.render_context, "[main-pass]render");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[phong-pass]draw");
+        let phong_cmd = app_ctx.render_context.alloc_command_buffer("[main-pass]render");
+        phong_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[phong-pass]draw");
         self.phong_pass.draw(
-            &cmd,
+            &phong_cmd,
             &render_info,
             app_ctx.render_context.swapchain_extent(),
             per_frame_data_buffer,
             gpu_scene,
             crt_frame_label,
         );
-        cmd.end();
+        phong_cmd.end();
 
-        app_ctx.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
+        RhiCommandBuffer::one_time_exec(
+            app_ctx.rhi,
+            app_ctx.rhi.graphics_command_pool.clone(),
+            &app_ctx.rhi.graphics_queue,
+            |rt_cmd| {
+                self.rt_pass.ray_trace(&rt_cmd, app_ctx.render_context, per_frame_data_buffer, gpu_scene);
+            },
+            "rt",
+        );
+
+        app_ctx.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[phong_cmd])], None);
     }
 }
 

@@ -30,6 +30,7 @@ impl RhiImageCreateInfo {
                 tiling: vk::ImageTiling::OPTIMAL,
                 usage,
                 sharing_mode: vk::SharingMode::EXCLUSIVE,
+                // spec 上面说，这里只能是 UNDEFINED 或者 PREINITIALIZED
                 initial_layout: vk::ImageLayout::UNDEFINED,
                 ..Default::default()
             },
@@ -109,7 +110,23 @@ impl Drop for RhiImage2D {
         unsafe { self.allocator.destroy_image(self.handle, &mut self.allocation) }
     }
 }
+// getter
+impl RhiImage2D {
+    #[inline]
+    pub fn width(&self) -> u32 {
+        self.image_info.extent().width
+    }
 
+    #[inline]
+    pub fn height(&self) -> u32 {
+        self.image_info.extent().height
+    }
+
+    #[inline]
+    pub fn handle(&self) -> vk::Image {
+        self.handle
+    }
+}
 impl RhiImage2D {
     pub fn new(
         rhi: &Rhi,
@@ -131,17 +148,6 @@ impl RhiImage2D {
             allocator: rhi.allocator.clone(),
         }
     }
-
-    #[inline]
-    pub fn width(&self) -> u32 {
-        self.image_info.extent().width
-    }
-
-    #[inline]
-    pub fn height(&self) -> u32 {
-        self.image_info.extent().height
-    }
-
     /// 根据 RGBA8_UNORM 的 data 创建 image
     pub fn from_rgba8(rhi: &Rhi, width: u32, height: u32, data: &[u8], name: impl AsRef<str>) -> Self {
         let image = Self::new(

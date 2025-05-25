@@ -2,8 +2,9 @@ use crate::frame_context::{FrameContext, RenderContextInitInfo};
 use crate::platform::camera::TruCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
+use crate::renderer::acc_manager::AccManager;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_scene::GpuScene;
+use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::TheWorld;
 use ash::vk;
 use raw_window_handle::HasDisplayHandle;
@@ -37,6 +38,7 @@ pub struct Renderer {
 
     pub bindless_mgr: Rc<RefCell<BindlessManager>>,
     pub scene_mgr: Rc<RefCell<TheWorld>>,
+    pub acc_mgr: Rc<RefCell<AccManager>>,
     pub gpu_scene: GpuScene,
     pub per_frame_data_buffers: Vec<RhiStructuredBuffer<shader::PerFrameData>>,
 }
@@ -73,7 +75,8 @@ impl Renderer {
 
         let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, render_context.frame_cnt_in_flight)));
         let scene_mgr = Rc::new(RefCell::new(TheWorld::new(bindless_mgr.clone())));
-        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), frames_in_flight);
+        let acc_mgr = Rc::new(RefCell::new(AccManager::new(&rhi, frames_in_flight)));
+        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), acc_mgr.clone(), frames_in_flight);
         let per_frame_data_buffers = (0..frames_in_flight)
             .map(|idx| {
                 RhiStructuredBuffer::<shader::PerFrameData>::new_ubo(&rhi, 1, format!("per-frame-data-buffer-{idx}"))
@@ -87,6 +90,7 @@ impl Renderer {
             bindless_mgr,
             scene_mgr,
             gpu_scene,
+            acc_mgr,
             per_frame_data_buffers,
         }
     }
@@ -190,9 +194,14 @@ impl Renderer {
             let mouse_pos = input_state.crt_mouse_pos;
             let extent = self.render_context.swapchain_extent();
 
+            let view = camera.get_view_matrix();
+            let projection = camera.get_projection_matrix();
+
             shader::PerFrameData {
-                projection: camera.get_projection_matrix().into(),
-                view: camera.get_view_matrix().into(),
+                projection: projection.into(),
+                view: view.into(),
+                inv_view: view.inverse().into(),
+                inv_projection: projection.inverse().into(),
                 camera_pos: camera.position.into(),
                 camera_forward: camera.camera_forward().into(),
                 time_ms: timer.duration.as_millis() as f32,
@@ -217,12 +226,20 @@ impl Renderer {
         let transfer_barrier_mask = RhiBarrierMask {
             src_stage: vk::PipelineStageFlags2::TRANSFER,
             src_access: vk::AccessFlags2::TRANSFER_WRITE,
-            dst_stage: vk::PipelineStageFlags2::VERTEX_SHADER | vk::PipelineStageFlags2::FRAGMENT_SHADER,
+            dst_stage: vk::PipelineStageFlags2::VERTEX_SHADER
+                | vk::PipelineStageFlags2::FRAGMENT_SHADER
+                | vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
             dst_access: vk::AccessFlags2::SHADER_READ,
         };
 
         self.gpu_scene.prepare_render_data(crt_frame_label);
-        self.gpu_scene.upload_to_buffer(&self.rhi, crt_frame_label, &cmd, transfer_barrier_mask);
+        self.gpu_scene.upload_to_buffer(
+            &self.rhi,
+            crt_frame_label,
+            &cmd,
+            transfer_barrier_mask,
+            self.render_context.current_rt_image_view(),
+        );
 
         cmd.cmd_update_buffer(
             self.per_frame_data_buffers[crt_frame_label].handle(),

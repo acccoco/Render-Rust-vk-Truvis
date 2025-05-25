@@ -1,6 +1,6 @@
 use crate::frame_context::FrameContext;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_scene::GpuScene;
+use crate::renderer::gpu_scene::GpuScene;
 use ash::vk;
 use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
 use model_manager::vertex::VertexLayout;

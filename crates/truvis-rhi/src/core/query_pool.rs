@@ -16,7 +16,6 @@ pub struct QueryPool {
 impl Drop for QueryPool {
     fn drop(&mut self) {
         unsafe {
-            log::info!("Destroying QueryPool: {:?}", self.handle);
             self.device.destroy_query_pool(self.handle, None);
         }
     }

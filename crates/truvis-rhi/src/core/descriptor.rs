@@ -44,7 +44,7 @@ impl<T: ShaderBindingLayout> RhiDescriptorSetLayout<T> {
     ///
     /// # 返回值
     /// 新的描述符集布局实例
-    pub fn new(rhi: &Rhi, flags: vk::DescriptorSetLayoutCreateFlags, debug_name: &str) -> Self {
+    pub fn new(rhi: &Rhi, flags: vk::DescriptorSetLayoutCreateFlags, debug_name: impl AsRef<str>) -> Self {
         // 从类型 T 获取绑定信息
         let (bindings, binding_flags) = T::get_vk_bindings();
         let mut bind_flags_ci = vk::DescriptorSetLayoutBindingFlagsCreateInfo::default().binding_flags(&binding_flags);
@@ -120,7 +120,7 @@ impl<T: ShaderBindingLayout> RhiDescriptorSet<T> {
         rhi: &Rhi,
         descriptor_pool: &RhiDescriptorPool,
         layout: &RhiDescriptorSetLayout<T>,
-        debug_name: &str,
+        debug_name: impl AsRef<str>,
     ) -> Self {
         // 分配描述符集
         let alloc_info = vk::DescriptorSetAllocateInfo::default()

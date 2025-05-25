@@ -11,7 +11,7 @@ use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
 use truvis_render::frame_context::FrameContext;
 use truvis_render::platform::timer::Timer;
 use truvis_render::renderer::bindless::BindlessManager;
-use truvis_render::renderer::frame_scene::GpuScene;
+use truvis_render::renderer::gpu_scene::GpuScene;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_render::renderer::scene_manager::TheWorld;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;

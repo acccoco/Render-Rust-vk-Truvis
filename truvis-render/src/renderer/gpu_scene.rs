@@ -1,3 +1,4 @@
+use crate::renderer::acc_manager::AccManager;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::scene_manager::TheWorld;
 use ash::vk;
@@ -11,6 +12,7 @@ use std::rc::Rc;
 use truvis_rhi::core::acceleration::RhiAcceleration;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
+use truvis_rhi::core::image::RhiImage2DView;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 use truvis_rhi::rhi::Rhi;
 
@@ -155,6 +157,10 @@ impl GpuSceneBuffers {
 
 /// 用于构建传输到 GPU 的场景数据
 pub struct GpuScene {
+    scene_mgr: Rc<RefCell<TheWorld>>,
+    bindless_mgr: Rc<RefCell<BindlessManager>>,
+    acc_mgr: Rc<RefCell<AccManager>>,
+
     /// GPU 中以顺序存储的 instance
     ///
     /// CPU 执行绘制时，会使用这个顺序来绘制实例
@@ -171,9 +177,6 @@ pub struct GpuScene {
     /// mesh 在 geometry buffer 中的 idx
     mesh_geometry_map: HashMap<uuid::Uuid, usize>,
 
-    scene_mgr: Rc<RefCell<TheWorld>>,
-    bindless_mgr: Rc<RefCell<BindlessManager>>,
-
     gpu_scene_buffers: Vec<GpuSceneBuffers>,
 }
 
@@ -182,11 +185,13 @@ impl GpuScene {
         rhi: &Rhi,
         scene_mgr: Rc<RefCell<TheWorld>>,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
+        acc_mgr: Rc<RefCell<AccManager>>,
         frame_in_flight: usize,
     ) -> Self {
         Self {
             scene_mgr,
             bindless_mgr,
+            acc_mgr,
 
             flatten_instances: vec![],
             flatten_materials: FlattenMap::default(),
@@ -217,6 +222,7 @@ impl GpuScene {
         frame_label: usize,
         cmd: &RhiCommandBuffer,
         barrier_mask: RhiBarrierMask,
+        ray_output_image: &RhiImage2DView,
     ) {
         self.upload_mesh_buffer(frame_label, cmd, barrier_mask);
         self.upload_instance_buffer(frame_label, cmd, barrier_mask);
@@ -225,6 +231,9 @@ impl GpuScene {
         self.upload_scene_buffer(frame_label, cmd, barrier_mask);
 
         self.build_tlas(rhi, frame_label);
+        if let Some(tlas) = &self.gpu_scene_buffers[frame_label].tlas {
+            self.acc_mgr.borrow_mut().update(frame_label, tlas, ray_output_image);
+        }
     }
 
     /// 绘制场景中的所有示例

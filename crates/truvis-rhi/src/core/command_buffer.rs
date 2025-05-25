@@ -55,13 +55,20 @@ impl RhiCommandBuffer {
     }
 
     /// 立即执行某个 command，并同步等待执行结果
-    pub fn one_time_exec<F, R>(rhi: &Rhi, command_pool: Rc<RhiCommandPool>, queue: &RhiQueue, func: F, name: &str) -> R
+    pub fn one_time_exec<F, R>(
+        rhi: &Rhi,
+        command_pool: Rc<RhiCommandPool>,
+        queue: &RhiQueue,
+        func: F,
+        name: impl AsRef<str>,
+    ) -> R
     where
         F: FnOnce(&RhiCommandBuffer) -> R,
     {
-        let command_buffer = RhiCommandBuffer::new(rhi.device.clone(), command_pool, &format!("one-time-{}", name));
+        let command_buffer =
+            RhiCommandBuffer::new(rhi.device.clone(), command_pool, &format!("one-time-{}", name.as_ref()));
 
-        command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, name);
+        command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, name.as_ref());
         let result = func(&command_buffer);
         command_buffer.end();
 

@@ -76,6 +76,8 @@ struct Scene {
 struct PerFrameData {
     float4x4 projection;
     float4x4 view;
+    float4x4 inv_view;
+    float4x4 inv_projection;
 
     float3 camera_pos;
     float time_ms;
@@ -94,7 +96,9 @@ struct PushConstants {
     PTR(PerFrameData) frame_data;
     PTR(Scene) scene;
 
+    /// raster only
     uint instance_idx;
+    /// raster only
     uint submesh_idx;
     uint _padding_1;
     uint _padding_2;

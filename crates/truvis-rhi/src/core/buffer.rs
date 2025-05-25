@@ -314,8 +314,8 @@ impl RhiBuffer {
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
         RhiCommandBuffer::one_time_exec(
             rhi,
-            rhi.transfer_command_pool.clone(),
-            &rhi.transfer_queue,
+            rhi.graphics_command_pool.clone(),
+            &rhi.graphics_queue,
             |cmd| {
                 cmd.cmd_copy_buffer(
                     &stage_buffer,
