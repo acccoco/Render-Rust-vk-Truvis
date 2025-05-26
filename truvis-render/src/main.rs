@@ -2,20 +2,13 @@ use ash::vk;
 use imgui::Ui;
 use model_manager::component::TruInstance;
 use shader_binding::shader;
-use std::cell::RefCell;
-use std::rc::Rc;
-use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
-use truvis_render::frame_context::FrameContext;
+use truvis_render::app::{OuterApp, TruvisApp};
+use truvis_render::platform::timer::Timer;
+use truvis_render::render::Renderer;
 use truvis_render::render_pass::phong::PhongPass;
 use truvis_render::render_pass::simple_rt::SimlpeRtPass;
-use truvis_render::renderer::acc_manager::AccManager;
-use truvis_render::renderer::bindless::BindlessManager;
 use truvis_render::renderer::framebuffer::FrameBuffer;
-use truvis_render::renderer::gpu_scene::GpuScene;
-use truvis_render::renderer::scene_manager::TheWorld;
-use truvis_rhi::core::buffer::RhiStructuredBuffer;
-use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::{core::command_queue::RhiSubmitInfo, rhi::Rhi};
+use truvis_rhi::core::command_queue::RhiSubmitInfo;
 
 struct PhongApp {
     phong_pass: PhongPass,
@@ -25,49 +18,48 @@ struct PhongApp {
 impl PhongApp {}
 
 impl OuterApp for PhongApp {
-    fn init(
-        rhi: &Rhi,
-        render_context: &mut FrameContext,
-        scene_mgr: Rc<RefCell<TheWorld>>,
-        bindless_mgr: Rc<RefCell<BindlessManager>>,
-        acc_mgr: Rc<RefCell<AccManager>>,
-    ) -> Self {
-        bindless_mgr.borrow_mut().register_texture(rhi, "assets/uv_checker.png".to_string());
+    fn init(renderer: &mut Renderer) -> Self {
+        renderer.bindless_mgr.borrow_mut().register_texture(&renderer.rhi, "assets/uv_checker.png".to_string());
 
-        let mut scene_mgr = scene_mgr.borrow_mut();
-        // 复制多个 instance
-        let ins_id = scene_mgr.load_scene(rhi, std::path::Path::new("assets/obj/spot.obj"), &glam::Mat4::IDENTITY);
-        let ins = scene_mgr.get_instance(&ins_id[0]).unwrap().clone();
-        let ins_1 = TruInstance {
-            transform: glam::Mat4::from_translation(glam::vec3(5.0, 0.0, 0.0)),
-            ..ins.clone()
-        };
-        scene_mgr.register_instance(ins_1);
-        let ins_2 = TruInstance {
-            transform: glam::Mat4::from_translation(glam::vec3(0.0, 5.0, 0.0)),
-            ..ins.clone()
-        };
-        scene_mgr.register_instance(ins_2);
-        scene_mgr.register_point_light(shader::PointLight {
-            pos: glam::vec3(-20.0, 40.0, 0.0).into(),
-            color: (glam::vec3(5.0, 6.0, 1.0) * 2.0).into(),
-            ..Default::default()
-        });
-        scene_mgr.register_point_light(shader::PointLight {
-            pos: glam::vec3(40.0, 40.0, -30.0).into(),
-            color: (glam::vec3(1.0, 6.0, 7.0) * 3.0).into(),
-            ..Default::default()
-        });
-        scene_mgr.register_point_light(shader::PointLight {
-            pos: glam::vec3(40.0, 40.0, 30.0).into(),
-            color: (glam::vec3(5.0, 1.0, 8.0) * 3.0).into(),
-            ..Default::default()
-        });
-        scene_mgr.load_scene(
-            rhi,
-            std::path::Path::new("assets/fbx/sponza/Sponza.fbx"),
-            &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
-        );
+        // 加载初始的场景
+        {
+            let mut scene_mgr = renderer.scene_mgr.borrow_mut();
+
+            // 复制多个 instance
+            let ins_id =
+                scene_mgr.load_scene(&renderer.rhi, std::path::Path::new("assets/obj/spot.obj"), &glam::Mat4::IDENTITY);
+            let ins = scene_mgr.get_instance(&ins_id[0]).unwrap().clone();
+            let ins_1 = TruInstance {
+                transform: glam::Mat4::from_translation(glam::vec3(5.0, 0.0, 0.0)),
+                ..ins.clone()
+            };
+            scene_mgr.register_instance(ins_1);
+            let ins_2 = TruInstance {
+                transform: glam::Mat4::from_translation(glam::vec3(0.0, 5.0, 0.0)),
+                ..ins.clone()
+            };
+            scene_mgr.register_instance(ins_2);
+            scene_mgr.register_point_light(shader::PointLight {
+                pos: glam::vec3(-20.0, 40.0, 0.0).into(),
+                color: (glam::vec3(5.0, 6.0, 1.0) * 2.0).into(),
+                ..Default::default()
+            });
+            scene_mgr.register_point_light(shader::PointLight {
+                pos: glam::vec3(40.0, 40.0, -30.0).into(),
+                color: (glam::vec3(1.0, 6.0, 7.0) * 3.0).into(),
+                ..Default::default()
+            });
+            scene_mgr.register_point_light(shader::PointLight {
+                pos: glam::vec3(40.0, 40.0, 30.0).into(),
+                color: (glam::vec3(5.0, 1.0, 8.0) * 3.0).into(),
+                ..Default::default()
+            });
+            scene_mgr.load_scene(
+                &renderer.rhi,
+                std::path::Path::new("assets/fbx/sponza/Sponza.fbx"),
+                &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
+            );
+        }
 
         let rot =
             glam::Mat4::from_euler(glam::EulerRot::XYZ, 30f32.to_radians(), 40f32.to_radians(), 50f32.to_radians());
@@ -79,8 +71,8 @@ impl OuterApp for PhongApp {
             glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
 
-        let rt_pass = SimlpeRtPass::new(rhi, bindless_mgr.clone(), acc_mgr.clone());
-        let phong_pass = PhongPass::new(rhi, render_context, bindless_mgr.clone());
+        let rt_pass = SimlpeRtPass::new(&renderer.rhi, renderer.bindless_mgr.clone(), renderer.acc_mgr.clone());
+        let phong_pass = PhongPass::new(&renderer.rhi, &renderer.frame_settings(), renderer.bindless_mgr.clone());
 
         Self { phong_pass, rt_pass }
     }
@@ -90,48 +82,44 @@ impl OuterApp for PhongApp {
         ui.text_wrapped("こんにちは世界！");
     }
 
-    fn draw(
-        &self,
-        app_ctx: &mut AppCtx,
-        per_frame_data_buffer: &RhiStructuredBuffer<shader::PerFrameData>,
-        gpu_scene: &GpuScene,
-    ) {
-        let crt_frame_label = app_ctx.render_context.current_frame_label();
+    fn draw(&self, renderer: &mut Renderer, _timer: &Timer) {
+        let crt_frame_label = renderer.crt_frame_label();
+        let frame_settings = renderer.frame_settings();
 
-        let color_attach = FrameBuffer::get_color_attachment(app_ctx.render_context.current_present_image_view());
-        let depth_attach = FrameBuffer::get_depth_attachment(app_ctx.render_context.depth_view.handle());
+        let render_context = renderer.render_context.as_mut().unwrap();
+        let swapchian = renderer.render_swapchain.as_mut().unwrap();
+        let rhi = &renderer.rhi;
+
+        let color_attach = FrameBuffer::get_color_attachment(swapchian.current_present_image_view());
+        let depth_attach = FrameBuffer::get_depth_attachment(render_context.depth_view.handle());
         let render_info = FrameBuffer::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
-                extent: app_ctx.render_context.swapchain_extent(),
+                extent: frame_settings.extent,
             },
             std::slice::from_ref(&color_attach),
             &depth_attach,
         );
 
-        let phong_cmd = app_ctx.render_context.alloc_command_buffer("[main-pass]render");
+        let phong_cmd = render_context.alloc_command_buffer("[main-pass]render");
         phong_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[phong-pass]draw");
+        let per_frame_data_buffer = &renderer.per_frame_data_buffers[crt_frame_label];
         self.phong_pass.draw(
             &phong_cmd,
             &render_info,
-            app_ctx.render_context.swapchain_extent(),
+            frame_settings.extent,
             per_frame_data_buffer,
-            gpu_scene,
+            &renderer.gpu_scene,
             crt_frame_label,
         );
         phong_cmd.end();
 
-        RhiCommandBuffer::one_time_exec(
-            app_ctx.rhi,
-            app_ctx.rhi.graphics_command_pool.clone(),
-            &app_ctx.rhi.graphics_queue,
-            |rt_cmd| {
-                self.rt_pass.ray_trace(&rt_cmd, app_ctx.render_context, per_frame_data_buffer, gpu_scene);
-            },
-            "rt",
-        );
+        let rt_cmd = render_context.alloc_command_buffer("[rt-pass]ray-trace");
+        rt_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[rt-pass]ray-trace");
+        self.rt_pass.ray_trace(&rt_cmd, render_context, &frame_settings, per_frame_data_buffer, &renderer.gpu_scene);
+        rt_cmd.end();
 
-        app_ctx.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[phong_cmd])], None);
+        rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[phong_cmd, rt_cmd])], None);
     }
 }
 

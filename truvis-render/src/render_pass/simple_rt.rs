@@ -1,4 +1,4 @@
-use crate::frame_context::FrameContext;
+use crate::render_context::{RenderContext, FrameSettings};
 use crate::renderer::acc_manager::AccManager;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
@@ -320,12 +320,13 @@ impl SimlpeRtPass {
     pub fn ray_trace(
         &self,
         cmd: &RhiCommandBuffer,
-        render_ctx: &FrameContext,
+        render_ctx: &RenderContext,
+        framse_settings: &FrameSettings,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
     ) {
         let frame_label = render_ctx.current_frame_label();
-        let frame_extent = render_ctx.swapchain_extent();
+        let frame_extent = framse_settings.extent;
 
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 

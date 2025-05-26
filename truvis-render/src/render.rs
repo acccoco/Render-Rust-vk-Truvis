@@ -1,4 +1,4 @@
-use crate::frame_context::{FrameContext, RenderContextInitInfo};
+use crate::render_context::{RenderContext, FrameSettings};
 use crate::platform::camera::TruCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
@@ -7,33 +7,46 @@ use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::TheWorld;
 use ash::vk;
-use raw_window_handle::HasDisplayHandle;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::ffi::CStr;
 use std::rc::Rc;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
+use truvis_rhi::core::swapchain::RhiSwapchain;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 use truvis_rhi::{
     basic::color::LabelColor,
-    core::{
-        command_queue::RhiSubmitInfo, swapchain::RhiSwapchainInitInfo, synchronize::RhiImageBarrier,
-        window_system::MainWindow,
-    },
+    core::{command_queue::RhiSubmitInfo, synchronize::RhiImageBarrier, window_system::MainWindow},
     rhi::Rhi,
 };
 
+const DEPTH_FORMAT_CANDIDATES: &[vk::Format] = &[
+    vk::Format::D32_SFLOAT_S8_UINT,
+    vk::Format::D32_SFLOAT,
+    vk::Format::D24_UNORM_S8_UINT,
+    vk::Format::D16_UNORM_S8_UINT,
+    vk::Format::D16_UNORM,
+];
+
+const FRAMES_IN_FLIGHT: usize = 3;
+
+const DEFAULT_SURFACE_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
+    format: vk::Format::B8G8R8A8_UNORM,
+    color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
+};
+
+const DEFAULT_PRESENT_MODE: vk::PresentModeKHR = vk::PresentModeKHR::MAILBOX;
+
 /// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
 pub struct Renderer {
-    /// window 需要在 event loop 中创建，因此使用 option 包装
-    pub window: Rc<MainWindow>,
+    /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
+    pub render_context: Option<RenderContext>,
 
-    /// render context 需要在 event loop 中创建，因此使用 option 包装
-    ///
-    /// 依赖于 window
-    pub render_context: FrameContext,
+    /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
+    pub render_swapchain: Option<RhiSwapchain>,
 
-    /// Rhi 需要在 window 之后创建，因为需要获取 window 相关的 extension
+    frame_settings: FrameSettings,
+
     pub rhi: Rc<Rhi>,
 
     pub bindless_mgr: Rc<RefCell<BindlessManager>>,
@@ -49,43 +62,51 @@ impl Drop for Renderer {
         self.wait_idle();
     }
 }
+// getter
 impl Renderer {
-    pub fn new(window_system: Rc<MainWindow>) -> Self {
-        // rhi
-        let rhi = {
-            // 追加 window system 需要的 extension，在 windows 下也就是 khr::Surface
-            let extra_instance_ext =
-                ash_window::enumerate_required_extensions(window_system.window().display_handle().unwrap().as_raw())
-                    .unwrap()
-                    .iter()
-                    .map(|ext| unsafe { CStr::from_ptr(*ext) })
-                    .collect();
-            Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext))
-        };
+    #[inline]
+    pub fn swapchain_extent(&self) -> vk::Extent2D {
+        self.render_swapchain.as_ref().unwrap().extent()
+    }
 
-        // render context
-        let render_context = {
-            let render_swapchain_init_info = RhiSwapchainInitInfo::new(window_system.clone());
+    #[inline]
+    pub fn color_format(&self) -> vk::Format {
+        self.render_swapchain.as_ref().unwrap().color_format()
+    }
 
-            let render_context_init_info = RenderContextInitInfo::default();
-            FrameContext::new(&rhi, &render_context_init_info, render_swapchain_init_info)
-        };
+    #[inline]
+    pub fn frame_settings(&self) -> FrameSettings {
+        self.frame_settings
+    }
 
-        let frames_in_flight = render_context.frame_cnt_in_flight;
+    #[inline]
+    pub fn crt_frame_label(&self) -> usize {
+        self.render_context.as_ref().unwrap().current_frame_label()
+    }
+}
+impl Renderer {
+    pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
+        let rhi = Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext));
 
-        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, render_context.frame_cnt_in_flight)));
+        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, FRAMES_IN_FLIGHT)));
         let scene_mgr = Rc::new(RefCell::new(TheWorld::new(bindless_mgr.clone())));
-        let acc_mgr = Rc::new(RefCell::new(AccManager::new(&rhi, frames_in_flight)));
-        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), acc_mgr.clone(), frames_in_flight);
-        let per_frame_data_buffers = (0..frames_in_flight)
+        let acc_mgr = Rc::new(RefCell::new(AccManager::new(&rhi, FRAMES_IN_FLIGHT)));
+        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), acc_mgr.clone(), FRAMES_IN_FLIGHT);
+        let per_frame_data_buffers = (0..FRAMES_IN_FLIGHT)
             .map(|idx| {
                 RhiStructuredBuffer::<shader::PerFrameData>::new_ubo(&rhi, 1, format!("per-frame-data-buffer-{idx}"))
             })
             .collect();
 
         Self {
-            window: window_system,
-            render_context,
+            frame_settings: FrameSettings {
+                frames_in_flight: FRAMES_IN_FLIGHT,
+                extent: vk::Extent2D::default(),
+                color_format: DEFAULT_SURFACE_FORMAT.format,
+                depth_format: Self::get_depth_format(&rhi),
+            },
+            render_context: None,
+            render_swapchain: None,
             rhi,
             bindless_mgr,
             scene_mgr,
@@ -95,8 +116,30 @@ impl Renderer {
         }
     }
 
+    /// 在 window 创建之后调用，初始化其他资源
+    pub fn init_after_window(&mut self, window: &MainWindow) {
+        self.rebuild_after_resized(window);
+    }
+
+    /// 根据 vulkan 实例和显卡，获取合适的深度格式
+    fn get_depth_format(rhi: &Rhi) -> vk::Format {
+        rhi.find_supported_format(
+            DEPTH_FORMAT_CANDIDATES,
+            vk::ImageTiling::OPTIMAL,
+            vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+        )
+        .first()
+        .copied()
+        .unwrap_or(vk::Format::UNDEFINED)
+    }
+
     pub fn before_frame(&mut self) {
-        self.render_context.acquire_frame();
+        let render_context = self.render_context.as_mut().unwrap();
+        let render_swapchain = self.render_swapchain.as_mut().unwrap();
+
+        render_context.begin_frame();
+        render_swapchain.acquire(&render_context.current_present_complete_semaphore(), None);
+        render_context.before_render(render_swapchain.current_present_image());
     }
 
     pub fn after_frame(&mut self) {
@@ -106,14 +149,17 @@ impl Renderer {
             "[ui-pass]",
             LabelColor::COLOR_PASS,
         );
+
+        let render_context = self.render_context.as_mut().unwrap();
+        let render_swapchain = self.render_swapchain.as_mut().unwrap();
         {
-            let barrier_cmd = self.render_context.alloc_command_buffer("ui pipeline barrier");
+            let barrier_cmd = render_context.alloc_command_buffer("ui pipeline barrier");
             barrier_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]color-attach-barrier");
             {
                 barrier_cmd.image_memory_barrier(
                     vk::DependencyFlags::empty(),
                     &[RhiImageBarrier::new()
-                        .image(self.render_context.current_present_image())
+                        .image(render_swapchain.current_present_image())
                         .layout_transfer(
                             vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                             vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
@@ -135,7 +181,9 @@ impl Renderer {
         }
         self.rhi.device.debug_utils().end_queue_label(self.rhi.graphics_queue.handle());
 
-        self.render_context.submit_frame();
+        render_context.after_render(render_swapchain.current_present_image());
+        render_swapchain.submit(&self.rhi.graphics_queue, &[render_context.current_render_complete_semaphore()]);
+        render_context.end_frame();
     }
 
     pub fn before_render(&mut self) {
@@ -158,41 +206,29 @@ impl Renderer {
     }
 
     /// 在窗口大小改变是，重建 swapchain
-    pub fn rebuild_render_context(&mut self) {
-        // 需要先销毁旧的 RenderContext，然后再创建新的 RenderContext。
-        // 如果直接使用 self.render_context = FrameContext::new(...)
-        // 会导致新的 RenderContext 先被创建，老的 RenderContext 才会被 drop
-        // 然而仅允许有一个 Swapchain 存在，因此需要先销毁旧的 RenderContext，再创建新的 RenderContext。
+    pub fn rebuild_after_resized(&mut self, window: &MainWindow) {
+        // 确保 swapchain 已经 drop 掉之后，再创建新的 swapchian，
+        // 因为同一时间只能有一个 swapchain 在使用 window
+        self.render_context = None;
+        self.render_swapchain = None;
 
-        // 首先获取旧的 render_context，将其从 self 中取出
-        let old_render_context = unsafe {
-            // 使用 std::ptr::read 从 self.render_context 的位置读取值
-            // 这样不会调用任何 drop 函数，只是简单地移走值
-            std::ptr::read(&self.render_context)
-        };
+        self.render_swapchain =
+            Some(RhiSwapchain::new(&self.rhi, window, DEFAULT_PRESENT_MODE, DEFAULT_SURFACE_FORMAT));
 
-        // 显式调用 drop 以确保资源被正确释放
-        drop(old_render_context);
-
-        // 创建新的 render_context
-        let render_swapchain_init_info = RhiSwapchainInitInfo::new(self.window.clone());
-        let render_context_init_info = RenderContextInitInfo::default();
-        let new_render_context = FrameContext::new(&self.rhi, &render_context_init_info, render_swapchain_init_info);
-
-        // 安全地放入新的 render_context，不会在旧位置调用 drop
-        unsafe {
-            // 使用 std::ptr::write 直接写入新值，不会调用任何 drop
-            std::ptr::write(&mut self.render_context, new_render_context);
-        }
+        self.frame_settings.extent = self.swapchain_extent();
+        self.render_context = Some(RenderContext::new(&self.rhi, self.frame_settings));
     }
 
     pub fn update_gpu_scene(&mut self, input_state: &InputState, timer: &Timer, camera: &TruCamera) {
-        let crt_frame_label = self.render_context.current_frame_label();
+        let render_context = self.render_context.as_mut().unwrap();
+        let render_swapchain = self.render_swapchain.as_mut().unwrap();
+
+        let crt_frame_label = render_context.current_frame_label();
 
         // 准备好当前帧的数据
         let per_frame_data = {
             let mouse_pos = input_state.crt_mouse_pos;
-            let extent = self.render_context.swapchain_extent();
+            let extent = render_swapchain.extent();
 
             let view = camera.get_view_matrix();
             let projection = camera.get_projection_matrix();
@@ -206,7 +242,7 @@ impl Renderer {
                 camera_forward: camera.camera_forward().into(),
                 time_ms: timer.duration.as_millis() as f32,
                 delta_time_ms: timer.delta_time_s * 1000.0,
-                frame_id: self.render_context.current_frame_num() as u64,
+                frame_id: render_context.current_frame_num() as u64,
                 mouse_pos: shader::Float2 {
                     x: mouse_pos.x as f32,
                     y: mouse_pos.y as f32,
@@ -220,7 +256,7 @@ impl Renderer {
         };
 
         // 将数据上传到 gpu buffer 中
-        let cmd = self.render_context.alloc_command_buffer("update-draw-buffer");
+        let cmd = render_context.alloc_command_buffer("update-draw-buffer");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
 
         let transfer_barrier_mask = RhiBarrierMask {
@@ -238,7 +274,7 @@ impl Renderer {
             crt_frame_label,
             &cmd,
             transfer_barrier_mask,
-            self.render_context.current_rt_image_view(),
+            render_context.current_rt_image_view(),
         );
 
         cmd.cmd_update_buffer(
@@ -253,6 +289,6 @@ impl Renderer {
                 .mask(transfer_barrier_mask)],
         );
         cmd.end();
-        self.render_context.graphics_queue().submit(vec![RhiSubmitInfo::new(std::slice::from_ref(&cmd))], None);
+        render_context.graphics_queue().submit(vec![RhiSubmitInfo::new(std::slice::from_ref(&cmd))], None);
     }
 }

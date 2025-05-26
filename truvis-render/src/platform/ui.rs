@@ -1,6 +1,6 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use crate::frame_context::FrameContext;
+use crate::render_context::{RenderContext, FrameSettings};
 use ash::vk;
 use image::EncodableLayout;
 use shader_layout_macro::ShaderLayout;
@@ -8,6 +8,7 @@ use std::mem::offset_of;
 use std::{cell::RefCell, rc::Rc};
 use truvis_rhi::core::descriptor::RhiDescriptorSetLayout;
 use truvis_rhi::core::device::RhiDevice;
+use truvis_rhi::core::swapchain::RhiSwapchain;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::shader_cursor::ShaderCursor;
 use truvis_rhi::{
@@ -76,7 +77,7 @@ struct GuiMesh {
 }
 
 impl GuiMesh {
-    pub fn from_draw_data(rhi: &Rhi, render_ctx: &mut FrameContext, draw_data: &imgui::DrawData) -> Self {
+    pub fn from_draw_data(rhi: &Rhi, render_ctx: &mut RenderContext, draw_data: &imgui::DrawData) -> Self {
         let cmd = render_ctx.alloc_command_buffer("uipass-create-mesh");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]create-mesh");
 
@@ -122,7 +123,7 @@ impl GuiMesh {
     /// @return (vertex buffer, vertex count, stage buffer)
     fn create_vertex_buffer(
         rhi: &Rhi,
-        render_ctx: &mut FrameContext,
+        render_ctx: &mut RenderContext,
         cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
     ) -> (RhiBuffer, usize, RhiBuffer) {
@@ -167,7 +168,7 @@ impl GuiMesh {
     /// @return (index buffer, index count, stage buffer)
     fn create_index_buffer(
         rhi: &Rhi,
-        render_ctx: &mut FrameContext,
+        render_ctx: &mut RenderContext,
         cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
     ) -> (RhiBuffer, usize, RhiBuffer) {
@@ -207,10 +208,6 @@ impl GuiMesh {
     }
 }
 
-pub struct UiCreateInfo {
-    pub frames_in_flight: usize,
-}
-
 pub struct Gui {
     pub context: RefCell<imgui::Context>,
     pub platform: imgui_winit_support::WinitPlatform,
@@ -245,7 +242,7 @@ impl Drop for Gui {
 
 // constructor & getter
 impl Gui {
-    pub fn new(rhi: &Rhi, render_ctx: &FrameContext, window: &winit::window::Window, options: &UiCreateInfo) -> Self {
+    pub fn new(rhi: &Rhi, window: &winit::window::Window, framse_settings: &FrameSettings) -> Self {
         let (mut imgui, platform) = Self::create_imgui(window);
 
         let descriptor_set_layout = RhiDescriptorSetLayout::<UiShaderLayout>::new(
@@ -255,7 +252,8 @@ impl Gui {
         );
         let pipeline_layout = Self::create_pipeline_layout(rhi.device.handle(), descriptor_set_layout.handle());
         rhi.device.debug_utils().set_object_debug_name(pipeline_layout, "[uipass]pipeline-layout");
-        let pipeline = Self::create_pipeline(rhi, render_ctx, pipeline_layout);
+        let pipeline =
+            Self::create_pipeline(rhi, framse_settings.color_format, framse_settings.depth_format, pipeline_layout);
         rhi.device.debug_utils().set_object_debug_name(pipeline, "[uipass]pipeline");
 
         let fonts_texture = {
@@ -321,7 +319,7 @@ impl Gui {
             _descriptor_pool: descriptor_pool,
             font_descriptor_set: descriptor_set,
 
-            meshes: (0..options.frames_in_flight).map(|_| None).collect(),
+            meshes: (0..framse_settings.frames_in_flight).map(|_| None).collect(),
 
             _device: rhi.device.clone(),
 
@@ -382,7 +380,12 @@ impl Gui {
         unsafe { device.create_pipeline_layout(&layout_info, None).unwrap() }
     }
 
-    fn create_pipeline(rhi: &Rhi, render_ctx: &FrameContext, pipeline_layout: vk::PipelineLayout) -> vk::Pipeline {
+    fn create_pipeline(
+        rhi: &Rhi,
+        color_format: vk::Format,
+        depth_format: vk::Format,
+        pipeline_layout: vk::PipelineLayout,
+    ) -> vk::Pipeline {
         let vert_shader_module =
             RhiShaderModule::new(rhi.device.clone(), std::path::Path::new("shader/build/imgui/imgui.slang.spv"));
         let frag_shader_module =
@@ -477,10 +480,10 @@ impl Gui {
             .layout(pipeline_layout)
             .subpass(0);
 
-        let color_attachment_formats = [render_ctx.color_format()];
+        let color_attachment_formats = [color_format];
         let mut rendering_info = vk::PipelineRenderingCreateInfo::default()
             .color_attachment_formats(&color_attachment_formats)
-            .depth_attachment_format(render_ctx.depth_format);
+            .depth_attachment_format(depth_format);
 
         let pipeline_info = pipeline_info.push_next(&mut rendering_info);
 
@@ -516,7 +519,9 @@ impl Gui {
     pub fn draw(
         &mut self,
         rhi: &Rhi,
-        render_ctx: &mut FrameContext,
+        render_ctx: &mut RenderContext,
+        swapchian: &RhiSwapchain,
+        frame_settings: &FrameSettings,
         window: &winit::window::Window,
         f: impl FnOnce(&mut imgui::Ui),
     ) {
@@ -545,7 +550,14 @@ impl Gui {
 
         let cmd = render_ctx.alloc_command_buffer("uipass-render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]draw");
-        self.record_cmd(render_ctx, &cmd, self.meshes[frame_index].as_ref().unwrap(), draw_data);
+        self.record_cmd(
+            render_ctx,
+            swapchian,
+            frame_settings,
+            &cmd,
+            self.meshes[frame_index].as_ref().unwrap(),
+            draw_data,
+        );
         cmd.end();
 
         render_ctx.graphics_queue().submit(vec![RhiSubmitInfo::new(&[cmd])], None);
@@ -563,13 +575,15 @@ impl Gui {
 
     fn record_cmd(
         &self,
-        render_ctx: &mut FrameContext,
+        render_ctx: &mut RenderContext,
+        swapchain: &RhiSwapchain,
+        frame_settings: &FrameSettings,
         cmd: &RhiCommandBuffer,
         mesh: &GuiMesh,
         draw_data: &imgui::DrawData,
     ) {
         let color_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(render_ctx.current_present_image_view())
+            .image_view(swapchain.current_present_image_view())
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
             .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);
@@ -580,7 +594,7 @@ impl Gui {
             .store_op(vk::AttachmentStoreOp::STORE);
         let render_info = vk::RenderingInfo::default()
             .layer_count(1)
-            .render_area(render_ctx.swapchain_extent().into())
+            .render_area(frame_settings.extent.into())
             .color_attachments(std::slice::from_ref(&color_attach_info))
             .depth_attachment(&depth_attach_info);
 

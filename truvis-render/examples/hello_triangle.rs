@@ -3,17 +3,13 @@ use imgui::Ui;
 use model_manager::component::TruGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
-use shader_binding::shader;
-use std::cell::RefCell;
-use std::rc::Rc;
-use truvis_render::app::{AppCtx, OuterApp, TruvisApp};
-use truvis_render::frame_context::FrameContext;
-use truvis_render::renderer::bindless::BindlessManager;
-use truvis_render::renderer::gpu_scene::GpuScene;
+use truvis_render::app::{OuterApp, TruvisApp};
+use truvis_render::platform::timer::Timer;
+use truvis_render::render::Renderer;
+use truvis_render::render_context::{FrameSettings, RenderContext};
 use truvis_render::renderer::framebuffer::FrameBuffer;
-use truvis_render::renderer::scene_manager::TheWorld;
-use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::graphics_pipeline::RhiGraphicsPipelineCreateInfo;
+use truvis_rhi::core::swapchain::RhiSwapchain;
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, graphics_pipeline::RhiGraphicsPipeline},
     rhi::Rhi,
@@ -28,13 +24,13 @@ struct HelloTriangle {
 }
 
 impl HelloTriangle {
-    fn init_pipeline(rhi: &Rhi, render_context: &mut FrameContext) -> RhiGraphicsPipeline {
+    fn init_pipeline(rhi: &Rhi, frame_settings: &FrameSettings) -> RhiGraphicsPipeline {
         let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
         pipeline_ci.vertex_shader_stage("shader/build/hello_triangle/triangle.slang.spv", cstr::cstr!("vsmain"));
         pipeline_ci.fragment_shader_stage("shader/build/hello_triangle/triangle.slang.spv", cstr::cstr!("psmain"));
         pipeline_ci.attach_info(
-            vec![render_context.color_format()],
-            Some(render_context.depth_format()),
+            vec![frame_settings.color_format],
+            Some(frame_settings.depth_format),
             Some(vk::Format::UNDEFINED),
         );
         pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
@@ -46,20 +42,20 @@ impl HelloTriangle {
         RhiGraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, "hello-triangle-pipeline")
     }
 
-    fn my_update(&self, rhi: &Rhi, render_context: &mut FrameContext) {
-        let color_attach = FrameBuffer::get_color_attachment(render_context.current_present_image_view());
+    fn my_update(&self, rhi: &Rhi, render_context: &mut RenderContext, swapchain: &RhiSwapchain) {
+        let color_attach = FrameBuffer::get_color_attachment(swapchain.current_present_image_view());
         let depth_attach = FrameBuffer::get_depth_attachment(render_context.depth_view.handle());
         let render_info = FrameBuffer::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
-                extent: render_context.swapchain_extent(),
+                extent: swapchain.extent(),
             },
             std::slice::from_ref(&color_attach),
             &depth_attach,
         );
-        let swapchain_extend = render_context.swapchain_extent();
+        let swapchain_extend = swapchain.extent();
 
-        let cmd = FrameContext::alloc_command_buffer(render_context, "render");
+        let cmd = RenderContext::alloc_command_buffer(render_context, "render");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);
@@ -93,8 +89,8 @@ impl HelloTriangle {
         rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
-    fn new(rhi: &Rhi, render_context: &mut FrameContext) -> Self {
-        let pipeline = HelloTriangle::init_pipeline(rhi, render_context);
+    fn new(rhi: &Rhi, frame_settings: FrameSettings) -> Self {
+        let pipeline = HelloTriangle::init_pipeline(rhi, &frame_settings);
         let triangle = VertexAosLayoutPosColor::triangle(rhi);
         Self {
             triangle,
@@ -106,18 +102,13 @@ impl HelloTriangle {
 }
 
 impl OuterApp for HelloTriangle {
-    fn init(
-        rhi: &Rhi,
-        render_context: &mut FrameContext,
-        _scene_mgr: Rc<RefCell<TheWorld>>,
-        bindless_mgr: Rc<RefCell<BindlessManager>>,
-    ) -> Self {
+    fn init(renderer: &mut Renderer) -> Self {
         log::info!("hello triangle init.");
 
         // 至少注册一个纹理，否则 bindless layout 会没有纹理绑定点
-        bindless_mgr.borrow_mut().register_texture(rhi, "assets/uv_checker.png".to_string());
+        renderer.bindless_mgr.borrow_mut().register_texture(&renderer.rhi, "assets/uv_checker.png".to_string());
 
-        HelloTriangle::new(rhi, render_context)
+        HelloTriangle::new(&renderer.rhi, renderer.frame_settings())
     }
 
     fn draw_ui(&mut self, ui: &mut Ui) {
@@ -139,17 +130,12 @@ impl OuterApp for HelloTriangle {
         ui.text(format!("Mouse Position: ({:.1},{:.1})", mouse_pos[0], mouse_pos[1]));
     }
 
-    fn update(&mut self, app_ctx: &mut AppCtx) {
-        self.frame_id = app_ctx.render_context.current_frame_num();
-    }
-
-    fn draw(
-        &self,
-        app_ctx: &mut AppCtx,
-        _per_frame_data_buffer: &RhiStructuredBuffer<shader::PerFrameData>,
-        _gpu_scene: &GpuScene,
-    ) {
-        self.my_update(app_ctx.rhi, app_ctx.render_context);
+    fn draw(&self, renderer: &mut Renderer, _timer: &Timer) {
+        self.my_update(
+            &renderer.rhi,
+            renderer.render_context.as_mut().unwrap(),
+            renderer.render_swapchain.as_mut().unwrap(),
+        );
     }
 }
 

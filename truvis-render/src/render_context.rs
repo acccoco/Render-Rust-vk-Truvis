@@ -9,25 +9,27 @@ use truvis_rhi::{
         command_queue::{RhiQueue, RhiSubmitInfo},
         device::RhiDevice,
         image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
-        swapchain::{RhiSwapchain, RhiSwapchainInitInfo},
         synchronize::{RhiFence, RhiImageBarrier, RhiSemaphore},
     },
     rhi::Rhi,
 };
 
-pub struct FrameContext {
-    pub render_swapchain: RhiSwapchain,
+#[derive(Debug, Clone, Copy)]
+pub struct FrameSettings {
+    pub extent: vk::Extent2D,
+    pub color_format: vk::Format,
+    pub depth_format: vk::Format,
+    pub frames_in_flight: usize,
+}
 
-    swapchain_image_index: usize,
-
+pub struct RenderContext {
     /// 当前处在 in-flight 的第几帧：A, B, C
     frame_label: usize,
 
-    /// frames in flight
-    pub frame_cnt_in_flight: usize,
-
     /// 当前的帧序号，一直累加
     frame_id: usize,
+
+    frames_in_flight: usize,
 
     /// 为每个 frame 分配一个 command pool
     graphics_command_pools: Vec<Rc<RhiCommandPool>>,
@@ -35,7 +37,6 @@ pub struct FrameContext {
     /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
     allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
 
-    pub depth_format: vk::Format,
     pub depth_image: Rc<RhiImage2D>,
     pub depth_view: Rc<RhiImage2DView>,
 
@@ -51,16 +52,14 @@ pub struct FrameContext {
     _command_queue: Rc<RhiQueue>,
     _transfer_queue: Rc<RhiQueue>,
 }
-
 // Ctor
-impl FrameContext {
-    pub fn new(rhi: &Rhi, init_info: &RenderContextInitInfo, render_swapchain_init_info: RhiSwapchainInitInfo) -> Self {
-        let render_swapchain = RhiSwapchain::new(rhi, &render_swapchain_init_info);
-        let (depth_format, depth_image, depth_image_view) =
-            Self::create_depth_image_and_view(rhi, &render_swapchain, &init_info.depth_format_dedicate);
+impl RenderContext {
+    pub fn new(rhi: &Rhi, frame_settings: FrameSettings) -> Self {
+        let (depth_image, depth_image_view) =
+            Self::create_depth_image_and_view(rhi, frame_settings.extent, frame_settings.depth_format);
 
         let create_semaphore = |name: &str| {
-            (0..init_info.frames_in_flight)
+            (0..frame_settings.frames_in_flight)
                 .map(|i| FRAME_ID_MAP[i])
                 .map(|tag| RhiSemaphore::new(rhi, &format!("{name}_{tag}")))
                 .collect_vec()
@@ -68,26 +67,28 @@ impl FrameContext {
         let present_complete_semaphores = create_semaphore("present_complete_semaphore");
         let render_complete_semaphores = create_semaphore("render_complete_semaphores");
 
-        let fence_frame_in_flight = (0..init_info.frames_in_flight)
+        let fence_frame_in_flight = (0..frame_settings.frames_in_flight)
             .map(|i| FRAME_ID_MAP[i])
             .map(|tag| RhiFence::new(rhi, true, &format!("frame_in_flight_fence_{tag}")))
             .collect();
 
-        let graphics_command_pools = Self::init_command_pool(rhi, init_info);
-        let (rt_images, rt_image_views) = Self::create_rt_images(rhi, &render_swapchain, init_info.frames_in_flight);
+        let graphics_command_pools = Self::init_command_pool(rhi, frame_settings.frames_in_flight);
+        let (rt_images, rt_image_views) = Self::create_rt_images(
+            rhi,
+            frame_settings.color_format,
+            frame_settings.extent,
+            frame_settings.frames_in_flight,
+        );
 
         Self {
-            render_swapchain,
-
-            swapchain_image_index: 0,
             frame_label: 0,
             frame_id: 0,
-            frame_cnt_in_flight: init_info.frames_in_flight,
+
+            frames_in_flight: frame_settings.frames_in_flight,
 
             graphics_command_pools,
-            allocated_command_buffers: vec![Vec::new(); init_info.frames_in_flight],
+            allocated_command_buffers: vec![Vec::new(); frame_settings.frames_in_flight],
 
-            depth_format,
             depth_image,
             depth_view: depth_image_view,
 
@@ -107,23 +108,13 @@ impl FrameContext {
 
     fn create_depth_image_and_view(
         rhi: &Rhi,
-        swapchain: &RhiSwapchain,
-        depth_format_dedicate: &[vk::Format],
-    ) -> (vk::Format, Rc<RhiImage2D>, Rc<RhiImage2DView>) {
-        let depth_format = rhi
-            .find_supported_format(
-                depth_format_dedicate,
-                vk::ImageTiling::OPTIMAL,
-                vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
-            )
-            .first()
-            .copied()
-            .unwrap();
-
+        extent: vk::Extent2D,
+        depth_format: vk::Format,
+    ) -> (Rc<RhiImage2D>, Rc<RhiImage2DView>) {
         let depth_image = Rc::new(RhiImage2D::new(
             rhi,
             Rc::new(RhiImageCreateInfo::new_image_2d_info(
-                swapchain.extent(),
+                extent,
                 depth_format,
                 vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
             )),
@@ -141,12 +132,13 @@ impl FrameContext {
             "depth-image-view".to_string(),
         );
 
-        (depth_format, depth_image, Rc::new(depth_image_view))
+        (depth_image, Rc::new(depth_image_view))
     }
 
     fn create_rt_images(
         rhi: &Rhi,
-        swapchain: &RhiSwapchain,
+        color_format: vk::Format,
+        extent: vk::Extent2D,
         frames_in_flight: usize,
     ) -> (Vec<Rc<RhiImage2D>>, Vec<RhiImage2DView>) {
         let rt_images = (0..frames_in_flight)
@@ -154,8 +146,8 @@ impl FrameContext {
                 RhiImage2D::new(
                     rhi,
                     Rc::new(RhiImageCreateInfo::new_image_2d_info(
-                        swapchain.extent(),
-                        swapchain.color_format(),
+                        extent,
+                        color_format,
                         vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED,
                     )),
                     &vk_mem::AllocationCreateInfo {
@@ -174,10 +166,7 @@ impl FrameContext {
                 RhiImage2DView::new(
                     rhi,
                     image.clone(),
-                    RhiImageViewCreateInfo::new_image_view_2d_info(
-                        swapchain.color_format(),
-                        vk::ImageAspectFlags::COLOR,
-                    ),
+                    RhiImageViewCreateInfo::new_image_view_2d_info(color_format, vk::ImageAspectFlags::COLOR),
                     format!("rt-image-view-{}", image_idx),
                 )
             })
@@ -208,8 +197,8 @@ impl FrameContext {
         (rt_images, rt_image_views)
     }
 
-    fn init_command_pool(rhi: &Rhi, init_info: &RenderContextInitInfo) -> Vec<Rc<RhiCommandPool>> {
-        (0..init_info.frames_in_flight)
+    fn init_command_pool(rhi: &Rhi, frames_in_flight: usize) -> Vec<Rc<RhiCommandPool>> {
+        (0..frames_in_flight)
             .map(|i| {
                 Rc::new(RhiCommandPool::new(
                     rhi,
@@ -222,27 +211,16 @@ impl FrameContext {
     }
 }
 // getter
-impl FrameContext {
+impl RenderContext {
     /// getter
     #[inline]
     pub fn graphics_queue(&self) -> &RhiQueue {
         &self.graphics_queue
     }
 
-    /// 直接从 swapchain 获取 extent
-    #[inline]
-    pub fn swapchain_extent(&self) -> vk::Extent2D {
-        self.render_swapchain.extent()
-    }
-
     #[inline]
     pub fn current_fence(&self) -> &RhiFence {
         &self.fence_frame_in_flight[self.frame_label]
-    }
-
-    #[inline]
-    pub fn color_format(&self) -> vk::Format {
-        self.render_swapchain.color_format()
     }
 
     /// 当前处在第几帧：A, B, C
@@ -264,11 +242,6 @@ impl FrameContext {
     }
 
     #[inline]
-    pub fn depth_format(&self) -> vk::Format {
-        self.depth_format
-    }
-
-    #[inline]
     pub fn current_render_complete_semaphore(&self) -> RhiSemaphore {
         self.render_complete_semaphores[self.frame_label].clone()
     }
@@ -278,28 +251,13 @@ impl FrameContext {
         self.present_complete_semaphores[self.frame_label].clone()
     }
 
-    /// 当前帧从 swapchain 获取到的用于 present 的 image
-    #[inline]
-    pub fn current_present_image(&self) -> vk::Image {
-        self.render_swapchain.images()[self.swapchain_image_index]
-    }
-
-    #[inline]
-    pub fn current_present_image_view(&self) -> vk::ImageView {
-        self.render_swapchain.image_views()[self.swapchain_image_index]
-    }
-
     #[inline]
     pub fn current_rt_image_view(&self) -> &RhiImage2DView {
         &self._rt_image_views[self.frame_label]
     }
 }
-impl FrameContext {
-    /// 准备好渲染当前frame 所需的资源
-    ///
-    /// * 通过 fence 等待当前 frame 资源释放
-    /// * 为 image 进行 layout transition 的操作
-    pub fn acquire_frame(&mut self) {
+impl RenderContext {
+    pub fn begin_frame(&mut self) {
         self.device.debug_utils().begin_queue_label(
             self.graphics_queue.handle(),
             "[acquire-frame]",
@@ -319,11 +277,9 @@ impl FrameContext {
             self.graphics_command_pools[self.frame_label].reset_all_buffers();
         }
         self.device.debug_utils().end_queue_label(self.graphics_queue.handle());
+    }
 
-        self.swapchain_image_index =
-            self.render_swapchain.acquire_next_frame(&self.present_complete_semaphores[self.frame_label], None)
-                as usize;
-
+    pub fn before_render(&mut self, present_image: vk::Image) {
         self.device.debug_utils().begin_queue_label(
             self.graphics_queue.handle(),
             "[acquire-frame]color-attach-transfer",
@@ -346,7 +302,7 @@ impl FrameContext {
                     )
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                    .image(self.current_present_image());
+                    .image(present_image);
                 cmd.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));
             }
             cmd.end();
@@ -362,10 +318,12 @@ impl FrameContext {
         self.device.debug_utils().end_queue_label(self.graphics_queue.handle());
     }
 
-    /// 提交当前 frame
-    ///
-    /// * 在提交之前，为 image 进行 layout transition
-    pub fn submit_frame(&mut self) {
+    pub fn end_frame(&mut self) {
+        self.frame_label = (self.frame_label + 1) % self.frames_in_flight;
+        self.frame_id += 1;
+    }
+
+    pub fn after_render(&mut self, present_image: vk::Image) {
         self.device.debug_utils().begin_queue_label(
             self.graphics_queue.handle(),
             "[submit-frame]",
@@ -386,7 +344,7 @@ impl FrameContext {
                     .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
-                    .image(self.current_present_image());
+                    .image(present_image);
                 cmd.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));
             }
             cmd.end();
@@ -401,15 +359,6 @@ impl FrameContext {
         }
         // queue label 不能跨过 submit，否则会导致 Nsight mismatch label
         self.device.debug_utils().end_queue_label(self.graphics_queue.handle());
-
-        self.render_swapchain.submit_frame(
-            &self.graphics_queue,
-            self.swapchain_image_index as u32,
-            &[self.current_render_complete_semaphore()],
-        );
-
-        self.frame_label = (self.frame_label + 1) % self.frame_cnt_in_flight;
-        self.frame_id += 1;
     }
 
     /// 分配 command buffer，在当前 frame 使用
@@ -422,7 +371,7 @@ impl FrameContext {
         cmd
     }
 }
-impl Drop for FrameContext {
+impl Drop for RenderContext {
     fn drop(&mut self) {
         for semaphore in std::mem::take(&mut self.present_complete_semaphores).into_iter() {
             semaphore.destroy();
@@ -432,26 +381,6 @@ impl Drop for FrameContext {
         }
         for fence in std::mem::take(&mut self.fence_frame_in_flight).into_iter() {
             fence.destroy();
-        }
-    }
-}
-
-pub struct RenderContextInitInfo {
-    frames_in_flight: usize,
-    depth_format_dedicate: Vec<vk::Format>,
-}
-
-impl Default for RenderContextInitInfo {
-    fn default() -> Self {
-        Self {
-            depth_format_dedicate: vec![
-                vk::Format::D32_SFLOAT_S8_UINT,
-                vk::Format::D32_SFLOAT,
-                vk::Format::D24_UNORM_S8_UINT,
-                vk::Format::D16_UNORM_S8_UINT,
-                vk::Format::D16_UNORM,
-            ],
-            frames_in_flight: 3,
         }
     }
 }

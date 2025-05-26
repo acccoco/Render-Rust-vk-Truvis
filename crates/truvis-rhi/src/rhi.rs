@@ -23,8 +23,8 @@ pub struct Rhi {
     pub allocator: Rc<RhiAllocator>,
 
     pub graphics_command_pool: Rc<RhiCommandPool>,
-    transfer_command_pool: Rc<RhiCommandPool>,
-    compute_command_pool: Rc<RhiCommandPool>,
+    _transfer_command_pool: Rc<RhiCommandPool>,
+    _compute_command_pool: Rc<RhiCommandPool>,
 
     pub graphics_queue: Rc<RhiQueue>,
     pub compute_queue: Rc<RhiQueue>,
@@ -132,8 +132,8 @@ impl Rhi {
             device,
             allocator,
             graphics_command_pool,
-            transfer_command_pool,
-            compute_command_pool,
+            _transfer_command_pool: transfer_command_pool,
+            _compute_command_pool: compute_command_pool,
             graphics_queue,
             compute_queue,
             transfer_queue,

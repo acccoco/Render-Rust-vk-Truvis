@@ -1,5 +1,5 @@
 pub mod app;
-pub mod frame_context;
+pub mod render_context;
 pub mod platform;
 pub mod render;
 pub mod renderer;

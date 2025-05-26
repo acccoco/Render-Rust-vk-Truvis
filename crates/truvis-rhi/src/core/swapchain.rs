@@ -14,43 +14,12 @@ use ash::vk;
 use itertools::Itertools;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
-pub struct RhiSwapchainInitInfo {
-    format: vk::SurfaceFormatKHR,
-    swapchain_present_mode: vk::PresentModeKHR,
-
-    window: Rc<MainWindow>,
-}
-
-impl RhiSwapchainInitInfo {
-    #[inline]
-    pub fn new(window: Rc<MainWindow>) -> Self {
-        Self {
-            format: vk::SurfaceFormatKHR {
-                format: vk::Format::B8G8R8A8_UNORM,
-                color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
-            },
-            swapchain_present_mode: vk::PresentModeKHR::MAILBOX,
-            window,
-        }
-    }
-
-    /// builder
-    #[inline]
-    pub fn format(mut self, format: vk::SurfaceFormatKHR) -> Self {
-        self.format = format;
-        self
-    }
-}
-
 struct RhiSurface {
     handle: vk::SurfaceKHR,
     pf: ash::khr::surface::Instance,
-
-    _window: Rc<MainWindow>,
 }
-
 impl RhiSurface {
-    fn new(rhi: &Rhi, window: Rc<MainWindow>) -> Self {
+    fn new(rhi: &Rhi, window: &MainWindow) -> Self {
         let surface_pf = ash::khr::surface::Instance::new(&rhi.vk_pf, rhi.instance());
 
         let surface = unsafe {
@@ -68,7 +37,6 @@ impl RhiSurface {
         RhiSurface {
             handle: surface,
             pf: surface_pf,
-            _window: window,
         }
     }
 }
@@ -90,12 +58,13 @@ pub struct RhiSwapchain {
     images: Vec<vk::Image>,
     image_views: Vec<vk::ImageView>,
 
+    swapchain_image_index: usize,
+
     extent: vk::Extent2D,
     color_format: vk::Format,
     color_space: vk::ColorSpaceKHR,
     present_mode: vk::PresentModeKHR,
 }
-
 // getter
 impl RhiSwapchain {
     #[inline]
@@ -127,15 +96,29 @@ impl RhiSwapchain {
     pub fn present_mode(&self) -> vk::PresentModeKHR {
         self.present_mode
     }
+
+    #[inline]
+    pub fn current_present_image(&self) -> vk::Image {
+        self.images[self.swapchain_image_index]
+    }
+
+    #[inline]
+    pub fn current_present_image_view(&self) -> vk::ImageView {
+        self.image_views[self.swapchain_image_index]
+    }
 }
-
 impl RhiSwapchain {
-    pub fn new(rhi: &Rhi, init_info: &RhiSwapchainInitInfo) -> Self {
+    pub fn new(
+        rhi: &Rhi,
+        window: &MainWindow,
+        present_mode: vk::PresentModeKHR,
+        surface_format: vk::SurfaceFormatKHR,
+    ) -> Self {
         let pdevice = rhi.physical_device().handle;
-        let surface = RhiSurface::new(rhi, init_info.window.clone());
+        let surface = RhiSurface::new(rhi, window);
 
-        let present_mode = Self::init_present_mode(rhi, &surface, init_info.swapchain_present_mode);
-        let (format, color_space) = Self::init_format_and_colorspace(rhi, &surface, init_info.format);
+        let present_mode = Self::init_present_mode(rhi, &surface, present_mode);
+        let (format, color_space) = Self::init_format_and_colorspace(rhi, &surface, surface_format);
 
         let surface_capabilities =
             unsafe { surface.pf.get_physical_device_surface_capabilities(pdevice, surface.handle).unwrap() };
@@ -152,6 +135,7 @@ impl RhiSwapchain {
             swapchain_handle,
             images,
             image_views,
+            swapchain_image_index: 0,
             extent,
             color_format: format,
             color_space,
@@ -283,7 +267,7 @@ impl RhiSwapchain {
     }
 
     #[inline]
-    pub fn acquire_next_frame(&self, semaphore: &RhiSemaphore, fence: Option<&RhiFence>) -> u32 {
+    pub fn acquire(&mut self, semaphore: &RhiSemaphore, fence: Option<&RhiFence>) {
         let (image_index, is_optimal) = unsafe {
             self.swapchain_pf
                 .acquire_next_image(
@@ -300,15 +284,16 @@ impl RhiSwapchain {
             // log::warn!("swapchain acquire image index {} is not optimal", image_index);
         }
 
-        image_index
+        self.swapchain_image_index = image_index as usize;
     }
 
     #[inline]
-    pub fn submit_frame(&self, queue: &RhiQueue, image_index: u32, wait_semaphores: &[RhiSemaphore]) {
+    pub fn submit(&self, queue: &RhiQueue, wait_semaphores: &[RhiSemaphore]) {
         let wait_semaphores = wait_semaphores.iter().map(|s| s.handle()).collect_vec();
+        let image_indices = [self.swapchain_image_index as u32];
         let present_info = vk::PresentInfoKHR::default()
             .wait_semaphores(&wait_semaphores)
-            .image_indices(std::slice::from_ref(&image_index))
+            .image_indices(&image_indices)
             .swapchains(std::slice::from_ref(&self.swapchain_handle));
 
         unsafe { self.swapchain_pf.queue_present(queue.handle(), &present_info).unwrap() };
