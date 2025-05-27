@@ -1,8 +1,7 @@
-use crate::render_context::{RenderContext, FrameSettings};
 use crate::platform::camera::TruCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
-use crate::renderer::acc_manager::AccManager;
+use crate::render_context::{FrameSettings, RenderContext};
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::TheWorld;
@@ -51,7 +50,6 @@ pub struct Renderer {
 
     pub bindless_mgr: Rc<RefCell<BindlessManager>>,
     pub scene_mgr: Rc<RefCell<TheWorld>>,
-    pub acc_mgr: Rc<RefCell<AccManager>>,
     pub gpu_scene: GpuScene,
     pub per_frame_data_buffers: Vec<RhiStructuredBuffer<shader::PerFrameData>>,
 }
@@ -60,6 +58,10 @@ impl Drop for Renderer {
         log::info!("Dropping Renderer");
         // 在 Renderer 被销毁时，等待 Rhi 设备空闲
         self.wait_idle();
+
+        if let Some(render_context) = self.render_context.take() {
+            render_context.destroy(&mut self.bindless_mgr.borrow_mut());
+        }
     }
 }
 // getter
@@ -90,8 +92,7 @@ impl Renderer {
 
         let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, FRAMES_IN_FLIGHT)));
         let scene_mgr = Rc::new(RefCell::new(TheWorld::new(bindless_mgr.clone())));
-        let acc_mgr = Rc::new(RefCell::new(AccManager::new(&rhi, FRAMES_IN_FLIGHT)));
-        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), acc_mgr.clone(), FRAMES_IN_FLIGHT);
+        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), FRAMES_IN_FLIGHT);
         let per_frame_data_buffers = (0..FRAMES_IN_FLIGHT)
             .map(|idx| {
                 RhiStructuredBuffer::<shader::PerFrameData>::new_ubo(&rhi, 1, format!("per-frame-data-buffer-{idx}"))
@@ -111,7 +112,6 @@ impl Renderer {
             bindless_mgr,
             scene_mgr,
             gpu_scene,
-            acc_mgr,
             per_frame_data_buffers,
         }
     }
@@ -209,14 +209,17 @@ impl Renderer {
     pub fn rebuild_after_resized(&mut self, window: &MainWindow) {
         // 确保 swapchain 已经 drop 掉之后，再创建新的 swapchian，
         // 因为同一时间只能有一个 swapchain 在使用 window
-        self.render_context = None;
+        if let Some(render_context) = self.render_context.take() {
+            render_context.destroy(&mut self.bindless_mgr.borrow_mut());
+        }
         self.render_swapchain = None;
 
         self.render_swapchain =
             Some(RhiSwapchain::new(&self.rhi, window, DEFAULT_PRESENT_MODE, DEFAULT_SURFACE_FORMAT));
 
         self.frame_settings.extent = self.swapchain_extent();
-        self.render_context = Some(RenderContext::new(&self.rhi, self.frame_settings));
+        self.render_context =
+            Some(RenderContext::new(&self.rhi, self.frame_settings, &mut self.bindless_mgr.borrow_mut()));
     }
 
     pub fn update_gpu_scene(&mut self, input_state: &InputState, timer: &Timer, camera: &TruCamera) {
@@ -224,6 +227,22 @@ impl Renderer {
         let render_swapchain = self.render_swapchain.as_mut().unwrap();
 
         let crt_frame_label = render_context.current_frame_label();
+
+        // 将数据上传到 gpu buffer 中
+        let cmd = render_context.alloc_command_buffer("update-draw-buffer");
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
+
+        let transfer_barrier_mask = RhiBarrierMask {
+            src_stage: vk::PipelineStageFlags2::TRANSFER,
+            src_access: vk::AccessFlags2::TRANSFER_WRITE,
+            dst_stage: vk::PipelineStageFlags2::VERTEX_SHADER
+                | vk::PipelineStageFlags2::FRAGMENT_SHADER
+                | vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+            dst_access: vk::AccessFlags2::SHADER_READ,
+        };
+
+        self.gpu_scene.prepare_render_data(crt_frame_label);
+        self.gpu_scene.upload_to_buffer(&self.rhi, crt_frame_label, &cmd, transfer_barrier_mask);
 
         // 准备好当前帧的数据
         let per_frame_data = {
@@ -251,32 +270,10 @@ impl Renderer {
                     x: extent.width as f32,
                     y: extent.height as f32,
                 },
+                rt_render_target: render_context.current_rt_render_target(&self.bindless_mgr.borrow()),
                 ..Default::default()
             }
         };
-
-        // 将数据上传到 gpu buffer 中
-        let cmd = render_context.alloc_command_buffer("update-draw-buffer");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
-
-        let transfer_barrier_mask = RhiBarrierMask {
-            src_stage: vk::PipelineStageFlags2::TRANSFER,
-            src_access: vk::AccessFlags2::TRANSFER_WRITE,
-            dst_stage: vk::PipelineStageFlags2::VERTEX_SHADER
-                | vk::PipelineStageFlags2::FRAGMENT_SHADER
-                | vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
-            dst_access: vk::AccessFlags2::SHADER_READ,
-        };
-
-        self.gpu_scene.prepare_render_data(crt_frame_label);
-        self.gpu_scene.upload_to_buffer(
-            &self.rhi,
-            crt_frame_label,
-            &cmd,
-            transfer_barrier_mask,
-            render_context.current_rt_image_view(),
-        );
-
         cmd.cmd_update_buffer(
             self.per_frame_data_buffers[crt_frame_label].handle(),
             0,

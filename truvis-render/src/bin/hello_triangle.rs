@@ -44,7 +44,7 @@ impl HelloTriangle {
 
     fn my_update(&self, rhi: &Rhi, render_context: &mut RenderContext, swapchain: &RhiSwapchain) {
         let color_attach = FrameBuffer::get_color_attachment(swapchain.current_present_image_view());
-        let depth_attach = FrameBuffer::get_depth_attachment(render_context.depth_view.handle());
+        let depth_attach = FrameBuffer::get_depth_attachment(render_context.depth_view().handle());
         let render_info = FrameBuffer::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),

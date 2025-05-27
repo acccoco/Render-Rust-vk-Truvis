@@ -1,5 +1,7 @@
+use crate::renderer::bindless::BindlessManager;
 use ash::vk;
 use itertools::Itertools;
+use shader_binding::shader;
 use std::rc::Rc;
 use truvis_rhi::{
     basic::{color::LabelColor, FRAME_ID_MAP},
@@ -37,15 +39,17 @@ pub struct RenderContext {
     /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
     allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
 
-    pub depth_image: Rc<RhiImage2D>,
-    pub depth_view: Rc<RhiImage2DView>,
+    /// FIXME 听说可以只需要一个 depth view，因为不需要同时渲染两帧
+    _depth_image: Rc<RhiImage2D>,
+    _depth_view: Rc<RhiImage2DView>,
 
     present_complete_semaphores: Vec<RhiSemaphore>,
     render_complete_semaphores: Vec<RhiSemaphore>,
     fence_frame_in_flight: Vec<RhiFence>,
 
     _rt_images: Vec<Rc<RhiImage2D>>,
-    _rt_image_views: Vec<RhiImage2DView>,
+    _rt_image_views: Vec<Rc<RhiImage2DView>>,
+    _rt_keywords: Vec<String>,
 
     device: Rc<RhiDevice>,
     graphics_queue: Rc<RhiQueue>,
@@ -54,7 +58,7 @@ pub struct RenderContext {
 }
 // Ctor
 impl RenderContext {
-    pub fn new(rhi: &Rhi, frame_settings: FrameSettings) -> Self {
+    pub fn new(rhi: &Rhi, frame_settings: FrameSettings, bindless_mgr: &mut BindlessManager) -> Self {
         let (depth_image, depth_image_view) =
             Self::create_depth_image_and_view(rhi, frame_settings.extent, frame_settings.depth_format);
 
@@ -79,6 +83,12 @@ impl RenderContext {
             frame_settings.extent,
             frame_settings.frames_in_flight,
         );
+        let mut rt_keywords = Vec::with_capacity(frame_settings.frames_in_flight);
+        for idx in 0..frame_settings.frames_in_flight {
+            let rt_keyword = format!("rt-image-{}", FRAME_ID_MAP[idx]);
+            bindless_mgr.register_image(rt_keyword.clone(), rt_image_views[idx].clone());
+            rt_keywords.push(rt_keyword);
+        }
 
         Self {
             frame_label: 0,
@@ -89,11 +99,12 @@ impl RenderContext {
             graphics_command_pools,
             allocated_command_buffers: vec![Vec::new(); frame_settings.frames_in_flight],
 
-            depth_image,
-            depth_view: depth_image_view,
+            _depth_image: depth_image,
+            _depth_view: depth_image_view,
 
             _rt_images: rt_images,
             _rt_image_views: rt_image_views,
+            _rt_keywords: rt_keywords,
 
             present_complete_semaphores,
             render_complete_semaphores,
@@ -103,6 +114,23 @@ impl RenderContext {
             graphics_queue: rhi.graphics_queue.clone(),
             _command_queue: rhi.compute_queue.clone(),
             _transfer_queue: rhi.transfer_queue.clone(),
+        }
+    }
+
+    /// 需要手动调用该函数释放资源
+    pub fn destroy(mut self, bindless_mgr: &mut BindlessManager) {
+        for semaphore in std::mem::take(&mut self.present_complete_semaphores).into_iter() {
+            semaphore.destroy();
+        }
+        for semaphore in std::mem::take(&mut self.render_complete_semaphores).into_iter() {
+            semaphore.destroy();
+        }
+        for fence in std::mem::take(&mut self.fence_frame_in_flight).into_iter() {
+            fence.destroy();
+        }
+
+        for rt_keyword in &self._rt_keywords {
+            bindless_mgr.unregister_image(rt_keyword)
         }
     }
 
@@ -140,7 +168,7 @@ impl RenderContext {
         color_format: vk::Format,
         extent: vk::Extent2D,
         frames_in_flight: usize,
-    ) -> (Vec<Rc<RhiImage2D>>, Vec<RhiImage2DView>) {
+    ) -> (Vec<Rc<RhiImage2D>>, Vec<Rc<RhiImage2DView>>) {
         let rt_images = (0..frames_in_flight)
             .map(|i| {
                 RhiImage2D::new(
@@ -163,12 +191,12 @@ impl RenderContext {
             .iter()
             .enumerate()
             .map(|(image_idx, image)| {
-                RhiImage2DView::new(
+                Rc::new(RhiImage2DView::new(
                     rhi,
                     image.clone(),
                     RhiImageViewCreateInfo::new_image_view_2d_info(color_format, vk::ImageAspectFlags::COLOR),
                     format!("rt-image-view-{}", image_idx),
-                )
+                ))
             })
             .collect_vec();
 
@@ -252,8 +280,13 @@ impl RenderContext {
     }
 
     #[inline]
-    pub fn current_rt_image_view(&self) -> &RhiImage2DView {
-        &self._rt_image_views[self.frame_label]
+    pub fn depth_view(&self) -> &RhiImage2DView {
+        &self._depth_view
+    }
+
+    #[inline]
+    pub fn current_rt_render_target(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
+        bindless_manager.get_image_idx(&self._rt_keywords[self.frame_label]).unwrap()
     }
 }
 impl RenderContext {
@@ -373,14 +406,8 @@ impl RenderContext {
 }
 impl Drop for RenderContext {
     fn drop(&mut self) {
-        for semaphore in std::mem::take(&mut self.present_complete_semaphores).into_iter() {
-            semaphore.destroy();
-        }
-        for semaphore in std::mem::take(&mut self.render_complete_semaphores).into_iter() {
-            semaphore.destroy();
-        }
-        for fence in std::mem::take(&mut self.fence_frame_in_flight).into_iter() {
-            fence.destroy();
-        }
+        assert!(self.present_complete_semaphores.is_empty(), "need destroy render context manually");
+        assert!(self.render_complete_semaphores.is_empty(), "need destroy render context manually");
+        assert!(self.fence_frame_in_flight.is_empty(), "need destroy render context manually");
     }
 }

@@ -1,6 +1,6 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use crate::render_context::{RenderContext, FrameSettings};
+use crate::render_context::{FrameSettings, RenderContext};
 use ash::vk;
 use image::EncodableLayout;
 use shader_layout_macro::ShaderLayout;
@@ -588,7 +588,7 @@ impl Gui {
             .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);
         let depth_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(render_ctx.depth_view.handle())
+            .image_view(render_ctx.depth_view().handle())
             .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
             .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);

@@ -1,5 +1,5 @@
 #include "phong.slangi"
-#include "../include/scene.slangi"
+#include "scene.slangi"
 
 struct VsInput
 {

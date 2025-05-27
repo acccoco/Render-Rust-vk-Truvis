@@ -1,4 +1,3 @@
-use crate::renderer::acc_manager::AccManager;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::scene_manager::TheWorld;
 use ash::vk;
@@ -12,7 +11,6 @@ use std::rc::Rc;
 use truvis_rhi::core::acceleration::RhiAcceleration;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::image::RhiImage2DView;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 use truvis_rhi::rhi::Rhi;
 
@@ -159,7 +157,6 @@ impl GpuSceneBuffers {
 pub struct GpuScene {
     scene_mgr: Rc<RefCell<TheWorld>>,
     bindless_mgr: Rc<RefCell<BindlessManager>>,
-    acc_mgr: Rc<RefCell<AccManager>>,
 
     /// GPU 中以顺序存储的 instance
     ///
@@ -179,19 +176,23 @@ pub struct GpuScene {
 
     gpu_scene_buffers: Vec<GpuSceneBuffers>,
 }
-
+// getter
+impl GpuScene {
+    #[inline]
+    pub fn tlas(&self, frame_label: usize) -> Option<&RhiAcceleration> {
+        self.gpu_scene_buffers[frame_label].tlas.as_ref()
+    }
+}
 impl GpuScene {
     pub fn new(
         rhi: &Rhi,
         scene_mgr: Rc<RefCell<TheWorld>>,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
-        acc_mgr: Rc<RefCell<AccManager>>,
         frame_in_flight: usize,
     ) -> Self {
         Self {
             scene_mgr,
             bindless_mgr,
-            acc_mgr,
 
             flatten_instances: vec![],
             flatten_materials: FlattenMap::default(),
@@ -222,18 +223,16 @@ impl GpuScene {
         frame_label: usize,
         cmd: &RhiCommandBuffer,
         barrier_mask: RhiBarrierMask,
-        ray_output_image: &RhiImage2DView,
     ) {
         self.upload_mesh_buffer(frame_label, cmd, barrier_mask);
         self.upload_instance_buffer(frame_label, cmd, barrier_mask);
         self.upload_material_buffer(frame_label, cmd, barrier_mask);
         self.upload_light_buffer(frame_label, cmd, barrier_mask);
-        self.upload_scene_buffer(frame_label, cmd, barrier_mask);
 
+        // 需要确保 instance 先与 tlas 构建
         self.build_tlas(rhi, frame_label);
-        if let Some(tlas) = &self.gpu_scene_buffers[frame_label].tlas {
-            self.acc_mgr.borrow_mut().update(frame_label, tlas, ray_output_image);
-        }
+
+        self.upload_scene_buffer(frame_label, cmd, barrier_mask);
     }
 
     /// 绘制场景中的所有示例
@@ -314,6 +313,10 @@ impl GpuScene {
             spot_lights: 0, // TODO 暂时无用
             point_light_count: scene_mgr.point_light_map().len() as u32,
             spot_light_count: 0, // TODO 暂时无用
+            tlas: crt_gpu_buffers.tlas.as_ref().unwrap().get_device_address(),
+
+            _padding_0: 0,
+            _padding_1: 0,
         };
 
         cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.handle(), 0, bytemuck::bytes_of(&scene_data));
@@ -428,8 +431,10 @@ impl GpuScene {
                 emissive: mat.emissive.xyz().into(),
                 metallic: 0.5,
                 roughness: 0.5,
-                diffuse_map: bindless_mgr.get_texture_idx(&mat.diffuse_map).unwrap_or(0),
-                normal_map: 0,
+                diffuse_map: bindless_mgr
+                    .get_texture_idx(&mat.diffuse_map)
+                    .unwrap_or(shader::TextureHandle { index: 0 }),
+                normal_map: shader::TextureHandle { index: 0 },
                 ..Default::default()
             };
         }
@@ -496,7 +501,7 @@ impl GpuScene {
         );
     }
 }
-
+// ray tracing
 impl GpuScene {
     /// 根据 instance 信息获得加速结构的 instance 信息
     fn get_as_instance_info(&self, instance: &TruInstance, custom_idx: u32) -> vk::AccelerationStructureInstanceKHR {

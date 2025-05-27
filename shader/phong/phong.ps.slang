@@ -1,5 +1,6 @@
-#include "phong.slangi"
-#include "../include/scene.slangi"
+#include "./phong.slangi"
+#include "scene.slangi"
+#include "bindless.slangi"
 
 struct PsInput
 {
@@ -14,13 +15,6 @@ struct PsOutput
 
 [[vk::push_constant]]
 PushConstants push_const;
-
-// TODO 可能需要 nonuniform，表示同一个 wavefront 的下标是不同的
-[[vk::binding(0, 0)]]
-Sampler2D<float4> textures[];
-
-[[vk::binding(1, 0)]]
-Texture2D<float4> images[];
 
 
 func phong_light(camera_pos: float3, pos: float3, normal: float3, light: PointLight, object_color: float4)->float3
@@ -59,11 +53,10 @@ PsOutput main(PsInput input)
     PBRMaterial* mat = scene->get_material(push_const.instance_idx, push_const.submesh_idx);
 
     const uint light_cnt = scene.point_light_count.x;
-    const uint diffuse_map_id = mat.diffuse_map;
 
     const float2 delta_uv = frac(frame_data.time_ms / 1000.0f);
     const float2 uv = input.coarse_vertex.uv + delta_uv;
-    const float4 object_color = textures[diffuse_map_id].Sample(uv);
+    const float4 object_color = mat.diffuse_map.sample(uv);
 
     float3 light_term = float3(0.0, 0.0, 0.0);
     for (uint i = 0; i < light_cnt; i++)

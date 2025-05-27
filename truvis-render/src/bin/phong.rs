@@ -71,7 +71,7 @@ impl OuterApp for PhongApp {
             glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
 
-        let rt_pass = SimlpeRtPass::new(&renderer.rhi, renderer.bindless_mgr.clone(), renderer.acc_mgr.clone());
+        let rt_pass = SimlpeRtPass::new(&renderer.rhi, renderer.bindless_mgr.clone());
         let phong_pass = PhongPass::new(&renderer.rhi, &renderer.frame_settings(), renderer.bindless_mgr.clone());
 
         Self { phong_pass, rt_pass }
@@ -91,7 +91,7 @@ impl OuterApp for PhongApp {
         let rhi = &renderer.rhi;
 
         let color_attach = FrameBuffer::get_color_attachment(swapchian.current_present_image_view());
-        let depth_attach = FrameBuffer::get_depth_attachment(render_context.depth_view.handle());
+        let depth_attach = FrameBuffer::get_depth_attachment(render_context.depth_view().handle());
         let render_info = FrameBuffer::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),

@@ -1,0 +1,9 @@
+#pragma once
+
+
+namespace blit {
+    /// blit shader 的参数
+    struct PushConstant {
+        
+    };
+};

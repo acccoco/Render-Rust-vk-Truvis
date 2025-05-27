@@ -1,6 +1,7 @@
 #pragma once
 #include "common.slangi"
 #include "light.slangi"
+#include "bindless.slangi"
 
 
 struct Instance {
@@ -30,8 +31,8 @@ struct PBRMaterial
     float3 emissive;
     float roughness;
 
-    uint diffuse_map;
-    uint normal_map;
+    TextureHandle diffuse_map;
+    TextureHandle normal_map;
     uint _padding_1;
     uint _padding_2;
 };
@@ -48,8 +49,12 @@ struct Scene {
     PTR(SpotLight) spot_lights;
 
     PTR(Instance) all_instances;
+    PTR(RaytracingAccelerationStructure) tlas;
+
     uint point_light_count;
     uint spot_light_count;
+    uint _padding_0;
+    uint _padding_1;
 
 #ifdef __SLANG__
     /// 根据 instance idx 和 submesh idx 获取 geometry
@@ -89,7 +94,8 @@ struct PerFrameData {
     float2 resolution;
 
     uint64_t frame_id;
-    uint64_t _padding_1;
+    ImageHandle rt_render_target;
+    uint _padding_1;
 };
 
 struct PushConstants {

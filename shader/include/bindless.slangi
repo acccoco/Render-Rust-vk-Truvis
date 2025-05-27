@@ -1,0 +1,36 @@
+#pragma once
+
+#ifdef __SLANG__
+
+// TODO 可能需要 nonuniform，表示同一个 wavefront 的下标是不同的
+[[vk::binding(0, 0)]]
+Sampler2D<float4> bindless_textures[];
+
+[[vk::binding(1, 0)]]
+RWTexture2D<float4> bindless_images[];
+
+#endif
+
+
+struct TextureHandle {
+    int index; 
+
+#ifdef __SLANG__
+    [ForceInline]
+    float4 sample(float2 uv) {
+        return bindless_textures[index].Sample(uv);
+    }
+#endif
+};
+
+
+struct ImageHandle {
+    int index; // 纹理的索引
+
+#ifdef __SLANG__
+    [ForceInline]
+    void store(uint2 coord, float4 value) {
+        bindless_images[index].Store(coord, value);
+    }
+#endif
+};

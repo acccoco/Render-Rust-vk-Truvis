@@ -1,5 +1,4 @@
-use crate::render_context::{RenderContext, FrameSettings};
-use crate::renderer::acc_manager::AccManager;
+use crate::render_context::{FrameSettings, RenderContext};
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
 use ash::vk;
@@ -223,14 +222,13 @@ impl SBTRegions {
 pub struct SimlpeRtPass {
     pipeline: RhiRtPipeline,
     _bindless_mgr: Rc<RefCell<BindlessManager>>,
-    _acc_mgr: Rc<RefCell<AccManager>>,
 
     _sbt: SBTRegions,
 
     _device: Rc<RhiDevice>,
 }
 impl SimlpeRtPass {
-    pub fn new(rhi: &Rhi, bindless_mgr: Rc<RefCell<BindlessManager>>, acc_mgr: Rc<RefCell<AccManager>>) -> Self {
+    pub fn new(rhi: &Rhi, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         let shader_modules = ShaderStage::iter()
             .map(|stage| stage.value())
             .map(|stage| RhiShaderModule::new(rhi.device.clone(), stage.path()))
@@ -269,12 +267,8 @@ impl SimlpeRtPass {
 
         let pipeline_layout = {
             let bineless_mgr = bindless_mgr.borrow();
-            let acc_mgr = acc_mgr.borrow();
 
-            let descriptor_sets = [
-                bineless_mgr.bindless_layout.handle(),
-                acc_mgr.rt_descriptor_set_layout.handle(),
-            ];
+            let descriptor_sets = [bineless_mgr.bindless_layout.handle()];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
@@ -313,7 +307,6 @@ impl SimlpeRtPass {
             pipeline: rt_pipeline,
             _sbt: sbt,
             _bindless_mgr: bindless_mgr,
-            _acc_mgr: acc_mgr,
             _device: rhi.device.clone(),
         }
     }
@@ -335,10 +328,7 @@ impl SimlpeRtPass {
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
             0,
-            &[
-                self._bindless_mgr.borrow().bindless_sets[frame_label].handle(),
-                self._acc_mgr.borrow().rt_descriptor_sets[frame_label].handle(),
-            ],
+            &[self._bindless_mgr.borrow().bindless_sets[frame_label].handle()],
             &[],
         );
         let push_constant = shader::PushConstants {

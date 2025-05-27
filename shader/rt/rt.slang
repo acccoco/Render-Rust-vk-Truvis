@@ -1,14 +1,6 @@
 #include "../include/scene.slangi"
 
 
-// set 1, binding 0
-[[vk::binding(0, 1)]]
-uniform RaytracingAccelerationStructure tlas;
-
-// set 1, binding 1
-[[vk::binding(1, 1)]]
-RWTexture2D<float4> render_target;
-
 [[vk::push_constant]]
 PushConstants push_const;
 
@@ -44,9 +36,13 @@ void main_ray_gen() {
     ray.TMax = 10000.0f;
 
     RayPayload payload = {float4(0, 0, 0, 1)};
-    TraceRay(tlas, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, ray, payload);
 
-    render_target[thread_id] = payload.color;
+    Scene* scene = push_const.scene;
+    RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
+
+    TraceRay(tlas_, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, ray, payload);
+
+    frame_data.rt_render_target.store(thread_id, payload.color);
 }
 
 [shader("closesthit")]

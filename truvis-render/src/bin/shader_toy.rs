@@ -78,7 +78,7 @@ impl ShaderToy {
             __padding__: [0.0, 0.0],
         };
 
-        let depth_attach_info = FrameBuffer::get_depth_attachment(render_context.depth_view.handle());
+        let depth_attach_info = FrameBuffer::get_depth_attachment(render_context.depth_view().handle());
         let color_attach_info = FrameBuffer::get_color_attachment(swapchain.current_present_image_view());
         let render_info = FrameBuffer::get_render_info(
             vk::Rect2D {

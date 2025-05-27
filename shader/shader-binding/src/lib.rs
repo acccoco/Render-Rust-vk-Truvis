@@ -1,11 +1,9 @@
 mod _shader_bindings;
 
-pub mod shader {
-    pub use crate::_shader_bindings::*;
-}
+pub use crate::_shader_bindings::root as shader;
 
 mod slang_traits {
-    use crate::_shader_bindings::*;
+    use crate::_shader_bindings::root::*;
 
     impl From<glam::UVec2> for Uint2 {
         fn from(value: glam::UVec2) -> Self {
