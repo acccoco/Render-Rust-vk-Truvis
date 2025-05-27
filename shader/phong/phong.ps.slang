@@ -61,7 +61,8 @@ PsOutput main(PsInput input)
     const uint light_cnt = scene.point_light_count.x;
     const uint diffuse_map_id = mat.diffuse_map;
 
-    const float2 uv = input.coarse_vertex.uv;
+    const float2 delta_uv = frac(frame_data.time_ms / 1000.0f);
+    const float2 uv = input.coarse_vertex.uv + delta_uv;
     const float4 object_color = textures[diffuse_map_id].Sample(uv);
 
     float3 light_term = float3(0.0, 0.0, 0.0);
