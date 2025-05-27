@@ -102,11 +102,9 @@ impl RhiBuffer {
         debug_name: impl AsRef<str>,
     ) -> Self {
         unsafe {
-            let (buffer, allocation) = if let Some(offset_align) = align {
-                rhi.allocator.create_buffer_with_alignment(buffer_ci.info(), &alloc_ci, offset_align).unwrap()
-            } else {
-                rhi.allocator.create_buffer(buffer_ci.info(), &alloc_ci).unwrap()
-            };
+            // 默认给 8 的 align，表示所有的 buffer 其实地址一定会和 8 对齐
+            let (buffer, allocation) =
+                rhi.allocator.create_buffer_with_alignment(buffer_ci.info(), &alloc_ci, align.unwrap_or(8)).unwrap();
 
             rhi.device.debug_utils().set_object_debug_name(buffer, debug_name.as_ref());
             Self {
@@ -285,8 +283,10 @@ impl RhiBuffer {
     {
         self.map();
         unsafe {
-            // 这里的 size 是目标内存的最大 size
-            // align 表示目标内存位置额外的内存对齐要求，这里使用 align_of 表示和 rust 中 T 保持一致
+            // 这里的 size 是 buffer 的最大 size
+            // 这个函数主要处理的是 device 的内存对齐(std140, std430)和 host 的内存对齐不一致的问题
+            // 这个函数会自动的为数据增加 padding
+            // 由于已经手动为 struct 添加了 padding，因此这个函数暂时用不上
             let mut slice =
                 ash::util::Align::new(self.map_ptr.unwrap() as *mut c_void, align_of::<T>() as u64, self.size);
             slice.copy_from_slice(data);
