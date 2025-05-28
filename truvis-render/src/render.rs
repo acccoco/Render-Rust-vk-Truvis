@@ -271,7 +271,8 @@ impl Renderer {
                     y: extent.height as f32,
                 },
                 rt_render_target: render_context.current_rt_render_target(&self.bindless_mgr.borrow()),
-                ..Default::default()
+
+                _padding_1: Default::default(),
             }
         };
         cmd.cmd_update_buffer(

@@ -435,7 +435,9 @@ impl GpuScene {
                     .get_texture_idx(&mat.diffuse_map)
                     .unwrap_or(shader::TextureHandle { index: 0 }),
                 normal_map: shader::TextureHandle { index: 0 },
-                ..Default::default()
+
+                _padding_1: Default::default(),
+                _padding_2: Default::default(),
             };
         }
 
@@ -461,7 +463,9 @@ impl GpuScene {
             light_buffer_slices[light_idx] = shader::PointLight {
                 pos: point_light.pos,
                 color: point_light.color,
-                ..Default::default()
+
+                _color_padding: Default::default(),
+                _pos_padding: Default::default(),
             };
         }
 
@@ -487,7 +491,9 @@ impl GpuScene {
                 geometry_buffer_slices[crt_geometry_idx + submesh_idx] = shader::Geometry {
                     position_buffer: geometry.vertex_buffer.device_address(),
                     index_buffer: geometry.index_buffer.device_address(),
-                    ..Default::default()
+
+                    normal_buffer: vk::DeviceAddress::default(), // TODO 暂时无用
+                    uv_buffer: vk::DeviceAddress::default(),     // TODO 暂时无用
                 };
             }
             crt_geometry_idx += mesh.geometries.len();

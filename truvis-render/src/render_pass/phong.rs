@@ -99,7 +99,12 @@ impl PhongPass {
             &shader::PushConstants {
                 frame_data: per_frame_data.device_address(),
                 scene: gpu_scene.scene_device_address(frame_label),
-                ..Default::default()
+
+                submesh_idx: 0,  // 这个值在 draw 时会被更新
+                instance_idx: 0, // 这个值在 draw 时会被更新
+
+                _padding_1: Default::default(),
+                _padding_2: Default::default(),
             },
             frame_label,
         );

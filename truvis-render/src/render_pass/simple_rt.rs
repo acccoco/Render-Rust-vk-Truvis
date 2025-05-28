@@ -334,7 +334,12 @@ impl SimlpeRtPass {
         let push_constant = shader::PushConstants {
             frame_data: per_frame_data.device_address(),
             scene: gpu_scene.scene_device_address(frame_label),
-            ..Default::default()
+
+            instance_idx: 0, // RT 不需要这个
+            submesh_idx: 0,  // RT 不需要这个
+
+            _padding_1: Default::default(),
+            _padding_2: Default::default(),
         };
         cmd.cmd_push_constants(
             self.pipeline.pipeline_layout,
