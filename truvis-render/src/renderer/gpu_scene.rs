@@ -313,7 +313,7 @@ impl GpuScene {
             spot_lights: 0, // TODO 暂时无用
             point_light_count: scene_mgr.point_light_map().len() as u32,
             spot_light_count: 0, // TODO 暂时无用
-            tlas: crt_gpu_buffers.tlas.as_ref().unwrap().get_device_address(),
+            tlas: crt_gpu_buffers.tlas.as_ref().map_or(vk::DeviceAddress::default(), |tlas| tlas.get_device_address()),
 
             _padding_0: 0,
             _padding_1: 0,
