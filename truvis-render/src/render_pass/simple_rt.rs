@@ -329,7 +329,7 @@ impl SimlpeRtPass {
             self.pipeline.pipeline_layout,
             0,
             &[self._bindless_mgr.borrow().bindless_sets[frame_label].handle()],
-            &[],
+            None,
         );
         let push_constant = shader::PushConstants {
             frame_data: per_frame_data.device_address(),

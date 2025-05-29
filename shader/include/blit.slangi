@@ -1,9 +1,15 @@
 #pragma once
+#include "bindless.slangi"
+#include "common.slangi"
 
+namespace blit
+{
+struct PushConstant
+{
+    ImageHandle src_image; // rt render
+    ImageHandle dst_image; // final image to present
 
-namespace blit {
-    /// blit shader 的参数
-    struct PushConstant {
-        
-    };
+    uint2 src_image_size;
+    uint2 offset;
+};
 };

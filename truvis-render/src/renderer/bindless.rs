@@ -16,14 +16,14 @@ use truvis_rhi::shader_cursor::ShaderCursor;
 pub struct BindlessTextureBindings {
     #[binding = 0]
     #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
-    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR"]
+    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | COMPUTE"]
     #[count = 128]
     #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
     _textures: (),
 
     #[binding = 1]
     #[descriptor_type = "STORAGE_IMAGE"]
-    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR"]
+    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | COMPUTE"]
     #[count = 128]
     #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
     _images: (),
@@ -48,6 +48,9 @@ pub struct BindlessManager {
     images: HashMap<String, Rc<RhiImage2DView>>,
 
     device: Rc<RhiDevice>,
+
+    /// 当前 frame in flight 的标签，每帧更新
+    frame_label: usize,
 }
 impl BindlessManager {
     pub fn new(rhi: &Rhi, frames_in_flight: usize) -> Self {
@@ -78,11 +81,21 @@ impl BindlessManager {
             images: HashMap::new(),
 
             device: rhi.device.clone(),
+
+            frame_label: 0,
         }
+    }
+
+    /// getter
+    #[inline]
+    pub fn current_descriptor_set(&self) -> &RhiDescriptorSet<BindlessTextureBindings> {
+        &self.bindless_sets[self.frame_label]
     }
 
     /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
     pub fn prepare_render_data(&mut self, frame_idx: usize) {
+        self.frame_label = frame_idx;
+
         let mut texture_infos = Vec::with_capacity(self.textures.iter().len());
         self.texture_map.clear();
         for (tex_idx, (tex_name, tex)) in self.textures.iter().enumerate() {

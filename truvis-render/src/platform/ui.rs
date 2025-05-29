@@ -659,7 +659,7 @@ impl Gui {
                                 self.pipeline_layout,
                                 0,
                                 &[self.get_texture(texture_id)],
-                                &[],
+                                None,
                             );
                             last_texture_id = Some(texture_id);
                         }

@@ -11,26 +11,34 @@ RWTexture2D<float4> bindless_images[];
 
 #endif
 
-
-struct TextureHandle {
-    int index; 
+struct TextureHandle
+{
+    int index;
 
 #ifdef __SLANG__
     [ForceInline]
-    float4 sample(float2 uv) {
+    float4 sample(float2 uv)
+    {
         return bindless_textures[index].Sample(uv);
     }
 #endif
 };
 
-
-struct ImageHandle {
+struct ImageHandle
+{
     int index; // 纹理的索引
 
 #ifdef __SLANG__
     [ForceInline]
-    void store(uint2 coord, float4 value) {
+    void store(uint2 coord, float4 value)
+    {
         bindless_images[index].Store(coord, value);
+    }
+
+    [ForceInline]
+    float4 load(uint2 coord)
+    {
+        return bindless_images[index].Load(coord);
     }
 #endif
 };

@@ -223,7 +223,7 @@ impl RhiCommandBuffer {
         pipeline_layout: vk::PipelineLayout,
         first_set: u32,
         descriptor_sets: &[vk::DescriptorSet],
-        dynamic_offsets: &[u32],
+        dynamic_offsets: Option<&[u32]>,
     ) {
         unsafe {
             self.device.cmd_bind_descriptor_sets(
@@ -232,7 +232,7 @@ impl RhiCommandBuffer {
                 pipeline_layout,
                 first_set,
                 descriptor_sets,
-                dynamic_offsets,
+                dynamic_offsets.unwrap_or(&[]),
             );
         }
     }
@@ -395,6 +395,16 @@ impl RhiCommandBuffer {
                 thread_size[1],
                 thread_size[2],
             );
+        }
+    }
+}
+
+// 计算着色器相关命令
+impl RhiCommandBuffer {
+    #[inline]
+    pub fn cmd_dispatch(&self, group_cnt: glam::UVec3) {
+        unsafe {
+            self.device.cmd_dispatch(self.handle, group_cnt.x, group_cnt.y, group_cnt.z);
         }
     }
 }

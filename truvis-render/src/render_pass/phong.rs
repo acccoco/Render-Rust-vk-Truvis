@@ -77,7 +77,7 @@ impl PhongPass {
             self.pipeline.layout(),
             0,
             &[self.bindless_manager.borrow().bindless_sets[frame_idx].handle()],
-            &[],
+            None,
         );
     }
 
