@@ -2,8 +2,8 @@
 
 #ifndef PTR 
     #ifdef __SLANG__
-        #define PTR(T) T *
+        #define PTR(T, ident) T* ident
     #else
-        #define PTR(T) uint64_t
+        #define PTR(T, ident) uint64_t ident
     #endif 
 #endif 

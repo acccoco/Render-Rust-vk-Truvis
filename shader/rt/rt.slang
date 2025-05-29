@@ -43,12 +43,16 @@ void main_closest_hit(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     Scene *scene = push_const.scene;
 
     const uint instance_id = InstanceIndex();
-    const int geometry_id = GeometryIndex();
+    const uint geometry_id = GeometryIndex();
+    const uint primitive_id = PrimitiveIndex();
 
     PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
+    Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
+    const Vertex hit_pos = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
 
-    // mat.diffuse_map.sample()
-    payload.color = float4((instance_id % 13) / 13.0, (instance_id % 17) / 17.0, (instance_id % 23) / 23.0, 1.0f);
+    const float4 color = mat.diffuse_map.sample(hit_pos.uv);
+    // payload.color = float4((instance_id % 13) / 13.0, (instance_id % 17) / 17.0, (instance_id % 23) / 23.0, 1.0f);
+    payload.color = color;
 }
 
 [shader("miss")]
