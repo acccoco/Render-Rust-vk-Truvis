@@ -133,12 +133,11 @@ impl<T: OuterApp> TruvisApp<T> {
         {
             self.outer_app.get_mut().unwrap().update(&mut self.renderer);
 
-            self.renderer.update_gpu_scene(
+            self.renderer.before_render(
                 &self.input_manager.borrow().state,
                 &self.timer,
                 self.camera_controller.camera(),
             );
-            self.renderer.before_render();
             self.outer_app.get_mut().unwrap().draw(&mut self.renderer, &self.timer);
             self.renderer.after_render();
 
@@ -156,6 +155,7 @@ impl<T: OuterApp> TruvisApp<T> {
         }
         self.renderer.after_frame();
     }
+
     pub fn rebuild(&mut self, width: u32, height: u32) {
         self.renderer.wait_idle();
 

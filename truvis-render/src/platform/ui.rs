@@ -8,7 +8,7 @@ use std::mem::offset_of;
 use std::{cell::RefCell, rc::Rc};
 use truvis_rhi::core::descriptor::RhiDescriptorSetLayout;
 use truvis_rhi::core::device::RhiDevice;
-use truvis_rhi::core::swapchain::RhiSwapchain;
+use crate::renderer::swapchain::RhiSwapchain;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::shader_cursor::ShaderCursor;
 use truvis_rhi::{

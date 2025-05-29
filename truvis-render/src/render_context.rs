@@ -4,7 +4,7 @@ use itertools::Itertools;
 use shader_binding::shader;
 use std::rc::Rc;
 use truvis_rhi::{
-    basic::{color::LabelColor, FRAME_ID_MAP},
+    basic::color::LabelColor,
     core::{
         command_buffer::RhiCommandBuffer,
         command_pool::RhiCommandPool,
@@ -16,9 +16,13 @@ use truvis_rhi::{
     rhi::Rhi,
 };
 
+/// frames in flight name
+pub const FRAME_ID_MAP: [char; 4] = ['A', 'B', 'C', 'D'];
+
 #[derive(Debug, Clone, Copy)]
 pub struct FrameSettings {
     pub extent: vk::Extent2D,
+    pub rt_rect: vk::Rect2D,
     pub color_format: vk::Format,
     pub depth_format: vk::Format,
     pub frames_in_flight: usize,
@@ -80,7 +84,7 @@ impl RenderContext {
         let (rt_images, rt_image_views) = Self::create_rt_images(
             rhi,
             frame_settings.color_format,
-            frame_settings.extent,
+            frame_settings.rt_rect.extent,
             frame_settings.frames_in_flight,
         );
         let mut rt_keywords = Vec::with_capacity(frame_settings.frames_in_flight);
@@ -163,10 +167,11 @@ impl RenderContext {
         (depth_image, Rc::new(depth_image_view))
     }
 
+    /// rt_extent: 表示的是 rt 渲染的分辨率，并不是最终 framebuffer 的分辨率
     fn create_rt_images(
         rhi: &Rhi,
         color_format: vk::Format,
-        extent: vk::Extent2D,
+        rt_extent: vk::Extent2D,
         frames_in_flight: usize,
     ) -> (Vec<Rc<RhiImage2D>>, Vec<Rc<RhiImage2DView>>) {
         let rt_images = (0..frames_in_flight)
@@ -174,7 +179,7 @@ impl RenderContext {
                 RhiImage2D::new(
                     rhi,
                     Rc::new(RhiImageCreateInfo::new_image_2d_info(
-                        extent,
+                        rt_extent,
                         color_format,
                         vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED,
                     )),
@@ -285,8 +290,13 @@ impl RenderContext {
     }
 
     #[inline]
-    pub fn current_rt_render_target(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
+    pub fn current_rt_bindless_handle(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
         bindless_manager.get_image_idx(&self._rt_keywords[self.frame_label]).unwrap()
+    }
+
+    #[inline]
+    pub fn current_rt_image(&self) -> &RhiImage2D {
+        &self._rt_images[self.frame_label]
     }
 }
 impl RenderContext {

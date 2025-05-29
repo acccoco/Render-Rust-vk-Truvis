@@ -2,16 +2,17 @@ use crate::platform::camera::TruCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
 use crate::render_context::{FrameSettings, RenderContext};
+use crate::render_pass::compute::ComputePass;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::TheWorld;
+use crate::renderer::swapchain::RhiSwapchain;
 use ash::vk;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::ffi::CStr;
 use std::rc::Rc;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
-use truvis_rhi::core::swapchain::RhiSwapchain;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 use truvis_rhi::{
     basic::color::LabelColor,
@@ -52,6 +53,8 @@ pub struct Renderer {
     pub scene_mgr: Rc<RefCell<TheWorld>>,
     pub gpu_scene: GpuScene,
     pub per_frame_data_buffers: Vec<RhiStructuredBuffer<shader::PerFrameData>>,
+
+    blit_pass: ComputePass<shader::blit::PushConstant>,
 }
 impl Drop for Renderer {
     fn drop(&mut self) {
@@ -61,6 +64,9 @@ impl Drop for Renderer {
 
         if let Some(render_context) = self.render_context.take() {
             render_context.destroy(&mut self.bindless_mgr.borrow_mut());
+        }
+        if let Some(render_swapchain) = self.render_swapchain.take() {
+            render_swapchain.destroy(&mut self.bindless_mgr.borrow_mut());
         }
     }
 }
@@ -85,6 +91,21 @@ impl Renderer {
     pub fn crt_frame_label(&self) -> usize {
         self.render_context.as_ref().unwrap().current_frame_label()
     }
+
+    #[inline]
+    pub fn render_context_mut(&mut self) -> &mut RenderContext {
+        self.render_context.as_mut().unwrap()
+    }
+
+    #[inline]
+    pub fn render_context(&self) -> &RenderContext {
+        self.render_context.as_ref().unwrap()
+    }
+
+    #[inline]
+    pub fn swapchain(&self) -> &RhiSwapchain {
+        self.render_swapchain.as_ref().unwrap()
+    }
 }
 impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
@@ -99,13 +120,22 @@ impl Renderer {
             })
             .collect();
 
+        let blit_pass = ComputePass::<shader::blit::PushConstant>::new(
+            &rhi,
+            &bindless_mgr.borrow(),
+            cstr::cstr!("main"),
+            "shader/build/imgui/blit.slang.spv",
+        );
+
         Self {
             frame_settings: FrameSettings {
                 frames_in_flight: FRAMES_IN_FLIGHT,
                 extent: vk::Extent2D::default(),
+                rt_rect: vk::Rect2D::default(),
                 color_format: DEFAULT_SURFACE_FORMAT.format,
                 depth_format: Self::get_depth_format(&rhi),
             },
+            blit_pass,
             render_context: None,
             render_swapchain: None,
             rhi,
@@ -186,7 +216,9 @@ impl Renderer {
         render_context.end_frame();
     }
 
-    pub fn before_render(&mut self) {
+    pub fn before_render(&mut self, input_state: &InputState, timer: &Timer, camera: &TruCamera) {
+        self.update_gpu_scene(input_state, timer, camera);
+
         // main pass
         self.rhi.device.debug_utils().begin_queue_label(
             self.rhi.graphics_queue.handle(),
@@ -197,6 +229,9 @@ impl Renderer {
 
     pub fn after_render(&mut self) {
         self.rhi.device.debug_utils().end_queue_label(self.rhi.graphics_queue.handle());
+
+        // blit
+        self.blit();
     }
 
     pub fn wait_idle(&self) {
@@ -212,17 +247,34 @@ impl Renderer {
         if let Some(render_context) = self.render_context.take() {
             render_context.destroy(&mut self.bindless_mgr.borrow_mut());
         }
-        self.render_swapchain = None;
+        if let Some(render_swapchain) = self.render_swapchain.take() {
+            render_swapchain.destroy(&mut self.bindless_mgr.borrow_mut());
+        }
 
-        self.render_swapchain =
-            Some(RhiSwapchain::new(&self.rhi, window, DEFAULT_PRESENT_MODE, DEFAULT_SURFACE_FORMAT));
+        self.render_swapchain = Some(RhiSwapchain::new(
+            &self.rhi,
+            window,
+            DEFAULT_PRESENT_MODE,
+            DEFAULT_SURFACE_FORMAT,
+            &mut self.bindless_mgr.borrow_mut(),
+        ));
 
         self.frame_settings.extent = self.swapchain_extent();
+        self.frame_settings.rt_rect = vk::Rect2D {
+            offset: vk::Offset2D {
+                x: self.swapchain_extent().width as i32 / 2 - 2,
+                y: self.swapchain_extent().height as i32 / 2 - 1,
+            },
+            extent: vk::Extent2D {
+                width: self.swapchain_extent().width / 2,
+                height: self.swapchain_extent().height / 2,
+            },
+        };
         self.render_context =
             Some(RenderContext::new(&self.rhi, self.frame_settings, &mut self.bindless_mgr.borrow_mut()));
     }
 
-    pub fn update_gpu_scene(&mut self, input_state: &InputState, timer: &Timer, camera: &TruCamera) {
+    fn update_gpu_scene(&mut self, input_state: &InputState, timer: &Timer, camera: &TruCamera) {
         let render_context = self.render_context.as_mut().unwrap();
         let render_swapchain = self.render_swapchain.as_mut().unwrap();
 
@@ -270,7 +322,7 @@ impl Renderer {
                     x: extent.width as f32,
                     y: extent.height as f32,
                 },
-                rt_render_target: render_context.current_rt_render_target(&self.bindless_mgr.borrow()),
+                rt_render_target: render_context.current_rt_bindless_handle(&self.bindless_mgr.borrow()),
 
                 _padding_1: Default::default(),
             }
@@ -288,5 +340,69 @@ impl Renderer {
         );
         cmd.end();
         render_context.graphics_queue().submit(vec![RhiSubmitInfo::new(std::slice::from_ref(&cmd))], None);
+    }
+
+    /// 将光追渲染的内容 blit 到 framebuffer 上面
+    fn blit(&mut self) {
+        let cmd = self.render_context_mut().alloc_command_buffer("blit");
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit-pass");
+        {
+            cmd.image_memory_barrier(
+                vk::DependencyFlags::empty(),
+                &[
+                    RhiImageBarrier::new()
+                        .image(self.swapchain().current_present_image())
+                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                        .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
+                        .src_mask(
+                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                        )
+                        .dst_mask(vk::PipelineStageFlags2::COMPUTE_SHADER, vk::AccessFlags2::SHADER_WRITE),
+                    RhiImageBarrier::new()
+                        .image(self.render_context().current_rt_image().handle())
+                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                        .src_mask(
+                            vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+                            vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                        )
+                        .dst_mask(vk::PipelineStageFlags2::COMPUTE_SHADER, vk::AccessFlags2::SHADER_READ),
+                ],
+            );
+
+            let rt_image_extent = self.frame_settings.rt_rect.extent;
+            let rt_image_offset = self.frame_settings.rt_rect.offset;
+            self.blit_pass.exec(
+                &cmd,
+                &self.bindless_mgr.borrow(),
+                &shader::blit::PushConstant {
+                    src_image: self.render_context().current_rt_bindless_handle(&self.bindless_mgr.borrow()),
+                    dst_image: self.swapchain().current_present_bindless_handle(&self.bindless_mgr.borrow()),
+                    src_image_size: glam::uvec2(rt_image_extent.width, rt_image_extent.height).into(),
+                    offset: glam::uvec2(rt_image_offset.x as u32, rt_image_offset.y as u32).into(),
+                },
+                glam::uvec3(
+                    rt_image_extent.width.div_ceil(shader::blit::SHADER_X as u32),
+                    rt_image_extent.height.div_ceil(shader::blit::SHADER_Y as u32),
+                    1,
+                ),
+            );
+
+            cmd.image_memory_barrier(
+                vk::DependencyFlags::empty(),
+                &[RhiImageBarrier::new()
+                    .image(self.swapchain().current_present_image())
+                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    .layout_transfer(vk::ImageLayout::GENERAL, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .src_mask(vk::PipelineStageFlags2::COMPUTE_SHADER, vk::AccessFlags2::SHADER_WRITE)
+                    .dst_mask(
+                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                        vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                    )],
+            );
+        }
+        cmd.end();
+
+        self.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 }

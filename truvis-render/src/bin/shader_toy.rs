@@ -10,7 +10,7 @@ use truvis_render::render::Renderer;
 use truvis_render::render_context::{FrameSettings, RenderContext};
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_rhi::core::graphics_pipeline::RhiGraphicsPipelineCreateInfo;
-use truvis_rhi::core::swapchain::RhiSwapchain;
+use truvis_render::renderer::swapchain::RhiSwapchain;
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, graphics_pipeline::RhiGraphicsPipeline},
     rhi::Rhi,

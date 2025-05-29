@@ -5,7 +5,6 @@ use shader_binding::shader;
 use truvis_render::app::{OuterApp, TruvisApp};
 use truvis_render::platform::timer::Timer;
 use truvis_render::render::Renderer;
-use truvis_render::render_pass::compute::ComputePass;
 use truvis_render::render_pass::phong::PhongPass;
 use truvis_render::render_pass::simple_rt::SimlpeRtPass;
 use truvis_render::renderer::framebuffer::FrameBuffer;
@@ -14,7 +13,6 @@ use truvis_rhi::core::command_queue::RhiSubmitInfo;
 struct PhongApp {
     phong_pass: PhongPass,
     rt_pass: SimlpeRtPass,
-    blit: ComputePass<shader::blit::PushConstant>,
 }
 
 impl PhongApp {}
@@ -23,12 +21,6 @@ impl OuterApp for PhongApp {
     fn init(renderer: &mut Renderer) -> Self {
         let rt_pass = SimlpeRtPass::new(&renderer.rhi, renderer.bindless_mgr.clone());
         let phong_pass = PhongPass::new(&renderer.rhi, &renderer.frame_settings(), renderer.bindless_mgr.clone());
-        let blit = ComputePass::<shader::blit::PushConstant>::new(
-            &renderer.rhi,
-            &renderer.bindless_mgr.borrow(),
-            cstr::cstr!("main"),
-            "shader/build/imgui/blit.slang.spv",
-        );
 
         // 注册默认贴图
         renderer.bindless_mgr.borrow_mut().register_texture(&renderer.rhi, "assets/uv_checker.png".to_string());
@@ -89,11 +81,7 @@ impl OuterApp for PhongApp {
             glam::Mat4::from_translation(glam::vec3(0.0, -10.0, 0.0)) * rot,
         ];
 
-        Self {
-            phong_pass,
-            rt_pass,
-            blit,
-        }
+        Self { phong_pass, rt_pass }
     }
 
     fn draw_ui(&mut self, ui: &mut Ui) {

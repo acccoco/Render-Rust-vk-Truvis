@@ -1,7 +1,9 @@
 use crate::renderer::bindless::BindlessManager;
 use ash::vk;
 use std::ffi::CStr;
+use std::rc::Rc;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
+use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::core::shader::RhiShaderModule;
 use truvis_rhi::rhi::Rhi;
 
@@ -11,8 +13,9 @@ pub struct ComputePass<P: bytemuck::Pod> {
     pipeline_layout: vk::PipelineLayout,
 
     _phantom: std::marker::PhantomData<P>,
-}
 
+    device: Rc<RhiDevice>,
+}
 impl<P: bytemuck::Pod> ComputePass<P> {
     pub fn new(rhi: &Rhi, bindless_mgr: &BindlessManager, entry_point: &CStr, shader_path: &str) -> Self {
         let shader_module = RhiShaderModule::new(rhi.device.clone(), std::path::Path::new(shader_path));
@@ -42,11 +45,14 @@ impl<P: bytemuck::Pod> ComputePass<P> {
                 .unwrap()[0]
         };
 
+        shader_module.destroy();
+
         Self {
             pipeline,
             pipeline_layout,
 
             _phantom: std::marker::PhantomData,
+            device: rhi.device.clone(),
         }
     }
 
@@ -64,5 +70,13 @@ impl<P: bytemuck::Pod> ComputePass<P> {
 
         // 执行计算
         cmd.cmd_dispatch(group_cnt);
+    }
+}
+impl<P: bytemuck::Pod> Drop for ComputePass<P> {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.destroy_pipeline(self.pipeline, None);
+            self.device.destroy_pipeline_layout(self.pipeline_layout, None);
+        }
     }
 }

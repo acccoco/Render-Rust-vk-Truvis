@@ -4,10 +4,16 @@
 
 namespace blit
 {
+
+static const int SHADER_X = 8;
+static const int SHADER_Y = 8;
+
 struct PushConstant
 {
-    ImageHandle src_image; // rt render
-    ImageHandle dst_image; // final image to present
+    /// rt render
+    ImageHandle src_image;
+    /// final image to present
+    ImageHandle dst_image;
 
     uint2 src_image_size;
     uint2 offset;

@@ -4,7 +4,7 @@
 blit::PushConstant gParams;
 
 [shader("compute")]
-[numthreads(8, 8, 1)]
+[numthreads(blit::SHADER_X, blit::SHADER_Y, 1)]
 void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     if (dispatchThreadID.x > gParams.src_image_size.x ||
