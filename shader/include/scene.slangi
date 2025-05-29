@@ -1,10 +1,10 @@
 #pragma once
+#include "bindless.slangi"
 #include "common.slangi"
 #include "light.slangi"
-#include "bindless.slangi"
 
-
-struct Instance {
+struct Instance
+{
     uint geometry_indirect_idx;
     uint geometry_count;
     uint material_indirect_idx;
@@ -14,13 +14,27 @@ struct Instance {
     float4x4 inv_model;
 };
 
+struct Vertex
+{
+    float position[3];
+    float normal[3];
+    float tangent[3];
+    float bitangent[3];
+    float uv[2];
+};
 
-struct Geometry {
-    PTR(float3) position_buffer;
-    PTR(uint) index_buffer;
+struct Geometry
+{
+    /// 这个字段就是 vertex buffer
+    PTR(Vertex)
+    position_buffer;
+    PTR(uint)
+    index_buffer;
 
-    PTR(float3) normal_buffer;
-    PTR(float2) uv_buffer;
+    PTR(float3)
+    normal_buffer;
+    PTR(float2)
+    uv_buffer;
 };
 
 struct PBRMaterial
@@ -37,19 +51,27 @@ struct PBRMaterial
     uint _padding_2;
 };
 
+struct Scene
+{
+    PTR(PBRMaterial)
+    all_mats;
+    PTR(Geometry)
+    all_geometries;
 
-struct Scene {
-    PTR(PBRMaterial) all_mats;
-    PTR(Geometry) all_geometries;
+    PTR(uint)
+    instance_material_map;
+    PTR(uint)
+    instance_geometry_map;
 
-    PTR(uint) instance_material_map;
-    PTR(uint) instance_geometry_map;
+    PTR(PointLight)
+    point_lights;
+    PTR(SpotLight)
+    spot_lights;
 
-    PTR(PointLight) point_lights;
-    PTR(SpotLight) spot_lights;
-
-    PTR(Instance) all_instances;
-    PTR(RaytracingAccelerationStructure) tlas;
+    PTR(Instance)
+    all_instances;
+    PTR(RaytracingAccelerationStructure)
+    tlas;
 
     uint point_light_count;
     uint spot_light_count;
@@ -58,27 +80,36 @@ struct Scene {
 
 #ifdef __SLANG__
     /// 根据 instance idx 和 submesh idx 获取 geometry
-    PTR(Geometry) get_geometry(uint instance_idx, uint submesh_idx)  {
-        PTR(Instance) instance = all_instances + instance_idx;
+    PTR(Geometry)
+    get_geometry(uint instance_idx, uint submesh_idx)
+    {
+        PTR(Instance)
+        instance = all_instances + instance_idx;
         uint geometry_map_idx = instance->geometry_indirect_idx + submesh_idx;
         uint geometry_idx = instance_geometry_map[geometry_map_idx];
-        PTR(Geometry) geometry = all_geometries + geometry_idx;
+        PTR(Geometry)
+        geometry = all_geometries + geometry_idx;
         return geometry;
     }
 
     /// 根据 instance idx 和 submesh idx 获取 material
-    PTR(PBRMaterial) get_material(uint instance_idx, uint submesh_idx)  {
-        PTR(Instance) instance = all_instances + instance_idx;
+    PTR(PBRMaterial)
+    get_material(uint instance_idx, uint submesh_idx)
+    {
+        PTR(Instance)
+        instance = all_instances + instance_idx;
         uint material_map_idx = instance->material_indirect_idx + submesh_idx;
         uint material_idx = instance_material_map[material_map_idx];
-        PTR(PBRMaterial) material = all_mats + material_idx;
+        PTR(PBRMaterial)
+        material = all_mats + material_idx;
         return material;
     }
 #endif
 };
 
 /// 渲染需要的一些公用参数，每帧更新
-struct PerFrameData {
+struct PerFrameData
+{
     float4x4 projection;
     float4x4 view;
     float4x4 inv_view;
@@ -98,9 +129,12 @@ struct PerFrameData {
     uint _padding_1;
 };
 
-struct PushConstants {
-    PTR(PerFrameData) frame_data;
-    PTR(Scene) scene;
+struct PushConstants
+{
+    PTR(PerFrameData)
+    frame_data;
+    PTR(Scene)
+    scene;
 
     /// raster only
     uint instance_idx;

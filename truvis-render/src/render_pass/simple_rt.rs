@@ -319,7 +319,6 @@ impl SimlpeRtPass {
         gpu_scene: &GpuScene,
     ) {
         let frame_label = render_ctx.current_frame_label();
-        let frame_extent = framse_settings.extent;
 
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
@@ -353,7 +352,11 @@ impl SimlpeRtPass {
             &self._sbt.sbt_region_miss,
             &self._sbt.sbt_region_hit,
             &self._sbt.sbt_region_callable,
-            [frame_extent.width, frame_extent.height, 1],
+            [
+                framse_settings.rt_rect.extent.width,
+                framse_settings.rt_rect.extent.height,
+                1,
+            ],
         );
 
         cmd.end_label();
