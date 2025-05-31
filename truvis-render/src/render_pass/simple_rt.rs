@@ -46,7 +46,7 @@ create_named_array!(
             Miss,
             RhiShaderStageInfo {
                 stage: vk::ShaderStageFlags::MISS_KHR,
-                entry_point: cstr::cstr!("main_miss"),
+                entry_point: cstr::cstr!("sky_miss"),
                 path: "shader/build/rt/rt.slang.spv",
             }
         ),
