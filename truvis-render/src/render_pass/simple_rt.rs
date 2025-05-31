@@ -67,10 +67,10 @@ create_named_array!(
             }
         ),
         (
-            ClosestHit2,
+            TransAny,
             RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                entry_point: cstr::cstr!("trans_closest_hit"),
+                stage: vk::ShaderStageFlags::ANY_HIT_KHR,
+                entry_point: cstr::cstr!("trans_any"),
                 path: "shader/build/rt/rt.slang.spv",
             }
         ),
@@ -111,17 +111,10 @@ create_named_array!(
             ShaderGroupInfo {
                 ty: vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
                 closest_hit: ShaderStage::ClosestHit.index() as u32,
+                any_hit: ShaderStage::TransAny.index() as u32,
                 ..ShaderGroupInfo::unused()
             }
         ),
-        (
-            Hit2,
-            ShaderGroupInfo {
-                ty: vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
-                closest_hit: ShaderStage::ClosestHit2.index() as u32,
-                ..ShaderGroupInfo::unused()
-            }
-        )
     ]
 );
 
@@ -139,7 +132,7 @@ pub struct SBTRegions {
 impl SBTRegions {
     const RAYGEN_SBT_REGION: usize = ShaderGroups::RayGen.index();
     const MISS_SBT_REGION: &'static [usize] = &[ShaderGroups::SkyMiss.index(), ShaderGroups::ShadowMiss.index()];
-    const HIT_SBT_REGION: &'static [usize] = &[ShaderGroups::Hit.index(), ShaderGroups::Hit2.index()];
+    const HIT_SBT_REGION: &'static [usize] = &[ShaderGroups::Hit.index()];
 
     pub fn create_sbt(rhi: &Rhi, pipeline: &RhiRtPipeline) -> Self {
         let rt_pipeline_props = rhi.device.rt_pipeline_props();
@@ -295,6 +288,7 @@ impl SimlpeRtPass {
             .stage_flags(
                 vk::ShaderStageFlags::RAYGEN_KHR
                     | vk::ShaderStageFlags::MISS_KHR
+                    | vk::ShaderStageFlags::ANY_HIT_KHR
                     | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
             )
             .offset(0)
@@ -315,7 +309,7 @@ impl SimlpeRtPass {
             .groups(&shader_groups)
             .layout(pipeline_layout)
             // TODO fixme
-            .max_pipeline_ray_recursion_depth(2);
+            .max_pipeline_ray_recursion_depth(6);
 
         let pipeline = unsafe {
             rhi.device
@@ -377,7 +371,10 @@ impl SimlpeRtPass {
         };
         cmd.cmd_push_constants(
             self.pipeline.pipeline_layout,
-            vk::ShaderStageFlags::RAYGEN_KHR | vk::ShaderStageFlags::MISS_KHR | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+            vk::ShaderStageFlags::RAYGEN_KHR
+                | vk::ShaderStageFlags::MISS_KHR
+                | vk::ShaderStageFlags::ANY_HIT_KHR
+                | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
             0,
             bytemuck::bytes_of(&push_constant),
         );

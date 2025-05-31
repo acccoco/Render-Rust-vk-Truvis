@@ -65,7 +65,7 @@ impl DrsGeometry3D {
                 .geometry_type(vk::GeometryTypeKHR::TRIANGLES)
                 // OPAQUE 表示永远不会调用 anyhit shader
                 // NO_DUPLICATE 表示 primitive 只会被 any hit shader 命中一次
-                .flags(vk::GeometryFlagsKHR::OPAQUE)
+                .flags(vk::GeometryFlagsKHR::NO_DUPLICATE_ANY_HIT_INVOCATION)
                 .geometry(vk::AccelerationStructureGeometryDataKHR {
                     triangles: geometry_triangle,
                 }),

@@ -1,12 +1,15 @@
 #include "scene.slangi"
 
+/// 太幽默了哥，为啥我需要手动限制最大递归深度啊，pipeline 里面的设置算啥？
+const static uint max_depth = 4;
+
 [[vk::push_constant]]
 PushConstants push_const;
 
-struct SkyMissPayload
+struct MainPayload
 {
     float4 color;
-    uint depth;
+    int depth;
 };
 
 struct ShadowMissPayload
@@ -32,67 +35,29 @@ void main_ray_gen()
     ray.TMin = 0.001f;
     ray.TMax = 10000.0f;
 
-    SkyMissPayload payload = {};
+    MainPayload payload = {};
     payload.color = float4(0.0f, 0.0f, 0.0f, 1.0f); // 初始化颜色
-    payload.depth = 0;
+    payload.depth = max_depth;
 
     Scene *scene = push_const.scene;
     RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
 
-    TraceRay(tlas_, RAY_FLAG_FORCE_OPAQUE, 0xFF, //
-             1,                                  // sbt record offset
-             0,                                  // sbt record stride
-             0,                                  // sky miss shader
+    TraceRay(tlas_, RAY_FLAG_NONE, 0xFF, //
+             0,                          // sbt record offset
+             0,                          // sbt record stride
+             0,                          // sky miss shader
              ray, payload);
 
     frame_data.rt_render_target.store(thread_id, payload.color);
 }
 
-static const float3 directional_light = normalize(float3(0.577f, -0.577f, -0.577f)); // 方向光
+static const float3 directional_light = normalize(float3(0.1f, -0.98995f, -0.1f)); // 方向光
 
 [shader("closesthit")]
-void trans_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+void main_closest_hit(inout MainPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    payload.depth += 1;
-    PerFrameData *frame_data = push_const.frame_data;
-    Scene *scene = push_const.scene;
+    payload.depth--;
 
-    const uint instance_id = InstanceIndex();
-    const uint geometry_id = GeometryIndex();
-    const uint primitive_id = PrimitiveIndex();
-
-    PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
-    Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
-    const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
-    const float3 world_pos = mul(ObjectToWorld3x4(), float4(interp_vertex.position, 1.f));
-    const float3 world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
-
-    // 当前命中位置 diffuse 颜色
-    const float4 tex_color = mat.diffuse_map.sample(interp_vertex.uv);
-    if (tex_color.w == 0.f && payload.depth < 4)
-    {
-        RayDesc ray;
-        ray.Origin = world_pos + WorldRayDirection() * 0.001f; // 偏移一点，避免自交
-        ray.Direction = WorldRayDirection();
-        ray.TMin = 0.001f;
-        ray.TMax = 10000.0f;
-        RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
-
-        TraceRay(tlas_, RAY_FLAG_FORCE_OPAQUE, 0xFF, //
-                 1,                                  // sbt record offset
-                 0,                                  // sbt record stride
-                 1,                                  // miss hit shader
-                 ray, payload);
-    }
-    else
-    {
-        payload.color = float4(tex_color.xyz, tex_color.w);
-    }
-}
-
-[shader("closesthit")]
-void main_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersectionAttributes attr)
-{
     PerFrameData *frame_data = push_const.frame_data;
     Scene *scene = push_const.scene;
 
@@ -114,7 +79,7 @@ void main_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersecti
     {
         attenuation = 0.3f;
     }
-    else
+    else if (payload.depth > 0)
     {
         RayDesc ray;
         ray.Origin = world_pos - directional_light * 0.001f; // 偏移一点，避免自交
@@ -137,17 +102,37 @@ void main_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersecti
         }
     }
 
-    payload.color = float4(tex_color.xyz * attenuation, tex_color.w);
+    payload.color = float4(tex_color.xyz * attenuation, 1.0);
 }
 
-[shader("closesthit")]
-void closest_hit2(inout SkyMissPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+[shader("anyhit")]
+void trans_any(inout MainPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    payload.color = float4(1.0f, 0.0f, 0.0f, 1.0f); // 红色
+    PerFrameData *frame_data = push_const.frame_data;
+    Scene *scene = push_const.scene;
+
+    const uint instance_id = InstanceIndex();
+    const uint geometry_id = GeometryIndex();
+    const uint primitive_id = PrimitiveIndex();
+
+    PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
+    Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
+    const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
+
+    // 当前命中位置 diffuse 颜色
+    const float4 tex_color = mat.diffuse_map.sample(interp_vertex.uv);
+    if (tex_color.w == 0.f)
+    {
+        IgnoreHit();
+    }
+    else
+    {
+        return;
+    }
 }
 
 [shader("miss")]
-void sky_miss(inout SkyMissPayload payload)
+void sky_miss(inout MainPayload payload)
 {
     payload.color = float4(0.8f, 0.8f, 0.8f, 1.0f); // 蓝色背景
 }

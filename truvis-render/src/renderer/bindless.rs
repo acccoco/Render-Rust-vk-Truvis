@@ -16,14 +16,14 @@ use truvis_rhi::shader_cursor::ShaderCursor;
 pub struct BindlessTextureBindings {
     #[binding = 0]
     #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
-    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | COMPUTE"]
+    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | MISS_KHR | COMPUTE"]
     #[count = 128]
     #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
     _textures: (),
 
     #[binding = 1]
     #[descriptor_type = "STORAGE_IMAGE"]
-    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | COMPUTE"]
+    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | MISS_KHR | COMPUTE"]
     #[count = 128]
     #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
     _images: (),
