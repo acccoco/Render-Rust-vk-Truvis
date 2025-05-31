@@ -108,25 +108,28 @@ impl OuterApp for PhongApp {
             &depth_attach,
         );
 
-        let phong_cmd = render_context.alloc_command_buffer("[main-pass]render");
-        phong_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[phong-pass]draw");
         let per_frame_data_buffer = &renderer.per_frame_data_buffers[crt_frame_label];
-        self.phong_pass.draw(
-            &phong_cmd,
-            &render_info,
-            frame_settings.extent,
-            per_frame_data_buffer,
-            &renderer.gpu_scene,
-            crt_frame_label,
-        );
-        phong_cmd.end();
+
+        if false {
+            let phong_cmd = render_context.alloc_command_buffer("[main-pass]render");
+            phong_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[phong-pass]draw");
+            self.phong_pass.draw(
+                &phong_cmd,
+                &render_info,
+                frame_settings.extent,
+                per_frame_data_buffer,
+                &renderer.gpu_scene,
+                crt_frame_label,
+            );
+            phong_cmd.end();
+        }
 
         let rt_cmd = render_context.alloc_command_buffer("[rt-pass]ray-trace");
         rt_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[rt-pass]ray-trace");
         self.rt_pass.ray_trace(&rt_cmd, render_context, &frame_settings, per_frame_data_buffer, &renderer.gpu_scene);
         rt_cmd.end();
 
-        rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[phong_cmd, rt_cmd])], None);
+        rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[rt_cmd])], None);
     }
 }
 

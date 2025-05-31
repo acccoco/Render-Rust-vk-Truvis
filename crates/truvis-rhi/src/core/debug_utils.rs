@@ -32,14 +32,18 @@ unsafe extern "system" fn vk_debug_callback(
         unsafe { CStr::from_ptr(callback_data.p_message).to_string_lossy() }
     };
 
-    // 按照 | 切分 msg 字符串，并在中间插入换行符
-    // let msg = msg.split('|').collect::<Vec<&str>>().join("\n\t");
-    // let msg = msg.split(" ] ").collect::<Vec<&str>>().join(" ]\n\t ");
     let format_msg = format!("[{:?}]\n{}\n", message_type, msg);
+
+    // 这个看起来像个 bug
+    let skip_msg = "DebugTypePointer: expected operand Base Type is not a valid debug type";
 
     match message_severity {
         vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
-            log::error!("{}", format_msg);
+            if format_msg.contains(skip_msg) {
+                log::warn!("Skipping message: {}", skip_msg);
+            } else {
+                log::error!("{}", format_msg);
+            }
         }
         vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {
             log::warn!("{}", format_msg);

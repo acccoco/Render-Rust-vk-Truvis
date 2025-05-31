@@ -261,13 +261,10 @@ impl Renderer {
 
         self.frame_settings.extent = self.swapchain_extent();
         self.frame_settings.rt_rect = vk::Rect2D {
-            offset: vk::Offset2D {
-                x: self.swapchain_extent().width as i32 / 2 - 2,
-                y: self.swapchain_extent().height as i32 / 2 - 1,
-            },
+            offset: vk::Offset2D { x: 0, y: 0 },
             extent: vk::Extent2D {
-                width: self.swapchain_extent().width / 2,
-                height: self.swapchain_extent().height / 2,
+                width: self.swapchain_extent().width,
+                height: self.swapchain_extent().height,
             },
         };
         self.render_context =

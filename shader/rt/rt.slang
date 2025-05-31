@@ -3,9 +3,14 @@
 [[vk::push_constant]]
 PushConstants push_const;
 
-struct RayPayload
+struct SkyMissPayload
 {
     float4 color;
+};
+
+struct ShadowMissPayload
+{
+    bool miss;
 };
 
 [shader("raygeneration")]
@@ -26,7 +31,7 @@ void main_ray_gen()
     ray.TMin = 0.001f;
     ray.TMax = 10000.0f;
 
-    RayPayload payload = { float4(0, 0, 0, 1) };
+    SkyMissPayload payload = { float4(0, 0, 0, 1) };
 
     Scene *scene = push_const.scene;
     RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
@@ -37,7 +42,7 @@ void main_ray_gen()
 }
 
 [shader("closesthit")]
-void main_closest_hit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+void main_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
     PerFrameData *frame_data = push_const.frame_data;
     Scene *scene = push_const.scene;
@@ -56,7 +61,13 @@ void main_closest_hit(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 }
 
 [shader("miss")]
-void main_miss(inout RayPayload payload)
+void sky_miss(inout SkyMissPayload payload)
 {
     payload.color = float4(0.8f, 0.8f, 0.8f, 1.0f); // 蓝色背景
+}
+
+[shader("miss")]
+void shadow_miss(inout ShadowMissPayload payload)
+{
+    payload.miss = true;
 }
