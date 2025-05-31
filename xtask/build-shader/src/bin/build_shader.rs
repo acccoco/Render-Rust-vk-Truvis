@@ -171,7 +171,7 @@ impl ShaderCompileTask {
                 "-I",
                 "shader/include",
                 // 生成 debug info 默认是 g2
-                "-g3",
+                "-g2",
                 "-matrix-layout-column-major", // 列主序
                 "-fvk-use-entrypoint-name",    // 具有多个 entry 时，需要这个选项
                 "-o",

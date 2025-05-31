@@ -43,10 +43,18 @@ create_named_array!(
             }
         ),
         (
-            Miss,
+            SkyMiss,
             RhiShaderStageInfo {
                 stage: vk::ShaderStageFlags::MISS_KHR,
                 entry_point: cstr::cstr!("sky_miss"),
+                path: "shader/build/rt/rt.slang.spv",
+            }
+        ),
+        (
+            ShadowMiss,
+            RhiShaderStageInfo {
+                stage: vk::ShaderStageFlags::MISS_KHR,
+                entry_point: cstr::cstr!("shadow_miss"),
                 path: "shader/build/rt/rt.slang.spv",
             }
         ),
@@ -75,10 +83,18 @@ create_named_array!(
             }
         ),
         (
-            Miss,
+            SkyMiss,
             ShaderGroupInfo {
                 ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
-                general: ShaderStage::Miss.index() as u32,
+                general: ShaderStage::SkyMiss.index() as u32,
+                ..ShaderGroupInfo::unused()
+            }
+        ),
+        (
+            ShadowMiss,
+            ShaderGroupInfo {
+                ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
+                general: ShaderStage::ShadowMiss.index() as u32,
                 ..ShaderGroupInfo::unused()
             }
         ),
@@ -106,11 +122,13 @@ pub struct SBTRegions {
 }
 impl SBTRegions {
     const RAYGEN_SBT_REGION: usize = ShaderGroups::RayGen.index();
-    const MISS_SBT_REGION: [usize; 1] = [ShaderGroups::Miss.index()];
+    const MISS_SBT_REGION: [usize; 2] = [ShaderGroups::SkyMiss.index(); ShaderGroups::ShadowMiss.index()];
     const HIT_SBT_REGION: [usize; 1] = [ShaderGroups::Hit.index()];
 
     pub fn create_sbt(rhi: &Rhi, pipeline: &RhiRtPipeline) -> Self {
         let rt_pipeline_props = rhi.device.rt_pipeline_props();
+
+        // 因为不需要 user data，所以可以直接使用 shader group handle size
         let aligned_shader_group_handle_size = helper::align_up(
             rt_pipeline_props.shader_group_handle_size,
             rt_pipeline_props.shader_group_handle_alignment,

@@ -36,10 +36,17 @@ void main_ray_gen()
     Scene *scene = push_const.scene;
     RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
 
-    TraceRay(tlas_, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, ray, payload);
+    TraceRay(tlas_, RAY_FLAG_FORCE_OPAQUE, 0xFF, //
+             0,                                  // sbt record offset
+             0,                                  // sbt record stride
+             0,                                  // sky miss shader
+             ray, payload);
 
     frame_data.rt_render_target.store(thread_id, payload.color);
 }
+
+// static const float3 directional_light = normalize(float3(0.577f, -0.577f, -0.577f)); // 方向光
+static const float3 directional_light = normalize(float3(0.f, -1.f, -0.f)); // 方向光
 
 [shader("closesthit")]
 void main_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersectionAttributes attr)
@@ -53,11 +60,40 @@ void main_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersecti
 
     PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
     Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
-    const Vertex hit_pos = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
+    const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
+    const float3 world_pos = mul(ObjectToWorld3x4(), float4(interp_vertex.position, 1.f));
+    const float3 world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
 
-    const float4 color = mat.diffuse_map.sample(hit_pos.uv);
-    // payload.color = float4((instance_id % 13) / 13.0, (instance_id % 17) / 17.0, (instance_id % 23) / 23.0, 1.0f);
-    payload.color = color;
+    float attenuation = 1.f;
+    if (dot(directional_light, world_normal) > 0.f)
+    {
+        attenuation = 0.3f;
+    }
+    else
+    {
+        RayDesc ray;
+        ray.Origin = world_pos - directional_light * 0.001f; // 偏移一点，避免自交
+        ray.Direction = -directional_light;
+        ray.TMin = 0.001f;
+        ray.TMax = 10000.0f;
+        ShadowMissPayload shadow_payload = { false };
+        RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
+
+        const uint ray_flags = RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER;
+        TraceRay(tlas_, ray_flags, 0xFF, //
+                 0,                      // sbt record offset
+                 0,                      // sbt record stride
+                 1,                      // shadow miss shader
+                 ray, shadow_payload);
+
+        if (!shadow_payload.miss) // 无法接收到方向光
+        {
+            attenuation = 0.3f;
+        }
+    }
+
+    const float4 tex_color = mat.diffuse_map.sample(interp_vertex.uv);
+    payload.color = float4(tex_color.xyz * attenuation, tex_color.w);
 }
 
 [shader("miss")]
