@@ -1,4 +1,4 @@
-use crate::component::TruGeometry;
+use crate::component::DrsGeometry;
 use crate::vertex::VertexLayout;
 use ash::vk;
 use std::mem::offset_of;
@@ -65,25 +65,25 @@ impl VertexLayoutAosPosNormalUv {
         vertex_buffer
     }
 
-    pub fn cube(rhi: &Rhi) -> TruGeometry<VertexPosNormalUv> {
+    pub fn cube(rhi: &Rhi) -> DrsGeometry<VertexPosNormalUv> {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::Cube::VERTICES, "cube-vertex-buffer");
 
         let mut index_buffer = RhiIndexBuffer::new(rhi, shape::Cube::INDICES.len(), "cube-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::Cube::INDICES);
 
-        TruGeometry {
+        DrsGeometry {
             vertex_buffer,
             index_buffer,
         }
     }
 
-    pub fn floor(rhi: &Rhi) -> TruGeometry<VertexPosNormalUv> {
+    pub fn floor(rhi: &Rhi) -> DrsGeometry<VertexPosNormalUv> {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::Floor::VERTICES, "floor-vertex-buffer");
 
         let mut index_buffer = RhiIndexBuffer::new(rhi, shape::Floor::INDICES.len(), "floor-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::Floor::INDICES);
 
-        TruGeometry {
+        DrsGeometry {
             vertex_buffer,
             index_buffer,
         }

@@ -3,7 +3,7 @@ use crate::renderer::scene_manager::TheWorld;
 use ash::vk;
 use glam::Vec4Swizzles;
 use itertools::Itertools;
-use model_manager::component::{TruGeometry3D, TruInstance};
+use model_manager::component::{DrsGeometry3D, DrsInstance};
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -245,7 +245,7 @@ impl GpuScene {
             let mesh = scene_mgr.get_mesh(&instance.mesh).unwrap();
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
                 cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&geometry.vertex_buffer), &[0]);
-                cmd.cmd_bind_index_buffer(&geometry.index_buffer, 0, TruGeometry3D::index_type());
+                cmd.cmd_bind_index_buffer(&geometry.index_buffer, 0, DrsGeometry3D::index_type());
 
                 before_draw(instance_idx as u32, submesh_idx as u32);
                 cmd.draw_indexed(geometry.index_cnt(), 0, 1, 0, 0);
@@ -510,7 +510,7 @@ impl GpuScene {
 // ray tracing
 impl GpuScene {
     /// 根据 instance 信息获得加速结构的 instance 信息
-    fn get_as_instance_info(&self, instance: &TruInstance, custom_idx: u32) -> vk::AccelerationStructureInstanceKHR {
+    fn get_as_instance_info(&self, instance: &DrsInstance, custom_idx: u32) -> vk::AccelerationStructureInstanceKHR {
         let scene_mgr = self.scene_mgr.borrow();
         let mesh = scene_mgr.get_mesh(&instance.mesh).expect("Mesh not found");
         vk::AccelerationStructureInstanceKHR {
@@ -530,6 +530,11 @@ impl GpuScene {
     fn build_tlas(&mut self, rhi: &Rhi, frame_label: usize) {
         if self.flatten_instances.is_empty() {
             // 没有实例数据，直接返回
+            return;
+        }
+
+        if self.gpu_scene_buffers[frame_label].tlas.is_some() {
+            // 已经构建过 tlas，直接返回
             return;
         }
 

@@ -1,4 +1,4 @@
-use crate::component::TruGeometry;
+use crate::component::DrsGeometry;
 use crate::vertex::VertexLayout;
 use ash::vk;
 use std::mem::offset_of;
@@ -53,25 +53,25 @@ impl VertexAosLayoutPosColor {
     }
 
     /// return: (vertex_buffer, index_buffer)
-    pub fn triangle(rhi: &Rhi) -> TruGeometry<VertexPosColor> {
+    pub fn triangle(rhi: &Rhi) -> DrsGeometry<VertexPosColor> {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::TRIANGLE_VERTEX_DATA, "triangle-vertex-buffer");
 
         let mut index_buffer = RhiIndexBuffer::new(rhi, shape::TRIANGLE_INDEX_DATA.len(), "triangle-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::TRIANGLE_INDEX_DATA);
 
-        TruGeometry {
+        DrsGeometry {
             vertex_buffer,
             index_buffer,
         }
     }
 
-    pub fn rectangle(rhi: &Rhi) -> TruGeometry<VertexPosColor> {
+    pub fn rectangle(rhi: &Rhi) -> DrsGeometry<VertexPosColor> {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::RECTANGLE_VERTEX_DATA, "rectangle-vertex-buffer");
 
         let mut index_buffer = RhiIndexBuffer::new(rhi, shape::RECTANGLE_INDEX_DATA.len(), "rectangle-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::RECTANGLE_INDEX_DATA);
 
-        TruGeometry {
+        DrsGeometry {
             vertex_buffer,
             index_buffer,
         }

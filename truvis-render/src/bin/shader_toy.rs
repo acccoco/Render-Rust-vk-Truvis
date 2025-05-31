@@ -1,7 +1,7 @@
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use imgui::Ui;
-use model_manager::component::TruGeometry;
+use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
 use truvis_render::app::{OuterApp, TruvisApp};
@@ -36,7 +36,7 @@ pub struct PushConstants {
 }
 
 struct ShaderToy {
-    rectangle: TruGeometry<VertexPosColor>,
+    rectangle: DrsGeometry<VertexPosColor>,
     pipeline: RhiGraphicsPipeline,
 }
 

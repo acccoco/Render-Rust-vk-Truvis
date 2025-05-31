@@ -66,6 +66,14 @@ create_named_array!(
                 path: "shader/build/rt/rt.slang.spv",
             }
         ),
+        (
+            ClosestHit2,
+            RhiShaderStageInfo {
+                stage: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+                entry_point: cstr::cstr!("trans_closest_hit"),
+                path: "shader/build/rt/rt.slang.spv",
+            }
+        ),
     ]
 );
 
@@ -105,6 +113,14 @@ create_named_array!(
                 closest_hit: ShaderStage::ClosestHit.index() as u32,
                 ..ShaderGroupInfo::unused()
             }
+        ),
+        (
+            Hit2,
+            ShaderGroupInfo {
+                ty: vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
+                closest_hit: ShaderStage::ClosestHit2.index() as u32,
+                ..ShaderGroupInfo::unused()
+            }
         )
     ]
 );
@@ -122,8 +138,8 @@ pub struct SBTRegions {
 }
 impl SBTRegions {
     const RAYGEN_SBT_REGION: usize = ShaderGroups::RayGen.index();
-    const MISS_SBT_REGION: [usize; 2] = [ShaderGroups::SkyMiss.index(); ShaderGroups::ShadowMiss.index()];
-    const HIT_SBT_REGION: [usize; 1] = [ShaderGroups::Hit.index()];
+    const MISS_SBT_REGION: &'static [usize] = &[ShaderGroups::SkyMiss.index(), ShaderGroups::ShadowMiss.index()];
+    const HIT_SBT_REGION: &'static [usize] = &[ShaderGroups::Hit.index(), ShaderGroups::Hit2.index()];
 
     pub fn create_sbt(rhi: &Rhi, pipeline: &RhiRtPipeline) -> Self {
         let rt_pipeline_props = rhi.device.rt_pipeline_props();
@@ -150,6 +166,7 @@ impl SBTRegions {
             rhi,
             (raygen_shader_group_region_size + miss_shader_group_region_size + hit_shader_group_region_size)
                 as vk::DeviceSize,
+            rt_pipeline_props.shader_group_base_alignment as vk::DeviceSize,
             "simple-rt-sbt",
         );
 

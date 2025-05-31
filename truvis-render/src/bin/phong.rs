@@ -1,6 +1,6 @@
 use ash::vk;
 use imgui::Ui;
-use model_manager::component::TruInstance;
+use model_manager::component::DrsInstance;
 use shader_binding::shader;
 use truvis_render::app::{OuterApp, TruvisApp};
 use truvis_render::platform::timer::Timer;
@@ -33,12 +33,12 @@ impl OuterApp for PhongApp {
             let ins_id =
                 scene_mgr.load_scene(&renderer.rhi, std::path::Path::new("assets/obj/spot.obj"), &glam::Mat4::IDENTITY);
             let ins = scene_mgr.get_instance(&ins_id[0]).unwrap().clone();
-            let ins_1 = TruInstance {
+            let ins_1 = DrsInstance {
                 transform: glam::Mat4::from_translation(glam::vec3(5.0, 0.0, 0.0)),
                 ..ins.clone()
             };
             scene_mgr.register_instance(ins_1);
-            let ins_2 = TruInstance {
+            let ins_2 = DrsInstance {
                 transform: glam::Mat4::from_translation(glam::vec3(0.0, 5.0, 0.0)),
                 ..ins.clone()
             };

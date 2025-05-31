@@ -1,5 +1,5 @@
 use crate::renderer::bindless::BindlessManager;
-use model_manager::component::{TruInstance, TruMaterial, TruMesh};
+use model_manager::component::{DrsInstance, TruMaterial, DrsMesh};
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -9,8 +9,8 @@ use truvis_rhi::rhi::Rhi;
 
 pub struct TheWorld {
     mat_map: HashMap<uuid::Uuid, TruMaterial>,
-    instance_map: HashMap<uuid::Uuid, TruInstance>,
-    mesh_map: HashMap<uuid::Uuid, TruMesh>,
+    instance_map: HashMap<uuid::Uuid, DrsInstance>,
+    mesh_map: HashMap<uuid::Uuid, DrsMesh>,
 
     point_light_map: HashMap<uuid::Uuid, shader::PointLight>,
 
@@ -23,11 +23,11 @@ impl TheWorld {
         &self.mat_map
     }
     #[inline]
-    pub fn instance_map(&self) -> &HashMap<uuid::Uuid, TruInstance> {
+    pub fn instance_map(&self) -> &HashMap<uuid::Uuid, DrsInstance> {
         &self.instance_map
     }
     #[inline]
-    pub fn mesh_map(&self) -> &HashMap<uuid::Uuid, TruMesh> {
+    pub fn mesh_map(&self) -> &HashMap<uuid::Uuid, DrsMesh> {
         &self.mesh_map
     }
     #[inline]
@@ -48,12 +48,12 @@ impl TheWorld {
 
     /// getter
     #[inline]
-    pub fn get_instance(&self, guid: &uuid::Uuid) -> Option<&TruInstance> {
+    pub fn get_instance(&self, guid: &uuid::Uuid) -> Option<&DrsInstance> {
         self.instance_map.get(guid)
     }
 
     #[inline]
-    pub fn get_mesh(&self, guid: &uuid::Uuid) -> Option<&TruMesh> {
+    pub fn get_mesh(&self, guid: &uuid::Uuid) -> Option<&DrsMesh> {
         self.mesh_map.get(guid)
     }
 
@@ -107,14 +107,14 @@ impl TheWorld {
     }
 
     /// 向场景中添加 mesh
-    pub fn register_mesh(&mut self, mesh: TruMesh) -> uuid::Uuid {
+    pub fn register_mesh(&mut self, mesh: DrsMesh) -> uuid::Uuid {
         let guid = uuid::Uuid::new_v4();
         self.mesh_map.insert(guid, mesh);
         guid
     }
 
     /// 向场景中添加 instance
-    pub fn register_instance(&mut self, instance: TruInstance) -> uuid::Uuid {
+    pub fn register_instance(&mut self, instance: DrsInstance) -> uuid::Uuid {
         let guid = uuid::Uuid::new_v4();
         self.instance_map.insert(guid, instance);
         guid

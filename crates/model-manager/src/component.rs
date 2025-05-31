@@ -23,12 +23,12 @@ pub struct TruMaterial {
     pub normal_map: String,
 }
 
-pub struct TruGeometry<V: bytemuck::Pod> {
+pub struct DrsGeometry<V: bytemuck::Pod> {
     pub vertex_buffer: RhiVertexBuffer<V>,
     pub index_buffer: RhiIndexBuffer,
 }
-pub type TruGeometry3D = TruGeometry<Vertex3D>;
-impl<V: bytemuck::Pod> TruGeometry<V> {
+pub type DrsGeometry3D = DrsGeometry<Vertex3D>;
+impl<V: bytemuck::Pod> DrsGeometry<V> {
     #[inline]
     pub fn index_type() -> vk::IndexType {
         vk::IndexType::UINT32
@@ -39,7 +39,7 @@ impl<V: bytemuck::Pod> TruGeometry<V> {
         self.index_buffer.index_cnt() as u32
     }
 }
-impl TruGeometry3D {
+impl DrsGeometry3D {
     pub fn get_blas_geometry_info(&self) -> BlasInputInfo {
         let geometry_triangle = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
@@ -63,7 +63,8 @@ impl TruGeometry3D {
         BlasInputInfo {
             geometry: vk::AccelerationStructureGeometryKHR::default()
                 .geometry_type(vk::GeometryTypeKHR::TRIANGLES)
-                // TODO 暂不考虑透明的情形，这个是啥意思呢
+                // OPAQUE 表示永远不会调用 anyhit shader
+                // NO_DUPLICATE 表示 primitive 只会被 any hit shader 命中一次
                 .flags(vk::GeometryFlagsKHR::OPAQUE)
                 .geometry(vk::AccelerationStructureGeometryDataKHR {
                     triangles: geometry_triangle,
@@ -79,15 +80,15 @@ impl TruGeometry3D {
     }
 }
 
-pub struct TruMesh {
-    pub geometries: Vec<TruGeometry<Vertex3D>>,
+pub struct DrsMesh {
+    pub geometries: Vec<DrsGeometry<Vertex3D>>,
 
     pub blas: Option<RhiAcceleration>,
     pub name: String,
     pub blas_device_address: Option<vk::DeviceAddress>,
 }
 
-impl TruMesh {
+impl DrsMesh {
     pub fn build_blas(&mut self, rhi: &Rhi) {
         if self.blas.is_some() {
             return; // 已经构建过了
@@ -107,7 +108,7 @@ impl TruMesh {
 }
 
 #[derive(Clone)]
-pub struct TruInstance {
+pub struct DrsInstance {
     pub mesh: uuid::Uuid,
     pub materials: Vec<uuid::Uuid>,
     pub transform: glam::Mat4,

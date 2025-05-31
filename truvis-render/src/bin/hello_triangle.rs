@@ -1,6 +1,6 @@
 use ash::vk;
 use imgui::Ui;
-use model_manager::component::TruGeometry;
+use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
 use truvis_render::app::{OuterApp, TruvisApp};
@@ -16,7 +16,7 @@ use truvis_rhi::{
 };
 
 struct HelloTriangle {
-    triangle: TruGeometry<VertexPosColor>,
+    triangle: DrsGeometry<VertexPosColor>,
 
     pipeline: RhiGraphicsPipeline,
 

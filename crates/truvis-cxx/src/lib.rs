@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use model_manager::component::{TruGeometry, TruInstance, TruMaterial, TruMesh};
+use model_manager::component::{DrsGeometry, DrsInstance, TruMaterial, DrsMesh};
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
@@ -37,8 +37,8 @@ impl AssimpSceneLoader {
     pub fn load_scene(
         rhi: &Rhi,
         model_file: &std::path::Path,
-        instance_register: impl FnMut(TruInstance) -> uuid::Uuid,
-        mesh_register: impl FnMut(TruMesh) -> uuid::Uuid,
+        instance_register: impl FnMut(DrsInstance) -> uuid::Uuid,
+        mesh_register: impl FnMut(DrsMesh) -> uuid::Uuid,
         mat_register: impl FnMut(TruMaterial) -> uuid::Uuid,
     ) -> Vec<uuid::Uuid> {
         validate_vertex_memory_layout();
@@ -69,7 +69,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中基础的几何体
-    fn load_mesh(&mut self, rhi: &Rhi, mut mesh_register: impl FnMut(TruMesh) -> uuid::Uuid) {
+    fn load_mesh(&mut self, rhi: &Rhi, mut mesh_register: impl FnMut(DrsMesh) -> uuid::Uuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -102,8 +102,8 @@ impl AssimpSceneLoader {
                 index_buffer.transfer_data_sync(rhi, index_data);
 
                 // 只有 single geometry 的 mesh
-                let mesh = TruMesh {
-                    geometries: vec![TruGeometry {
+                let mesh = DrsMesh {
+                    geometries: vec![DrsGeometry {
                         vertex_buffer,
                         index_buffer,
                     }],
@@ -153,7 +153,7 @@ impl AssimpSceneLoader {
     /// 由于 Assimp 的复用层级是 geometry，而应用需要的复用层级是 mesh
     ///
     /// 因此将 Assimp 中的一个 Instance 拆分为多个 Instance，将其 geometry 提升为 mesh
-    fn load_instance(&mut self, mut instance_register: impl FnMut(TruInstance) -> uuid::Uuid) {
+    fn load_instance(&mut self, mut instance_register: impl FnMut(DrsInstance) -> uuid::Uuid) {
         let instance_cnt = unsafe { get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)
             .filter_map(|instance_idx| unsafe {
@@ -186,7 +186,7 @@ impl AssimpSceneLoader {
 
                 let mut ins_uuids = Vec::with_capacity(mesh_cnt as usize);
                 for (mesh_uuid, mat_uuid) in std::iter::zip(mesh_uuids, mat_uuids) {
-                    let instance = TruInstance {
+                    let instance = DrsInstance {
                         transform: std::mem::transmute::<CxxMat4f, glam::Mat4>(instance.world_transform),
                         mesh: mesh_uuid,
                         materials: vec![mat_uuid],

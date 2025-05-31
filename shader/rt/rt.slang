@@ -6,6 +6,7 @@ PushConstants push_const;
 struct SkyMissPayload
 {
     float4 color;
+    uint depth;
 };
 
 struct ShadowMissPayload
@@ -31,13 +32,15 @@ void main_ray_gen()
     ray.TMin = 0.001f;
     ray.TMax = 10000.0f;
 
-    SkyMissPayload payload = { float4(0, 0, 0, 1) };
+    SkyMissPayload payload = {};
+    payload.color = float4(0.0f, 0.0f, 0.0f, 1.0f); // 初始化颜色
+    payload.depth = 0;
 
     Scene *scene = push_const.scene;
     RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
 
     TraceRay(tlas_, RAY_FLAG_FORCE_OPAQUE, 0xFF, //
-             0,                                  // sbt record offset
+             1,                                  // sbt record offset
              0,                                  // sbt record stride
              0,                                  // sky miss shader
              ray, payload);
@@ -45,8 +48,47 @@ void main_ray_gen()
     frame_data.rt_render_target.store(thread_id, payload.color);
 }
 
-// static const float3 directional_light = normalize(float3(0.577f, -0.577f, -0.577f)); // 方向光
-static const float3 directional_light = normalize(float3(0.f, -1.f, -0.f)); // 方向光
+static const float3 directional_light = normalize(float3(0.577f, -0.577f, -0.577f)); // 方向光
+
+[shader("closesthit")]
+void trans_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+{
+    payload.depth += 1;
+    PerFrameData *frame_data = push_const.frame_data;
+    Scene *scene = push_const.scene;
+
+    const uint instance_id = InstanceIndex();
+    const uint geometry_id = GeometryIndex();
+    const uint primitive_id = PrimitiveIndex();
+
+    PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
+    Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
+    const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
+    const float3 world_pos = mul(ObjectToWorld3x4(), float4(interp_vertex.position, 1.f));
+    const float3 world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
+
+    // 当前命中位置 diffuse 颜色
+    const float4 tex_color = mat.diffuse_map.sample(interp_vertex.uv);
+    if (tex_color.w == 0.f && payload.depth < 4)
+    {
+        RayDesc ray;
+        ray.Origin = world_pos + WorldRayDirection() * 0.001f; // 偏移一点，避免自交
+        ray.Direction = WorldRayDirection();
+        ray.TMin = 0.001f;
+        ray.TMax = 10000.0f;
+        RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
+
+        TraceRay(tlas_, RAY_FLAG_FORCE_OPAQUE, 0xFF, //
+                 1,                                  // sbt record offset
+                 0,                                  // sbt record stride
+                 1,                                  // miss hit shader
+                 ray, payload);
+    }
+    else
+    {
+        payload.color = float4(tex_color.xyz, tex_color.w);
+    }
+}
 
 [shader("closesthit")]
 void main_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersectionAttributes attr)
@@ -63,6 +105,9 @@ void main_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersecti
     const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
     const float3 world_pos = mul(ObjectToWorld3x4(), float4(interp_vertex.position, 1.f));
     const float3 world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
+
+    // 当前命中位置 diffuse 颜色
+    const float4 tex_color = mat.diffuse_map.sample(interp_vertex.uv);
 
     float attenuation = 1.f;
     if (dot(directional_light, world_normal) > 0.f)
@@ -92,8 +137,13 @@ void main_closest_hit(inout SkyMissPayload payload, in BuiltInTriangleIntersecti
         }
     }
 
-    const float4 tex_color = mat.diffuse_map.sample(interp_vertex.uv);
     payload.color = float4(tex_color.xyz * attenuation, tex_color.w);
+}
+
+[shader("closesthit")]
+void closest_hit2(inout SkyMissPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+{
+    payload.color = float4(1.0f, 0.0f, 0.0f, 1.0f); // 红色
 }
 
 [shader("miss")]

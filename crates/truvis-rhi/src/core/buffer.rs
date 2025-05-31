@@ -460,7 +460,7 @@ pub struct RhiSBTBuffer {
     _inner: RhiBuffer,
 }
 impl RhiSBTBuffer {
-    pub fn new(rhi: &Rhi, size: vk::DeviceSize, name: impl AsRef<str>) -> Self {
+    pub fn new(rhi: &Rhi, size: vk::DeviceSize, align: vk::DeviceSize, name: impl AsRef<str>) -> Self {
         Self {
             _inner: RhiBuffer::new(
                 rhi,
@@ -475,7 +475,7 @@ impl RhiSBTBuffer {
                     flags: vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM,
                     ..Default::default()
                 }),
-                None,
+                Some(align),
                 format!("SBTBuffer::{}", name.as_ref()),
             ),
         }
