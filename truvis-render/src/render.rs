@@ -1,4 +1,4 @@
-use crate::platform::camera::TruCamera;
+use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
 use crate::render_context::{FrameSettings, RenderContext};
@@ -134,6 +134,9 @@ impl Renderer {
                 rt_rect: vk::Rect2D::default(),
                 color_format: DEFAULT_SURFACE_FORMAT.format,
                 depth_format: Self::get_depth_format(&rhi),
+                accum_frames: None,
+                last_camera_dir: glam::Vec3::ZERO,
+                last_camera_pos: glam::Vec3::ZERO,
             },
             blit_pass,
             render_context: None,
@@ -163,7 +166,7 @@ impl Renderer {
         .unwrap_or(vk::Format::UNDEFINED)
     }
 
-    pub fn before_frame(&mut self) {
+    pub fn begin_frame(&mut self) {
         let render_context = self.render_context.as_mut().unwrap();
         let render_swapchain = self.render_swapchain.as_mut().unwrap();
 
@@ -172,7 +175,7 @@ impl Renderer {
         render_context.before_render(render_swapchain.current_present_image());
     }
 
-    pub fn after_frame(&mut self) {
+    pub fn end_frame(&mut self) {
         // ui pass
         self.rhi.device.debug_utils().begin_queue_label(
             self.rhi.graphics_queue.handle(),
@@ -216,7 +219,18 @@ impl Renderer {
         render_context.end_frame();
     }
 
-    pub fn before_render(&mut self, input_state: &InputState, timer: &Timer, camera: &TruCamera) {
+    pub fn before_render(&mut self, input_state: &InputState, timer: &Timer, camera: &DrsCamera) {
+        let current_camera_dir = glam::vec3(camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg);
+        if camera.position != self.frame_settings.last_camera_pos
+            || self.frame_settings.last_camera_dir != current_camera_dir
+        {
+            self.frame_settings.reset_accum_frames();
+        }
+
+        self.frame_settings.last_camera_pos = camera.position;
+        self.frame_settings.last_camera_dir = current_camera_dir;
+
+        self.frame_settings.update_accum_frames();
         self.update_gpu_scene(input_state, timer, camera);
 
         // main pass
@@ -267,11 +281,12 @@ impl Renderer {
                 height: self.swapchain_extent().height,
             },
         };
+        self.frame_settings.reset_accum_frames();
         self.render_context =
             Some(RenderContext::new(&self.rhi, self.frame_settings, &mut self.bindless_mgr.borrow_mut()));
     }
 
-    fn update_gpu_scene(&mut self, input_state: &InputState, timer: &Timer, camera: &TruCamera) {
+    fn update_gpu_scene(&mut self, input_state: &InputState, timer: &Timer, camera: &DrsCamera) {
         let render_context = self.render_context.as_mut().unwrap();
         let render_swapchain = self.render_swapchain.as_mut().unwrap();
 
@@ -320,8 +335,7 @@ impl Renderer {
                     y: extent.height as f32,
                 },
                 rt_render_target: render_context.current_rt_bindless_handle(&self.bindless_mgr.borrow()),
-
-                _padding_1: Default::default(),
+                accum_frames: self.frame_settings.accum_frames.unwrap() as u32,
             }
         };
         cmd.cmd_update_buffer(

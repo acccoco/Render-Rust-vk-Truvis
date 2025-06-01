@@ -1,7 +1,11 @@
+#include "random.slangi"
 #include "scene.slangi"
 
 /// 太幽默了哥，为啥我需要手动限制最大递归深度啊，pipeline 里面的设置算啥？
 const static uint max_depth = 4;
+
+/// 超过一定数量后，就不再重新计算了
+const static uint max_accum_frames = 100;
 
 [[vk::push_constant]]
 PushConstants push_const;
@@ -20,11 +24,21 @@ struct ShadowMissPayload
 [shader("raygeneration")]
 void main_ray_gen()
 {
+    PerFrameData *frame_data = push_const.frame_data;
+    if (frame_data.accum_frames >= max_accum_frames)
+    {
+        // 达到最大累积帧数，直接返回
+        return;
+    }
+
     uint2 thread_id = DispatchRaysIndex().xy;
 
-    PerFrameData *frame_data = push_const.frame_data;
+    Random random = Random(thread_id.y * DispatchRaysDimensions().x + thread_id.x, frame_data.accum_frames);
+    const float r1 = random.next();
+    const float r2 = random.next();
+    const float2 subpixel_jitter = frame_data.accum_frames == 0 ? float2(0.5f) : float2(r1, r2);
 
-    const float2 pixel_center = float2(thread_id) + float2(0.5f, 0.5f);
+    const float2 pixel_center = float2(thread_id) + subpixel_jitter;
     const float2 in_uv = pixel_center / float2(DispatchRaysDimensions().xy);
     const float4 target_in_view = mul(frame_data.inv_projection, float4(in_uv.x * 2.0 - 1.0, 1.0 - in_uv.y * 2.0, 1.0, 1.0));
     const float4 direction = mul(frame_data.inv_view, float4(normalize(target_in_view.xyz), 0.0));
@@ -48,7 +62,17 @@ void main_ray_gen()
              0,                          // sky miss shader
              ray, payload);
 
-    frame_data.rt_render_target.store(thread_id, payload.color);
+    if (frame_data.accum_frames > 0)
+    {
+        float a = 1.f / float(frame_data.accum_frames + 1);
+        const float3 old_color = frame_data.rt_render_target.load(thread_id).xyz;
+        // const float3 old_color = float3(1.f, 0.f, 0.f);
+        frame_data.rt_render_target.store(thread_id, float4(lerp(old_color, payload.color.xyz, a), 1.f));
+    }
+    else
+    {
+        frame_data.rt_render_target.store(thread_id, float4(payload.color.xyz, 1.f));
+    }
 }
 
 static const float3 directional_light = normalize(float3(0.1f, -0.98995f, -0.1f)); // 方向光

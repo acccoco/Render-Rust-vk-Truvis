@@ -26,6 +26,24 @@ pub struct FrameSettings {
     pub color_format: vk::Format,
     pub depth_format: vk::Format,
     pub frames_in_flight: usize,
+    pub last_camera_pos: glam::Vec3,
+    pub last_camera_dir: glam::Vec3,
+
+    /// 累计的帧数，可以用于 TAA
+    pub accum_frames: Option<usize>,
+}
+impl FrameSettings {
+    pub fn reset_accum_frames(&mut self) {
+        self.accum_frames = None;
+    }
+
+    pub fn update_accum_frames(&mut self) {
+        if let Some(accum) = self.accum_frames.as_mut() {
+            *accum += 1;
+        } else {
+            self.accum_frames = Some(0);
+        }
+    }
 }
 
 pub struct RenderContext {
@@ -51,9 +69,9 @@ pub struct RenderContext {
     render_complete_semaphores: Vec<RhiSemaphore>,
     fence_frame_in_flight: Vec<RhiFence>,
 
-    _rt_images: Vec<Rc<RhiImage2D>>,
-    _rt_image_views: Vec<Rc<RhiImage2DView>>,
-    _rt_keywords: Vec<String>,
+    rt_image: Rc<RhiImage2D>,
+    rt_image_view: Rc<RhiImage2DView>,
+    rt_keyword: String,
 
     device: Rc<RhiDevice>,
     graphics_queue: Rc<RhiQueue>,
@@ -81,18 +99,10 @@ impl RenderContext {
             .collect();
 
         let graphics_command_pools = Self::init_command_pool(rhi, frame_settings.frames_in_flight);
-        let (rt_images, rt_image_views) = Self::create_rt_images(
-            rhi,
-            frame_settings.color_format,
-            frame_settings.rt_rect.extent,
-            frame_settings.frames_in_flight,
-        );
-        let mut rt_keywords = Vec::with_capacity(frame_settings.frames_in_flight);
-        for idx in 0..frame_settings.frames_in_flight {
-            let rt_keyword = format!("rt-image-{}", FRAME_ID_MAP[idx]);
-            bindless_mgr.register_image(rt_keyword.clone(), rt_image_views[idx].clone());
-            rt_keywords.push(rt_keyword);
-        }
+        let (rt_image, rt_image_view) =
+            Self::create_rt_images(rhi, frame_settings.color_format, frame_settings.rt_rect.extent);
+        let rt_keyword = "rt-image".to_string();
+        bindless_mgr.register_image(rt_keyword.clone(), rt_image_view.clone());
 
         Self {
             frame_label: 0,
@@ -106,9 +116,9 @@ impl RenderContext {
             _depth_image: depth_image,
             _depth_view: depth_image_view,
 
-            _rt_images: rt_images,
-            _rt_image_views: rt_image_views,
-            _rt_keywords: rt_keywords,
+            rt_image,
+            rt_image_view,
+            rt_keyword,
 
             present_complete_semaphores,
             render_complete_semaphores,
@@ -133,9 +143,7 @@ impl RenderContext {
             fence.destroy();
         }
 
-        for rt_keyword in &self._rt_keywords {
-            bindless_mgr.unregister_image(rt_keyword)
-        }
+        bindless_mgr.unregister_image(&self.rt_keyword)
     }
 
     fn create_depth_image_and_view(
@@ -172,38 +180,27 @@ impl RenderContext {
         rhi: &Rhi,
         color_format: vk::Format,
         rt_extent: vk::Extent2D,
-        frames_in_flight: usize,
-    ) -> (Vec<Rc<RhiImage2D>>, Vec<Rc<RhiImage2DView>>) {
-        let rt_images = (0..frames_in_flight)
-            .map(|i| {
-                RhiImage2D::new(
-                    rhi,
-                    Rc::new(RhiImageCreateInfo::new_image_2d_info(
-                        rt_extent,
-                        color_format,
-                        vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED,
-                    )),
-                    &vk_mem::AllocationCreateInfo {
-                        usage: vk_mem::MemoryUsage::AutoPreferDevice,
-                        ..Default::default()
-                    },
-                    &format!("rt-image-{}", i),
-                )
-            })
-            .map(Rc::new)
-            .collect_vec();
-        let rt_image_views = rt_images
-            .iter()
-            .enumerate()
-            .map(|(image_idx, image)| {
-                Rc::new(RhiImage2DView::new(
-                    rhi,
-                    image.clone(),
-                    RhiImageViewCreateInfo::new_image_view_2d_info(color_format, vk::ImageAspectFlags::COLOR),
-                    format!("rt-image-view-{}", image_idx),
-                ))
-            })
-            .collect_vec();
+    ) -> (Rc<RhiImage2D>, Rc<RhiImage2DView>) {
+        let rt_image = Rc::new(RhiImage2D::new(
+            rhi,
+            Rc::new(RhiImageCreateInfo::new_image_2d_info(
+                rt_extent,
+                color_format,
+                vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED,
+            )),
+            &vk_mem::AllocationCreateInfo {
+                usage: vk_mem::MemoryUsage::AutoPreferDevice,
+                ..Default::default()
+            },
+            "rt-image",
+        ));
+
+        let rt_image_view = Rc::new(RhiImage2DView::new(
+            rhi,
+            rt_image.clone(),
+            RhiImageViewCreateInfo::new_image_view_2d_info(color_format, vk::ImageAspectFlags::COLOR),
+            "rt-image-view".to_string(),
+        ));
 
         // layout transfer
         RhiCommandBuffer::one_time_exec(
@@ -211,23 +208,19 @@ impl RenderContext {
             rhi.graphics_command_pool.clone(),
             &rhi.graphics_queue,
             |cmd| {
-                let barriers = rt_images
-                    .iter()
-                    .map(|image| {
-                        RhiImageBarrier::new()
-                            .image(image.handle())
-                            .src_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())
-                            .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
-                            .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL)
-                            .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                    })
-                    .collect_vec();
-                cmd.image_memory_barrier(vk::DependencyFlags::empty(), &barriers);
+                let barrier = RhiImageBarrier::new()
+                    .image(rt_image.handle())
+                    .src_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())
+                    .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
+                    .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL)
+                    .image_aspect_flag(vk::ImageAspectFlags::COLOR);
+
+                cmd.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&barrier));
             },
             "transfer-rt-image-layout",
         );
 
-        (rt_images, rt_image_views)
+        (rt_image, rt_image_view)
     }
 
     fn init_command_pool(rhi: &Rhi, frames_in_flight: usize) -> Vec<Rc<RhiCommandPool>> {
@@ -291,12 +284,12 @@ impl RenderContext {
 
     #[inline]
     pub fn current_rt_bindless_handle(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
-        bindless_manager.get_image_idx(&self._rt_keywords[self.frame_label]).unwrap()
+        bindless_manager.get_image_idx(&self.rt_keyword).unwrap()
     }
 
     #[inline]
     pub fn current_rt_image(&self) -> &RhiImage2D {
-        &self._rt_images[self.frame_label]
+        &self.rt_image
     }
 }
 impl RenderContext {
@@ -337,7 +330,7 @@ impl RenderContext {
             {
                 // 只需要建立起执行依赖即可，确保 present 完成后，再进行 layout trans
                 // COLOR_ATTACHMENT_READ 对应 blend 等操作
-                let image_barrier = RhiImageBarrier::new()
+                let present_image_barrier = RhiImageBarrier::new()
                     .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
                     .dst_mask(
                         vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
@@ -346,7 +339,18 @@ impl RenderContext {
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
                     .image(present_image);
-                cmd.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));
+
+                // frams in flight 使用同一个 rt image，因此需要确保之前的 rt 写入已经完成
+                let rt_image_barrier = RhiImageBarrier::new()
+                    .image(self.rt_image.handle())
+                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    .src_mask(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, vk::AccessFlags2::SHADER_STORAGE_WRITE)
+                    .dst_mask(
+                        vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+                        vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
+                    );
+
+                cmd.image_memory_barrier(vk::DependencyFlags::empty(), &[present_image_barrier, rt_image_barrier]);
             }
             cmd.end();
 

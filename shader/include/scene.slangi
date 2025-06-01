@@ -154,7 +154,8 @@ struct PerFrameData
 
     uint64_t frame_id;
     ImageHandle rt_render_target;
-    uint _padding_1;
+    /// 累计的帧数
+    uint accum_frames;
 };
 
 struct PushConstants

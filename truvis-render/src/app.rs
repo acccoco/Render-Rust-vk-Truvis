@@ -1,4 +1,4 @@
-use crate::platform::camera::TruCamera;
+use crate::platform::camera::DrsCamera;
 use crate::platform::camera_controller::CameraController;
 use crate::platform::input_manager::InputManager;
 use crate::platform::timer::Timer;
@@ -22,7 +22,7 @@ pub fn panic_handler(info: &std::panic::PanicHookInfo) {
 }
 
 pub trait OuterApp {
-    fn init(renderer: &mut Renderer) -> Self;
+    fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self;
 
     fn draw_ui(&mut self, ui: &mut imgui::Ui);
 
@@ -70,7 +70,7 @@ impl<T: OuterApp> TruvisApp<T> {
         let timer = Timer::default();
 
         // 创建相机控制器
-        let camera_controller = CameraController::new(TruCamera::default(), input_manager.clone());
+        let camera_controller = CameraController::new(DrsCamera::default(), input_manager.clone());
 
         let event_loop = winit::event_loop::EventLoop::<UserEvent>::with_user_event().build().unwrap();
 
@@ -108,7 +108,7 @@ impl<T: OuterApp> TruvisApp<T> {
         self.renderer.init_after_window(&window_system);
         let gui = Gui::new(&self.renderer.rhi, window_system.window(), &self.renderer.frame_settings());
 
-        let outer_app = T::init(&mut self.renderer);
+        let outer_app = T::init(&mut self.renderer, self.camera_controller.camera_mut());
 
         self.window_system.set(window_system).map_err(|_| ()).unwrap();
         self.gui.set(gui).map_err(|_| ()).unwrap();
@@ -129,7 +129,7 @@ impl<T: OuterApp> TruvisApp<T> {
         // 更新相机控制器
         self.camera_controller.update(self.timer.delta_time_s);
 
-        self.renderer.before_frame();
+        self.renderer.begin_frame();
         {
             self.outer_app.get_mut().unwrap().update(&mut self.renderer);
 
@@ -153,7 +153,7 @@ impl<T: OuterApp> TruvisApp<T> {
                 },
             );
         }
-        self.renderer.after_frame();
+        self.renderer.end_frame();
     }
 
     pub fn rebuild(&mut self, width: u32, height: u32) {

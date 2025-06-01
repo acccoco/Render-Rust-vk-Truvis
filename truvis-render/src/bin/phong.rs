@@ -3,6 +3,7 @@ use imgui::Ui;
 use model_manager::component::DrsInstance;
 use shader_binding::shader;
 use truvis_render::app::{OuterApp, TruvisApp};
+use truvis_render::platform::camera::DrsCamera;
 use truvis_render::platform::timer::Timer;
 use truvis_render::render::Renderer;
 use truvis_render::render_pass::phong::PhongPass;
@@ -18,7 +19,7 @@ struct PhongApp {
 impl PhongApp {}
 
 impl OuterApp for PhongApp {
-    fn init(renderer: &mut Renderer) -> Self {
+    fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
         let rt_pass = SimlpeRtPass::new(&renderer.rhi, renderer.bindless_mgr.clone());
         let phong_pass = PhongPass::new(&renderer.rhi, &renderer.frame_settings(), renderer.bindless_mgr.clone());
 
@@ -70,6 +71,10 @@ impl OuterApp for PhongApp {
                 &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
             );
         }
+
+        camera.position = glam::vec3(270.0, 194.0, -64.0);
+        camera.euler_yaw_deg = 90.0;
+        camera.euler_pitch_deg = 0.0;
 
         let rot =
             glam::Mat4::from_euler(glam::EulerRot::XYZ, 30f32.to_radians(), 40f32.to_radians(), 50f32.to_radians());
