@@ -6,7 +6,7 @@
 #include <assimp/material.h>
 #include <assimp/mesh.h>
 #include <assimp/scene.h>
-#include <model_loader/c_data_define.hpp>
+#include <public/scene_loader/c_data_define.hpp>
 
 
 namespace truvis
@@ -16,9 +16,13 @@ struct MeshLoader
 {
     explicit MeshLoader(const std::filesystem::path& mesh_path)
         : mesh_path_(mesh_path),
-          dir_path_(mesh_path.parent_path()) {}
-
+          dir_path_(mesh_path.parent_path())
+    {}
     ~MeshLoader() = default;
+    MeshLoader(const MeshLoader&) = delete;
+    MeshLoader(MeshLoader&&) = delete;
+    MeshLoader& operator=(const MeshLoader&) = delete;
+    MeshLoader& operator=(MeshLoader&&) = delete;
 
     bool load_scene();
 
@@ -42,7 +46,7 @@ struct MeshLoader
     [[nodiscard]] size_t get_material_count() const { return materials_.size(); }
 
 private:
-    /// 递归地处理节点，节点中包括多个 mesh，包含子节点
+    /// 处理一个节点，节点中包括多个 mesh，不考虑子节点
     [[nodiscard]]
     bool process_node(CxxInstance& instance, const aiNode& ai_node, const aiMatrix4x4& parent_transform) const;
 
@@ -55,13 +59,13 @@ private:
     static bool process_geometry(CxxRasterGeometry& geometry, const aiMesh& ai_mesh);
 
 private:
-    const std::filesystem::path mesh_path_; // mesh 文件对应的路径
-    const std::filesystem::path dir_path_;  // mesh 文件所在的文件夹，形式："xx/xxx"
+    const std::filesystem::path mesh_path_;    // mesh 文件对应的路径
+    const std::filesystem::path dir_path_;     // mesh 文件所在的文件夹，形式："xx/xxx"
 
-    std::vector<CxxInstance> instances_;        // 所有的实例
-    std::vector<CxxRasterGeometry> geometries_; // 所有的几何体
-    std::vector<CxxMaterial> materials_;        // 所有的材质
+    std::vector<CxxInstance> instances_;           // 所有的实例
+    std::vector<CxxRasterGeometry> geometries_;    // 所有的几何体
+    std::vector<CxxMaterial> materials_;           // 所有的材质
 
     const aiScene* ai_scene_ = nullptr;
 };
-} // namespace truvis
+}    // namespace truvis

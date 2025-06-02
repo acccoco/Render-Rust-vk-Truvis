@@ -10,7 +10,7 @@ use truvis_rhi::core::command_queue::RhiQueue;
 use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::core::image::{RhiImage2DView, RhiImageViewCreateInfo};
 use truvis_rhi::core::synchronize::{RhiFence, RhiSemaphore};
-use truvis_rhi::core::window_system::MainWindow;
+use crate::renderer::window_system::MainWindow;
 use truvis_rhi::rhi::Rhi;
 
 struct RhiSurface {

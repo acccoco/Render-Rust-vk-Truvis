@@ -4,12 +4,13 @@ use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
 use truvis_render::app::{OuterApp, TruvisApp};
+use truvis_render::platform::camera::DrsCamera;
 use truvis_render::platform::timer::Timer;
 use truvis_render::render::Renderer;
 use truvis_render::render_context::{FrameSettings, RenderContext};
 use truvis_render::renderer::framebuffer::FrameBuffer;
-use truvis_rhi::core::graphics_pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_render::renderer::swapchain::RhiSwapchain;
+use truvis_rhi::core::graphics_pipeline::RhiGraphicsPipelineCreateInfo;
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, graphics_pipeline::RhiGraphicsPipeline},
     rhi::Rhi,
@@ -102,7 +103,7 @@ impl HelloTriangle {
 }
 
 impl OuterApp for HelloTriangle {
-    fn init(renderer: &mut Renderer) -> Self {
+    fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
         log::info!("hello triangle init.");
 
         // 至少注册一个纹理，否则 bindless layout 会没有纹理绑定点

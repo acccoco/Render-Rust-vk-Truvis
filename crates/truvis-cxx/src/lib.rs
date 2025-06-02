@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use model_manager::component::{DrsGeometry, DrsInstance, TruMaterial, DrsMesh};
+use model_manager::component::{DrsGeometry, DrsInstance, DrsMesh, TruMaterial};
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
@@ -133,12 +133,14 @@ impl AssimpSceneLoader {
                     diffuse: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.diffuse),
                     specular: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.specular),
                     emissive: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.emission),
+                    reflection: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.reflection).x,
+                    opaque: 1.0,
 
                     diffuse_map: std::ffi::CStr::from_ptr(mat.diffuse_map.as_ptr()).to_str().unwrap().to_string(),
                     specular_map: std::ffi::CStr::from_ptr(mat.specular_map.as_ptr()).to_str().unwrap().to_string(),
                     emissive_map: std::ffi::CStr::from_ptr(mat.emissive_map.as_ptr()).to_str().unwrap().to_string(),
                     ambient_map: std::ffi::CStr::from_ptr(mat.ambient_map.as_ptr()).to_str().unwrap().to_string(),
-                    ..Default::default()
+                    normal_map: std::ffi::CStr::from_ptr(mat.normal_map.as_ptr()).to_str().unwrap().to_string(),
                 });
 
                 mat_uuid

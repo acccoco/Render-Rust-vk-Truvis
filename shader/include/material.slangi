@@ -1,0 +1,16 @@
+#pragma once
+#include "bindless.slangi"
+
+struct PBRMaterial
+{
+    float3 base_color;
+    float metallic;
+
+    float3 emissive;
+    float roughness;
+
+    TextureHandle diffuse_map;
+    TextureHandle normal_map;
+    float reflection;
+    float opaque;
+};

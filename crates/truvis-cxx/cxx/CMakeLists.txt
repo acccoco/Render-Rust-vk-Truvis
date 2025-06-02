@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.10)
 set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
 
+# 直接执行一下命令生成 vs 项目，不需要用 clion
+# mkdkr build
+# cd build
+# cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_CONFIGURATION_TYPES="Debug;Release" ..
 project(TruvisAssimpCxx)
 
 
@@ -19,8 +23,9 @@ find_package(glm CONFIG REQUIRED)
 
 # 动态库
 ###########################################################################
-file(GLOB_RECURSE SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
-add_library(truvis-assimp-cxx SHARED ${SRC_FILES})
+file(GLOB_RECURSE SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
+add_library(truvis-assimp-cxx SHARED ${SOURCE_FILES} ${HEADER_FILES})
 target_include_directories(truvis-assimp-cxx PUBLIC include)
 target_link_libraries(truvis-assimp-cxx PUBLIC
         assimp::assimp

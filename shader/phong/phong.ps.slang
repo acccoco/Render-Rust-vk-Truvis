@@ -1,6 +1,7 @@
 #include "./phong.slangi"
-#include "scene.slangi"
 #include "bindless.slangi"
+#include "pass/rt.slangi"
+#include "scene.slangi"
 
 struct PsInput
 {
@@ -14,43 +15,17 @@ struct PsOutput
 };
 
 [[vk::push_constant]]
-PushConstants push_const;
-
-
-func phong_light(camera_pos: float3, pos: float3, normal: float3, light: PointLight, object_color: float4)->float3
-{
-    const float3 light_dir = normalize(pos - light.pos);
-    const float3 view_dir = normalize(pos - camera_pos);
-    const float3 reflect_dir = normalize(reflect(light_dir, normal));
-    const float3 halfway = -normalize(light_dir + view_dir);
-
-    const float diffuse_coef = max(0.0, dot(-light_dir, normal));
-    const float specular_coef = pow(max(0.0, dot(normal, halfway)), 8.0);
-
-    const float const_term = 1.0f;
-    const float linear_term = 0.09f;
-    const float quadratic_term = 0.032f;
-    const float distance = length(light.pos - pos);
-
-    // FIXME attenuation
-    const float light_attenuation = 10.0 / (const_term + linear_term * distance + quadratic_term * distance * distance);
-
-    const float3 diffuse_color = object_color.rgb * diffuse_coef * light.color;
-    const float3 specular_color = float3(1.f, 1.f, 1.f) * specular_coef;
-
-    const float3 color = (diffuse_color + specular_color) * light_attenuation;
-    return color;
-}
+rt::PushConstants push_const;
 
 [shader("pixel")]
 PsOutput main(PsInput input)
 {
     const float3 normal = normalize(input.coarse_vertex.frag_normal);
 
-    PerFrameData* frame_data = push_const.frame_data;
-    Scene* scene = push_const.scene;
-    Instance* instance = scene.all_instances + push_const.instance_idx;
-    PBRMaterial* mat = scene->get_material(push_const.instance_idx, push_const.submesh_idx);
+    PerFrameData *frame_data = push_const.frame_data;
+    Scene *scene = push_const.scene;
+    Instance *instance = scene.all_instances + push_const.instance_idx;
+    PBRMaterial *mat = scene->get_material(push_const.instance_idx, push_const.submesh_idx);
 
     const uint light_cnt = scene.point_light_count.x;
 
@@ -62,7 +37,7 @@ PsOutput main(PsInput input)
     for (uint i = 0; i < light_cnt; i++)
     {
         const PointLight point_light = scene.point_lights[i];
-        light_term += phong_light(frame_data.camera_pos, input.coarse_vertex.world_pos, normal, point_light, object_color);
+        light_term += point_light.phong_light(frame_data.camera_pos, input.coarse_vertex.world_pos, normal, object_color);
     }
 
     const float3 min_color = object_color.xyz * 0.5;

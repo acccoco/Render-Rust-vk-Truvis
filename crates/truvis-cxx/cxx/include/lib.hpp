@@ -1,5 +1,5 @@
 #pragma once
-#include "model_loader/c_data_define.hpp"
+#include "public/scene_loader/c_data_define.hpp"
 
 #ifdef BUILDING_DLL    // 该 macro 由 cmake 定义
 #define DLL_API __declspec(dllexport)

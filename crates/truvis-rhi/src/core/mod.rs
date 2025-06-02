@@ -17,4 +17,3 @@ pub mod sampler;
 pub mod shader;
 pub mod synchronize;
 pub mod texture;
-pub mod window_system;

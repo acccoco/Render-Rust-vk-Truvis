@@ -70,7 +70,7 @@ pub struct RenderContext {
     fence_frame_in_flight: Vec<RhiFence>,
 
     rt_image: Rc<RhiImage2D>,
-    rt_image_view: Rc<RhiImage2DView>,
+    _rt_image_view: Rc<RhiImage2DView>,
     rt_keyword: String,
 
     device: Rc<RhiDevice>,
@@ -117,7 +117,7 @@ impl RenderContext {
             _depth_view: depth_image_view,
 
             rt_image,
-            rt_image_view,
+            _rt_image_view: rt_image_view,
             rt_keyword,
 
             present_complete_semaphores,

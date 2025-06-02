@@ -10,7 +10,7 @@ use std::ffi::CStr;
 use std::rc::Rc;
 use std::sync::OnceLock;
 use truvis_crate_tools::init_log::init_log;
-use truvis_rhi::core::window_system::{MainWindow, WindowCreateInfo};
+use crate::renderer::window_system::{MainWindow, WindowCreateInfo};
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::ActiveEventLoop;

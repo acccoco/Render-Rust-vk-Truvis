@@ -1,5 +1,6 @@
 #include "scene.slangi"
 #include "./phong.slangi"
+#include "pass/rt.slangi"
 
 struct VsInput
 {
@@ -21,7 +22,7 @@ struct VsOutput
 };
 
 [[vk::push_constant]]
-PushConstants push_const;
+rt::PushConstants push_const;
 
 [shader("vertex")]
 VsOutput main(VsInput input)

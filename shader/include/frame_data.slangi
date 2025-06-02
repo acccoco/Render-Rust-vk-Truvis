@@ -1,0 +1,25 @@
+#pragma once
+#include "bindless.slangi"
+
+/// 渲染需要的一些公用参数，每帧更新
+struct PerFrameData
+{
+    float4x4 projection;
+    float4x4 view;
+    float4x4 inv_view;
+    float4x4 inv_projection;
+
+    float3 camera_pos;
+    float time_ms;
+
+    float3 camera_forward;
+    float delta_time_ms;
+
+    float2 mouse_pos;
+    float2 resolution;
+
+    uint64_t frame_id;
+    ImageHandle rt_render_target;
+    /// 累计的帧数
+    uint accum_frames;
+};

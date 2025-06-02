@@ -292,7 +292,7 @@ impl SimlpeRtPass {
                     | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
             )
             .offset(0)
-            .size(size_of::<shader::PushConstants>() as u32);
+            .size(size_of::<shader::rt::PushConstants>() as u32);
 
         let pipeline_layout = {
             let bineless_mgr = bindless_mgr.borrow();
@@ -308,8 +308,9 @@ impl SimlpeRtPass {
             .stages(&stage_infos)
             .groups(&shader_groups)
             .layout(pipeline_layout)
-            // TODO fixme
-            .max_pipeline_ray_recursion_depth(6);
+            // 这个仅仅是用来分配栈内存的，并不会在超过递归深度后让调用被丢弃
+            // 需要手动跟踪递归深度
+            .max_pipeline_ray_recursion_depth(2);
 
         let pipeline = unsafe {
             rhi.device
@@ -359,7 +360,7 @@ impl SimlpeRtPass {
             &[self._bindless_mgr.borrow().bindless_sets[frame_label].handle()],
             None,
         );
-        let push_constant = shader::PushConstants {
+        let push_constant = shader::rt::PushConstants {
             frame_data: per_frame_data.device_address(),
             scene: gpu_scene.scene_device_address(frame_label),
 

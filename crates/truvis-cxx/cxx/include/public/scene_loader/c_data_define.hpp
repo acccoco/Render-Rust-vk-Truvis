@@ -28,7 +28,7 @@ struct alignas(4) CxxVec4f
 /// 4x4 矩阵结构体 (列主序)
 struct alignas(4) CxxMat4f
 {
-    float m[16]; // m[0]..m[3] 是第一列，以此类推
+    float m[16];    // m[0]..m[3] 是第一列，以此类推
 };
 
 /// 三角形面结构体
@@ -54,40 +54,14 @@ struct alignas(4) CxxVertex3D
 struct CxxRasterGeometry
 {
     CxxRasterGeometry() = default;
-
-    ~CxxRasterGeometry()
-    {
-        delete[] vertex_array_;
-        delete[] face_array_;
-        vertex_array_ = nullptr;
-        face_array_ = nullptr;
-    }
-
+    ~CxxRasterGeometry();
     /// 移动构造会在 vector 扩容的时候被调用，避免调用 destructor 导致内存异常释放
-    CxxRasterGeometry(CxxRasterGeometry&& other) noexcept
-        : vertex_cnt_(other.vertex_cnt_),
-          vertex_array_(other.vertex_array_),
-          face_cnt_(other.face_cnt_),
-          face_array_(other.face_array_)
-    {
-        other.vertex_array_ = nullptr;
-        other.face_array_ = nullptr;
-    }
+    CxxRasterGeometry(CxxRasterGeometry&& other) noexcept;
+    CxxRasterGeometry(const CxxRasterGeometry&) = delete;
+    CxxRasterGeometry& operator=(const CxxRasterGeometry&) = delete;
+    CxxRasterGeometry& operator=(CxxRasterGeometry&&) = delete;
 
-    void init(const unsigned int vertex_cnt, const unsigned int face_cnt)
-    {
-        this->vertex_cnt_ = vertex_cnt;
-        this->face_cnt_ = face_cnt;
-
-        if (vertex_cnt != 0)
-        {
-            this->vertex_array_ = new CxxVertex3D[vertex_cnt];
-        }
-        if (face_cnt != 0)
-        {
-            this->face_array_ = new CxxTriangleFace[face_cnt];
-        }
-    }
+    void init(unsigned int vertex_cnt, const unsigned int face_cnt);
 
     [[nodiscard]] unsigned int vertex_cnt() const { return vertex_cnt_; }
     [[nodiscard]] unsigned int face_cnt() const { return face_cnt_; }
@@ -95,12 +69,14 @@ struct CxxRasterGeometry
     [[nodiscard]] CxxTriangleFace* faces() const { return face_array_; }
 
 private:
-    unsigned int vertex_cnt_ = 0;
     CxxVertex3D* vertex_array_ = nullptr;
-
-    unsigned int face_cnt_ = 0;
     CxxTriangleFace* face_array_ = nullptr;
+    unsigned int vertex_cnt_ = 0;
+    unsigned int face_cnt_ = 0;
 };
+
+
+constexpr static size_t PATH_BUFFER_SIZE = 256;
 
 /// 材质结构体
 struct CxxMaterial
@@ -109,48 +85,28 @@ struct CxxMaterial
     CxxVec4f diffuse;
     CxxVec4f specular;
     CxxVec4f emission;
+    CxxVec4f reflection;
 
     /// 字符串使用 C 风格字符数组，确保以 null 结尾
-    char diffuse_map[256];
-    char ambient_map[256];
-    char emissive_map[256];
-    char specular_map[256];
+    char diffuse_map[PATH_BUFFER_SIZE];
+    char ambient_map[PATH_BUFFER_SIZE];
+    char emissive_map[PATH_BUFFER_SIZE];
+    char specular_map[PATH_BUFFER_SIZE];
+    char normal_map[PATH_BUFFER_SIZE];
 };
 
 struct CxxInstance
 {
     CxxInstance() = default;
-
+    ~CxxInstance();
     /// 移动构造会在 vector 扩容的时候被调用，避免调用 destructor 导致内存异常释放
-    CxxInstance(CxxInstance&& other) noexcept
-        : world_transform(other.world_transform),
-          mesh_cnt_(other.mesh_cnt_),
-          mat_indices_(other.mat_indices_),
-          mesh_indices_(other.mesh_indices_)
-    {
-        other.mat_indices_ = nullptr;
-        other.mesh_indices_ = nullptr;
-    }
-
-
-    ~CxxInstance()
-    {
-        delete[] mat_indices_;
-        delete[] mesh_indices_;
-        mat_indices_ = nullptr;
-        mesh_indices_ = nullptr;
-    }
+    CxxInstance(CxxInstance&& other) noexcept;
+    CxxInstance(const CxxInstance&) = delete;
+    CxxInstance& operator=(const CxxInstance&) = delete;
+    CxxInstance& operator=(CxxInstance&&) = delete;
 
     /// mesh 有可能是 0 个，需要格外小心
-    void init(const unsigned int geometry_cnt)
-    {
-        mesh_cnt_ = geometry_cnt;
-        if (mesh_cnt_ != 0)
-        {
-            this->mat_indices_ = new unsigned int[geometry_cnt];
-            this->mesh_indices_ = new unsigned int[geometry_cnt];
-        }
-    }
+    void init(unsigned int geometry_cnt);
 
     [[nodiscard]] unsigned int* mat_indices() const { return mat_indices_; }
     [[nodiscard]] unsigned int* mesh_indices() const { return mesh_indices_; }
@@ -160,10 +116,10 @@ struct CxxInstance
     CxxMat4f world_transform = {};
 
 private:
+    unsigned int* mat_indices_ = nullptr;
+    unsigned int* mesh_indices_ = nullptr;
+
     /// 几何体索引数量
     unsigned int mesh_cnt_ = 0;
-
-    unsigned int* mat_indices_ = nullptr;
-
-    unsigned int* mesh_indices_ = nullptr;
+    int padding_ = 0;
 };

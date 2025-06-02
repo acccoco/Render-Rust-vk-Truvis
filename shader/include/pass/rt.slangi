@@ -1,0 +1,21 @@
+#pragma once
+#include "../frame_data.slangi"
+#include "../ptr.slangi"
+#include "../scene.slangi"
+
+
+namespace rt
+{
+struct PushConstants
+{
+    PTR(PerFrameData, frame_data);
+    PTR(Scene, scene);
+
+    /// raster only
+    uint instance_idx;
+    /// raster only
+    uint submesh_idx;
+    uint _padding_1;
+    uint _padding_2;
+};
+};

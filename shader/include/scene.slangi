@@ -1,7 +1,9 @@
 #pragma once
 #include "bindless.slangi"
-#include "common.slangi"
+#include "geometry.slangi"
 #include "light.slangi"
+#include "material.slangi"
+#include "ptr.slangi"
 
 struct Instance
 {
@@ -12,79 +14,6 @@ struct Instance
 
     float4x4 model;
     float4x4 inv_model;
-};
-
-struct Vertex
-{
-    float3 position;
-    float3 normal;
-    float3 tangent;
-    float3 bitangent;
-    float2 uv;
-};
-
-struct Geometry
-{
-    /// 这个字段就是 vertex buffer
-    PTR(Vertex, position_buffer);
-    PTR(uint, index_buffer);
-
-    PTR(float3, normal_buffer);
-    PTR(float2, uv_buffer);
-
-#ifdef __SLANG__
-    [ForceInline]
-    Vertex *get_vertex(uint vertex_idx)
-    {
-        return position_buffer + vertex_idx;
-    }
-
-    [ForceInline]
-    uint3 get_triangle(uint primive_id)
-    {
-        uint index0 = index_buffer[primive_id * 3 + 0];
-        uint index1 = index_buffer[primive_id * 3 + 1];
-        uint index2 = index_buffer[primive_id * 3 + 2];
-        return uint3(index0, index1, index2);
-    }
-
-    /// 根据插值系数，得到插值后的顶点
-    /// @return normal 并没有 normalized
-    Vertex get_interp_vertex(uint primive_id, float2 barycentrics)
-    {
-        uint3 triangle = get_triangle(primive_id);
-        Vertex *A = get_vertex(triangle.x);
-        Vertex *B = get_vertex(triangle.y);
-        Vertex *C = get_vertex(triangle.z);
-
-        const float a = 1.f - barycentrics.x - barycentrics.y;
-        const float b = barycentrics.x;
-        const float c = barycentrics.y;
-
-        Vertex vertex;
-        vertex.position = A->position * a + B->position * b + C->position * c;
-        vertex.normal = A->normal * a + B->normal * b + C->normal * c;
-        vertex.tangent = A->tangent * a + B->tangent * b + C->tangent * c;
-        vertex.bitangent = A->bitangent * a + B->bitangent * b + C->bitangent * c;
-        vertex.uv = A->uv * a + B->uv * b + C->uv * c;
-        return vertex;
-    }
-
-#endif
-};
-
-struct PBRMaterial
-{
-    float3 base_color;
-    float metallic;
-
-    float3 emissive;
-    float roughness;
-
-    TextureHandle diffuse_map;
-    TextureHandle normal_map;
-    uint _padding_1;
-    uint _padding_2;
 };
 
 struct Scene
@@ -103,10 +32,11 @@ struct Scene
 
     uint point_light_count;
     uint spot_light_count;
-    uint _padding_0;
-    uint _padding_1;
+    TextureHandle sky;
+    TextureHandle uv_checker;
 
 #ifdef __SLANG__
+
     /// 根据 instance idx 和 submesh idx 获取 geometry
     Geometry *
     get_geometry(uint instance_idx, uint submesh_idx)
@@ -132,41 +62,7 @@ struct Scene
             material = all_mats + material_idx;
         return material;
     }
+
 #endif
 };
 
-/// 渲染需要的一些公用参数，每帧更新
-struct PerFrameData
-{
-    float4x4 projection;
-    float4x4 view;
-    float4x4 inv_view;
-    float4x4 inv_projection;
-
-    float3 camera_pos;
-    float time_ms;
-
-    float3 camera_forward;
-    float delta_time_ms;
-
-    float2 mouse_pos;
-    float2 resolution;
-
-    uint64_t frame_id;
-    ImageHandle rt_render_target;
-    /// 累计的帧数
-    uint accum_frames;
-};
-
-struct PushConstants
-{
-    PTR(PerFrameData, frame_data);
-    PTR(Scene, scene);
-
-    /// raster only
-    uint instance_idx;
-    /// raster only
-    uint submesh_idx;
-    uint _padding_1;
-    uint _padding_2;
-};

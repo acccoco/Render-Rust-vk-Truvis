@@ -1,5 +1,5 @@
-#include "model_loader/mesh_loader.hpp"
-#include "model_loader/data_convert.hpp"
+#include "private/scene_loader/data_convert.hpp"
+#include "private/scene_loader/mesh_loader.hpp"
 
 #include <assimp/matrix4x4.h>
 #include <cassert>
@@ -19,7 +19,7 @@ bool MeshLoader::load_scene()
     {
         std::cerr << std::format("Mesh file {} or dir {} not found", this->mesh_path_.string(),
                                  this->dir_path_.string())
-                << std::endl;
+                  << "\n";
         return false;
     }
 
@@ -32,11 +32,11 @@ bool MeshLoader::load_scene()
     // 默认 UV 以左下角为原点，可以通过 FlipUVs 标志修改为左上角
     // 默认矩阵采用 row major 的存储方式
     constexpr auto post_process_flags =
-            aiProcess_CalcTangentSpace        // 如果顶点具有法线属性，自动生成 tangent space 属性
-            | aiProcess_JoinIdenticalVertices // 确保 index buffer 存在，且每个顶点都是不重复的
-            | aiProcess_Triangulate           // 将所有的面三角化
-            | aiProcess_GenNormals            // 如果没有法线，自动生成面法线
-            | aiProcess_SortByPType           // 在三角化之后发生，可以去除 point 和 line
+            aiProcess_CalcTangentSpace           // 如果顶点具有法线属性，自动生成 tangent space 属性
+            | aiProcess_JoinIdenticalVertices    // 确保 index buffer 存在，且每个顶点都是不重复的
+            | aiProcess_Triangulate              // 将所有的面三角化
+            | aiProcess_GenNormals               // 如果没有法线，自动生成面法线
+            | aiProcess_SortByPType              // 在三角化之后发生，可以去除 point 和 line
             | aiProcess_FlipUVs;
 
 
@@ -45,7 +45,7 @@ bool MeshLoader::load_scene()
     this->ai_scene_ = assimp_impoter.ReadFile(mesh_path_.string(), post_process_flags);
     if (!this->ai_scene_ || (this->ai_scene_->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !this->ai_scene_->mRootNode)
     {
-        std::cout << std::format("{}", assimp_impoter.GetErrorString()) << std::endl;
+        std::cout << std::format("{}", assimp_impoter.GetErrorString()) << "\n";
         return false;
     }
 
@@ -64,7 +64,7 @@ bool MeshLoader::load_scene()
 
         // 处理子节点 - 需要累积变换矩阵
         aiMatrix4x4 current_transform = parent_transform * node->mTransformation;
-        for (int i = 0; i < node->mNumChildren; ++i)
+        for (uint32_t i = 0; i < node->mNumChildren; ++i)
         {
             node_queue.emplace_back(node->mChildren[i], current_transform);
         }
@@ -72,7 +72,7 @@ bool MeshLoader::load_scene()
 
     // 处理所有的材质
     this->materials_.reserve(ai_scene_->mNumMaterials);
-    for (int i = 0; i < ai_scene_->mNumMaterials; ++i)
+    for (uint32_t i = 0; i < ai_scene_->mNumMaterials; ++i)
     {
         const auto ai_mat = ai_scene_->mMaterials[i];
         this->materials_.emplace_back();
@@ -82,7 +82,7 @@ bool MeshLoader::load_scene()
 
     // 处理所有的 mesh
     this->geometries_.reserve(ai_scene_->mNumMeshes);
-    for (int i = 0; i < ai_scene_->mNumMeshes; ++i)
+    for (uint32_t i = 0; i < ai_scene_->mNumMeshes; ++i)
     {
         const auto ai_mesh = ai_scene_->mMeshes[i];
         this->geometries_.emplace_back();
@@ -113,6 +113,7 @@ bool MeshLoader::process_material(CxxMaterial& material, const aiMaterial& ai_ma
     // 提取出各种颜色
     {
         aiColor4D out_color = {};
+        ai_real out_real = {};
 
         ai_mat.Get(AI_MATKEY_COLOR_DIFFUSE, out_color);
         material.diffuse = DataConvert::vec4(out_color);
@@ -125,6 +126,9 @@ bool MeshLoader::process_material(CxxMaterial& material, const aiMaterial& ai_ma
 
         ai_mat.Get(AI_MATKEY_COLOR_EMISSIVE, out_color);
         material.emission = DataConvert::vec4(out_color);
+
+        ai_mat.Get(AI_MATKEY_ROUGHNESS_FACTOR, out_real);
+        material.reflection = CxxVec4f{out_real, out_real, out_real, out_real};
     }
 
     // 提取出各种纹理
@@ -132,11 +136,11 @@ bool MeshLoader::process_material(CxxMaterial& material, const aiMaterial& ai_ma
         const auto get_texture = [&](const aiTextureType tex_type, char* dest, const size_t max_len) {
             if (ai_mat.GetTextureCount(tex_type) == 0)
             {
-                dest[0] = '\0'; // 空字符串
+                dest[0] = '\0';    // 空字符串
                 return;
             }
 
-            aiString out_path; // 获取到的是相对路径
+            aiString out_path;    // 获取到的是相对路径
             ai_mat.GetTexture(tex_type, 0, &out_path);
 
             const auto tex_path = dir_path_ / out_path.C_Str();
@@ -147,10 +151,11 @@ bool MeshLoader::process_material(CxxMaterial& material, const aiMaterial& ai_ma
         };
 
         // 复制各种纹理路径到材质结构中
-        get_texture(aiTextureType_DIFFUSE, material.diffuse_map, 256);
-        get_texture(aiTextureType_AMBIENT, material.ambient_map, 256);
-        get_texture(aiTextureType_EMISSIVE, material.emissive_map, 256);
-        get_texture(aiTextureType_SPECULAR, material.specular_map, 256);
+        get_texture(aiTextureType_DIFFUSE, material.diffuse_map, PATH_BUFFER_SIZE);
+        get_texture(aiTextureType_AMBIENT, material.ambient_map, PATH_BUFFER_SIZE);
+        get_texture(aiTextureType_EMISSIVE, material.emissive_map, PATH_BUFFER_SIZE);
+        get_texture(aiTextureType_SPECULAR, material.specular_map, PATH_BUFFER_SIZE);
+        get_texture(aiTextureType_NORMALS, material.normal_map, PATH_BUFFER_SIZE);
     }
 
     return true;
@@ -165,10 +170,10 @@ bool MeshLoader::process_geometry(CxxRasterGeometry& geometry, const aiMesh& ai_
     {
         // 通过 Assimp 的 post-process 保证了这里的 face 都是 triangle
         assert(ai_mesh.mFaces[i].mNumIndices == 3);
-        geometry.faces()[i] = {
-                ai_mesh.mFaces[i].mIndices[0],
-                ai_mesh.mFaces[i].mIndices[1],
-                ai_mesh.mFaces[i].mIndices[2],
+        geometry.faces()[i] = CxxTriangleFace{
+                .a = ai_mesh.mFaces[i].mIndices[0],
+                .b = ai_mesh.mFaces[i].mIndices[1],
+                .c = ai_mesh.mFaces[i].mIndices[2],
         };
     }
 
@@ -189,7 +194,7 @@ bool MeshLoader::process_geometry(CxxRasterGeometry& geometry, const aiMesh& ai_
         geometry.vertices()[i].bitangent = DataConvert::vec3(ai_mesh.mBitangents[i]);
 
         // 默认的 UV 值
-        geometry.vertices()[i].uv = {0.0f, 0.0f};
+        geometry.vertices()[i].uv = CxxVec2f{.x = 0.0f, .y = 0.0f};
     }
 
     // uv: Assimp 最多支持 8 套 uv。我们只需要第一套就好
@@ -204,4 +209,4 @@ bool MeshLoader::process_geometry(CxxRasterGeometry& geometry, const aiMesh& ai_
     return true;
 }
 
-} // namespace truvis
+}    // namespace truvis

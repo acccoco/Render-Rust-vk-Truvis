@@ -12,8 +12,8 @@ pub struct TruMaterial {
     pub specular: glam::Vec4,
     pub emissive: glam::Vec4,
 
-    pub shininess: f32,
-    pub alpha: f32,
+    pub reflection: f32,
+    pub opaque: f32,
 
     pub diffuse_map: String,
     pub ambient_map: String,

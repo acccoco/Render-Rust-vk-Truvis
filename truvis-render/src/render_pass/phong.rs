@@ -30,7 +30,7 @@ impl PhongPass {
         ci.push_constant_ranges(vec![vk::PushConstantRange::default()
             .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
             .offset(0)
-            .size(size_of::<shader::PushConstants>() as u32)]);
+            .size(size_of::<shader::rt::PushConstants>() as u32)]);
         ci.descriptor_set_layouts(vec![bindless_manager.borrow().bindless_layout.handle()]);
         ci.attach_info(vec![frame_settings.color_format], Some(frame_settings.depth_format), None);
         ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
@@ -49,7 +49,7 @@ impl PhongPass {
         &self,
         cmd: &RhiCommandBuffer,
         viewport: &vk::Rect2D,
-        push_constant: &shader::PushConstants,
+        push_constant: &shader::rt::PushConstants,
         frame_idx: usize,
     ) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline());
@@ -96,7 +96,7 @@ impl PhongPass {
         self.bind(
             cmd,
             &viewport.into(),
-            &shader::PushConstants {
+            &shader::rt::PushConstants {
                 frame_data: per_frame_data.device_address(),
                 scene: gpu_scene.scene_device_address(frame_label),
 
@@ -114,7 +114,7 @@ impl PhongPass {
             cmd.cmd_push_constants(
                 self.pipeline.layout(),
                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                offset_of!(shader::PushConstants, instance_idx) as u32,
+                offset_of!(shader::rt::PushConstants, instance_idx) as u32,
                 bytemuck::bytes_of(&data),
             );
         });

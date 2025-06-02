@@ -153,6 +153,11 @@ impl GpuSceneBuffers {
     }
 }
 
+struct Resources {
+    sky: String,
+    uv_checker: String,
+}
+
 /// 用于构建传输到 GPU 的场景数据
 pub struct GpuScene {
     scene_mgr: Rc<RefCell<TheWorld>>,
@@ -175,6 +180,8 @@ pub struct GpuScene {
     mesh_geometry_map: HashMap<uuid::Uuid, usize>,
 
     gpu_scene_buffers: Vec<GpuSceneBuffers>,
+
+    resources: Resources,
 }
 // getter
 impl GpuScene {
@@ -190,6 +197,13 @@ impl GpuScene {
         bindless_mgr: Rc<RefCell<BindlessManager>>,
         frame_in_flight: usize,
     ) -> Self {
+        let resources = Resources {
+            sky: "assets/textures/sky.jpg".to_string(),
+            uv_checker: "assets/textures/uv_checker.png".to_string(),
+        };
+        bindless_mgr.borrow_mut().register_texture(rhi, resources.sky.clone());
+        bindless_mgr.borrow_mut().register_texture(rhi, resources.uv_checker.clone());
+
         Self {
             scene_mgr,
             bindless_mgr,
@@ -200,6 +214,7 @@ impl GpuScene {
             mesh_geometry_map: HashMap::new(),
 
             gpu_scene_buffers: (0..frame_in_flight).map(|i| GpuSceneBuffers::new(rhi, i)).collect(),
+            resources,
         }
     }
 
@@ -303,6 +318,7 @@ impl GpuScene {
     fn upload_scene_buffer(&mut self, frame_label: usize, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
         let scene_mgr = self.scene_mgr.borrow();
         let crt_gpu_buffers = &self.gpu_scene_buffers[frame_label];
+        let bindless_mgr = self.bindless_mgr.borrow();
         let scene_data = shader::Scene {
             all_instances: crt_gpu_buffers.instance_buffer.device_address(),
             all_mats: crt_gpu_buffers.material_buffer.device_address(),
@@ -315,8 +331,8 @@ impl GpuScene {
             spot_light_count: 0, // TODO 暂时无用
             tlas: crt_gpu_buffers.tlas.as_ref().map_or(vk::DeviceAddress::default(), |tlas| tlas.get_device_address()),
 
-            _padding_0: 0,
-            _padding_1: 0,
+            sky: bindless_mgr.get_texture_idx(&self.resources.sky).unwrap(),
+            uv_checker: bindless_mgr.get_texture_idx(&self.resources.uv_checker).unwrap(),
         };
 
         cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.handle(), 0, bytemuck::bytes_of(&scene_data));
@@ -431,13 +447,14 @@ impl GpuScene {
                 emissive: mat.emissive.xyz().into(),
                 metallic: 0.5,
                 roughness: 0.5,
-                diffuse_map: bindless_mgr
-                    .get_texture_idx(&mat.diffuse_map)
-                    .unwrap_or(shader::TextureHandle { index: 0 }),
-                normal_map: shader::TextureHandle { index: 0 },
-
-                _padding_1: Default::default(),
-                _padding_2: Default::default(),
+                diffuse_map: bindless_mgr.get_texture_idx(&mat.diffuse_map).unwrap_or(shader::TextureHandle {
+                    index: shader::INVALID_TEX_ID,
+                }),
+                normal_map: bindless_mgr.get_texture_idx(&mat.normal_map).unwrap_or(shader::TextureHandle {
+                    index: shader::INVALID_TEX_ID,
+                }),
+                reflection: mat.reflection.into(),
+                opaque: mat.opaque.into(),
             };
         }
 
@@ -491,9 +508,6 @@ impl GpuScene {
                 geometry_buffer_slices[crt_geometry_idx + submesh_idx] = shader::Geometry {
                     position_buffer: geometry.vertex_buffer.device_address(),
                     index_buffer: geometry.index_buffer.device_address(),
-
-                    normal_buffer: vk::DeviceAddress::default(), // TODO 暂时无用
-                    uv_buffer: vk::DeviceAddress::default(),     // TODO 暂时无用
                 };
             }
             crt_geometry_idx += mesh.geometries.len();

@@ -7,6 +7,7 @@ use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::TheWorld;
 use crate::renderer::swapchain::RhiSwapchain;
+use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use shader_binding::shader;
 use std::cell::RefCell;
@@ -16,7 +17,7 @@ use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 use truvis_rhi::{
     basic::color::LabelColor,
-    core::{command_queue::RhiSubmitInfo, synchronize::RhiImageBarrier, window_system::MainWindow},
+    core::{command_queue::RhiSubmitInfo, synchronize::RhiImageBarrier},
     rhi::Rhi,
 };
 
