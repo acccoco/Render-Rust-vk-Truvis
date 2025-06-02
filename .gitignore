@@ -2,6 +2,9 @@
 /target
 *.spv
 
+# resource
+assets
+
 # operating system
 .DS_Store
 

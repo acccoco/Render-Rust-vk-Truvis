@@ -1,6 +1,5 @@
 use ash::vk;
 use imgui::Ui;
-use model_manager::component::DrsInstance;
 use shader_binding::shader;
 use truvis_render::app::{OuterApp, TruvisApp};
 use truvis_render::platform::camera::DrsCamera;
@@ -64,7 +63,7 @@ impl OuterApp for PhongApp {
         Self { phong_pass, rt_pass }
     }
 
-    fn draw_ui(&mut self, ui: &mut Ui) {
+    fn draw_ui(&mut self, _ui: &mut Ui) {
         // ui.text_wrapped("Hello world!");
         // ui.text_wrapped("こんにちは世界！");
     }

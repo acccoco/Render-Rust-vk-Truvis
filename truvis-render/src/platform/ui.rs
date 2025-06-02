@@ -346,7 +346,7 @@ impl Gui {
                 }),
             },
             imgui::FontSource::TtfData {
-                data: include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/fonts/mplus-1p-regular.ttf")),
+                data: include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/mplus-1p-regular.ttf")),
                 size_pixels: font_size,
                 config: Some(imgui::FontConfig {
                     rasterizer_multiply: 1.75,

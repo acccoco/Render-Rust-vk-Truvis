@@ -198,8 +198,8 @@ impl GpuScene {
         frame_in_flight: usize,
     ) -> Self {
         let resources = Resources {
-            sky: "assets/textures/sky.jpg".to_string(),
-            uv_checker: "assets/textures/uv_checker.png".to_string(),
+            sky: concat!(env!("CARGO_MANIFEST_DIR"), "/resources/sky.jpg").to_string(),
+            uv_checker: concat!(env!("CARGO_MANIFEST_DIR"), "/resources/uv_checker.png").to_string(),
         };
         bindless_mgr.borrow_mut().register_texture(rhi, resources.sky.clone());
         bindless_mgr.borrow_mut().register_texture(rhi, resources.uv_checker.clone());
