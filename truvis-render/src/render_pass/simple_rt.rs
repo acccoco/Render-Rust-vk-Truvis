@@ -74,6 +74,14 @@ create_named_array!(
                 path: "shader/build/rt/rt.slang.spv",
             }
         ),
+        (
+            DiffuseCall,
+            RhiShaderStageInfo {
+                stage: vk::ShaderStageFlags::CALLABLE_KHR,
+                entry_point: cstr::cstr!("diffuse_callable"),
+                path: "shader/build/rt/rt.slang.spv",
+            }
+        ),
     ]
 );
 
@@ -115,6 +123,14 @@ create_named_array!(
                 ..ShaderGroupInfo::unused()
             }
         ),
+        (
+            DiffuseCall,
+            ShaderGroupInfo {
+                ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
+                general: ShaderStage::DiffuseCall.index() as u32,
+                ..ShaderGroupInfo::unused()
+            }
+        ),
     ]
 );
 
@@ -133,6 +149,7 @@ impl SBTRegions {
     const RAYGEN_SBT_REGION: usize = ShaderGroups::RayGen.index();
     const MISS_SBT_REGION: &'static [usize] = &[ShaderGroups::SkyMiss.index(), ShaderGroups::ShadowMiss.index()];
     const HIT_SBT_REGION: &'static [usize] = &[ShaderGroups::Hit.index()];
+    const CALLABLE_SBT_REGION: &'static [usize] = &[ShaderGroups::DiffuseCall.index()];
 
     pub fn create_sbt(rhi: &Rhi, pipeline: &RhiRtPipeline) -> Self {
         let rt_pipeline_props = rhi.device.rt_pipeline_props();
@@ -154,11 +171,17 @@ impl SBTRegions {
             Self::HIT_SBT_REGION.len() as u32 * aligned_shader_group_handle_size,
             rt_pipeline_props.shader_group_base_alignment,
         );
+        let callable_shader_group_region_size = helper::align_up(
+            Self::CALLABLE_SBT_REGION.len() as u32 * aligned_shader_group_handle_size,
+            rt_pipeline_props.shader_group_base_alignment,
+        );
 
         let mut sbt_buffer = RhiSBTBuffer::new(
             rhi,
-            (raygen_shader_group_region_size + miss_shader_group_region_size + hit_shader_group_region_size)
-                as vk::DeviceSize,
+            (raygen_shader_group_region_size
+                + miss_shader_group_region_size
+                + hit_shader_group_region_size
+                + callable_shader_group_region_size) as vk::DeviceSize,
             rt_pipeline_props.shader_group_base_alignment as vk::DeviceSize,
             "simple-rt-sbt",
         );
@@ -181,6 +204,15 @@ impl SBTRegions {
                 sbt_address
                     + raygen_shader_group_region_size as vk::DeviceSize
                     + miss_shader_group_region_size as vk::DeviceSize,
+            );
+        let sbt_region_callable = vk::StridedDeviceAddressRegionKHR::default()
+            .stride(aligned_shader_group_handle_size as vk::DeviceSize)
+            .size(callable_shader_group_region_size as vk::DeviceSize)
+            .device_address(
+                sbt_address
+                    + raygen_shader_group_region_size as vk::DeviceSize
+                    + miss_shader_group_region_size as vk::DeviceSize
+                    + hit_shader_group_region_size as vk::DeviceSize,
             );
 
         // 从 pipeline 中获取 shader 的 handle，并且将 shader handle 写入到 shader binding table 中
@@ -232,6 +264,14 @@ impl SBTRegions {
                 );
             }
 
+            let sbt_host_addr_callable = sbt_host_addr_hit.wrapping_byte_add(sbt_region_hit.size as usize);
+            for (idx, group_handle_idx) in Self::CALLABLE_SBT_REGION.iter().enumerate() {
+                copy_shader_group_hande(
+                    *group_handle_idx,
+                    sbt_host_addr_callable.wrapping_byte_add(idx * sbt_region_callable.stride as usize),
+                );
+            }
+
             sbt_buffer.flush(0, sbt_buffer_size);
             sbt_buffer.unmap()
         }
@@ -240,7 +280,7 @@ impl SBTRegions {
             sbt_region_raygen,
             sbt_region_miss,
             sbt_region_hit,
-            sbt_region_callable: vk::StridedDeviceAddressRegionKHR::default(),
+            sbt_region_callable,
             _sbt_buffer: sbt_buffer,
             _device: rhi.device.clone(),
         }
@@ -289,6 +329,7 @@ impl SimlpeRtPass {
                 vk::ShaderStageFlags::RAYGEN_KHR
                     | vk::ShaderStageFlags::MISS_KHR
                     | vk::ShaderStageFlags::ANY_HIT_KHR
+                    | vk::ShaderStageFlags::CALLABLE_KHR
                     | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
             )
             .offset(0)
@@ -375,6 +416,7 @@ impl SimlpeRtPass {
             vk::ShaderStageFlags::RAYGEN_KHR
                 | vk::ShaderStageFlags::MISS_KHR
                 | vk::ShaderStageFlags::ANY_HIT_KHR
+                | vk::ShaderStageFlags::CALLABLE_KHR
                 | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
             0,
             bytemuck::bytes_of(&push_constant),

@@ -25,6 +25,14 @@ struct ShadowMissPayload
     bool miss;
 };
 
+struct MatPayload
+{
+    uint instance_id;
+    uint geometry_id;
+    float2 uv;
+    float3 color;
+};
+
 [shader("raygeneration")]
 void main_ray_gen()
 {
@@ -111,7 +119,16 @@ void main_closest_hit(inout MainPayload payload, in BuiltInTriangleIntersectionA
     float3 tex_color;
     if (mat.diffuse_map.is_valid())
     {
-        tex_color = mat.diffuse_map.sample(interp_vertex.uv).xyz;
+        MatPayload mat_payload;
+        mat_payload.instance_id = instance_id;
+        mat_payload.geometry_id = geometry_id;
+        mat_payload.uv = interp_vertex.uv;
+        mat_payload.color = float3(0.f);
+        CallShader(0, mat_payload);
+
+        tex_color = mat_payload.color;
+        // tex_color = mat.diffuse_map.sample(interp_vertex.uv).xyz;
+
         payload.attenuation *= 0.4f;
         if (payload.attenuation.x > 0.1f)
         {
@@ -174,6 +191,13 @@ void main_closest_hit(inout MainPayload payload, in BuiltInTriangleIntersectionA
     }
 
     payload.color = float3(mat.base_color * tex_color.xyz * attenuation);
+}
+
+[shader("callable")]
+void diffuse_callable(inout MatPayload payload)
+{
+    PBRMaterial *mat = push_const.scene.get_material(payload.instance_id, payload.geometry_id);
+    payload.color = mat.diffuse_map.sample(payload.uv).xyz;
 }
 
 /// FIXME 这个效率很低
