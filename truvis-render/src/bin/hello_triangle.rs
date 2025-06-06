@@ -107,7 +107,7 @@ impl OuterApp for HelloTriangle {
         log::info!("hello triangle init.");
 
         // 至少注册一个纹理，否则 bindless layout 会没有纹理绑定点
-        renderer.bindless_mgr.borrow_mut().register_texture(&renderer.rhi, "assets/uv_checker.png".to_string());
+        // renderer.bindless_mgr.borrow_mut().register_texture(&renderer.rhi, "assets/uv_checker.png".to_string());
 
         HelloTriangle::new(&renderer.rhi, renderer.frame_settings())
     }

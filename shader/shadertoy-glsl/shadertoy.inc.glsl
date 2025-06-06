@@ -8,6 +8,6 @@ layout(push_constant) uniform PushConstants {
     int frame;
     float frame_rate;
 
-    float __padding__1;
-    float __padding__2;
+    float padding_1;
+    float padding_2;
 } pc;

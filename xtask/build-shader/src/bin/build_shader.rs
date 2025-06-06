@@ -92,7 +92,7 @@ impl ShaderCompileTask {
     }
 
     fn process_cmd_output(&self, output: std::process::Output) {
-        if !output.status.success() {
+        if true {
             if !output.stdout.is_empty() {
                 log::info!("stdout: {stdout}", stdout = String::from_utf8_lossy(&output.stdout));
             }
