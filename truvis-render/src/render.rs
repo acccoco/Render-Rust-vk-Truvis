@@ -1,7 +1,8 @@
+use crate::pipeline_settings::{AccumData, FrameSettings, PipelineSettings};
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
-use crate::render_context::{FrameSettings, RenderContext};
+use crate::render_context::RenderContext;
 use crate::render_pass::compute::ComputePass;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
@@ -21,23 +22,6 @@ use truvis_rhi::{
     rhi::Rhi,
 };
 
-const DEPTH_FORMAT_CANDIDATES: &[vk::Format] = &[
-    vk::Format::D32_SFLOAT_S8_UINT,
-    vk::Format::D32_SFLOAT,
-    vk::Format::D24_UNORM_S8_UINT,
-    vk::Format::D16_UNORM_S8_UINT,
-    vk::Format::D16_UNORM,
-];
-
-const FRAMES_IN_FLIGHT: usize = 3;
-
-const DEFAULT_SURFACE_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
-    format: vk::Format::B8G8R8A8_UNORM,
-    color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
-};
-
-const DEFAULT_PRESENT_MODE: vk::PresentModeKHR = vk::PresentModeKHR::MAILBOX;
-
 /// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
 pub struct Renderer {
     /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
@@ -46,7 +30,8 @@ pub struct Renderer {
     /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
     pub render_swapchain: Option<RhiSwapchain>,
 
-    frame_settings: FrameSettings,
+    pipeline_settings: PipelineSettings,
+    accum_data: AccumData,
 
     pub rhi: Rc<Rhi>,
 
@@ -84,8 +69,8 @@ impl Renderer {
     }
 
     #[inline]
-    pub fn frame_settings(&self) -> FrameSettings {
-        self.frame_settings
+    pub fn pipeline_settings(&self) -> PipelineSettings {
+        self.pipeline_settings
     }
 
     #[inline]
@@ -112,10 +97,11 @@ impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         let rhi = Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext));
 
-        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, FRAMES_IN_FLIGHT)));
+        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, DefaultRenderSettings::FRAMES_IN_FLIGHT)));
         let scene_mgr = Rc::new(RefCell::new(TheWorld::new(bindless_mgr.clone())));
-        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), FRAMES_IN_FLIGHT);
-        let per_frame_data_buffers = (0..FRAMES_IN_FLIGHT)
+        let gpu_scene =
+            GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), DefaultRenderSettings::FRAMES_IN_FLIGHT);
+        let per_frame_data_buffers = (0..DefaultRenderSettings::FRAMES_IN_FLIGHT)
             .map(|idx| {
                 RhiStructuredBuffer::<shader::PerFrameData>::new_ubo(&rhi, 1, format!("per-frame-data-buffer-{idx}"))
             })
@@ -129,16 +115,13 @@ impl Renderer {
         );
 
         Self {
-            frame_settings: FrameSettings {
-                frames_in_flight: FRAMES_IN_FLIGHT,
-                extent: vk::Extent2D::default(),
-                rt_rect: vk::Rect2D::default(),
-                color_format: DEFAULT_SURFACE_FORMAT.format,
+            pipeline_settings: PipelineSettings {
+                color_format: DefaultRenderSettings::DEFAULT_SURFACE_FORMAT.format,
                 depth_format: Self::get_depth_format(&rhi),
-                accum_frames: None,
-                last_camera_dir: glam::Vec3::ZERO,
-                last_camera_pos: glam::Vec3::ZERO,
+                frames_in_flight: DefaultRenderSettings::FRAMES_IN_FLIGHT,
+                frame_settings: Default::default(),
             },
+            accum_data: Default::default(),
             blit_pass,
             render_context: None,
             render_swapchain: None,
@@ -158,7 +141,7 @@ impl Renderer {
     /// 根据 vulkan 实例和显卡，获取合适的深度格式
     fn get_depth_format(rhi: &Rhi) -> vk::Format {
         rhi.find_supported_format(
-            DEPTH_FORMAT_CANDIDATES,
+            DefaultRenderSettings::DEPTH_FORMAT_CANDIDATES,
             vk::ImageTiling::OPTIMAL,
             vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
         )
@@ -222,16 +205,7 @@ impl Renderer {
 
     pub fn before_render(&mut self, input_state: &InputState, timer: &Timer, camera: &DrsCamera) {
         let current_camera_dir = glam::vec3(camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg);
-        if camera.position != self.frame_settings.last_camera_pos
-            || self.frame_settings.last_camera_dir != current_camera_dir
-        {
-            self.frame_settings.reset_accum_frames();
-        }
-
-        self.frame_settings.last_camera_pos = camera.position;
-        self.frame_settings.last_camera_dir = current_camera_dir;
-
-        self.frame_settings.update_accum_frames();
+        self.accum_data.update_accum_frames(current_camera_dir, camera.position);
         self.update_gpu_scene(input_state, timer, camera);
 
         // main pass
@@ -269,22 +243,19 @@ impl Renderer {
         self.render_swapchain = Some(RhiSwapchain::new(
             &self.rhi,
             window,
-            DEFAULT_PRESENT_MODE,
-            DEFAULT_SURFACE_FORMAT,
+            DefaultRenderSettings::DEFAULT_PRESENT_MODE,
+            DefaultRenderSettings::DEFAULT_SURFACE_FORMAT,
             &mut self.bindless_mgr.borrow_mut(),
         ));
 
-        self.frame_settings.extent = self.swapchain_extent();
-        self.frame_settings.rt_rect = vk::Rect2D {
-            offset: vk::Offset2D { x: 0, y: 0 },
-            extent: vk::Extent2D {
-                width: self.swapchain_extent().width,
-                height: self.swapchain_extent().height,
-            },
+        self.pipeline_settings.frame_settings = FrameSettings {
+            viewport_extent: self.swapchain_extent(),
+            rt_extent: self.swapchain_extent(),
+            rt_offset: vk::Offset2D { x: 0, y: 0 },
         };
-        self.frame_settings.reset_accum_frames();
+        self.accum_data.reset();
         self.render_context =
-            Some(RenderContext::new(&self.rhi, self.frame_settings, &mut self.bindless_mgr.borrow_mut()));
+            Some(RenderContext::new(&self.rhi, &self.pipeline_settings, &mut self.bindless_mgr.borrow_mut()));
     }
 
     fn update_gpu_scene(&mut self, input_state: &InputState, timer: &Timer, camera: &DrsCamera) {
@@ -336,7 +307,7 @@ impl Renderer {
                     y: extent.height as f32,
                 },
                 rt_render_target: render_context.current_rt_bindless_handle(&self.bindless_mgr.borrow()),
-                accum_frames: self.frame_settings.accum_frames.unwrap() as u32,
+                accum_frames: self.accum_data.accum_frames_num as u32,
             }
         };
         cmd.cmd_update_buffer(
@@ -382,8 +353,8 @@ impl Renderer {
                 ],
             );
 
-            let rt_image_extent = self.frame_settings.rt_rect.extent;
-            let rt_image_offset = self.frame_settings.rt_rect.offset;
+            let rt_image_extent = self.pipeline_settings.frame_settings.rt_extent;
+            let rt_image_offset = self.pipeline_settings.frame_settings.rt_offset;
             self.blit_pass.exec(
                 &cmd,
                 &self.bindless_mgr.borrow(),
@@ -417,4 +388,21 @@ impl Renderer {
 
         self.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
+}
+
+struct DefaultRenderSettings;
+impl DefaultRenderSettings {
+    pub const DEPTH_FORMAT_CANDIDATES: &'static [vk::Format] = &[
+        vk::Format::D32_SFLOAT_S8_UINT,
+        vk::Format::D32_SFLOAT,
+        vk::Format::D24_UNORM_S8_UINT,
+        vk::Format::D16_UNORM_S8_UINT,
+        vk::Format::D16_UNORM,
+    ];
+    pub const FRAMES_IN_FLIGHT: usize = 3;
+    pub const DEFAULT_SURFACE_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
+        format: vk::Format::B8G8R8A8_UNORM,
+        color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
+    };
+    pub const DEFAULT_PRESENT_MODE: vk::PresentModeKHR = vk::PresentModeKHR::MAILBOX;
 }

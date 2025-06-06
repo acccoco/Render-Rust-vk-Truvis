@@ -1,3 +1,4 @@
+use crate::pipeline_settings::{PipelineSettings, FRAME_ID_MAP};
 use crate::renderer::bindless::BindlessManager;
 use ash::vk;
 use itertools::Itertools;
@@ -15,36 +16,6 @@ use truvis_rhi::{
     },
     rhi::Rhi,
 };
-
-/// frames in flight name
-pub const FRAME_ID_MAP: [char; 4] = ['A', 'B', 'C', 'D'];
-
-#[derive(Debug, Clone, Copy)]
-pub struct FrameSettings {
-    pub extent: vk::Extent2D,
-    pub rt_rect: vk::Rect2D,
-    pub color_format: vk::Format,
-    pub depth_format: vk::Format,
-    pub frames_in_flight: usize,
-    pub last_camera_pos: glam::Vec3,
-    pub last_camera_dir: glam::Vec3,
-
-    /// 累计的帧数，可以用于 TAA
-    pub accum_frames: Option<usize>,
-}
-impl FrameSettings {
-    pub fn reset_accum_frames(&mut self) {
-        self.accum_frames = None;
-    }
-
-    pub fn update_accum_frames(&mut self) {
-        if let Some(accum) = self.accum_frames.as_mut() {
-            *accum += 1;
-        } else {
-            self.accum_frames = Some(0);
-        }
-    }
-}
 
 pub struct RenderContext {
     /// 当前处在 in-flight 的第几帧：A, B, C
@@ -80,12 +51,15 @@ pub struct RenderContext {
 }
 // Ctor
 impl RenderContext {
-    pub fn new(rhi: &Rhi, frame_settings: FrameSettings, bindless_mgr: &mut BindlessManager) -> Self {
-        let (depth_image, depth_image_view) =
-            Self::create_depth_image_and_view(rhi, frame_settings.extent, frame_settings.depth_format);
+    pub fn new(rhi: &Rhi, pipeline_settings: &PipelineSettings, bindless_mgr: &mut BindlessManager) -> Self {
+        let (depth_image, depth_image_view) = Self::create_depth_image_and_view(
+            rhi,
+            pipeline_settings.frame_settings.viewport_extent,
+            pipeline_settings.depth_format,
+        );
 
         let create_semaphore = |name: &str| {
-            (0..frame_settings.frames_in_flight)
+            (0..pipeline_settings.frames_in_flight)
                 .map(|i| FRAME_ID_MAP[i])
                 .map(|tag| RhiSemaphore::new(rhi, &format!("{name}_{tag}")))
                 .collect_vec()
@@ -93,14 +67,14 @@ impl RenderContext {
         let present_complete_semaphores = create_semaphore("present_complete_semaphore");
         let render_complete_semaphores = create_semaphore("render_complete_semaphores");
 
-        let fence_frame_in_flight = (0..frame_settings.frames_in_flight)
+        let fence_frame_in_flight = (0..pipeline_settings.frames_in_flight)
             .map(|i| FRAME_ID_MAP[i])
             .map(|tag| RhiFence::new(rhi, true, &format!("frame_in_flight_fence_{tag}")))
             .collect();
 
-        let graphics_command_pools = Self::init_command_pool(rhi, frame_settings.frames_in_flight);
+        let graphics_command_pools = Self::init_command_pool(rhi, pipeline_settings.frames_in_flight);
         let (rt_image, rt_image_view) =
-            Self::create_rt_images(rhi, frame_settings.color_format, frame_settings.rt_rect.extent);
+            Self::create_rt_images(rhi, pipeline_settings.color_format, pipeline_settings.frame_settings.rt_extent);
         let rt_keyword = "rt-image".to_string();
         bindless_mgr.register_image(rt_keyword.clone(), rt_image_view.clone());
 
@@ -108,10 +82,10 @@ impl RenderContext {
             frame_label: 0,
             frame_id: 0,
 
-            frames_in_flight: frame_settings.frames_in_flight,
+            frames_in_flight: pipeline_settings.frames_in_flight,
 
             graphics_command_pools,
-            allocated_command_buffers: vec![Vec::new(); frame_settings.frames_in_flight],
+            allocated_command_buffers: vec![Vec::new(); pipeline_settings.frames_in_flight],
 
             _depth_image: depth_image,
             _depth_view: depth_image_view,

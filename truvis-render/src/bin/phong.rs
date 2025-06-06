@@ -56,7 +56,7 @@ impl PhongApp {
 impl OuterApp for PhongApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
         let rt_pass = SimlpeRtPass::new(&renderer.rhi, renderer.bindless_mgr.clone());
-        let phong_pass = PhongPass::new(&renderer.rhi, &renderer.frame_settings(), renderer.bindless_mgr.clone());
+        let phong_pass = PhongPass::new(&renderer.rhi, &renderer.pipeline_settings(), renderer.bindless_mgr.clone());
 
         Self::create_scene(renderer, camera);
 
@@ -70,7 +70,7 @@ impl OuterApp for PhongApp {
 
     fn draw(&self, renderer: &mut Renderer, _timer: &Timer) {
         let crt_frame_label = renderer.crt_frame_label();
-        let frame_settings = renderer.frame_settings();
+        let pipeline_settigns = renderer.pipeline_settings();
 
         let render_context = renderer.render_context.as_mut().unwrap();
         let swapchian = renderer.render_swapchain.as_mut().unwrap();
@@ -81,7 +81,7 @@ impl OuterApp for PhongApp {
         let render_info = FrameBuffer::get_render_info(
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
-                extent: frame_settings.extent,
+                extent: pipeline_settigns.frame_settings.viewport_extent,
             },
             std::slice::from_ref(&color_attach),
             &depth_attach,
@@ -95,7 +95,7 @@ impl OuterApp for PhongApp {
             self.phong_pass.draw(
                 &phong_cmd,
                 &render_info,
-                frame_settings.extent,
+                pipeline_settigns.frame_settings.viewport_extent,
                 per_frame_data_buffer,
                 &renderer.gpu_scene,
                 crt_frame_label,
@@ -105,7 +105,13 @@ impl OuterApp for PhongApp {
 
         let rt_cmd = render_context.alloc_command_buffer("[rt-pass]ray-trace");
         rt_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[rt-pass]ray-trace");
-        self.rt_pass.ray_trace(&rt_cmd, render_context, &frame_settings, per_frame_data_buffer, &renderer.gpu_scene);
+        self.rt_pass.ray_trace(
+            &rt_cmd,
+            render_context,
+            &pipeline_settigns.frame_settings,
+            per_frame_data_buffer,
+            &renderer.gpu_scene,
+        );
         rt_cmd.end();
 
         rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[rt_cmd])], None);

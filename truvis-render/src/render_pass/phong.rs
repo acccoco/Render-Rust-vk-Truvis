@@ -1,4 +1,4 @@
-use crate::render_context::FrameSettings;
+use crate::pipeline_settings::PipelineSettings;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
 use ash::vk;
@@ -19,7 +19,11 @@ pub struct PhongPass {
     bindless_manager: Rc<RefCell<BindlessManager>>,
 }
 impl PhongPass {
-    pub fn new(rhi: &Rhi, frame_settings: &FrameSettings, bindless_manager: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new(
+        rhi: &Rhi,
+        pipeline_settings: &PipelineSettings,
+        bindless_manager: Rc<RefCell<BindlessManager>>,
+    ) -> Self {
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
         ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv", cstr::cstr!("main"));
         ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv", cstr::cstr!("main"));
@@ -32,7 +36,7 @@ impl PhongPass {
             .offset(0)
             .size(size_of::<shader::rt::PushConstants>() as u32)]);
         ci.descriptor_set_layouts(vec![bindless_manager.borrow().bindless_layout.handle()]);
-        ci.attach_info(vec![frame_settings.color_format], Some(frame_settings.depth_format), None);
+        ci.attach_info(vec![pipeline_settings.color_format], Some(pipeline_settings.depth_format), None);
         ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
             .blend_enable(false)
             .color_write_mask(vk::ColorComponentFlags::RGBA)]);

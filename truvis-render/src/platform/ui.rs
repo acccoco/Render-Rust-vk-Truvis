@@ -1,6 +1,8 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use crate::render_context::{FrameSettings, RenderContext};
+use crate::pipeline_settings::{FrameSettings, PipelineSettings};
+use crate::render_context::RenderContext;
+use crate::renderer::swapchain::RhiSwapchain;
 use ash::vk;
 use image::EncodableLayout;
 use shader_layout_macro::ShaderLayout;
@@ -8,7 +10,6 @@ use std::mem::offset_of;
 use std::{cell::RefCell, rc::Rc};
 use truvis_rhi::core::descriptor::RhiDescriptorSetLayout;
 use truvis_rhi::core::device::RhiDevice;
-use crate::renderer::swapchain::RhiSwapchain;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::shader_cursor::ShaderCursor;
 use truvis_rhi::{
@@ -242,7 +243,7 @@ impl Drop for Gui {
 
 // constructor & getter
 impl Gui {
-    pub fn new(rhi: &Rhi, window: &winit::window::Window, framse_settings: &FrameSettings) -> Self {
+    pub fn new(rhi: &Rhi, window: &winit::window::Window, pipeline_settings: &PipelineSettings) -> Self {
         let (mut imgui, platform) = Self::create_imgui(window);
 
         let descriptor_set_layout = RhiDescriptorSetLayout::<UiShaderLayout>::new(
@@ -253,7 +254,7 @@ impl Gui {
         let pipeline_layout = Self::create_pipeline_layout(rhi.device.handle(), descriptor_set_layout.handle());
         rhi.device.debug_utils().set_object_debug_name(pipeline_layout, "[uipass]pipeline-layout");
         let pipeline =
-            Self::create_pipeline(rhi, framse_settings.color_format, framse_settings.depth_format, pipeline_layout);
+            Self::create_pipeline(rhi, pipeline_settings.color_format, pipeline_settings.depth_format, pipeline_layout);
         rhi.device.debug_utils().set_object_debug_name(pipeline, "[uipass]pipeline");
 
         let fonts_texture = {
@@ -319,7 +320,7 @@ impl Gui {
             _descriptor_pool: descriptor_pool,
             font_descriptor_set: descriptor_set,
 
-            meshes: (0..framse_settings.frames_in_flight).map(|_| None).collect(),
+            meshes: (0..pipeline_settings.frames_in_flight).map(|_| None).collect(),
 
             _device: rhi.device.clone(),
 
@@ -594,7 +595,7 @@ impl Gui {
             .store_op(vk::AttachmentStoreOp::STORE);
         let render_info = vk::RenderingInfo::default()
             .layer_count(1)
-            .render_area(frame_settings.extent.into())
+            .render_area(frame_settings.viewport_extent.into())
             .color_attachments(std::slice::from_ref(&color_attach_info))
             .depth_attachment(&depth_attach_info);
 

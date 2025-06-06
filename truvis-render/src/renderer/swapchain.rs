@@ -1,4 +1,4 @@
-use crate::render_context::FRAME_ID_MAP;
+use crate::pipeline_settings::FRAME_ID_MAP;
 use crate::renderer::bindless::BindlessManager;
 use ash::vk;
 use itertools::Itertools;

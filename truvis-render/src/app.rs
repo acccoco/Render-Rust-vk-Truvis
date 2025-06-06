@@ -4,13 +4,13 @@ use crate::platform::input_manager::InputManager;
 use crate::platform::timer::Timer;
 use crate::platform::ui::Gui;
 use crate::render::Renderer;
+use crate::renderer::window_system::{MainWindow, WindowCreateInfo};
 use raw_window_handle::HasDisplayHandle;
 use std::cell::{OnceCell, RefCell};
 use std::ffi::CStr;
 use std::rc::Rc;
 use std::sync::OnceLock;
 use truvis_crate_tools::init_log::init_log;
-use crate::renderer::window_system::{MainWindow, WindowCreateInfo};
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
@@ -106,7 +106,7 @@ impl<T: OuterApp> TruvisApp<T> {
 
         let window_system = MainWindow::new(event_loop, window_init_info);
         self.renderer.init_after_window(&window_system);
-        let gui = Gui::new(&self.renderer.rhi, window_system.window(), &self.renderer.frame_settings());
+        let gui = Gui::new(&self.renderer.rhi, window_system.window(), &self.renderer.pipeline_settings());
 
         let outer_app = T::init(&mut self.renderer, self.camera_controller.camera_mut());
 
@@ -141,12 +141,12 @@ impl<T: OuterApp> TruvisApp<T> {
             self.outer_app.get_mut().unwrap().draw(&mut self.renderer, &self.timer);
             self.renderer.after_render();
 
-            let frame_settings = self.renderer.frame_settings();
+            let pipeline_settings = self.renderer.pipeline_settings();
             self.gui.get_mut().unwrap().draw(
                 &self.renderer.rhi,
                 self.renderer.render_context.as_mut().unwrap(),
                 self.renderer.render_swapchain.as_mut().unwrap(),
-                &frame_settings,
+                &pipeline_settings.frame_settings,
                 self.window_system.get().unwrap().window(),
                 |imgui| {
                     self.outer_app.get_mut().unwrap().draw_ui(imgui);
