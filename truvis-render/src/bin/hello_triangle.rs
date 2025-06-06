@@ -4,10 +4,11 @@ use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
 use truvis_render::app::{OuterApp, TruvisApp};
+use truvis_render::pipeline_settings::PipelineSettings;
 use truvis_render::platform::camera::DrsCamera;
 use truvis_render::platform::timer::Timer;
 use truvis_render::render::Renderer;
-use truvis_render::render_context::{FrameSettings, RenderContext};
+use truvis_render::render_context::RenderContext;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_render::renderer::swapchain::RhiSwapchain;
 use truvis_rhi::core::graphics_pipeline::RhiGraphicsPipelineCreateInfo;
@@ -25,13 +26,13 @@ struct HelloTriangle {
 }
 
 impl HelloTriangle {
-    fn init_pipeline(rhi: &Rhi, frame_settings: &FrameSettings) -> RhiGraphicsPipeline {
+    fn init_pipeline(rhi: &Rhi, pipeline_settings: &PipelineSettings) -> RhiGraphicsPipeline {
         let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
         pipeline_ci.vertex_shader_stage("shader/build/hello_triangle/triangle.slang.spv", cstr::cstr!("vsmain"));
         pipeline_ci.fragment_shader_stage("shader/build/hello_triangle/triangle.slang.spv", cstr::cstr!("psmain"));
         pipeline_ci.attach_info(
-            vec![frame_settings.color_format],
-            Some(frame_settings.depth_format),
+            vec![pipeline_settings.color_format],
+            Some(pipeline_settings.depth_format),
             Some(vk::Format::UNDEFINED),
         );
         pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
@@ -90,8 +91,8 @@ impl HelloTriangle {
         rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
-    fn new(rhi: &Rhi, frame_settings: FrameSettings) -> Self {
-        let pipeline = HelloTriangle::init_pipeline(rhi, &frame_settings);
+    fn new(rhi: &Rhi, pipeline_settings: &PipelineSettings) -> Self {
+        let pipeline = HelloTriangle::init_pipeline(rhi, &pipeline_settings);
         let triangle = VertexAosLayoutPosColor::triangle(rhi);
         Self {
             triangle,
@@ -103,13 +104,13 @@ impl HelloTriangle {
 }
 
 impl OuterApp for HelloTriangle {
-    fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
+    fn init(renderer: &mut Renderer, _camera: &mut DrsCamera) -> Self {
         log::info!("hello triangle init.");
 
         // 至少注册一个纹理，否则 bindless layout 会没有纹理绑定点
         // renderer.bindless_mgr.borrow_mut().register_texture(&renderer.rhi, "assets/uv_checker.png".to_string());
 
-        HelloTriangle::new(&renderer.rhi, renderer.pipeline_settings())
+        HelloTriangle::new(&renderer.rhi, &renderer.pipeline_settings())
     }
 
     fn draw_ui(&mut self, ui: &mut Ui) {

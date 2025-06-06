@@ -5,10 +5,11 @@ use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
 use truvis_render::app::{OuterApp, TruvisApp};
+use truvis_render::pipeline_settings::PipelineSettings;
 use truvis_render::platform::camera::DrsCamera;
 use truvis_render::platform::timer::Timer;
 use truvis_render::render::Renderer;
-use truvis_render::render_context::{FrameSettings, RenderContext};
+use truvis_render::render_context::RenderContext;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_render::renderer::swapchain::RhiSwapchain;
 use truvis_rhi::core::graphics_pipeline::RhiGraphicsPipelineCreateInfo;
@@ -42,7 +43,7 @@ struct ShaderToy {
 }
 
 impl ShaderToy {
-    fn init_pipeline(rhi: &Rhi, frame_settings: FrameSettings) -> RhiGraphicsPipeline {
+    fn init_pipeline(rhi: &Rhi, pipeline_settings: &PipelineSettings) -> RhiGraphicsPipeline {
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
         ci.push_constant_ranges(vec![vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
@@ -51,7 +52,7 @@ impl ShaderToy {
         }]);
         ci.vertex_shader_stage("shader/build/shadertoy-glsl/shadertoy.vert.spv", cstr::cstr!("main"));
         ci.fragment_shader_stage("shader/build/shadertoy-glsl/shadertoy.frag.spv", cstr::cstr!("main"));
-        ci.attach_info(vec![frame_settings.color_format], Some(frame_settings.depth_format), None);
+        ci.attach_info(vec![pipeline_settings.color_format], Some(pipeline_settings.depth_format), None);
         ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
         ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
         ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
@@ -131,10 +132,10 @@ impl ShaderToy {
         rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
-    fn new(rhi: &Rhi, frame_settings: FrameSettings) -> Self {
+    fn new(rhi: &Rhi, pipeline_settings: &PipelineSettings) -> Self {
         log::info!("start.");
 
-        let pipeline = Self::init_pipeline(rhi, frame_settings);
+        let pipeline = Self::init_pipeline(rhi, pipeline_settings);
         let rectangle = VertexAosLayoutPosColor::rectangle(rhi);
 
         Self { rectangle, pipeline }
@@ -142,11 +143,11 @@ impl ShaderToy {
 }
 
 impl OuterApp for ShaderToy {
-    fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
+    fn init(renderer: &mut Renderer, _camera: &mut DrsCamera) -> Self {
         // 至少注册一个纹理，否则 bindless layout 会没有纹理绑定点
         // renderer.bindless_mgr.borrow_mut().register_texture(&renderer.rhi, "assets/uv_checker.png".to_string());
 
-        ShaderToy::new(&renderer.rhi, renderer.pipeline_settings())
+        ShaderToy::new(&renderer.rhi, &renderer.pipeline_settings())
     }
 
     fn draw_ui(&mut self, ui: &mut Ui) {
