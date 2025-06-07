@@ -5,21 +5,21 @@ macro_rules! create_named_array {
         // 定义枚举
         #[repr(usize)]
         #[derive(Debug, Clone, Copy)]
-        pub enum $enum_name {
+        enum $enum_name {
             $($variant,)*
         }
-
-        // 定义数组
-        pub const $array_name: [$type; count_indexed_array!($($variant),*)] = [
-            $($value,)*
-        ];
 
         // 定义索引方法
         impl $enum_name {
             const COUNT: usize = count_indexed_array!($($variant),*);
 
+            // 定义数组
+            const ARRAY: [$type; Self::COUNT] = [
+                $($value,)*
+            ];
+
             pub fn value(self) -> &'static $type {
-                &$array_name[self as usize]
+                &Self::ARRAY[self as usize]
             }
 
             pub const fn index(self) -> usize {
