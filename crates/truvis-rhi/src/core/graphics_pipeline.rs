@@ -3,14 +3,11 @@ use crate::core::device::RhiDevice;
 use crate::core::shader::{RhiShaderModule, RhiShaderStageInfo};
 use ash::vk;
 use itertools::Itertools;
+use std::convert::identity;
 use std::ffi::CStr;
 use std::rc::Rc;
 
 pub struct RhiGraphicsPipelineCreateInfo {
-    descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
-
-    push_constant_ranges: Vec<vk::PushConstantRange>,
-
     /// dynamic render 需要的 framebuffer 信息
     color_attach_formats: Vec<vk::Format>,
     /// dynamic render 需要的 framebuffer 信息
@@ -25,16 +22,14 @@ pub struct RhiGraphicsPipelineCreateInfo {
 
     primitive_topology: vk::PrimitiveTopology,
 
-    // FIXME
     rasterize_state_info: vk::PipelineRasterizationStateCreateInfo<'static>,
 
     msaa_sample: vk::SampleCountFlags,
     enable_sample_shading: bool,
 
     color_attach_blend_states: Vec<vk::PipelineColorBlendAttachmentState>,
-    enable_logical_op: bool,
+    blend_info: vk::PipelineColorBlendStateCreateInfo<'static>,
 
-    // FIXME
     depth_stencil_info: vk::PipelineDepthStencilStateCreateInfo<'static>,
 
     dynamic_states: Vec<vk::DynamicState>,
@@ -48,7 +43,6 @@ impl Default for RhiGraphicsPipelineCreateInfo {
             depth_attach_format: vk::Format::UNDEFINED,
             stencil_attach_format: vk::Format::UNDEFINED,
 
-            descriptor_set_layouts: vec![],
             shader_stages: vec![],
 
             vertex_binding_desc: vec![],
@@ -69,7 +63,9 @@ impl Default for RhiGraphicsPipelineCreateInfo {
             enable_sample_shading: false,
 
             color_attach_blend_states: vec![],
-            enable_logical_op: false,
+            blend_info: vk::PipelineColorBlendStateCreateInfo::default()
+                .logic_op_enable(false)
+                .blend_constants([0.0, 0.0, 0.0, 0.0]),
 
             depth_stencil_info: vk::PipelineDepthStencilStateCreateInfo::default()
                 .depth_test_enable(true)
@@ -78,10 +74,10 @@ impl Default for RhiGraphicsPipelineCreateInfo {
                 .depth_bounds_test_enable(false)
                 .stencil_test_enable(false),
             dynamic_states: vec![vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR],
-            push_constant_ranges: vec![],
         }
     }
 }
+// builder
 impl RhiGraphicsPipelineCreateInfo {
     /// builder
     #[inline]
@@ -120,6 +116,12 @@ impl RhiGraphicsPipelineCreateInfo {
         self
     }
 
+    #[inline]
+    pub fn shader_stages(&mut self, stages: Vec<RhiShaderStageInfo>) -> &mut Self {
+        self.shader_stages = stages;
+        self
+    }
+
     /// builder
     #[inline]
     pub fn vertex_binding(&mut self, bindings: Vec<vk::VertexInputBindingDescription>) -> &mut Self {
@@ -134,24 +136,51 @@ impl RhiGraphicsPipelineCreateInfo {
         self
     }
 
-    /// builder
+    /// 为每个 color attachment 指定 blend 操作
     #[inline]
-    pub fn color_blend_attach_states(&mut self, states: Vec<vk::PipelineColorBlendAttachmentState>) -> &mut Self {
+    pub fn color_blend(
+        &mut self,
+        states: Vec<vk::PipelineColorBlendAttachmentState>,
+        blend_constants: [f32; 4],
+    ) -> &mut Self {
         self.color_attach_blend_states = states;
+        self.blend_info.blend_constants = blend_constants;
+        self.blend_info.logic_op_enable = vk::FALSE;
         self
     }
 
-    /// builder
+    /// logic op 和 blend op 是互斥的
     #[inline]
-    pub fn push_constant_ranges(&mut self, ranges: Vec<vk::PushConstantRange>) -> &mut Self {
-        self.push_constant_ranges = ranges;
+    pub fn blend_logic_op(&mut self, logic_op: vk::LogicOp) -> &mut Self {
+        self.blend_info.logic_op = logic_op;
+        self.blend_info.logic_op_enable = vk::TRUE;
         self
     }
 
-    /// builder
     #[inline]
-    pub fn descriptor_set_layouts(&mut self, layouts: Vec<vk::DescriptorSetLayout>) -> &mut Self {
-        self.descriptor_set_layouts = layouts;
+    pub fn cull_mode(&mut self, mode: vk::CullModeFlags, front_face: vk::FrontFace) -> &mut Self {
+        self.rasterize_state_info.cull_mode = mode;
+        self.rasterize_state_info.front_face = front_face;
+        self
+    }
+
+    #[inline]
+    pub fn depth_test(
+        &mut self,
+        depth_test_op: Option<vk::CompareOp>,
+        depth_write: bool,
+        depth_bounds_test: bool,
+    ) -> &mut Self {
+        self.depth_stencil_info.depth_test_enable = depth_test_op.map_or(vk::FALSE, |_| vk::TRUE);
+        self.depth_stencil_info.depth_compare_op = depth_test_op.map_or(vk::CompareOp::NEVER, identity);
+        self.depth_stencil_info.depth_write_enable = if depth_write { vk::TRUE } else { vk::FALSE };
+        self.depth_stencil_info.depth_bounds_test_enable = if depth_bounds_test { vk::TRUE } else { vk::FALSE };
+        self
+    }
+
+    #[inline]
+    pub fn stencil_test(&mut self, enable: bool) -> &mut Self {
+        self.depth_stencil_info.stencil_test_enable = if enable { vk::TRUE } else { vk::FALSE };
         self
     }
 }
@@ -203,7 +232,9 @@ impl RhiPipelineLayout {
 
 pub struct RhiGraphicsPipeline {
     pipeline: vk::Pipeline,
-    pipeline_layout: RhiPipelineLayout,
+
+    /// 因为多个 pipeline 可以使用同一个 pipeline layout，所以这里使用 Rc
+    pipeline_layout: Rc<RhiPipelineLayout>,
 
     device: Rc<RhiDevice>,
 }
@@ -224,19 +255,17 @@ impl Drop for RhiGraphicsPipeline {
     }
 }
 impl RhiGraphicsPipeline {
-    pub fn new(device: Rc<RhiDevice>, create_info: &RhiGraphicsPipelineCreateInfo, debug_name: &str) -> Self {
+    pub fn new(
+        device: Rc<RhiDevice>,
+        create_info: &RhiGraphicsPipelineCreateInfo,
+        pipeline_layout: Rc<RhiPipelineLayout>,
+        debug_name: &str,
+    ) -> Self {
         // dynamic rendering 需要的 framebuffer 信息
         let mut attach_info = vk::PipelineRenderingCreateInfo::default()
             .color_attachment_formats(&create_info.color_attach_formats)
             .depth_attachment_format(create_info.depth_attach_format)
             .stencil_attachment_format(create_info.stencil_attach_format);
-
-        let pipeline_layout = RhiPipelineLayout::new(
-            device.clone(),
-            &create_info.descriptor_set_layouts,
-            &create_info.push_constant_ranges,
-            debug_name,
-        );
 
         let shader_modules = create_info
             .shader_stages
@@ -277,9 +306,7 @@ impl RhiGraphicsPipeline {
             .rasterization_samples(create_info.msaa_sample);
 
         // 混合设置：需要为每个 color attachment 分别指定
-        let color_blend_info = vk::PipelineColorBlendStateCreateInfo::default()
-            .logic_op_enable(create_info.enable_logical_op)
-            .attachments(&create_info.color_attach_blend_states);
+        let color_blend_info = create_info.blend_info.attachments(&create_info.color_attach_blend_states);
 
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&create_info.dynamic_states);
@@ -321,7 +348,7 @@ impl RhiGraphicsPipeline {
     }
 
     #[inline]
-    pub fn pipeline(&self) -> vk::Pipeline {
+    pub fn handle(&self) -> vk::Pipeline {
         self.pipeline
     }
 

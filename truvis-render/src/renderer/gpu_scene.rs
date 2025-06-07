@@ -201,8 +201,8 @@ impl GpuScene {
             sky: concat!(env!("CARGO_MANIFEST_DIR"), "/resources/sky.jpg").to_string(),
             uv_checker: concat!(env!("CARGO_MANIFEST_DIR"), "/resources/uv_checker.png").to_string(),
         };
-        bindless_mgr.borrow_mut().register_texture(rhi, resources.sky.clone());
-        bindless_mgr.borrow_mut().register_texture(rhi, resources.uv_checker.clone());
+        bindless_mgr.borrow_mut().register_texture_by_path(rhi, resources.sky.clone());
+        bindless_mgr.borrow_mut().register_texture_by_path(rhi, resources.uv_checker.clone());
 
         Self {
             scene_mgr,

@@ -3,6 +3,7 @@ use imgui::Ui;
 use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
+use std::rc::Rc;
 use truvis_render::app::{OuterApp, TruvisApp};
 use truvis_render::pipeline_settings::PipelineSettings;
 use truvis_render::platform::camera::DrsCamera;
@@ -11,7 +12,7 @@ use truvis_render::render::Renderer;
 use truvis_render::render_context::RenderContext;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_render::renderer::swapchain::RhiSwapchain;
-use truvis_rhi::core::graphics_pipeline::RhiGraphicsPipelineCreateInfo;
+use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, graphics_pipeline::RhiGraphicsPipeline},
     rhi::Rhi,
@@ -37,11 +38,16 @@ impl HelloTriangle {
         );
         pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
         pipeline_ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
-        pipeline_ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
-            .blend_enable(false)
-            .color_write_mask(vk::ColorComponentFlags::RGBA)]);
+        pipeline_ci.color_blend(
+            vec![vk::PipelineColorBlendAttachmentState::default()
+                .blend_enable(false)
+                .color_write_mask(vk::ColorComponentFlags::RGBA)],
+            [0.0; 4],
+        );
 
-        RhiGraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, "hello-triangle-pipeline")
+        let pipeline_layout = Rc::new(RhiPipelineLayout::new(rhi.device.clone(), &[], &[], "hello-triangle"));
+
+        RhiGraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, pipeline_layout, "hello-triangle-pipeline")
     }
 
     fn my_update(&self, rhi: &Rhi, render_context: &mut RenderContext, swapchain: &RhiSwapchain) {
@@ -61,7 +67,7 @@ impl HelloTriangle {
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[main-pass]draw");
         {
             cmd.cmd_begin_rendering(&render_info);
-            cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline());
+            cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
 
             cmd.cmd_set_viewport(
                 0,

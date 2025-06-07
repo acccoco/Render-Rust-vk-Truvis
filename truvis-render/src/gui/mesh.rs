@@ -120,13 +120,13 @@ impl GuiMesh {
         let mut vertex_buffer = RhiBuffer::new_vertex_buffer(
             rhi,
             vertices_size,
-            &format!("{}-imgui-vertex-buffer", render_ctx.current_frame_prefix()),
+            format!("{}-imgui-vertex-buffer", render_ctx.current_frame_prefix()),
         );
 
         let mut stage_buffer = RhiBuffer::new_stage_buffer(
             rhi,
             vertices_size as vk::DeviceSize,
-            &format!("{}-imgui-vertex-stage-buffer", render_ctx.current_frame_prefix()),
+            format!("{}-imgui-vertex-stage-buffer", render_ctx.current_frame_prefix()),
         );
         stage_buffer.transfer_data_by_mem_map(&vertices);
 

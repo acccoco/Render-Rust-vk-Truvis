@@ -1,8 +1,8 @@
+use crate::gui::ui::Gui;
 use crate::platform::camera::DrsCamera;
 use crate::platform::camera_controller::CameraController;
 use crate::platform::input_manager::InputManager;
 use crate::platform::timer::Timer;
-use crate::platform::ui::Gui;
 use crate::render::Renderer;
 use crate::renderer::window_system::{MainWindow, WindowCreateInfo};
 use raw_window_handle::HasDisplayHandle;
@@ -106,7 +106,12 @@ impl<T: OuterApp> TruvisApp<T> {
 
         let window_system = MainWindow::new(event_loop, window_init_info);
         self.renderer.init_after_window(&window_system);
-        let gui = Gui::new(&self.renderer.rhi, window_system.window(), &self.renderer.pipeline_settings());
+        let gui = Gui::new(
+            &self.renderer.rhi,
+            window_system.window(),
+            &self.renderer.pipeline_settings(),
+            self.renderer.bindless_mgr.clone(),
+        );
 
         let outer_app = T::init(&mut self.renderer, self.camera_controller.camera_mut());
 

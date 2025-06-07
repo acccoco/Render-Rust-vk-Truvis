@@ -119,14 +119,23 @@ impl BindlessManager {
         self.device.write_descriptor_sets(&writes);
     }
 
-    pub fn register_texture(&mut self, rhi: &Rhi, texture_path: String) {
+    pub fn register_texture_by_path(&mut self, rhi: &Rhi, texture_path: String) {
         if self.texture_map.contains_key(&texture_path) {
+            log::error!("Texture {} is already registered", texture_path);
             return;
         }
 
         let texture = ImageLoader::load_image(rhi, std::path::Path::new(&texture_path));
 
         self.textures.insert(texture_path, texture);
+    }
+
+    pub fn register_texture(&mut self, key: String, texture: RhiTexture2D) {
+        if self.texture_map.contains_key(&key) {
+            log::error!("Texture {} is already registered", key);
+            return;
+        }
+        self.textures.insert(key, texture);
     }
 
     pub fn register_image(&mut self, key: String, image: Rc<RhiImage2DView>) {

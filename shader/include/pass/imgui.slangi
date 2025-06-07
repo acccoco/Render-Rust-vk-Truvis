@@ -1,0 +1,15 @@
+#pragma once
+#include "../bindless.slangi"
+#include "../ptr.slangi"
+
+namespace imgui
+{
+
+struct PushConstant
+{
+    float4x4 ortho;
+
+    TextureHandle texture;
+    int _padding_0;
+};
+};

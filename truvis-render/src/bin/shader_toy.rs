@@ -4,6 +4,7 @@ use imgui::Ui;
 use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
+use std::rc::Rc;
 use truvis_render::app::{OuterApp, TruvisApp};
 use truvis_render::pipeline_settings::PipelineSettings;
 use truvis_render::platform::camera::DrsCamera;
@@ -12,7 +13,7 @@ use truvis_render::render::Renderer;
 use truvis_render::render_context::RenderContext;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_render::renderer::swapchain::RhiSwapchain;
-use truvis_rhi::core::graphics_pipeline::RhiGraphicsPipelineCreateInfo;
+use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, graphics_pipeline::RhiGraphicsPipeline},
     rhi::Rhi,
@@ -45,21 +46,30 @@ struct ShaderToy {
 impl ShaderToy {
     fn init_pipeline(rhi: &Rhi, pipeline_settings: &PipelineSettings) -> RhiGraphicsPipeline {
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
-        ci.push_constant_ranges(vec![vk::PushConstantRange {
-            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-            offset: 0,
-            size: size_of::<PushConstants>() as u32,
-        }]);
         ci.vertex_shader_stage("shader/build/shadertoy-glsl/shadertoy.vert.spv", cstr::cstr!("main"));
         ci.fragment_shader_stage("shader/build/shadertoy-glsl/shadertoy.frag.spv", cstr::cstr!("main"));
         ci.attach_info(vec![pipeline_settings.color_format], Some(pipeline_settings.depth_format), None);
         ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
         ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
-        ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
-            .blend_enable(false)
-            .color_write_mask(vk::ColorComponentFlags::RGBA)]);
+        ci.color_blend(
+            vec![vk::PipelineColorBlendAttachmentState::default()
+                .blend_enable(false)
+                .color_write_mask(vk::ColorComponentFlags::RGBA)],
+            [0.0; 4],
+        );
 
-        RhiGraphicsPipeline::new(rhi.device.clone(), &ci, "shadertoy")
+        let pipeline_layout = Rc::new(RhiPipelineLayout::new(
+            rhi.device.clone(),
+            &[],
+            &[vk::PushConstantRange {
+                stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                offset: 0,
+                size: size_of::<PushConstants>() as u32,
+            }],
+            "shadertoy",
+        ));
+
+        RhiGraphicsPipeline::new(rhi.device.clone(), &ci, pipeline_layout, "shadertoy")
     }
 
     fn run(&self, rhi: &Rhi, render_context: &mut RenderContext, swapchain: &RhiSwapchain, timer: &Timer) {
@@ -102,7 +112,7 @@ impl ShaderToy {
             );
 
             cmd.cmd_begin_rendering(&render_info);
-            cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline());
+            cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
 
             cmd.cmd_set_viewport(
                 0,

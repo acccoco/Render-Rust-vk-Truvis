@@ -9,3 +9,4 @@
 
 #include "../include/pass/blit.slangi"
 #include "../include/pass/rt.slangi"
+#include "../include/pass/imgui.slangi"

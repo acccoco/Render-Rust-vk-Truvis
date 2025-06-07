@@ -88,7 +88,7 @@ impl TheWorld {
                 // 注册纹理
                 let mut bindless_mgr = self.bindless_mgr.borrow_mut();
                 if !mat.diffuse_map.is_empty() {
-                    bindless_mgr.register_texture(rhi, mat.diffuse_map.clone());
+                    bindless_mgr.register_texture_by_path(rhi, mat.diffuse_map.clone());
                 }
 
                 self.mat_map.insert(guid, mat);

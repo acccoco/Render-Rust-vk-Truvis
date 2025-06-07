@@ -3,7 +3,6 @@
 #include "../ptr.slangi"
 #include "../scene.slangi"
 
-
 namespace rt
 {
 struct PushConstants

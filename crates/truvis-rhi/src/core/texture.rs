@@ -19,13 +19,13 @@ pub struct RhiTexture2D {
 impl RhiTexture2D {
     #[inline]
     pub fn new(rhi: &Rhi, image: Rc<RhiImage2D>, name: &str) -> Self {
-        let sampler = Rc::new(RhiSampler::new(rhi, Rc::new(RhiSamplerCreateInfo::new()), &format!("{}-sampler", name)));
+        let sampler = Rc::new(RhiSampler::new(rhi, Rc::new(RhiSamplerCreateInfo::new()), name));
 
         let image_view = Rc::new(RhiImage2DView::new(
             rhi,
             image.clone(),
             RhiImageViewCreateInfo::new_image_view_2d_info(vk::Format::R8G8B8A8_UNORM, vk::ImageAspectFlags::COLOR),
-            format!("{}-view", name),
+            name.to_string(),
         ));
 
         Self {

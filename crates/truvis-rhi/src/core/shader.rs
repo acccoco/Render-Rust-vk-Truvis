@@ -55,6 +55,7 @@ impl RhiShaderModule {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct RhiShaderStageInfo {
     pub stage: vk::ShaderStageFlags,
     pub entry_point: &'static CStr,

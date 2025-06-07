@@ -11,7 +11,7 @@ use std::rc::Rc;
 use truvis_rhi::basic::color::LabelColor;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo};
+use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
 use truvis_rhi::rhi::Rhi;
 
 pub struct PhongPass {
@@ -31,17 +31,25 @@ impl PhongPass {
         ci.vertex_binding(VertexLayoutAos3D::vertex_input_bindings());
         ci.vertex_attribute(VertexLayoutAos3D::vertex_input_attributes());
 
-        ci.push_constant_ranges(vec![vk::PushConstantRange::default()
-            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
-            .offset(0)
-            .size(size_of::<shader::rt::PushConstants>() as u32)]);
-        ci.descriptor_set_layouts(vec![bindless_manager.borrow().bindless_layout.handle()]);
         ci.attach_info(vec![pipeline_settings.color_format], Some(pipeline_settings.depth_format), None);
-        ci.color_blend_attach_states(vec![vk::PipelineColorBlendAttachmentState::default()
-            .blend_enable(false)
-            .color_write_mask(vk::ColorComponentFlags::RGBA)]);
+        ci.color_blend(
+            vec![vk::PipelineColorBlendAttachmentState::default()
+                .blend_enable(false)
+                .color_write_mask(vk::ColorComponentFlags::RGBA)],
+            [0.0; 4],
+        );
 
-        let d3_pipe = RhiGraphicsPipeline::new(rhi.device.clone(), &ci, "phong-d3-pipe");
+        let pipeline_layout = Rc::new(RhiPipelineLayout::new(
+            rhi.device.clone(),
+            &[bindless_manager.borrow().bindless_layout.handle()],
+            &[vk::PushConstantRange::default()
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+                .offset(0)
+                .size(size_of::<shader::rt::PushConstants>() as u32)],
+            "phong-pass",
+        ));
+
+        let d3_pipe = RhiGraphicsPipeline::new(rhi.device.clone(), &ci, pipeline_layout, "phong-d3-pipe");
 
         Self {
             pipeline: d3_pipe,
@@ -56,7 +64,7 @@ impl PhongPass {
         push_constant: &shader::rt::PushConstants,
         frame_idx: usize,
     ) {
-        cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.pipeline());
+        cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
         cmd.cmd_set_viewport(
             0,
             &[vk::Viewport {
