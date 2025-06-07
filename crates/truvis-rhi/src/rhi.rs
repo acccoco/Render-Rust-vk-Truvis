@@ -93,28 +93,28 @@ impl Rhi {
 
         // 在 device 以及 debug_utils 之前创建的 vk::Handle
         {
-            device.debug_utils().set_object_debug_name(instance.vk_handle(), "instance");
-            device.debug_utils().set_object_debug_name(physical_device.handle, "physical device");
+            device.debug_utils().set_debug_name(instance.as_ref(), "main");
+            device.debug_utils().set_debug_name(physical_device.as_ref(), "main");
 
-            device.debug_utils().set_object_debug_name(device.vk_handle(), "device");
-            device.debug_utils().set_object_debug_name(graphics_queue.handle, "graphics-queue");
-            device.debug_utils().set_object_debug_name(compute_queue.handle, "compute-queue");
-            device.debug_utils().set_object_debug_name(transfer_queue.handle, "transfer-queue");
+            device.debug_utils().set_debug_name(device.as_ref(), "main");
+            device.debug_utils().set_debug_name(graphics_queue.as_ref(), "graphics");
+            device.debug_utils().set_debug_name(compute_queue.as_ref(), "compute");
+            device.debug_utils().set_debug_name(transfer_queue.as_ref(), "transfer");
         }
 
-        let graphics_command_pool = Rc::new(RhiCommandPool::new_before_rhi(
+        let graphics_command_pool = Rc::new(RhiCommandPool::new(
             device.clone(),
             physical_device.graphics_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),
             "rhi-graphics-command-pool",
         ));
-        let compute_command_pool = Rc::new(RhiCommandPool::new_before_rhi(
+        let compute_command_pool = Rc::new(RhiCommandPool::new(
             device.clone(),
             physical_device.compute_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),
             "rhi-compute-command-pool",
         ));
-        let transfer_command_pool = Rc::new(RhiCommandPool::new_before_rhi(
+        let transfer_command_pool = Rc::new(RhiCommandPool::new(
             device.clone(),
             physical_device.transfer_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),

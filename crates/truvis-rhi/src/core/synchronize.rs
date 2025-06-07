@@ -2,6 +2,7 @@
 
 use std::rc::Rc;
 
+use crate::core::debug_utils::RhiDebugType;
 use crate::{core::device::RhiDevice, rhi::Rhi};
 use ash::vk;
 
@@ -12,6 +13,15 @@ pub struct RhiFence {
     fence: vk::Fence,
     device: Rc<RhiDevice>,
 }
+impl RhiDebugType for RhiFence {
+    fn debug_type_name() -> &'static str {
+        "RhiFence"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.fence
+    }
+}
 
 impl RhiFence {
     /// # param
@@ -21,11 +31,12 @@ impl RhiFence {
         let fence =
             unsafe { rhi.device().create_fence(&vk::FenceCreateInfo::default().flags(fence_flags), None).unwrap() };
 
-        rhi.device.debug_utils().set_object_debug_name(fence, debug_name);
-        Self {
+        let fence = Self {
             fence,
             device: rhi.device.clone(),
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&fence, debug_name);
+        fence
     }
 
     #[inline]
@@ -68,11 +79,12 @@ impl RhiSemaphore {
     pub fn new(rhi: &Rhi, debug_name: &str) -> Self {
         let semaphore = unsafe { rhi.device().create_semaphore(&vk::SemaphoreCreateInfo::default(), None).unwrap() };
 
-        rhi.device.debug_utils().set_object_debug_name(semaphore, debug_name);
-        Self {
+        let semaphore = Self {
             semaphore,
             device: rhi.device.clone(),
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&semaphore, debug_name);
+        semaphore
     }
 
     #[inline]
@@ -85,6 +97,15 @@ impl RhiSemaphore {
         unsafe {
             self.device.destroy_semaphore(self.semaphore, None);
         }
+    }
+}
+impl RhiDebugType for RhiSemaphore {
+    fn debug_type_name() -> &'static str {
+        "RhiSemaphore"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.semaphore
     }
 }
 

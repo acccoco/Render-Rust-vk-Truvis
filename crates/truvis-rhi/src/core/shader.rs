@@ -1,9 +1,9 @@
 use std::ffi::CStr;
 use std::rc::Rc;
 
-use ash::vk;
-
+use crate::core::debug_utils::RhiDebugType;
 use crate::core::device::RhiDevice;
+use ash::vk;
 
 /// # Destroy
 ///
@@ -13,7 +13,15 @@ pub struct RhiShaderModule {
 
     device: Rc<RhiDevice>,
 }
+impl RhiDebugType for RhiShaderModule {
+    fn debug_type_name() -> &'static str {
+        "RhiShaderModule"
+    }
 
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
 impl RhiShaderModule {
     /// # param
     /// * path - spv shader 文件路径
@@ -25,11 +33,12 @@ impl RhiShaderModule {
 
         unsafe {
             let shader_module = device.create_shader_module(&shader_module_info, None).unwrap();
-            device.debug_utils().set_object_debug_name(shader_module, path.to_str().unwrap());
-            Self {
+            let shader_module = Self {
                 handle: shader_module,
-                device,
-            }
+                device: device.clone(),
+            };
+            device.debug_utils().set_debug_name(&shader_module, path.to_str().unwrap());
+            shader_module
         }
     }
 

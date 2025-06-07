@@ -4,6 +4,7 @@ use ash::vk;
 use vk_mem::Alloc;
 
 use crate::core::allocator::RhiAllocator;
+use crate::core::debug_utils::RhiDebugType;
 use crate::core::device::RhiDevice;
 use crate::{
     core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, synchronize::RhiImageBarrier},
@@ -105,6 +106,15 @@ pub struct RhiImage2D {
 
     allocator: Rc<RhiAllocator>,
 }
+impl RhiDebugType for RhiImage2D {
+    fn debug_type_name() -> &'static str {
+        "RhiImage2D"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
 impl Drop for RhiImage2D {
     fn drop(&mut self) {
         unsafe { self.allocator.destroy_image(self.handle, &mut self.allocation) }
@@ -135,10 +145,7 @@ impl RhiImage2D {
         debug_name: &str,
     ) -> Self {
         let (image, alloc) = unsafe { rhi.allocator.create_image(image_info.creat_info(), alloc_info).unwrap() };
-
-        rhi.device.debug_utils().set_object_debug_name(image, debug_name);
-
-        Self {
+        let image = Self {
             _name: debug_name.to_string(),
 
             handle: image,
@@ -146,7 +153,9 @@ impl RhiImage2D {
 
             image_info,
             allocator: rhi.allocator.clone(),
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&image, debug_name);
+        image
     }
     /// 根据 RGBA8_UNORM 的 data 创建 image
     pub fn from_rgba8(rhi: &Rhi, width: u32, height: u32, data: &[u8], name: impl AsRef<str>) -> Self {
@@ -272,33 +281,44 @@ impl Drop for RhiImage2DView {
         }
     }
 }
+impl RhiDebugType for RhiImage2DView {
+    fn debug_type_name() -> &'static str {
+        "RhiImage2DView"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
 
 impl RhiImage2DView {
     pub fn new(rhi: &Rhi, image: Rc<RhiImage2D>, mut info: RhiImageViewCreateInfo, name: String) -> Self {
         info.inner.image = image.handle;
         let handle = unsafe { rhi.device.create_image_view(&info.inner, None).unwrap() };
-        rhi.device.debug_utils().set_object_debug_name(handle, &name);
-        Self {
+        let image_view = Self {
             handle,
             _image: Some(image),
             _info: Rc::new(info),
-            _name: name,
+            _name: name.clone(),
             device: rhi.device.clone(),
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&image_view, &name);
+        image_view
     }
 
     /// 主要用于创建 swapchain 的 image view
     pub fn new_with_raw_image(rhi: &Rhi, vk_image: vk::Image, mut info: RhiImageViewCreateInfo, name: String) -> Self {
         info.inner.image = vk_image;
         let handle = unsafe { rhi.device.create_image_view(&info.inner, None).unwrap() };
-        rhi.device.debug_utils().set_object_debug_name(handle, &name);
-        Self {
+        let image_view = Self {
             handle,
             _image: None,
             _info: Rc::new(info),
-            _name: name,
+            _name: name.clone(),
             device: rhi.device.clone(),
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&image_view, &name);
+        image_view
     }
 
     /// getter

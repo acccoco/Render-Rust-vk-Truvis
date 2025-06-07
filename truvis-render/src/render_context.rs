@@ -201,7 +201,7 @@ impl RenderContext {
         (0..frames_in_flight)
             .map(|i| {
                 Rc::new(RhiCommandPool::new(
-                    rhi,
+                    rhi.device.clone(),
                     rhi.graphics_queue_family(),
                     vk::CommandPoolCreateFlags::TRANSIENT,
                     &format!("render_context_graphics_command_pool_{}", i),

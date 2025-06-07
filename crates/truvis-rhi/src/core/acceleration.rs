@@ -5,8 +5,9 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
+use crate::core::debug_utils::RhiDebugType;
 use crate::{
-    core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, device::RhiDevice, query_pool::QueryPool},
+    core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, device::RhiDevice, query_pool::RhiQueryPool},
     rhi::Rhi,
 };
 
@@ -20,6 +21,15 @@ pub struct RhiAcceleration {
     _buffer: RhiBuffer,
 
     device: Rc<RhiDevice>,
+}
+impl RhiDebugType for RhiAcceleration {
+    fn debug_type_name() -> &'static str {
+        "RhiAcceleration"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.acceleration_structure
+    }
 }
 impl RhiAcceleration {
     /// 同步构建 blas
@@ -89,7 +99,7 @@ impl RhiAcceleration {
         };
 
         // 创建一个 QueryPool，用于查询 compact size
-        let mut query_pool = QueryPool::new(rhi, vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, 1, "");
+        let mut query_pool = RhiQueryPool::new(rhi, vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, 1, "");
         query_pool.reset(0, 1);
 
         // 等待初步 build 完成
@@ -241,13 +251,14 @@ impl RhiAcceleration {
         let acceleration_structure = unsafe {
             rhi.device().acceleration_structure_pf().create_acceleration_structure(&create_info, None).unwrap()
         };
-        rhi.device().debug_utils().set_object_debug_name(acceleration_structure, debug_name);
 
-        Self {
+        let acc = Self {
             device: rhi.device.clone(),
             acceleration_structure,
             _buffer: buffer,
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&acc, debug_name);
+        acc
     }
 
     #[inline]

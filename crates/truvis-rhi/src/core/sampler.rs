@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::core::debug_utils::RhiDebugType;
 use crate::core::device::RhiDevice;
 use crate::rhi::Rhi;
 use ash::vk;
@@ -45,6 +46,15 @@ pub struct RhiSampler {
     _info: Rc<RhiSamplerCreateInfo>,
     device: Rc<RhiDevice>,
 }
+impl RhiDebugType for RhiSampler {
+    fn debug_type_name() -> &'static str {
+        "RhiSampler"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
 impl Drop for RhiSampler {
     fn drop(&mut self) {
         unsafe {
@@ -57,13 +67,13 @@ impl RhiSampler {
     #[inline]
     pub fn new(rhi: &Rhi, info: Rc<RhiSamplerCreateInfo>, debug_name: &str) -> Self {
         let handle = unsafe { rhi.device.create_sampler(&info.inner, None).unwrap() };
-        rhi.device.debug_utils().set_object_debug_name(handle, debug_name);
-
-        Self {
+        let sampler = Self {
             handle,
             _info: info,
             device: rhi.device.clone(),
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&sampler, debug_name);
+        sampler
     }
 
     /// getter

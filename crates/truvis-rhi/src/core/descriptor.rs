@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use super::device::RhiDevice;
+use crate::core::debug_utils::RhiDebugType;
 use crate::core::descriptor_pool::RhiDescriptorPool;
 use crate::rhi::Rhi;
 use ash::vk;
@@ -34,6 +35,15 @@ impl<T: ShaderBindingLayout> Drop for RhiDescriptorSetLayout<T> {
         }
     }
 }
+impl<T: ShaderBindingLayout> RhiDebugType for RhiDescriptorSetLayout<T> {
+    fn debug_type_name() -> &'static str {
+        "RhiDescriptorSetLayout"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.layout
+    }
+}
 
 impl<T: ShaderBindingLayout> RhiDescriptorSetLayout<T> {
     /// 创建新的描述符集布局
@@ -55,12 +65,13 @@ impl<T: ShaderBindingLayout> RhiDescriptorSetLayout<T> {
 
         // 创建 Vulkan 描述符集布局
         let layout = unsafe { rhi.device().create_descriptor_set_layout(&create_info, None).unwrap() };
-        rhi.device.debug_utils().set_object_debug_name(layout, debug_name);
-        Self {
+        let layout = Self {
             layout,
             phantom_data: std::marker::PhantomData,
             _device: rhi.device.clone(),
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&layout, debug_name);
+        layout
     }
 
     #[inline]
@@ -92,6 +103,15 @@ pub struct RhiDescriptorSet<T: ShaderBindingLayout> {
     phantom_data: std::marker::PhantomData<T>,
 
     _device: Rc<RhiDevice>,
+}
+impl<T: ShaderBindingLayout> RhiDebugType for RhiDescriptorSet<T> {
+    fn debug_type_name() -> &'static str {
+        "RhiDescriptorSet"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
 }
 
 /// 描述符更新信息
@@ -127,12 +147,13 @@ impl<T: ShaderBindingLayout> RhiDescriptorSet<T> {
             .descriptor_pool(descriptor_pool.handle())
             .set_layouts(std::slice::from_ref(&layout.layout));
         let descriptor_set = unsafe { rhi.device.allocate_descriptor_sets(&alloc_info).unwrap()[0] };
-        rhi.device.debug_utils().set_object_debug_name(descriptor_set, debug_name);
-        Self {
+        let set = Self {
             handle: descriptor_set,
             phantom_data: std::marker::PhantomData,
             _device: rhi.device.clone(),
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&set, debug_name);
+        set
     }
 
     #[inline]

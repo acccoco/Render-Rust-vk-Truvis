@@ -4,13 +4,41 @@ use std::ops::{Deref, DerefMut};
 use std::{ffi::c_void, rc::Rc};
 use vk_mem::Alloc;
 
+use crate::core::debug_utils::RhiDebugType;
 use crate::{
     core::{allocator::RhiAllocator, command_buffer::RhiCommandBuffer, device::RhiDevice},
     rhi::Rhi,
 };
 
-/// 定义一个 macro，自动为各种派生 buffer 类型实现 Deref 和 DerefMut
-macro_rules! impl_deref_buffer {
+/// 定义一个 macro，自动为各种派生 Buffer 类型实现 Deref、DerefMut 和 RhiDebugType
+macro_rules! impl_derive_buffer {
+    // 支持泛型的版本
+    ($name:ident<$($generic:ident $(: $bound:path)?),*>, $target:ty, $inner:ident) => {
+        impl<$($generic $(: $bound)?),*> Deref for $name<$($generic),*> {
+            type Target = $target;
+
+            fn deref(&self) -> &Self::Target {
+                &self.$inner
+            }
+        }
+
+        impl<$($generic $(: $bound)?),*> DerefMut for $name<$($generic),*> {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.$inner
+            }
+        }
+
+        impl<$($generic $(: $bound)?),*> RhiDebugType for $name<$($generic),*> {
+            fn debug_type_name() -> &'static str {
+                stringify!($name)
+            }
+
+            fn vk_handle(&self) -> impl vk::Handle {
+                self.$inner.vk_handle()
+            }
+        }
+    };
+    // 非泛型版本
     ($name:ident, $target:ty, $inner:ident) => {
         impl Deref for $name {
             type Target = $target;
@@ -23,6 +51,16 @@ macro_rules! impl_deref_buffer {
         impl DerefMut for $name {
             fn deref_mut(&mut self) -> &mut Self::Target {
                 &mut self.$inner
+            }
+        }
+
+        impl RhiDebugType for $name {
+            fn debug_type_name() -> &'static str {
+                stringify!($name)
+            }
+
+            fn vk_handle(&self) -> impl vk::Handle {
+                self.$inner.vk_handle()
             }
         }
     };
@@ -83,6 +121,15 @@ pub struct RhiBuffer {
     _buffer_info: Rc<RhiBufferCreateInfo>,
     _alloc_info: Rc<vk_mem::AllocationCreateInfo>,
 }
+impl RhiDebugType for RhiBuffer {
+    fn debug_type_name() -> &'static str {
+        "RhiBuffer"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
 impl Drop for RhiBuffer {
     fn drop(&mut self) {
         unsafe {
@@ -106,8 +153,7 @@ impl RhiBuffer {
             let (buffer, allocation) =
                 rhi.allocator.create_buffer_with_alignment(buffer_ci.info(), &alloc_ci, align.unwrap_or(8)).unwrap();
 
-            rhi.device.debug_utils().set_object_debug_name(buffer, debug_name.as_ref());
-            Self {
+            let buffer = Self {
                 handle: buffer,
                 allocation,
                 map_ptr: None,
@@ -118,7 +164,9 @@ impl RhiBuffer {
                 _buffer_info: buffer_ci,
                 _alloc_info: alloc_ci,
                 device_addr: None,
-            }
+            };
+            rhi.device.debug_utils().set_debug_name(&buffer, &buffer.debug_name);
+            buffer
         }
     }
 
@@ -344,18 +392,7 @@ pub struct RhiStructuredBuffer<T: bytemuck::Pod> {
     len: usize,
     _phantom: PhantomData<T>,
 }
-impl<T: bytemuck::Pod> Deref for RhiStructuredBuffer<T> {
-    type Target = RhiBuffer;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-impl<T: bytemuck::Pod> DerefMut for RhiStructuredBuffer<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
+impl_derive_buffer!(RhiStructuredBuffer<T: bytemuck::Pod>, RhiBuffer, inner);
 impl<T: bytemuck::Pod> RhiStructuredBuffer<T> {
     #[inline]
     pub fn new_ubo(rhi: &Rhi, len: usize, debug_name: impl AsRef<str>) -> Self {
@@ -418,16 +455,10 @@ pub struct RhiStageBuffer<T: bytemuck::Pod> {
     inner: RhiBuffer,
     _phantom: PhantomData<T>,
 }
-impl<T: bytemuck::Pod> Deref for RhiStageBuffer<T> {
-    type Target = RhiBuffer;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
+impl_derive_buffer!(RhiStageBuffer<T: bytemuck::Pod>, RhiBuffer, inner);
 impl<T: bytemuck::Pod> RhiStageBuffer<T> {
     pub fn new(rhi: &Rhi, debug_name: impl AsRef<str>) -> Self {
-        Self {
+        let buffer = Self {
             inner: RhiBuffer::new(
                 rhi,
                 Rc::new(RhiBufferCreateInfo::new(size_of::<T>() as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC)),
@@ -440,7 +471,9 @@ impl<T: bytemuck::Pod> RhiStageBuffer<T> {
                 debug_name,
             ),
             _phantom: PhantomData,
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&buffer, &buffer.inner.debug_name);
+        buffer
     }
 
     // BUG 可能需要考虑内存对齐
@@ -459,9 +492,10 @@ impl<T: bytemuck::Pod> RhiStageBuffer<T> {
 pub struct RhiSBTBuffer {
     _inner: RhiBuffer,
 }
+impl_derive_buffer!(RhiSBTBuffer, RhiBuffer, _inner);
 impl RhiSBTBuffer {
     pub fn new(rhi: &Rhi, size: vk::DeviceSize, align: vk::DeviceSize, name: impl AsRef<str>) -> Self {
-        Self {
+        let buffer = Self {
             _inner: RhiBuffer::new(
                 rhi,
                 Rc::new(RhiBufferCreateInfo::new(
@@ -478,7 +512,9 @@ impl RhiSBTBuffer {
                 Some(align),
                 format!("SBTBuffer::{}", name.as_ref()),
             ),
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&buffer, name.as_ref());
+        buffer
     }
 
     #[inline]
@@ -486,7 +522,6 @@ impl RhiSBTBuffer {
         self._inner.handle
     }
 }
-impl_deref_buffer!(RhiSBTBuffer, RhiBuffer, _inner);
 
 /// 顶点类型是 u32
 pub struct RhiIndexBuffer {
@@ -495,16 +530,18 @@ pub struct RhiIndexBuffer {
     /// 索引数量
     index_cnt: usize,
 }
-impl_deref_buffer!(RhiIndexBuffer, RhiBuffer, inner);
+impl_derive_buffer!(RhiIndexBuffer, RhiBuffer, inner);
 impl RhiIndexBuffer {
     pub fn new(rhi: &Rhi, index_cnt: usize, debug_name: impl AsRef<str>) -> Self {
         let size = index_cnt * size_of::<u32>();
         let buffer = RhiBuffer::new_index_buffer(rhi, size, debug_name);
 
-        Self {
+        let buffer = Self {
             inner: buffer,
             index_cnt,
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&buffer, &buffer.inner.debug_name);
+        buffer
     }
 
     #[inline]
@@ -526,27 +563,19 @@ pub struct RhiVertexBuffer<V: bytemuck::Pod> {
 
     _phantom: PhantomData<V>,
 }
-impl<V: bytemuck::Pod> Deref for RhiVertexBuffer<V> {
-    type Target = RhiBuffer;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-impl<V: bytemuck::Pod> DerefMut for RhiVertexBuffer<V> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
+impl_derive_buffer!(RhiVertexBuffer<V: bytemuck::Pod>, RhiBuffer, inner);
 impl<V: bytemuck::Pod> RhiVertexBuffer<V> {
     pub fn new(rhi: &Rhi, vertex_cnt: usize, debug_name: impl AsRef<str>) -> Self {
         let size = vertex_cnt * size_of::<V>();
         let buffer = RhiBuffer::new_vertex_buffer(rhi, size, debug_name);
 
-        Self {
+        let buffer = Self {
             inner: buffer,
             vertex_cnt,
             _phantom: PhantomData,
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&buffer, &buffer.inner.debug_name);
+        buffer
     }
 
     #[inline]

@@ -1,4 +1,4 @@
-use crate::core::debug_utils::RhiDebugUtils;
+use crate::core::debug_utils::{RhiDebugType, RhiDebugUtils};
 use ash::vk;
 use itertools::Itertools;
 use std::ops::Deref;
@@ -19,6 +19,15 @@ impl Drop for RhiInstance {
             log::info!("Destroying RhiInstance");
             self.handle.destroy_instance(None);
         }
+    }
+}
+impl RhiDebugType for RhiInstance {
+    fn debug_type_name() -> &'static str {
+        "RhiInstance"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle.handle()
     }
 }
 

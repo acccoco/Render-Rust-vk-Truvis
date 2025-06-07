@@ -1,4 +1,5 @@
 use crate::core::command_queue::RhiQueueFamily;
+use crate::core::debug_utils::RhiDebugType;
 use ash::vk;
 use itertools::Itertools;
 use std::ffi::CStr;
@@ -34,6 +35,15 @@ impl Drop for RhiPhysicalDevice {
         // 物理设备不需要手动释放
         log::info!("no need to destroy physical device manually, it will be destroyed when instance is destroyed");
         // unsafe { self.handle.destroy_physical_device(None); }
+    }
+}
+impl RhiDebugType for RhiPhysicalDevice {
+    fn debug_type_name() -> &'static str {
+        "RhiPhysicalDevice"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
     }
 }
 

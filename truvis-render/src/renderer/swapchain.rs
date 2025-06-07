@@ -1,5 +1,6 @@
 use crate::pipeline_settings::FRAME_ID_MAP;
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use itertools::Itertools;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
@@ -7,10 +8,10 @@ use shader_binding::shader;
 use std::iter::zip;
 use std::rc::Rc;
 use truvis_rhi::core::command_queue::RhiQueue;
+use truvis_rhi::core::debug_utils::RhiDebugType;
 use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::core::image::{RhiImage2DView, RhiImageViewCreateInfo};
 use truvis_rhi::core::synchronize::{RhiFence, RhiSemaphore};
-use crate::renderer::window_system::MainWindow;
 use truvis_rhi::rhi::Rhi;
 
 struct RhiSurface {
@@ -31,17 +32,26 @@ impl RhiSurface {
             )
             .unwrap()
         };
-        rhi.device.debug_utils().set_object_debug_name(surface, "main-surface");
-
-        RhiSurface {
+        let surface = RhiSurface {
             handle: surface,
             pf: surface_pf,
-        }
+        };
+        rhi.device.debug_utils().set_debug_name(&surface, "main-surface");
+
+        surface
     }
 }
 impl Drop for RhiSurface {
     fn drop(&mut self) {
         unsafe { self.pf.destroy_surface(self.handle, None) }
+    }
+}
+impl RhiDebugType for RhiSurface {
+    fn debug_type_name() -> &'static str {
+        "RhiSurface"
+    }
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
     }
 }
 

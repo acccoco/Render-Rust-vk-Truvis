@@ -1,3 +1,4 @@
+use crate::core::debug_utils::RhiDebugType;
 use crate::core::device::RhiDevice;
 use crate::core::shader::{RhiShaderModule, RhiShaderStageInfo};
 use ash::vk;
@@ -38,7 +39,6 @@ pub struct RhiGraphicsPipelineCreateInfo {
 
     dynamic_states: Vec<vk::DynamicState>,
 }
-
 impl Default for RhiGraphicsPipelineCreateInfo {
     fn default() -> Self {
         Self {
@@ -82,7 +82,6 @@ impl Default for RhiGraphicsPipelineCreateInfo {
         }
     }
 }
-
 impl RhiGraphicsPipelineCreateInfo {
     /// builder
     #[inline]
@@ -157,23 +156,73 @@ impl RhiGraphicsPipelineCreateInfo {
     }
 }
 
-pub struct RhiGraphicsPipeline {
-    pipeline: vk::Pipeline,
-    pipeline_layout: vk::PipelineLayout,
-
+pub struct RhiPipelineLayout {
+    handle: vk::PipelineLayout,
     device: Rc<RhiDevice>,
 }
+impl RhiDebugType for RhiPipelineLayout {
+    fn debug_type_name() -> &'static str {
+        "RhiPipelineLayouer"
+    }
 
-impl Drop for RhiGraphicsPipeline {
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
+impl Drop for RhiPipelineLayout {
     fn drop(&mut self) {
         unsafe {
-            log::info!("Destroying RhiGraphicsPipeline");
-            self.device.destroy_pipeline(self.pipeline, None);
-            self.device.destroy_pipeline_layout(self.pipeline_layout, None);
+            self.device.destroy_pipeline_layout(self.handle, None);
         }
     }
 }
+impl RhiPipelineLayout {
+    pub fn new(
+        device: Rc<RhiDevice>,
+        descriptor_set_layouts: &[vk::DescriptorSetLayout],
+        push_constant_ranges: &[vk::PushConstantRange],
+        debug_name: impl AsRef<str>,
+    ) -> Self {
+        let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::default()
+            .set_layouts(descriptor_set_layouts)
+            .push_constant_ranges(push_constant_ranges);
+        let handle = unsafe { device.create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() };
+        let layout = RhiPipelineLayout {
+            handle,
+            device: device.clone(),
+        };
+        device.debug_utils().set_debug_name(&layout, debug_name);
+        layout
+    }
 
+    #[inline]
+    pub fn handle(&self) -> vk::PipelineLayout {
+        self.handle
+    }
+}
+
+pub struct RhiGraphicsPipeline {
+    pipeline: vk::Pipeline,
+    pipeline_layout: RhiPipelineLayout,
+
+    device: Rc<RhiDevice>,
+}
+impl RhiDebugType for RhiGraphicsPipeline {
+    fn debug_type_name() -> &'static str {
+        "RhiGraphicsPipeline"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.pipeline
+    }
+}
+impl Drop for RhiGraphicsPipeline {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.destroy_pipeline(self.pipeline, None);
+        }
+    }
+}
 impl RhiGraphicsPipeline {
     pub fn new(device: Rc<RhiDevice>, create_info: &RhiGraphicsPipelineCreateInfo, debug_name: &str) -> Self {
         // dynamic rendering 需要的 framebuffer 信息
@@ -182,13 +231,12 @@ impl RhiGraphicsPipeline {
             .depth_attachment_format(create_info.depth_attach_format)
             .stencil_attachment_format(create_info.stencil_attach_format);
 
-        let pipeline_layout = {
-            let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::default()
-                .set_layouts(&create_info.descriptor_set_layouts)
-                .push_constant_ranges(&create_info.push_constant_ranges);
-            unsafe { device.create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() }
-        };
-        device.debug_utils().set_object_debug_name(pipeline_layout, debug_name);
+        let pipeline_layout = RhiPipelineLayout::new(
+            device.clone(),
+            &create_info.descriptor_set_layouts,
+            &create_info.push_constant_ranges,
+            debug_name,
+        );
 
         let shader_modules = create_info
             .shader_stages
@@ -248,7 +296,7 @@ impl RhiGraphicsPipeline {
             .multisample_state(&msaa_info)
             .color_blend_state(&color_blend_info)
             .depth_stencil_state(&create_info.depth_stencil_info)
-            .layout(pipeline_layout)
+            .layout(pipeline_layout.handle)
             .dynamic_state(&dynamic_state_info)
             .push_next(&mut attach_info);
 
@@ -257,17 +305,19 @@ impl RhiGraphicsPipeline {
                 .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
                 .unwrap()[0]
         };
-        device.debug_utils().set_object_debug_name(pipeline, debug_name);
+        let pipeline = RhiGraphicsPipeline {
+            pipeline,
+            pipeline_layout,
+            device: device.clone(),
+        };
+
+        device.debug_utils().set_debug_name(&pipeline, debug_name);
 
         shader_modules.into_iter().for_each(|module| {
             module.destroy();
         });
 
-        RhiGraphicsPipeline {
-            pipeline,
-            pipeline_layout,
-            device,
-        }
+        pipeline
     }
 
     #[inline]
@@ -277,6 +327,6 @@ impl RhiGraphicsPipeline {
 
     #[inline]
     pub fn layout(&self) -> vk::PipelineLayout {
-        self.pipeline_layout
+        self.pipeline_layout.handle
     }
 }

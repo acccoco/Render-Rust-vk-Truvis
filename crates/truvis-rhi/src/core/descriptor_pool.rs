@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::core::debug_utils::RhiDebugType;
 use crate::core::device::RhiDevice;
 use ash::vk;
 
@@ -55,6 +56,15 @@ pub struct RhiDescriptorPool {
     device: Rc<RhiDevice>,
     name: String,
 }
+impl RhiDebugType for RhiDescriptorPool {
+    fn debug_type_name() -> &'static str {
+        "RhiDescriptorPool"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
 impl Drop for RhiDescriptorPool {
     /// 释放 Vulkan 描述符池
     fn drop(&mut self) {
@@ -62,7 +72,6 @@ impl Drop for RhiDescriptorPool {
         unsafe { self.device.destroy_descriptor_pool(self.handle, None) };
     }
 }
-
 impl RhiDescriptorPool {
     /// 创建新的描述符池
     ///
@@ -76,14 +85,14 @@ impl RhiDescriptorPool {
     #[inline]
     pub fn new(device: Rc<RhiDevice>, ci: Rc<RhiDescriptorPoolCreateInfo>, name: &str) -> Self {
         let pool = unsafe { device.create_descriptor_pool(&ci.inner, None).unwrap() };
-        device.debug_utils().set_object_debug_name(pool, name);
-
-        Self {
+        let pool = Self {
             handle: pool,
             _info: ci,
-            device,
+            device: device.clone(),
             name: name.to_string(),
-        }
+        };
+        device.debug_utils().set_debug_name(&pool, name);
+        pool
     }
 
     /// 获取 Vulkan 描述符池句柄

@@ -3,7 +3,7 @@ use itertools::Itertools;
 use std::{ffi::CStr, ops::Deref, rc::Rc};
 
 use crate::core::command_queue::RhiQueueFamily;
-use crate::core::debug_utils::RhiDebugUtils;
+use crate::core::debug_utils::{RhiDebugType, RhiDebugUtils};
 use crate::core::{instance::RhiInstance, physical_device::RhiPhysicalDevice};
 use crate::shader_cursor::RhiWriteDescriptorSet;
 
@@ -32,6 +32,14 @@ impl Drop for RhiDevice {
             self.debug_utils = None;
             self.handle.destroy_device(None);
         }
+    }
+}
+impl RhiDebugType for RhiDevice {
+    fn debug_type_name() -> &'static str {
+        "RhiDevice"
+    }
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle.handle()
     }
 }
 
@@ -221,35 +229,6 @@ impl RhiDevice {
 
 // tools
 impl RhiDevice {
-    #[inline]
-    pub fn create_render_pass(&self, render_pass_ci: &vk::RenderPassCreateInfo, debug_name: &str) -> vk::RenderPass {
-        let render_pass = unsafe { self.handle.create_render_pass(render_pass_ci, None).unwrap() };
-        self.debug_utils().set_object_debug_name(render_pass, debug_name);
-        render_pass
-    }
-
-    #[inline]
-    pub fn create_pipeline_cache(
-        &self,
-        pipeline_cache_ci: &vk::PipelineCacheCreateInfo,
-        debug_name: &str,
-    ) -> vk::PipelineCache {
-        let pipeline_cache = unsafe { self.handle.create_pipeline_cache(pipeline_cache_ci, None).unwrap() };
-        self.debug_utils().set_object_debug_name(pipeline_cache, debug_name);
-        pipeline_cache
-    }
-
-    #[inline]
-    pub fn create_frame_buffer(
-        &self,
-        frame_buffer_ci: &vk::FramebufferCreateInfo,
-        debug_name: &str,
-    ) -> vk::Framebuffer {
-        let frame_buffer = unsafe { self.handle.create_framebuffer(frame_buffer_ci, None).unwrap() };
-        self.debug_utils().set_object_debug_name(frame_buffer, debug_name);
-        frame_buffer
-    }
-
     #[inline]
     pub fn write_descriptor_sets(&self, writes: &[RhiWriteDescriptorSet]) {
         let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();

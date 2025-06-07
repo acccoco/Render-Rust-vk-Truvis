@@ -63,6 +63,11 @@ unsafe extern "system" fn vk_debug_callback(
     vk::FALSE
 }
 
+pub trait RhiDebugType {
+    fn debug_type_name() -> &'static str;
+    fn vk_handle(&self) -> impl vk::Handle;
+}
+
 impl RhiDebugUtils {
     pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, device: &ash::Device) -> Self {
         let loader = ash::ext::debug_utils::Instance::new(vk_pf, instance);
@@ -114,12 +119,26 @@ impl RhiDebugUtils {
     }
 
     #[inline]
-    pub fn set_object_debug_name(&self, handle: impl vk::Handle + Copy, name: impl AsRef<str>) {
+    pub fn set_object_debug_name<T: vk::Handle + Copy>(&self, handle: T, name: impl AsRef<str>) {
         let name = CString::new(name.as_ref()).unwrap();
         unsafe {
             self.vk_debug_utils_device
                 .set_debug_utils_object_name(
                     &vk::DebugUtilsObjectNameInfoEXT::default().object_name(name.as_c_str()).object_handle(handle),
+                )
+                .unwrap();
+        }
+    }
+
+    pub fn set_debug_name<T: RhiDebugType>(&self, handle: &T, name: impl AsRef<str>) {
+        let debug_name = format!("{}::{}", T::debug_type_name(), name.as_ref());
+        let debug_name = CString::new(debug_name.as_str()).unwrap();
+        unsafe {
+            self.vk_debug_utils_device
+                .set_debug_utils_object_name(
+                    &vk::DebugUtilsObjectNameInfoEXT::default()
+                        .object_name(debug_name.as_c_str())
+                        .object_handle(handle.vk_handle()),
                 )
                 .unwrap();
         }

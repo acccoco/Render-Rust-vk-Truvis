@@ -3,6 +3,7 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
+use crate::core::debug_utils::RhiDebugType;
 use crate::core::synchronize::RhiBufferBarrier;
 use crate::{
     basic::color::LabelColor,
@@ -11,7 +12,7 @@ use crate::{
         command_pool::RhiCommandPool,
         command_queue::{RhiQueue, RhiSubmitInfo},
         device::RhiDevice,
-        query_pool::QueryPool,
+        query_pool::RhiQueryPool,
         synchronize::RhiImageBarrier,
     },
     rhi::Rhi,
@@ -29,6 +30,15 @@ pub struct RhiCommandBuffer {
 
     device: Rc<RhiDevice>,
 }
+impl RhiDebugType for RhiCommandBuffer {
+    fn debug_type_name() -> &'static str {
+        "RhiCommandBuffer"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
 
 // Basic
 impl RhiCommandBuffer {
@@ -39,13 +49,14 @@ impl RhiCommandBuffer {
             .command_buffer_count(1);
 
         let command_buffer = unsafe { device.allocate_command_buffers(&info).unwrap()[0] };
-        device.debug_utils().set_object_debug_name(command_buffer, debug_name);
-        RhiCommandBuffer {
+        let cmd_buffer = RhiCommandBuffer {
             handle: command_buffer,
             command_pool,
 
-            device,
-        }
+            device: device.clone(),
+        };
+        device.debug_utils().set_debug_name(&cmd_buffer, debug_name);
+        cmd_buffer
     }
 
     /// getter
@@ -357,7 +368,7 @@ impl RhiCommandBuffer {
     #[inline]
     pub fn write_acceleration_structure_properties(
         &self,
-        query_pool: &mut QueryPool,
+        query_pool: &mut RhiQueryPool,
         first_query: u32,
         acceleration_structures: &[vk::AccelerationStructureKHR],
     ) {

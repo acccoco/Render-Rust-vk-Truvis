@@ -3,7 +3,8 @@ use std::rc::Rc;
 use ash::vk;
 
 use crate::core::command_queue::RhiQueueFamily;
-use crate::{core::device::RhiDevice, rhi::Rhi};
+use crate::core::debug_utils::RhiDebugType;
+use crate::core::device::RhiDevice;
 
 /// command pool 是和 queue family 绑定的，而不是和 queue 绑定的
 pub struct RhiCommandPool {
@@ -13,6 +14,15 @@ pub struct RhiCommandPool {
     device: Rc<RhiDevice>,
     _debug_name: String,
 }
+impl RhiDebugType for RhiCommandPool {
+    fn debug_type_name() -> &'static str {
+        "RhiCommandPool"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
 impl Drop for RhiCommandPool {
     fn drop(&mut self) {
         unsafe {
@@ -20,16 +30,9 @@ impl Drop for RhiCommandPool {
         }
     }
 }
-
 impl RhiCommandPool {
     #[inline]
-    pub fn new(rhi: &Rhi, queue_family: RhiQueueFamily, flags: vk::CommandPoolCreateFlags, debug_name: &str) -> Self {
-        Self::new_before_rhi(rhi.device.clone(), queue_family, flags, debug_name)
-    }
-
-    /// 用于在 rhi 初始化完成之前创建 command pool
-    #[inline]
-    pub fn new_before_rhi(
+    pub fn new(
         device: Rc<RhiDevice>,
         queue_family: RhiQueueFamily,
         flags: vk::CommandPoolCreateFlags,
@@ -46,13 +49,14 @@ impl RhiCommandPool {
                 .unwrap()
         };
 
-        device.debug_utils().set_object_debug_name(pool, debug_name);
-        Self {
+        let command_pool = Self {
             handle: pool,
             _queue_family: queue_family,
-            device,
+            device: device.clone(),
             _debug_name: debug_name.to_string(),
-        }
+        };
+        device.debug_utils().set_debug_name(&command_pool, debug_name);
+        command_pool
     }
 
     /// getter

@@ -2,9 +2,10 @@ use std::rc::Rc;
 
 use ash::vk;
 
+use crate::core::debug_utils::RhiDebugType;
 use crate::{core::device::RhiDevice, rhi::Rhi};
 
-pub struct QueryPool {
+pub struct RhiQueryPool {
     handle: vk::QueryPool,
     query_type: vk::QueryType,
 
@@ -13,15 +14,23 @@ pub struct QueryPool {
 
     device: Rc<RhiDevice>,
 }
-impl Drop for QueryPool {
+impl RhiDebugType for RhiQueryPool {
+    fn debug_type_name() -> &'static str {
+        "RhiQueryPool"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
+impl Drop for RhiQueryPool {
     fn drop(&mut self) {
         unsafe {
             self.device.destroy_query_pool(self.handle, None);
         }
     }
 }
-
-impl QueryPool {
+impl RhiQueryPool {
     #[inline]
     pub fn new(rhi: &Rhi, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self {
         let create_info = vk::QueryPoolCreateInfo {
@@ -30,17 +39,16 @@ impl QueryPool {
             ..Default::default()
         };
 
-        unsafe {
-            let handle = rhi.device.create_query_pool(&create_info, None).unwrap();
-            rhi.device.debug_utils().set_object_debug_name(handle, debug_name);
+        let handle = unsafe { rhi.device.create_query_pool(&create_info, None).unwrap() };
 
-            Self {
-                device: rhi.device.clone(),
-                handle,
-                query_type: ty,
-                _cnt: cnt,
-            }
-        }
+        let query_pool = Self {
+            device: rhi.device.clone(),
+            handle,
+            query_type: ty,
+            _cnt: cnt,
+        };
+        rhi.device.debug_utils().set_debug_name(&query_pool, debug_name);
+        query_pool
     }
 
     #[inline]

@@ -3,6 +3,7 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
+use crate::core::debug_utils::RhiDebugType;
 use crate::core::{
     command_buffer::RhiCommandBuffer,
     device::RhiDevice,
@@ -25,6 +26,14 @@ pub struct RhiQueue {
     pub(crate) queue_family: RhiQueueFamily,
 
     pub(crate) device: Rc<RhiDevice>,
+}
+impl RhiDebugType for RhiQueue {
+    fn debug_type_name() -> &'static str {
+        "RhiQueue"
+    }
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
 }
 
 impl RhiQueue {
