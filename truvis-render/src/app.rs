@@ -39,10 +39,17 @@ pub trait OuterApp {
 
 pub struct TruvisApp<T: OuterApp> {
     renderer: Renderer,
+
+    /// 需要等待窗口事件初始化，因此 OnceCell
     window_system: OnceCell<MainWindow>,
+
     input_manager: Rc<RefCell<InputManager>>,
+
+    /// 需要在 window 之后初始化，因此 OnceCell
     gui: OnceCell<Gui>,
+
     timer: Timer,
+
     camera_controller: CameraController,
 
     outer_app: OnceCell<T>,
@@ -50,7 +57,6 @@ pub struct TruvisApp<T: OuterApp> {
 
 impl<T: OuterApp> Drop for TruvisApp<T> {
     fn drop(&mut self) {
-        log::info!("Dropping TruvisApp");
         // 在 TruvisApp 被销毁时，等待 Renderer 设备空闲
         self.renderer.wait_idle();
     }
@@ -123,10 +129,14 @@ impl<T: OuterApp> TruvisApp<T> {
     }
 
     pub fn update(&mut self) {
+        // ===================== Phase: Begin Frame =====================
+        self.renderer.begin_frame();
+
+        // ===================== Phase: IO =====================
         // 更新计时器
         self.timer.update();
         let duration = std::time::Duration::from_secs_f32(self.timer.delta_time_s);
-        self.gui.get_mut().unwrap().context.get_mut().io_mut().update_delta_time(duration);
+        self.gui.get_mut().unwrap().prepare_frame(self.window_system.get().unwrap().window(), duration);
 
         // 更新输入状态
         self.input_manager.borrow_mut().update();
@@ -134,30 +144,29 @@ impl<T: OuterApp> TruvisApp<T> {
         // 更新相机控制器
         self.camera_controller.update(self.timer.delta_time_s);
 
-        self.renderer.begin_frame();
-        {
-            self.outer_app.get_mut().unwrap().update(&mut self.renderer);
+        // ===================== Phase: Update =====================
+        self.gui.get_mut().unwrap().update(self.window_system.get().unwrap().window(), |ui| {
+            self.outer_app.get_mut().unwrap().draw_ui(ui);
+        });
+        self.outer_app.get_mut().unwrap().update(&mut self.renderer);
 
-            self.renderer.before_render(
-                &self.input_manager.borrow().state,
-                &self.timer,
-                self.camera_controller.camera(),
-            );
-            self.outer_app.get_mut().unwrap().draw(&mut self.renderer, &self.timer);
-            self.renderer.after_render();
+        // ===================== Phase: Before Render =====================
+        self.renderer.before_render(&self.input_manager.borrow().state, &self.timer, self.camera_controller.camera());
 
-            let pipeline_settings = self.renderer.pipeline_settings();
-            self.gui.get_mut().unwrap().draw(
-                &self.renderer.rhi,
-                self.renderer.render_context.as_mut().unwrap(),
-                self.renderer.render_swapchain.as_mut().unwrap(),
-                &pipeline_settings.frame_settings,
-                self.window_system.get().unwrap().window(),
-                |imgui| {
-                    self.outer_app.get_mut().unwrap().draw_ui(imgui);
-                },
-            );
-        }
+        // ===================== Phase: Render =====================
+        self.outer_app.get_mut().unwrap().draw(&mut self.renderer, &self.timer);
+
+        // ===================== Phase: After Render =====================
+        self.renderer.after_render();
+        let pipeline_settings = self.renderer.pipeline_settings();
+        self.gui.get_mut().unwrap().render(
+            &self.renderer.rhi,
+            self.renderer.render_context.as_mut().unwrap(),
+            self.renderer.render_swapchain.as_mut().unwrap(),
+            &pipeline_settings.frame_settings,
+        );
+
+        // ===================== Phase: End Frame =====================
         self.renderer.end_frame();
     }
 

@@ -1,6 +1,7 @@
+#include "pass/rt.slangi"
 #include "phong.slangi"
 #include "scene.slangi"
-#include "pass/rt.slangi"
+
 
 struct VsInput
 {
@@ -10,11 +11,11 @@ struct VsInput
     [[vk::location(1)]]
     float3 normal : NORMAL;
 
-    [[vk::location(2)]]
-    float3 tangent : TANGENT;
+    // [[vk::location(2)]]
+    // float3 tangent : TANGENT;
 
-    [[vk::location(3)]]
-    float3 bitangent : BITANGENT;
+    // [[vk::location(3)]]
+    // float3 bitangent : BITANGENT;
 
     [[vk::location(4)]]
     float2 uv : UV;
@@ -27,15 +28,14 @@ struct VsOutput
     CoarseVertex coarse_vertex : CoarseVertex;
 };
 
-
 [[vk::push_constant]]
 rt::PushConstants push_const;
 
 [shader("vertex")]
 VsOutput main(VsInput input)
 {
-    Instance* instance = push_const.scene.all_instances + push_const.instance_idx;
-    PerFrameData* frame_data = push_const.frame_data;
+    Instance *instance = push_const.scene.all_instances + push_const.instance_idx;
+    PerFrameData *frame_data = push_const.frame_data;
 
     VsOutput output = (VsOutput)0;
 
