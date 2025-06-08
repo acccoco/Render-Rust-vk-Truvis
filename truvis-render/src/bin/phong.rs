@@ -5,8 +5,8 @@ use truvis_render::app::{OuterApp, TruvisApp};
 use truvis_render::platform::camera::DrsCamera;
 use truvis_render::platform::timer::Timer;
 use truvis_render::render::Renderer;
-use truvis_render::render_pass::phong::PhongPass;
-use truvis_render::render_pass::simple_rt::SimlpeRtPass;
+use truvis_render::render_pipeline::phong::PhongPass;
+use truvis_render::render_pipeline::simple_rt::SimlpeRtPass;
 use truvis_render::renderer::framebuffer::FrameBuffer;
 use truvis_rhi::core::command_queue::RhiSubmitInfo;
 

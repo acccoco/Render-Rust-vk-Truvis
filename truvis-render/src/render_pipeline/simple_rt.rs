@@ -136,7 +136,6 @@ create_named_array!(
 );
 
 pub struct SBTRegions {
-    // TODO 这个字段不应该放在这里，这个是和场景有关的
     sbt_region_raygen: vk::StridedDeviceAddressRegionKHR,
     sbt_region_miss: vk::StridedDeviceAddressRegionKHR,
     sbt_region_hit: vk::StridedDeviceAddressRegionKHR,

@@ -3,7 +3,7 @@ use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
 use crate::render_context::RenderContext;
-use crate::render_pass::compute::ComputePass;
+use crate::render_pipeline::compute::ComputePass;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::TheWorld;

@@ -1,4 +1,5 @@
 use crate::pipeline_settings::{PipelineSettings, FRAME_ID_MAP};
+use crate::render_pipeline::pipeline_tools::PipelineTools;
 use crate::renderer::bindless::BindlessManager;
 use ash::vk;
 use itertools::Itertools;
@@ -304,15 +305,13 @@ impl RenderContext {
             {
                 // 只需要建立起执行依赖即可，确保 present 完成后，再进行 layout trans
                 // COLOR_ATTACHMENT_READ 对应 blend 等操作
-                let present_image_barrier = RhiImageBarrier::new()
-                    .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
-                    .dst_mask(
-                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                        vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-                    )
-                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                    .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                    .image(present_image);
+                PipelineTools::present_image_layout_trans_to(
+                    &cmd,
+                    present_image,
+                    vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                    vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
+                );
 
                 // frams in flight 使用同一个 rt image，因此需要确保之前的 rt 写入已经完成
                 let rt_image_barrier = RhiImageBarrier::new()
@@ -324,7 +323,7 @@ impl RenderContext {
                         vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
                     );
 
-                cmd.image_memory_barrier(vk::DependencyFlags::empty(), &[present_image_barrier, rt_image_barrier]);
+                cmd.image_memory_barrier(vk::DependencyFlags::empty(), &[rt_image_barrier]);
             }
             cmd.end();
 
