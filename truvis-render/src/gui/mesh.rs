@@ -4,7 +4,6 @@ use std::mem::offset_of;
 use truvis_rhi::basic::color::LabelColor;
 use truvis_rhi::core::buffer::RhiBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::command_queue::RhiSubmitInfo;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::rhi::Rhi;
 
@@ -60,10 +59,12 @@ pub struct GuiMesh {
 }
 
 impl GuiMesh {
-    pub fn from_draw_data(rhi: &Rhi, render_ctx: &mut FrameContext, draw_data: &imgui::DrawData) -> Self {
-        let cmd = render_ctx.alloc_command_buffer("uipass-create-mesh");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]create-mesh");
-
+    pub fn from_draw_data(
+        rhi: &Rhi,
+        cmd: &RhiCommandBuffer,
+        render_ctx: &mut FrameContext,
+        draw_data: &imgui::DrawData,
+    ) -> Self {
         let (vertex_buffer, vertex_cnt, vertex_stage_buffer) =
             Self::create_vertex_buffer(rhi, render_ctx, &cmd, draw_data);
         let (index_buffer, index_cnt, index_stage_buffer) = Self::create_index_buffer(rhi, render_ctx, &cmd, draw_data);
@@ -72,23 +73,19 @@ impl GuiMesh {
         {
             cmd.buffer_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[RhiBufferBarrier::default()
-                    .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
-                    .dst_mask(vk::PipelineStageFlags2::INDEX_INPUT, vk::AccessFlags2::INDEX_READ)
-                    .buffer(index_buffer.handle(), 0, vk::WHOLE_SIZE)],
-            );
-            cmd.buffer_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[RhiBufferBarrier::default()
-                    .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
-                    .dst_mask(vk::PipelineStageFlags2::VERTEX_INPUT, vk::AccessFlags2::VERTEX_ATTRIBUTE_READ)
-                    .buffer(vertex_buffer.handle(), 0, vk::WHOLE_SIZE)],
+                &[
+                    RhiBufferBarrier::default()
+                        .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
+                        .dst_mask(vk::PipelineStageFlags2::INDEX_INPUT, vk::AccessFlags2::INDEX_READ)
+                        .buffer(index_buffer.handle(), 0, vk::WHOLE_SIZE),
+                    RhiBufferBarrier::default()
+                        .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
+                        .dst_mask(vk::PipelineStageFlags2::VERTEX_INPUT, vk::AccessFlags2::VERTEX_ATTRIBUTE_READ)
+                        .buffer(vertex_buffer.handle(), 0, vk::WHOLE_SIZE),
+                ],
             );
         }
         cmd.end_label();
-        cmd.end();
-
-        rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
 
         Self {
             vertex_buffer,
@@ -165,12 +162,12 @@ impl GuiMesh {
         let mut index_buffer = RhiBuffer::new_index_buffer(
             rhi,
             indices_size,
-            &format!("{}-imgui-index-buffer", render_ctx.crt_frame_prefix()),
+            format!("{}-imgui-index-buffer", render_ctx.crt_frame_prefix()),
         );
         let mut stage_buffer = RhiBuffer::new_stage_buffer(
             rhi,
             indices_size as vk::DeviceSize,
-            &format!("{}-imgui-index-stage-buffer", render_ctx.crt_frame_prefix()),
+            format!("{}-imgui-index-stage-buffer", render_ctx.crt_frame_prefix()),
         );
         stage_buffer.transfer_data_by_mem_map(&indices);
 

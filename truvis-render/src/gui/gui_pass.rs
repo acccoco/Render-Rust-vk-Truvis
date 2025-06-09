@@ -119,7 +119,7 @@ impl GuiPass {
 
         let mesh;
         let draw_data;
-        if let Some(r) = gui.imgui_render(rhi, render_ctx) {
+        if let Some(r) = gui.imgui_render(rhi, cmd, render_ctx) {
             (mesh, draw_data) = r;
         } else {
             return;
