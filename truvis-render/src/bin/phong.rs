@@ -87,7 +87,7 @@ impl OuterApp for PhongApp {
             &depth_attach,
         );
 
-        let per_frame_data_buffer = &renderer.per_frame_data_buffers[crt_frame_label];
+        let per_frame_data_buffer = &renderer.per_frame_data_buffers[*crt_frame_label];
 
         if false {
             let phong_cmd = render_context.alloc_command_buffer("[main-pass]render");

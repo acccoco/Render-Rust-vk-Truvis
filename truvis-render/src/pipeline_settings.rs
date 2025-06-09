@@ -44,6 +44,3 @@ impl AccumData {
         self.accum_frames_num = 0;
     }
 }
-
-/// frames in flight name
-pub const FRAME_ID_MAP: [char; 4] = ['A', 'B', 'C', 'D'];

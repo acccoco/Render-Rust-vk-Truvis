@@ -1,4 +1,4 @@
-use crate::pipeline_settings::FRAME_ID_MAP;
+use crate::render::FifLabel;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::window_system::MainWindow;
 use ash::vk;
@@ -55,7 +55,7 @@ impl RhiDebugType for RhiSurface {
     }
 }
 
-pub struct RhiSwapchain {
+pub struct RenderSwapchain {
     swapchain_pf: ash::khr::swapchain::Device,
     swapchain_handle: vk::SwapchainKHR,
 
@@ -76,7 +76,7 @@ pub struct RhiSwapchain {
     present_mode: vk::PresentModeKHR,
 }
 // getter
-impl RhiSwapchain {
+impl RenderSwapchain {
     #[inline]
     pub fn images(&self) -> &[vk::Image] {
         &self.images
@@ -117,7 +117,7 @@ impl RhiSwapchain {
         bindless_mgr.get_image_idx(&self.image_keywords[self.swapchain_image_index]).unwrap()
     }
 }
-impl RhiSwapchain {
+impl RenderSwapchain {
     pub fn new(
         rhi: &Rhi,
         window: &MainWindow,
@@ -141,8 +141,11 @@ impl RhiSwapchain {
 
         let (images, image_views) = Self::create_images_and_views(rhi, swapchain_handle, &swapchain_pf, format);
 
-        let image_keywords =
-            images.iter().enumerate().map(|(i, _)| format!("swapchain-image-{}", FRAME_ID_MAP[i])).collect_vec();
+        let image_keywords = images
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("swapchain-image-{}", FifLabel::from_usize(i)))
+            .collect_vec();
         for (image_view, keyword) in zip(&image_views, &image_keywords) {
             bindless_mgr.register_image(keyword.clone(), image_view.clone());
         }
@@ -322,7 +325,7 @@ impl RhiSwapchain {
         }
     }
 }
-impl Drop for RhiSwapchain {
+impl Drop for RenderSwapchain {
     fn drop(&mut self) {
         assert!(self.image_views.is_empty(), "RhiSwapchain should be destroyed manually");
     }

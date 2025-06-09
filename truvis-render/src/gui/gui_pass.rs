@@ -1,8 +1,9 @@
-use crate::gui::mesh::{GuiMesh, ImGuiVertex};
+use crate::gui::mesh::ImGuiVertex;
+use crate::gui::ui::Gui;
 use crate::pipeline_settings::{FrameSettings, PipelineSettings};
 use crate::render_context::RenderContext;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::swapchain::RhiSwapchain;
+use crate::renderer::swapchain::RenderSwapchain;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
@@ -41,16 +42,7 @@ create_named_array!(
     ]
 );
 
-// #[derive(ShaderLayout)]
-// pub struct UiShaderLayout {
-//     #[binding = 0]
-//     #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
-//     #[stage = "FRAGMENT"]
-//     _font: (),
-// }
-
 pub struct GuiPass {
-    //descriptor_set_layout: RhiDescriptorSetLayout<UiShaderLayout>,
     pipeline: RhiGraphicsPipeline,
     pipeline_layout: Rc<RhiPipelineLayout>,
     bindless_mgr: Rc<RefCell<BindlessManager>>,
@@ -104,13 +96,12 @@ impl GuiPass {
 
     pub fn draw(
         &self,
+        rhi: &Rhi,
         render_ctx: &mut RenderContext,
-        swapchain: &RhiSwapchain,
+        swapchain: &RenderSwapchain,
         frame_settings: &FrameSettings,
         cmd: &RhiCommandBuffer,
-        mesh: &GuiMesh,
-        draw_data: &imgui::DrawData,
-        get_texture_key: impl Fn(imgui::TextureId) -> String,
+        gui: &mut Gui,
     ) {
         let color_attach_info = vk::RenderingAttachmentInfo::default()
             .image_view(swapchain.current_present_image_view())
@@ -127,6 +118,15 @@ impl GuiPass {
             .render_area(frame_settings.viewport_extent.into())
             .color_attachments(std::slice::from_ref(&color_attach_info))
             .depth_attachment(&depth_attach_info);
+
+        let mesh;
+        let draw_data;
+        let get_texture_key;
+        if let Some(r) = gui.imgui_render(rhi, render_ctx) {
+            (mesh, draw_data, get_texture_key) = r;
+        } else {
+            return;
+        }
 
         let viewport = vk::Viewport {
             width: draw_data.framebuffer_scale[0] * draw_data.display_size[0],
@@ -157,7 +157,7 @@ impl GuiPass {
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),
             0,
-            &[self.bindless_mgr.borrow().bindless_sets[frame_label].handle()],
+            &[self.bindless_mgr.borrow().bindless_sets[*frame_label].handle()],
             None,
         );
         cmd.cmd_push_constants(

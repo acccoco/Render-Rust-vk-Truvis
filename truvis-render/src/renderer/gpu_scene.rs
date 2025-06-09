@@ -1,3 +1,4 @@
+use crate::render::FifLabel;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::scene_manager::TheWorld;
 use ash::vk;
@@ -218,13 +219,13 @@ impl GpuScene {
         }
     }
 
-    pub fn scene_device_address(&self, frame_idx: usize) -> vk::DeviceAddress {
-        self.gpu_scene_buffers[frame_idx].scene_buffer.device_address()
+    pub fn scene_device_address(&self, frame_idx: FifLabel) -> vk::DeviceAddress {
+        self.gpu_scene_buffers[*frame_idx].scene_buffer.device_address()
     }
 
     /// 在每一帧开始时调用，将场景数据转换为 GPU 可读的形式
-    pub fn prepare_render_data(&mut self, frame_idx: usize) {
-        self.bindless_mgr.borrow_mut().prepare_render_data(frame_idx);
+    pub fn prepare_render_data(&mut self, frame_label: FifLabel) {
+        self.bindless_mgr.borrow_mut().prepare_render_data(frame_label);
 
         self.flatten_material_data();
         self.flatten_mesh_data();
@@ -235,7 +236,7 @@ impl GpuScene {
     pub fn upload_to_buffer(
         &mut self,
         rhi: &Rhi,
-        frame_label: usize,
+        frame_label: FifLabel,
         cmd: &RhiCommandBuffer,
         barrier_mask: RhiBarrierMask,
     ) {
@@ -315,9 +316,9 @@ impl GpuScene {
     }
 
     /// 将整个场景的数据上传到 scene buffer 中去
-    fn upload_scene_buffer(&mut self, frame_label: usize, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
+    fn upload_scene_buffer(&mut self, frame_label: FifLabel, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
         let scene_mgr = self.scene_mgr.borrow();
-        let crt_gpu_buffers = &self.gpu_scene_buffers[frame_label];
+        let crt_gpu_buffers = &self.gpu_scene_buffers[*frame_label];
         let bindless_mgr = self.bindless_mgr.borrow();
         let scene_data = shader::Scene {
             all_instances: crt_gpu_buffers.instance_buffer.device_address(),
@@ -349,8 +350,8 @@ impl GpuScene {
     /// 将数据转换为 shader 中的实例数据
     ///
     /// 其中 buffer 可以是 stage buffer 的内存映射
-    fn upload_instance_buffer(&mut self, frame_label: usize, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[frame_label];
+    fn upload_instance_buffer(&mut self, frame_label: FifLabel, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_label];
 
         let crt_instance_stage_buffer = &mut crt_gpu_buffers.instance_stage_buffer;
         let crt_geometry_indirect_stage_buffer = &mut crt_gpu_buffers.geometry_indirect_stage_buffer;
@@ -429,8 +430,8 @@ impl GpuScene {
     }
 
     /// 将 material 数据上传到 material buffer 中
-    fn upload_material_buffer(&mut self, frame_label: usize, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[frame_label];
+    fn upload_material_buffer(&mut self, frame_label: FifLabel, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_label];
         let crt_material_stage_buffer = &mut crt_gpu_buffers.material_stage_buffer;
         crt_material_stage_buffer.map();
         let material_buffer_slices = crt_material_stage_buffer.mapped_slice();
@@ -466,8 +467,8 @@ impl GpuScene {
         );
     }
 
-    fn upload_light_buffer(&mut self, frame_label: usize, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[frame_label];
+    fn upload_light_buffer(&mut self, frame_label: FifLabel, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_label];
         let crt_light_stage_buffer = &mut crt_gpu_buffers.light_stage_buffer;
         crt_light_stage_buffer.map();
         let light_buffer_slices = crt_light_stage_buffer.mapped_slice();
@@ -490,8 +491,8 @@ impl GpuScene {
     }
 
     /// 将 mesh 数据以 geometry 的形式上传到 GPU
-    fn upload_mesh_buffer(&mut self, frame_label: usize, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[frame_label];
+    fn upload_mesh_buffer(&mut self, frame_label: FifLabel, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_label];
         let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         crt_geometry_stage_buffer.map();
         // let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
@@ -541,13 +542,13 @@ impl GpuScene {
         }
     }
 
-    fn build_tlas(&mut self, rhi: &Rhi, frame_label: usize) {
+    fn build_tlas(&mut self, rhi: &Rhi, frame_label: FifLabel) {
         if self.flatten_instances.is_empty() {
             // 没有实例数据，直接返回
             return;
         }
 
-        if self.gpu_scene_buffers[frame_label].tlas.is_some() {
+        if self.gpu_scene_buffers[*frame_label].tlas.is_some() {
             // 已经构建过 tlas，直接返回
             return;
         }
@@ -568,7 +569,7 @@ impl GpuScene {
             "scene tlas",
         );
 
-        self.gpu_scene_buffers[frame_label].tlas = Some(tlas);
+        self.gpu_scene_buffers[*frame_label].tlas = Some(tlas);
     }
 }
 

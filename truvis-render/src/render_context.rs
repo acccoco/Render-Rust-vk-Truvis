@@ -1,4 +1,5 @@
-use crate::pipeline_settings::{PipelineSettings, FRAME_ID_MAP};
+use crate::pipeline_settings::PipelineSettings;
+use crate::render::FifLabel;
 use crate::render_pipeline::pipeline_tools::PipelineTools;
 use crate::renderer::bindless::BindlessManager;
 use ash::vk;
@@ -20,12 +21,10 @@ use truvis_rhi::{
 
 pub struct RenderContext {
     /// 当前处在 in-flight 的第几帧：A, B, C
-    frame_label: usize,
+    fif_label: FifLabel,
 
     /// 当前的帧序号，一直累加
     frame_id: usize,
-
-    frames_in_flight: usize,
 
     /// 为每个 frame 分配一个 command pool
     graphics_command_pools: Vec<Rc<RhiCommandPool>>,
@@ -61,16 +60,16 @@ impl RenderContext {
 
         let create_semaphore = |name: &str| {
             (0..pipeline_settings.frames_in_flight)
-                .map(|i| FRAME_ID_MAP[i])
-                .map(|tag| RhiSemaphore::new(rhi, &format!("{name}_{tag}")))
+                .map(|i| FifLabel::from_usize(i))
+                .map(|frame_label| RhiSemaphore::new(rhi, &format!("{name}_{frame_label}")))
                 .collect_vec()
         };
         let present_complete_semaphores = create_semaphore("present_complete_semaphore");
         let render_complete_semaphores = create_semaphore("render_complete_semaphores");
 
         let fence_frame_in_flight = (0..pipeline_settings.frames_in_flight)
-            .map(|i| FRAME_ID_MAP[i])
-            .map(|tag| RhiFence::new(rhi, true, &format!("frame_in_flight_fence_{tag}")))
+            .map(|i| FifLabel::from_usize(i))
+            .map(|frame_label| RhiFence::new(rhi, true, &format!("frame_in_flight_fence_{frame_label}")))
             .collect();
 
         let graphics_command_pools = Self::init_command_pool(rhi, pipeline_settings.frames_in_flight);
@@ -80,10 +79,8 @@ impl RenderContext {
         bindless_mgr.register_image(rt_keyword.clone(), rt_image_view.clone());
 
         Self {
-            frame_label: 0,
+            fif_label: FifLabel::A, // 初始为 A
             frame_id: 0,
-
-            frames_in_flight: pipeline_settings.frames_in_flight,
 
             graphics_command_pools,
             allocated_command_buffers: vec![Vec::new(); pipeline_settings.frames_in_flight],
@@ -221,13 +218,13 @@ impl RenderContext {
 
     #[inline]
     pub fn current_fence(&self) -> &RhiFence {
-        &self.fence_frame_in_flight[self.frame_label]
+        &self.fence_frame_in_flight[*self.fif_label]
     }
 
     /// 当前处在第几帧：A, B, C
     #[inline]
-    pub fn current_frame_label(&self) -> usize {
-        self.frame_label
+    pub fn current_frame_label(&self) -> FifLabel {
+        self.fif_label
     }
 
     /// 当前帧的编号，一直增加
@@ -239,17 +236,17 @@ impl RenderContext {
     /// 当前帧的 debug prefix，例如：`[frame-A-113]`
     #[inline]
     pub fn current_frame_prefix(&self) -> String {
-        format!("[frame-{}-{}]", FRAME_ID_MAP[self.frame_label], self.frame_id)
+        format!("[frame-{}-{}]", self.fif_label, self.frame_id)
     }
 
     #[inline]
     pub fn current_render_complete_semaphore(&self) -> RhiSemaphore {
-        self.render_complete_semaphores[self.frame_label].clone()
+        self.render_complete_semaphores[*self.fif_label].clone()
     }
 
     #[inline]
     pub fn current_present_complete_semaphore(&self) -> RhiSemaphore {
-        self.present_complete_semaphores[self.frame_label].clone()
+        self.present_complete_semaphores[*self.fif_label].clone()
     }
 
     #[inline]
@@ -275,17 +272,17 @@ impl RenderContext {
             LabelColor::COLOR_STAGE,
         );
         {
-            let current_fence = &self.fence_frame_in_flight[self.frame_label];
+            let current_fence = &self.fence_frame_in_flight[*self.fif_label];
             current_fence.wait();
             current_fence.reset();
 
             // 释放当前 frame 的 command buffer 的资源
-            std::mem::take(&mut self.allocated_command_buffers[self.frame_label]) //
+            std::mem::take(&mut self.allocated_command_buffers[*self.fif_label]) //
                 .into_iter()
                 .for_each(|cmd| cmd.free());
 
             // 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
-            self.graphics_command_pools[self.frame_label].reset_all_buffers();
+            self.graphics_command_pools[*self.fif_label].reset_all_buffers();
         }
         self.device.debug_utils().end_queue_label(self.graphics_queue.handle());
     }
@@ -339,7 +336,7 @@ impl RenderContext {
     }
 
     pub fn end_frame(&mut self) {
-        self.frame_label = (self.frame_label + 1) % self.frames_in_flight;
+        self.fif_label.next_frame();
         self.frame_id += 1;
     }
 
@@ -374,7 +371,7 @@ impl RenderContext {
                     self.current_render_complete_semaphore(),
                     vk::PipelineStageFlags2::BOTTOM_OF_PIPE, /*TODO 需要确认 signal 的 stage*/
                 )])],
-                Some(self.fence_frame_in_flight[self.frame_label].clone()),
+                Some(self.fence_frame_in_flight[*self.fif_label].clone()),
             );
         }
         // queue label 不能跨过 submit，否则会导致 Nsight mismatch label
@@ -383,11 +380,11 @@ impl RenderContext {
 
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer(&mut self, debug_name: &str) -> RhiCommandBuffer {
-        let name = format!("[frame-{}-{}]{}", FRAME_ID_MAP[self.frame_label], self.frame_id, debug_name);
+        let name = format!("[frame-{}-{}]{}", self.fif_label, self.frame_id, debug_name);
         let cmd =
-            RhiCommandBuffer::new(self.device.clone(), self.graphics_command_pools[self.frame_label].clone(), &name);
+            RhiCommandBuffer::new(self.device.clone(), self.graphics_command_pools[*self.fif_label].clone(), &name);
 
-        self.allocated_command_buffers[self.frame_label].push(cmd.clone());
+        self.allocated_command_buffers[*self.fif_label].push(cmd.clone());
         cmd
     }
 }

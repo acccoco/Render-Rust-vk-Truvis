@@ -1,3 +1,4 @@
+use crate::render::FifLabel;
 use crate::resource::ImageLoader;
 use ash::vk;
 use itertools::Itertools;
@@ -50,7 +51,7 @@ pub struct BindlessManager {
     device: Rc<RhiDevice>,
 
     /// 当前 frame in flight 的标签，每帧更新
-    frame_label: usize,
+    frame_label: FifLabel,
 }
 impl BindlessManager {
     pub fn new(rhi: &Rhi, frames_in_flight: usize) -> Self {
@@ -82,19 +83,19 @@ impl BindlessManager {
 
             device: rhi.device.clone(),
 
-            frame_label: 0,
+            frame_label: FifLabel::A,
         }
     }
 
     /// getter
     #[inline]
     pub fn current_descriptor_set(&self) -> &RhiDescriptorSet<BindlessTextureBindings> {
-        &self.bindless_sets[self.frame_label]
+        &self.bindless_sets[*self.frame_label]
     }
 
     /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
-    pub fn prepare_render_data(&mut self, frame_idx: usize) {
-        self.frame_label = frame_idx;
+    pub fn prepare_render_data(&mut self, frame_label: FifLabel) {
+        self.frame_label = frame_label;
 
         let mut texture_infos = Vec::with_capacity(self.textures.iter().len());
         self.texture_map.clear();
@@ -113,8 +114,12 @@ impl BindlessManager {
         }
 
         let writes = [
-            BindlessTextureBindings::textures().write_image(self.bindless_sets[frame_idx].handle(), 0, texture_infos),
-            BindlessTextureBindings::images().write_image(self.bindless_sets[frame_idx].handle(), 0, image_infos),
+            BindlessTextureBindings::textures().write_image(
+                self.bindless_sets[*frame_label].handle(),
+                0,
+                texture_infos,
+            ),
+            BindlessTextureBindings::images().write_image(self.bindless_sets[*frame_label].handle(), 0, image_infos),
         ];
         self.device.write_descriptor_sets(&writes);
     }

@@ -1,4 +1,5 @@
 use crate::pipeline_settings::PipelineSettings;
+use crate::render::FifLabel;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
 use ash::vk;
@@ -62,7 +63,7 @@ impl PhongPass {
         cmd: &RhiCommandBuffer,
         viewport: &vk::Rect2D,
         push_constant: &shader::rt::PushConstants,
-        frame_idx: usize,
+        frame_idx: FifLabel,
     ) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
         cmd.cmd_set_viewport(
@@ -88,7 +89,7 @@ impl PhongPass {
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline.layout(),
             0,
-            &[self.bindless_manager.borrow().bindless_sets[frame_idx].handle()],
+            &[self.bindless_manager.borrow().bindless_sets[*frame_idx].handle()],
             None,
         );
     }
@@ -100,7 +101,7 @@ impl PhongPass {
         viewport: vk::Extent2D,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
-        frame_label: usize,
+        frame_label: FifLabel,
     ) {
         cmd.cmd_begin_rendering(render_info);
         cmd.begin_label("[phong-pass]draw", LabelColor::COLOR_PASS);

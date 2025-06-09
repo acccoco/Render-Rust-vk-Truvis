@@ -157,14 +157,7 @@ impl<T: OuterApp> TruvisApp<T> {
         self.outer_app.get_mut().unwrap().draw(&mut self.renderer, &self.timer);
 
         // ===================== Phase: After Render =====================
-        self.renderer.after_render();
-        let pipeline_settings = self.renderer.pipeline_settings();
-        self.gui.get_mut().unwrap().render(
-            &self.renderer.rhi,
-            self.renderer.render_context.as_mut().unwrap(),
-            self.renderer.render_swapchain.as_mut().unwrap(),
-            &pipeline_settings.frame_settings,
-        );
+        self.renderer.after_render(self.gui.get_mut().unwrap());
 
         // ===================== Phase: End Frame =====================
         self.renderer.end_frame();

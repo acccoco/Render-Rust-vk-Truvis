@@ -1,3 +1,5 @@
+use crate::gui::gui_pass::GuiPass;
+use crate::gui::ui::Gui;
 use crate::pipeline_settings::{AccumData, FrameSettings, PipelineSettings};
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
@@ -7,12 +9,14 @@ use crate::render_pipeline::compute::ComputePass;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::TheWorld;
-use crate::renderer::swapchain::RhiSwapchain;
+use crate::renderer::swapchain::RenderSwapchain;
 use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::ffi::CStr;
+use std::fmt::Display;
+use std::ops::Deref;
 use std::rc::Rc;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
@@ -28,7 +32,7 @@ pub struct Renderer {
     pub render_context: Option<RenderContext>,
 
     /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
-    pub render_swapchain: Option<RhiSwapchain>,
+    pub render_swapchain: Option<RenderSwapchain>,
 
     pipeline_settings: PipelineSettings,
     accum_data: AccumData,
@@ -41,6 +45,7 @@ pub struct Renderer {
     pub per_frame_data_buffers: Vec<RhiStructuredBuffer<shader::PerFrameData>>,
 
     blit_pass: ComputePass<shader::blit::PushConstant>,
+    gui_pass: GuiPass,
 }
 impl Drop for Renderer {
     fn drop(&mut self) {
@@ -74,7 +79,7 @@ impl Renderer {
     }
 
     #[inline]
-    pub fn crt_frame_label(&self) -> usize {
+    pub fn crt_frame_label(&self) -> FifLabel {
         self.render_context.as_ref().unwrap().current_frame_label()
     }
 
@@ -89,7 +94,7 @@ impl Renderer {
     }
 
     #[inline]
-    pub fn swapchain(&self) -> &RhiSwapchain {
+    pub fn swapchain(&self) -> &RenderSwapchain {
         self.render_swapchain.as_ref().unwrap()
     }
 }
@@ -97,11 +102,10 @@ impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         let rhi = Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext));
 
-        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, DefaultRenderSettings::FRAMES_IN_FLIGHT)));
+        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, FifLabel::FRAMES_IN_FLIGHT)));
         let scene_mgr = Rc::new(RefCell::new(TheWorld::new(bindless_mgr.clone())));
-        let gpu_scene =
-            GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), DefaultRenderSettings::FRAMES_IN_FLIGHT);
-        let per_frame_data_buffers = (0..DefaultRenderSettings::FRAMES_IN_FLIGHT)
+        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), FifLabel::FRAMES_IN_FLIGHT);
+        let per_frame_data_buffers = (0..FifLabel::FRAMES_IN_FLIGHT)
             .map(|idx| {
                 RhiStructuredBuffer::<shader::PerFrameData>::new_ubo(&rhi, 1, format!("per-frame-data-buffer-{idx}"))
             })
@@ -114,15 +118,20 @@ impl Renderer {
             "shader/build/imgui/blit.slang.spv",
         );
 
+        let pipeline_settings = PipelineSettings {
+            color_format: DefaultRenderSettings::DEFAULT_SURFACE_FORMAT.format,
+            depth_format: Self::get_depth_format(&rhi),
+            frames_in_flight: FifLabel::FRAMES_IN_FLIGHT,
+            frame_settings: Default::default(),
+        };
+
+        let gui_pass = GuiPass::new(&rhi, &pipeline_settings, bindless_mgr.clone());
+
         Self {
-            pipeline_settings: PipelineSettings {
-                color_format: DefaultRenderSettings::DEFAULT_SURFACE_FORMAT.format,
-                depth_format: Self::get_depth_format(&rhi),
-                frames_in_flight: DefaultRenderSettings::FRAMES_IN_FLIGHT,
-                frame_settings: Default::default(),
-            },
+            pipeline_settings,
             accum_data: Default::default(),
             blit_pass,
+            gui_pass,
             render_context: None,
             render_swapchain: None,
             rhi,
@@ -216,11 +225,25 @@ impl Renderer {
         );
     }
 
-    pub fn after_render(&mut self) {
+    pub fn after_render(&mut self, gui: &mut Gui) {
         self.rhi.device.debug_utils().end_queue_label(self.rhi.graphics_queue.handle());
 
         // blit
         self.blit();
+
+        // gui
+        let cmd = self.render_context_mut().alloc_command_buffer("gui-pass");
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[gui-pass]draw");
+        self.gui_pass.draw(
+            &self.rhi,
+            self.render_context.as_mut().unwrap(),
+            self.render_swapchain.as_ref().unwrap(),
+            &self.pipeline_settings.frame_settings,
+            &cmd,
+            gui,
+        );
+        cmd.end();
+        self.render_context().graphics_queue().submit(vec![RhiSubmitInfo::new(&[cmd])], None);
     }
 
     pub fn wait_idle(&self) {
@@ -240,7 +263,7 @@ impl Renderer {
             render_swapchain.destroy(&mut self.bindless_mgr.borrow_mut());
         }
 
-        self.render_swapchain = Some(RhiSwapchain::new(
+        self.render_swapchain = Some(RenderSwapchain::new(
             &self.rhi,
             window,
             DefaultRenderSettings::DEFAULT_PRESENT_MODE,
@@ -311,14 +334,14 @@ impl Renderer {
             }
         };
         cmd.cmd_update_buffer(
-            self.per_frame_data_buffers[crt_frame_label].handle(),
+            self.per_frame_data_buffers[*crt_frame_label].handle(),
             0,
             bytemuck::bytes_of(&per_frame_data),
         );
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
             &[RhiBufferBarrier::default()
-                .buffer(self.per_frame_data_buffers[crt_frame_label].handle(), 0, vk::WHOLE_SIZE)
+                .buffer(self.per_frame_data_buffers[*crt_frame_label].handle(), 0, vk::WHOLE_SIZE)
                 .mask(transfer_barrier_mask)],
         );
         cmd.end();
@@ -390,6 +413,59 @@ impl Renderer {
     }
 }
 
+/// frames in flight 中每一帧的 label
+#[derive(Debug, Clone, Copy)]
+pub enum FifLabel {
+    A,
+    B,
+    C,
+}
+impl Deref for FifLabel {
+    type Target = usize;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::A => &Self::INDEX[0],
+            Self::B => &Self::INDEX[1],
+            Self::C => &Self::INDEX[2],
+        }
+    }
+}
+impl Display for FifLabel {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::A => write!(f, "A"),
+            Self::B => write!(f, "B"),
+            Self::C => write!(f, "C"),
+        }
+    }
+}
+impl FifLabel {
+    pub const FRAMES_IN_FLIGHT: usize = 3;
+
+    const INDEX: [usize; 3] = [0, 1, 2];
+
+    #[inline]
+    pub fn from_usize(idx: usize) -> Self {
+        match idx {
+            0 => Self::A,
+            1 => Self::B,
+            2 => Self::C,
+            _ => panic!("Invalid frame index: {idx}"),
+        }
+    }
+
+    #[inline]
+    pub fn next_frame(&mut self) {
+        *self = match self {
+            Self::A => Self::B,
+            Self::B => Self::C,
+            Self::C => Self::A,
+        };
+    }
+}
+
 struct DefaultRenderSettings;
 impl DefaultRenderSettings {
     pub const DEPTH_FORMAT_CANDIDATES: &'static [vk::Format] = &[
@@ -399,7 +475,6 @@ impl DefaultRenderSettings {
         vk::Format::D16_UNORM_S8_UINT,
         vk::Format::D16_UNORM,
     ];
-    pub const FRAMES_IN_FLIGHT: usize = 3;
     pub const DEFAULT_SURFACE_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
         format: vk::Format::B8G8R8A8_UNORM,
         color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,

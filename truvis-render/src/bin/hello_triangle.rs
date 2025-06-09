@@ -11,7 +11,7 @@ use truvis_render::platform::timer::Timer;
 use truvis_render::render::Renderer;
 use truvis_render::render_context::RenderContext;
 use truvis_render::renderer::framebuffer::FrameBuffer;
-use truvis_render::renderer::swapchain::RhiSwapchain;
+use truvis_render::renderer::swapchain::RenderSwapchain;
 use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
 use truvis_rhi::{
     core::{command_queue::RhiSubmitInfo, graphics_pipeline::RhiGraphicsPipeline},
@@ -50,7 +50,7 @@ impl HelloTriangle {
         RhiGraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, pipeline_layout, "hello-triangle-pipeline")
     }
 
-    fn my_update(&self, rhi: &Rhi, render_context: &mut RenderContext, swapchain: &RhiSwapchain) {
+    fn my_update(&self, rhi: &Rhi, render_context: &mut RenderContext, swapchain: &RenderSwapchain) {
         let color_attach = FrameBuffer::get_color_attachment(swapchain.current_present_image_view());
         let depth_attach = FrameBuffer::get_depth_attachment(render_context.depth_view().handle());
         let render_info = FrameBuffer::get_render_info(

@@ -398,7 +398,7 @@ impl SimlpeRtPass {
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
             0,
-            &[self._bindless_mgr.borrow().bindless_sets[frame_label].handle()],
+            &[self._bindless_mgr.borrow().bindless_sets[*frame_label].handle()],
             None,
         );
         let push_constant = shader::rt::PushConstants {

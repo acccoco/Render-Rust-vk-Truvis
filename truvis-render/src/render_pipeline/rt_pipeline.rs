@@ -5,7 +5,7 @@ use crate::render_pipeline::compute::ComputePass;
 use crate::render_pipeline::simple_rt::SimlpeRtPass;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::gpu_scene::GpuScene;
-use crate::renderer::swapchain::RhiSwapchain;
+use crate::renderer::swapchain::RenderSwapchain;
 use ash::vk;
 use shader_binding::shader;
 use std::cell::RefCell;
@@ -55,7 +55,7 @@ impl RtPipeline {
         }
     }
 
-    pub fn render(&self, rhi: &Rhi, render_ctx: &mut RenderContext, swapchain: &RhiSwapchain, gui: &mut Gui) {
+    pub fn render(&self, rhi: &Rhi, render_ctx: &mut RenderContext, swapchain: &RenderSwapchain, gui: &mut Gui) {
         let ctx = self.context.as_ref().unwrap();
         let gpu_scene = self.gpu_scene.borrow();
         let bindless_mgr = self.bindless_mgr.borrow();
@@ -83,7 +83,7 @@ impl RtPipeline {
             ),
         );
 
-        gui.render(rhi, render_ctx, swapchain, &ctx.frame_settings);
+        // gui.render(rhi, render_ctx, swapchain, &ctx.frame_settings);
 
         cmd.end();
     }
