@@ -4,6 +4,7 @@ use crate::platform::camera_controller::CameraController;
 use crate::platform::input_manager::InputManager;
 use crate::platform::timer::Timer;
 use crate::render::Renderer;
+use crate::render_pipeline::pipeline_context::{PipelineContext, TempPipelineCtx};
 use crate::renderer::window_system::{MainWindow, WindowCreateInfo};
 use raw_window_handle::HasDisplayHandle;
 use std::cell::{OnceCell, RefCell};
@@ -24,18 +25,18 @@ pub fn panic_handler(info: &std::panic::PanicHookInfo) {
 pub trait OuterApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self;
 
-    fn draw_ui(&mut self, ui: &mut imgui::Ui);
+    fn draw_ui(&mut self, _ui: &mut imgui::Ui) {}
 
     fn update(&mut self, _renderer: &mut Renderer) {}
 
     /// 发生于 acquire_frame 之后，submit_frame 之前
-    fn draw(&self, _renderer: &mut Renderer, _timer: &Timer) {
-        // 默认不做任何事情
-    }
+    fn draw(&self, _pipeline_ctx: PipelineContext) {}
 
     /// window 发生改变后，重建
     fn rebuild(&mut self, _renderer: &mut Renderer) {}
 }
+
+pub struct UserEvent;
 
 pub struct TruvisApp<T: OuterApp> {
     renderer: Renderer,
@@ -54,16 +55,12 @@ pub struct TruvisApp<T: OuterApp> {
 
     outer_app: OnceCell<T>,
 }
-
 impl<T: OuterApp> Drop for TruvisApp<T> {
     fn drop(&mut self) {
         // 在 TruvisApp 被销毁时，等待 Renderer 设备空闲
         self.renderer.wait_idle();
     }
 }
-
-pub struct UserEvent;
-
 impl<T: OuterApp> TruvisApp<T> {
     /// 整个程序的入口
     pub fn run() {
@@ -115,7 +112,7 @@ impl<T: OuterApp> TruvisApp<T> {
         let gui = Gui::new(
             &self.renderer.rhi,
             window_system.window(),
-            &self.renderer.pipeline_settings(),
+            &self.renderer.renderer_settings(),
             self.renderer.bindless_mgr.clone(),
         );
 
@@ -154,10 +151,18 @@ impl<T: OuterApp> TruvisApp<T> {
         self.renderer.before_render(&self.input_manager.borrow().state, &self.timer, self.camera_controller.camera());
 
         // ===================== Phase: Render =====================
-        self.outer_app.get_mut().unwrap().draw(&mut self.renderer, &self.timer);
+        // 构建出 PipelineContext
+        let pipeline_ctx = self.renderer.collect_render_ctx();
+        let pipeline_ctx = TempPipelineCtx {
+            gui: Some(self.gui.get_mut().unwrap()),
+            timer: Some(&self.timer),
+            ..pipeline_ctx
+        }
+        .to_pipeline_context();
+        self.outer_app.get_mut().unwrap().draw(pipeline_ctx);
 
         // ===================== Phase: After Render =====================
-        self.renderer.after_render(self.gui.get_mut().unwrap());
+        self.renderer.after_render();
 
         // ===================== Phase: End Frame =====================
         self.renderer.end_frame();

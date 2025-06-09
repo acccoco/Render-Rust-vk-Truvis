@@ -1,9 +1,8 @@
 use crate::gui::mesh::ImGuiVertex;
 use crate::gui::ui::Gui;
-use crate::pipeline_settings::{FrameSettings, PipelineSettings};
-use crate::render_context::RenderContext;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::swapchain::RenderSwapchain;
+use crate::renderer::frame_context::FrameContext;
+use crate::renderer::pipeline_settings::{FrameSettings, PipelineSettings};
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
@@ -97,14 +96,13 @@ impl GuiPass {
     pub fn draw(
         &self,
         rhi: &Rhi,
-        render_ctx: &mut RenderContext,
-        swapchain: &RenderSwapchain,
+        render_ctx: &mut FrameContext,
         frame_settings: &FrameSettings,
         cmd: &RhiCommandBuffer,
         gui: &mut Gui,
     ) {
         let color_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(swapchain.current_present_image_view())
+            .image_view(render_ctx.crt_present_image_view().handle())
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
             .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);
@@ -121,9 +119,8 @@ impl GuiPass {
 
         let mesh;
         let draw_data;
-        let get_texture_key;
         if let Some(r) = gui.imgui_render(rhi, render_ctx) {
-            (mesh, draw_data, get_texture_key) = r;
+            (mesh, draw_data) = r;
         } else {
             return;
         }
@@ -135,7 +132,7 @@ impl GuiPass {
             ..Default::default()
         };
 
-        let frame_label = render_ctx.current_frame_label();
+        let frame_label = render_ctx.crt_frame_label();
 
         cmd.cmd_begin_rendering(&render_info);
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
@@ -211,7 +208,7 @@ impl GuiPass {
 
                         // 加载 texture，如果和上一个 command 使用的 texture 不是同一个，则需要重新加载
                         if Some(texture_id) != last_texture_id {
-                            let texture_key = get_texture_key(texture_id);
+                            let texture_key = Gui::get_texture_key(texture_id);
                             let texture_handle = bindless_mgr.get_texture_idx(&texture_key).unwrap();
                             cmd.cmd_push_constants(
                                 self.pipeline_layout.handle(),

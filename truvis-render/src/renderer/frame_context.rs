@@ -1,17 +1,15 @@
-use crate::pipeline_settings::PipelineSettings;
-use crate::render::FifLabel;
-use crate::render_pipeline::pipeline_tools::PipelineTools;
+use crate::renderer::pipeline_settings::{DefaultRendererSettings, FifLabel, FrameSettings, PipelineSettings};
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::swapchain::RenderSwapchain;
+use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
 use std::rc::Rc;
 use truvis_rhi::{
-    basic::color::LabelColor,
     core::{
         command_buffer::RhiCommandBuffer,
         command_pool::RhiCommandPool,
-        command_queue::{RhiQueue, RhiSubmitInfo},
         device::RhiDevice,
         image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo},
         synchronize::{RhiFence, RhiImageBarrier, RhiSemaphore},
@@ -19,7 +17,11 @@ use truvis_rhi::{
     rhi::Rhi,
 };
 
-pub struct RenderContext {
+pub struct FrameContext {
+    render_swapchain: RenderSwapchain,
+
+    frame_settings: FrameSettings,
+
     /// 当前处在 in-flight 的第几帧：A, B, C
     fif_label: FifLabel,
 
@@ -32,6 +34,11 @@ pub struct RenderContext {
     /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
     allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
 
+    /// 来自于 swpachain，生命周期跟随 swapchain
+    present_images: Vec<vk::Image>,
+    present_image_views: Vec<Rc<RhiImage2DView>>,
+    present_image_bindless_keys: Vec<String>,
+
     /// FIXME 听说可以只需要一个 depth view，因为不需要同时渲染两帧
     _depth_image: Rc<RhiImage2D>,
     _depth_view: Rc<RhiImage2DView>,
@@ -42,21 +49,54 @@ pub struct RenderContext {
 
     rt_image: Rc<RhiImage2D>,
     _rt_image_view: Rc<RhiImage2DView>,
-    rt_keyword: String,
+    rt_bindless_key: String,
 
     device: Rc<RhiDevice>,
-    graphics_queue: Rc<RhiQueue>,
-    _command_queue: Rc<RhiQueue>,
-    _transfer_queue: Rc<RhiQueue>,
 }
-// Ctor
-impl RenderContext {
-    pub fn new(rhi: &Rhi, pipeline_settings: &PipelineSettings, bindless_mgr: &mut BindlessManager) -> Self {
-        let (depth_image, depth_image_view) = Self::create_depth_image_and_view(
+// init
+impl FrameContext {
+    pub fn new(
+        rhi: &Rhi,
+        window: &MainWindow,
+        pipeline_settings: &PipelineSettings,
+        bindless_mgr: &mut BindlessManager,
+    ) -> Self {
+        let swapchain = RenderSwapchain::new(
             rhi,
-            pipeline_settings.frame_settings.viewport_extent,
-            pipeline_settings.depth_format,
+            window,
+            DefaultRendererSettings::DEFAULT_PRESENT_MODE,
+            DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
         );
+        let present_images = swapchain.present_images();
+        let present_image_views = present_images
+            .iter()
+            .enumerate()
+            .map(|(idx, image)| {
+                Rc::new(RhiImage2DView::new_with_raw_image(
+                    rhi,
+                    *image,
+                    RhiImageViewCreateInfo::new_image_view_2d_info(
+                        pipeline_settings.color_format,
+                        vk::ImageAspectFlags::COLOR,
+                    ),
+                    format!("swapchain-present-{idx}"),
+                ))
+            })
+            .collect_vec();
+        let present_image_bindless_keys =
+            present_image_views.iter().enumerate().map(|(idx, _)| format!("present-image-{}", idx)).collect_vec();
+        for (key, view) in present_image_bindless_keys.iter().zip(present_image_views.iter()) {
+            bindless_mgr.register_image(key.clone(), view.clone());
+        }
+
+        let frame_settings = FrameSettings {
+            viewport_extent: swapchain.extent(),
+            rt_extent: swapchain.extent(),
+            rt_offset: vk::Offset2D { x: 0, y: 0 },
+        };
+
+        let (depth_image, depth_image_view) =
+            Self::create_depth_image_and_view(rhi, frame_settings.viewport_extent, pipeline_settings.depth_format);
 
         let create_semaphore = |name: &str| {
             (0..pipeline_settings.frames_in_flight)
@@ -74,11 +114,18 @@ impl RenderContext {
 
         let graphics_command_pools = Self::init_command_pool(rhi, pipeline_settings.frames_in_flight);
         let (rt_image, rt_image_view) =
-            Self::create_rt_images(rhi, pipeline_settings.color_format, pipeline_settings.frame_settings.rt_extent);
+            Self::create_rt_images(rhi, pipeline_settings.color_format, frame_settings.rt_extent);
         let rt_keyword = "rt-image".to_string();
         bindless_mgr.register_image(rt_keyword.clone(), rt_image_view.clone());
 
         Self {
+            render_swapchain: swapchain,
+            present_images,
+            present_image_views,
+            present_image_bindless_keys,
+
+            frame_settings,
+
             fif_label: FifLabel::A, // 初始为 A
             frame_id: 0,
 
@@ -90,16 +137,13 @@ impl RenderContext {
 
             rt_image,
             _rt_image_view: rt_image_view,
-            rt_keyword,
+            rt_bindless_key: rt_keyword,
 
             present_complete_semaphores,
             render_complete_semaphores,
             fence_frame_in_flight,
 
             device: rhi.device.clone(),
-            graphics_queue: rhi.graphics_queue.clone(),
-            _command_queue: rhi.compute_queue.clone(),
-            _transfer_queue: rhi.transfer_queue.clone(),
         }
     }
 
@@ -115,7 +159,14 @@ impl RenderContext {
             fence.destroy();
         }
 
-        bindless_mgr.unregister_image(&self.rt_keyword)
+        bindless_mgr.unregister_image(&self.rt_bindless_key);
+
+        for present_image_view in std::mem::take(&mut self.present_image_views).into_iter() {
+            drop(present_image_view);
+        }
+        for present_image_bindless_key in std::mem::take(&mut self.present_image_bindless_keys).into_iter() {
+            bindless_mgr.unregister_image(&present_image_bindless_key);
+        }
     }
 
     fn create_depth_image_and_view(
@@ -209,38 +260,32 @@ impl RenderContext {
     }
 }
 // getter
-impl RenderContext {
-    /// getter
+impl FrameContext {
     #[inline]
-    pub fn graphics_queue(&self) -> &RhiQueue {
-        &self.graphics_queue
-    }
-
-    #[inline]
-    pub fn current_fence(&self) -> &RhiFence {
+    pub fn crt_fence(&self) -> &RhiFence {
         &self.fence_frame_in_flight[*self.fif_label]
     }
 
     /// 当前处在第几帧：A, B, C
     #[inline]
-    pub fn current_frame_label(&self) -> FifLabel {
+    pub fn crt_frame_label(&self) -> FifLabel {
         self.fif_label
     }
 
     /// 当前帧的编号，一直增加
     #[inline]
-    pub fn current_frame_num(&self) -> usize {
+    pub fn crt_frame_id(&self) -> usize {
         self.frame_id
     }
 
     /// 当前帧的 debug prefix，例如：`[frame-A-113]`
     #[inline]
-    pub fn current_frame_prefix(&self) -> String {
-        format!("[frame-{}-{}]", self.fif_label, self.frame_id)
+    pub fn crt_frame_prefix(&self) -> String {
+        format!("[F{}{}]", self.frame_id, self.fif_label)
     }
 
     #[inline]
-    pub fn current_render_complete_semaphore(&self) -> RhiSemaphore {
+    pub fn crt_render_complete_semaphore(&self) -> RhiSemaphore {
         self.render_complete_semaphores[*self.fif_label].clone()
     }
 
@@ -255,22 +300,58 @@ impl RenderContext {
     }
 
     #[inline]
-    pub fn current_rt_bindless_handle(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
-        bindless_manager.get_image_idx(&self.rt_keyword).unwrap()
+    pub fn crt_present_image_view(&self) -> &RhiImage2DView {
+        let present_image_idx = self.render_swapchain.current_present_image_index();
+        &self.present_image_views[present_image_idx]
     }
 
     #[inline]
-    pub fn current_rt_image(&self) -> &RhiImage2D {
+    pub fn crt_present_image(&self) -> vk::Image {
+        let present_image_idx = self.render_swapchain.current_present_image_index();
+        self.present_images[present_image_idx]
+    }
+
+    #[inline]
+    pub fn crt_present_image_bindless_handle(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
+        let present_image_idx = self.render_swapchain.current_present_image_index();
+        bindless_manager.get_image_idx(&self.present_image_bindless_keys[present_image_idx]).unwrap()
+    }
+
+    #[inline]
+    pub fn crt_rt_bindless_handle(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
+        bindless_manager.get_image_idx(&self.rt_bindless_key).unwrap()
+    }
+
+    #[inline]
+    pub fn crt_rt_image_view(&self) -> &RhiImage2D {
         &self.rt_image
     }
+
+    #[inline]
+    pub fn crt_rt_image(&self) -> &RhiImage2D {
+        &self.rt_image
+    }
+
+    #[inline]
+    pub fn frame_settings(&self) -> FrameSettings {
+        self.frame_settings
+    }
 }
-impl RenderContext {
+// tools
+impl FrameContext {
+    /// 分配 command buffer，在当前 frame 使用
+    pub fn alloc_command_buffer(&mut self, debug_name: &str) -> RhiCommandBuffer {
+        let name = format!("[frame-{}-{}]{}", self.fif_label, self.frame_id, debug_name);
+        let cmd =
+            RhiCommandBuffer::new(self.device.clone(), self.graphics_command_pools[*self.fif_label].clone(), &name);
+
+        self.allocated_command_buffers[*self.fif_label].push(cmd.clone());
+        cmd
+    }
+}
+// phase methods
+impl FrameContext {
     pub fn begin_frame(&mut self) {
-        self.device.debug_utils().begin_queue_label(
-            self.graphics_queue.handle(),
-            "[acquire-frame]",
-            LabelColor::COLOR_STAGE,
-        );
         {
             let current_fence = &self.fence_frame_in_flight[*self.fif_label];
             current_fence.wait();
@@ -284,111 +365,23 @@ impl RenderContext {
             // 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
             self.graphics_command_pools[*self.fif_label].reset_all_buffers();
         }
-        self.device.debug_utils().end_queue_label(self.graphics_queue.handle());
+
+        let crt_present_complete_semaphore = self.current_present_complete_semaphore();
+        self.render_swapchain.acquire(&crt_present_complete_semaphore, None);
     }
 
-    pub fn before_render(&mut self, present_image: vk::Image) {
-        self.device.debug_utils().begin_queue_label(
-            self.graphics_queue.handle(),
-            "[acquire-frame]color-attach-transfer",
-            LabelColor::COLOR_STAGE,
-        );
-        {
-            let cmd = self.alloc_command_buffer(&format!(
-                "{}-[acquire-frame]color-attach-layout-transfer",
-                self.current_frame_prefix()
-            ));
-            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[acquire]color-attach-layout-transfer");
-            {
-                // 只需要建立起执行依赖即可，确保 present 完成后，再进行 layout trans
-                // COLOR_ATTACHMENT_READ 对应 blend 等操作
-                PipelineTools::present_image_layout_trans_to(
-                    &cmd,
-                    present_image,
-                    vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                    vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-                );
+    pub fn before_render(&mut self) {}
 
-                // frams in flight 使用同一个 rt image，因此需要确保之前的 rt 写入已经完成
-                let rt_image_barrier = RhiImageBarrier::new()
-                    .image(self.rt_image.handle())
-                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                    .src_mask(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, vk::AccessFlags2::SHADER_STORAGE_WRITE)
-                    .dst_mask(
-                        vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
-                        vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
-                    );
+    pub fn end_frame(&mut self, rhi: &Rhi) {
+        self.render_swapchain.submit(&rhi.graphics_queue, &[self.crt_render_complete_semaphore()]);
 
-                cmd.image_memory_barrier(vk::DependencyFlags::empty(), &[rt_image_barrier]);
-            }
-            cmd.end();
-
-            self.graphics_queue.submit(
-                vec![RhiSubmitInfo::new(&[cmd]).wait_infos(&[(
-                    self.current_present_complete_semaphore(),
-                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                )])],
-                None,
-            );
-        }
-        self.device.debug_utils().end_queue_label(self.graphics_queue.handle());
-    }
-
-    pub fn end_frame(&mut self) {
         self.fif_label.next_frame();
         self.frame_id += 1;
     }
 
-    pub fn after_render(&mut self, present_image: vk::Image) {
-        self.device.debug_utils().begin_queue_label(
-            self.graphics_queue.handle(),
-            "[submit-frame]",
-            LabelColor::COLOR_PASS,
-        );
-        {
-            let cmd = self.alloc_command_buffer(&format!(
-                "{}-[submit-frame]color-attach-layout-transfer",
-                self.current_frame_prefix()
-            ));
-            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "color-attach-layout-transfer");
-            {
-                let image_barrier = RhiImageBarrier::new()
-                    .src_mask(
-                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                        vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                    )
-                    .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
-                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                    .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
-                    .image(present_image);
-                cmd.image_memory_barrier(vk::DependencyFlags::empty(), std::slice::from_ref(&image_barrier));
-            }
-            cmd.end();
-
-            self.graphics_queue.submit(
-                vec![RhiSubmitInfo::new(&[cmd]).signal_infos(&[(
-                    self.current_render_complete_semaphore(),
-                    vk::PipelineStageFlags2::BOTTOM_OF_PIPE, /*TODO 需要确认 signal 的 stage*/
-                )])],
-                Some(self.fence_frame_in_flight[*self.fif_label].clone()),
-            );
-        }
-        // queue label 不能跨过 submit，否则会导致 Nsight mismatch label
-        self.device.debug_utils().end_queue_label(self.graphics_queue.handle());
-    }
-
-    /// 分配 command buffer，在当前 frame 使用
-    pub fn alloc_command_buffer(&mut self, debug_name: &str) -> RhiCommandBuffer {
-        let name = format!("[frame-{}-{}]{}", self.fif_label, self.frame_id, debug_name);
-        let cmd =
-            RhiCommandBuffer::new(self.device.clone(), self.graphics_command_pools[*self.fif_label].clone(), &name);
-
-        self.allocated_command_buffers[*self.fif_label].push(cmd.clone());
-        cmd
-    }
+    pub fn after_render(&mut self) {}
 }
-impl Drop for RenderContext {
+impl Drop for FrameContext {
     fn drop(&mut self) {
         assert!(self.present_complete_semaphores.is_empty(), "need destroy render context manually");
         assert!(self.render_complete_semaphores.is_empty(), "need destroy render context manually");

@@ -1,7 +1,8 @@
-use crate::pipeline_settings::PipelineSettings;
-use crate::render::FifLabel;
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::frame_context::FrameContext;
+use truvis_rhi::core::framebuffer::FrameBuffer;
 use crate::renderer::gpu_scene::GpuScene;
+use crate::renderer::pipeline_settings::{FifLabel, RendererSettings};
 use ash::vk;
 use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
 use model_manager::vertex::VertexLayout;
@@ -22,7 +23,7 @@ pub struct PhongPass {
 impl PhongPass {
     pub fn new(
         rhi: &Rhi,
-        pipeline_settings: &PipelineSettings,
+        renderer_settings: &RendererSettings,
         bindless_manager: Rc<RefCell<BindlessManager>>,
     ) -> Self {
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
@@ -32,7 +33,11 @@ impl PhongPass {
         ci.vertex_binding(VertexLayoutAos3D::vertex_input_bindings());
         ci.vertex_attribute(VertexLayoutAos3D::vertex_input_attributes());
 
-        ci.attach_info(vec![pipeline_settings.color_format], Some(pipeline_settings.depth_format), None);
+        ci.attach_info(
+            vec![renderer_settings.pipeline_settings.color_format],
+            Some(renderer_settings.pipeline_settings.depth_format),
+            None,
+        );
         ci.color_blend(
             vec![vk::PipelineColorBlendAttachmentState::default()
                 .blend_enable(false)
@@ -97,13 +102,24 @@ impl PhongPass {
     pub fn draw(
         &self,
         cmd: &RhiCommandBuffer,
-        render_info: &vk::RenderingInfo,
+        frame_ctx: &FrameContext,
         viewport: vk::Extent2D,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
         frame_label: FifLabel,
     ) {
-        cmd.cmd_begin_rendering(render_info);
+        let color_attach = FrameBuffer::get_color_attachment(frame_ctx.crt_present_image_view().handle());
+        let depth_attach = FrameBuffer::get_depth_attachment(frame_ctx.depth_view().handle());
+        let render_info = FrameBuffer::get_render_info(
+            vk::Rect2D {
+                offset: vk::Offset2D::default(),
+                extent: frame_ctx.frame_settings().viewport_extent,
+            },
+            std::slice::from_ref(&color_attach),
+            &depth_attach,
+        );
+
+        cmd.cmd_begin_rendering(&render_info);
         cmd.begin_label("[phong-pass]draw", LabelColor::COLOR_PASS);
 
         self.bind(

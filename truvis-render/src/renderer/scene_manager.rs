@@ -1,5 +1,5 @@
 use crate::renderer::bindless::BindlessManager;
-use model_manager::component::{DrsInstance, TruMaterial, DrsMesh};
+use model_manager::component::{DrsInstance, DrsMesh, TruMaterial};
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -7,7 +7,7 @@ use std::rc::Rc;
 use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::rhi::Rhi;
 
-pub struct TheWorld {
+pub struct SceneManager {
     mat_map: HashMap<uuid::Uuid, TruMaterial>,
     instance_map: HashMap<uuid::Uuid, DrsInstance>,
     mesh_map: HashMap<uuid::Uuid, DrsMesh>,
@@ -17,7 +17,7 @@ pub struct TheWorld {
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
 // getter
-impl TheWorld {
+impl SceneManager {
     #[inline]
     pub fn mat_map(&self) -> &HashMap<uuid::Uuid, TruMaterial> {
         &self.mat_map
@@ -35,7 +35,7 @@ impl TheWorld {
         &self.point_light_map
     }
 }
-impl TheWorld {
+impl SceneManager {
     pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         Self {
             mat_map: HashMap::new(),

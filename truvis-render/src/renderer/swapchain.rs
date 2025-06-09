@@ -1,16 +1,11 @@
-use crate::render::FifLabel;
-use crate::renderer::bindless::BindlessManager;
 use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use itertools::Itertools;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use shader_binding::shader;
-use std::iter::zip;
 use std::rc::Rc;
 use truvis_rhi::core::command_queue::RhiQueue;
 use truvis_rhi::core::debug_utils::RhiDebugType;
 use truvis_rhi::core::device::RhiDevice;
-use truvis_rhi::core::image::{RhiImage2DView, RhiImageViewCreateInfo};
 use truvis_rhi::core::synchronize::{RhiFence, RhiSemaphore};
 use truvis_rhi::rhi::Rhi;
 
@@ -65,21 +60,16 @@ pub struct RenderSwapchain {
 
     /// 这里的 image 并非手动创建的，因此无法使用 RhiImage 类型
     images: Vec<vk::Image>,
-    image_views: Vec<Rc<RhiImage2DView>>,
-    image_keywords: Vec<String>,
 
     swapchain_image_index: usize,
 
     extent: vk::Extent2D,
-    color_format: vk::Format,
-    color_space: vk::ColorSpaceKHR,
-    present_mode: vk::PresentModeKHR,
 }
 // getter
 impl RenderSwapchain {
     #[inline]
-    pub fn images(&self) -> &[vk::Image] {
-        &self.images
+    pub fn present_images(&self) -> Vec<vk::Image> {
+        self.images.clone()
     }
 
     #[inline]
@@ -88,33 +78,13 @@ impl RenderSwapchain {
     }
 
     #[inline]
-    pub fn color_format(&self) -> vk::Format {
-        self.color_format
-    }
-
-    #[inline]
-    pub fn color_space(&self) -> vk::ColorSpaceKHR {
-        self.color_space
-    }
-
-    #[inline]
-    pub fn present_mode(&self) -> vk::PresentModeKHR {
-        self.present_mode
-    }
-
-    #[inline]
     pub fn current_present_image(&self) -> vk::Image {
         self.images[self.swapchain_image_index]
     }
 
     #[inline]
-    pub fn current_present_image_view(&self) -> vk::ImageView {
-        self.image_views[self.swapchain_image_index].handle()
-    }
-
-    #[inline]
-    pub fn current_present_bindless_handle(&self, bindless_mgr: &BindlessManager) -> shader::ImageHandle {
-        bindless_mgr.get_image_idx(&self.image_keywords[self.swapchain_image_index]).unwrap()
+    pub fn current_present_image_index(&self) -> usize {
+        self.swapchain_image_index
     }
 }
 impl RenderSwapchain {
@@ -123,7 +93,6 @@ impl RenderSwapchain {
         window: &MainWindow,
         present_mode: vk::PresentModeKHR,
         surface_format: vk::SurfaceFormatKHR,
-        bindless_mgr: &mut BindlessManager,
     ) -> Self {
         let pdevice = rhi.physical_device().handle;
         let surface = RhiSurface::new(rhi, window);
@@ -139,28 +108,14 @@ impl RenderSwapchain {
         let (swapchain_handle, swapchain_pf) =
             Self::create_handle(rhi, &surface, &surface_capabilities, format, color_space, extent, present_mode);
 
-        let (images, image_views) = Self::create_images_and_views(rhi, swapchain_handle, &swapchain_pf, format);
-
-        let image_keywords = images
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!("swapchain-image-{}", FifLabel::from_usize(i)))
-            .collect_vec();
-        for (image_view, keyword) in zip(&image_views, &image_keywords) {
-            bindless_mgr.register_image(keyword.clone(), image_view.clone());
-        }
+        let images = unsafe { swapchain_pf.get_swapchain_images(swapchain_handle).unwrap() };
 
         Self {
             swapchain_pf,
             swapchain_handle,
             images,
-            image_views,
-            image_keywords,
             swapchain_image_index: 0,
             extent,
-            color_format: format,
-            color_space,
-            present_mode,
             _surface: surface,
             _device: rhi.device.clone(),
         }
@@ -209,33 +164,6 @@ impl RenderSwapchain {
 
             (swapchain_handle, swapchain_pf)
         }
-    }
-
-    fn create_images_and_views(
-        rhi: &Rhi,
-        swapchain_handle: vk::SwapchainKHR,
-        swapchain_pf: &ash::khr::swapchain::Device,
-        format: vk::Format,
-    ) -> (Vec<vk::Image>, Vec<Rc<RhiImage2DView>>) {
-        let swapchain_images = unsafe { swapchain_pf.get_swapchain_images(swapchain_handle).unwrap() };
-
-        // 为 images 设置 debug name
-        for (i, img) in swapchain_images.iter().enumerate() {
-            rhi.device.debug_utils().set_object_debug_name(*img, format!("swapchain-image-{i}"));
-        }
-
-        let image_views = swapchain_images
-            .iter()
-            .enumerate()
-            .map(|(idx, img)| {
-                let ci = RhiImageViewCreateInfo::new_image_view_2d_info(format, vk::ImageAspectFlags::COLOR);
-                let image_view =
-                    RhiImage2DView::new_with_raw_image(rhi, *img, ci, format!("swapchain-image-view-{idx}"));
-                Rc::new(image_view)
-            })
-            .collect_vec();
-
-        (swapchain_images, image_views)
     }
 
     /// 找到一个合适的 present mode
@@ -311,22 +239,11 @@ impl RenderSwapchain {
 
         unsafe { self.swapchain_pf.queue_present(queue.handle(), &present_info).unwrap() };
     }
-
-    /// 需要手动销毁 swapchain
-    pub fn destroy(mut self, bindless_mgr: &mut BindlessManager) {
-        unsafe {
-            for view in std::mem::take(&mut self.image_views) {
-                drop(view)
-            }
-            for keyword in std::mem::take(&mut self.image_keywords) {
-                bindless_mgr.unregister_image(&keyword);
-            }
-            self.swapchain_pf.destroy_swapchain(self.swapchain_handle, None);
-        }
-    }
 }
 impl Drop for RenderSwapchain {
     fn drop(&mut self) {
-        assert!(self.image_views.is_empty(), "RhiSwapchain should be destroyed manually");
+        unsafe {
+            self.swapchain_pf.destroy_swapchain(self.swapchain_handle, None);
+        }
     }
 }

@@ -1,6 +1,6 @@
-use crate::render::FifLabel;
+use crate::renderer::pipeline_settings::FifLabel;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::scene_manager::TheWorld;
+use crate::renderer::scene_manager::SceneManager;
 use ash::vk;
 use glam::Vec4Swizzles;
 use itertools::Itertools;
@@ -161,7 +161,7 @@ struct Resources {
 
 /// 用于构建传输到 GPU 的场景数据
 pub struct GpuScene {
-    scene_mgr: Rc<RefCell<TheWorld>>,
+    scene_mgr: Rc<RefCell<SceneManager>>,
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 
     /// GPU 中以顺序存储的 instance
@@ -194,7 +194,7 @@ impl GpuScene {
 impl GpuScene {
     pub fn new(
         rhi: &Rhi,
-        scene_mgr: Rc<RefCell<TheWorld>>,
+        scene_mgr: Rc<RefCell<SceneManager>>,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
         frame_in_flight: usize,
     ) -> Self {
@@ -454,8 +454,8 @@ impl GpuScene {
                 normal_map: bindless_mgr.get_texture_idx(&mat.normal_map).unwrap_or(shader::TextureHandle {
                     index: shader::INVALID_TEX_ID,
                 }),
-                reflection: mat.reflection.into(),
-                opaque: mat.opaque.into(),
+                reflection: mat.reflection,
+                opaque: mat.opaque,
             };
         }
 

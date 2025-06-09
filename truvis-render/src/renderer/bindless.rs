@@ -1,4 +1,4 @@
-use crate::render::FifLabel;
+use crate::renderer::pipeline_settings::FifLabel;
 use crate::resource::ImageLoader;
 use ash::vk;
 use itertools::Itertools;

@@ -1,51 +1,39 @@
-use crate::gui::gui_pass::GuiPass;
-use crate::gui::ui::Gui;
-use crate::pipeline_settings::{AccumData, FrameSettings, PipelineSettings};
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
-use crate::render_context::RenderContext;
-use crate::render_pipeline::compute::ComputePass;
+use crate::render_pipeline::pipeline_context::TempPipelineCtx;
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::frame_context::FrameContext;
 use crate::renderer::gpu_scene::GpuScene;
-use crate::renderer::scene_manager::TheWorld;
-use crate::renderer::swapchain::RenderSwapchain;
+use crate::renderer::pipeline_settings::{
+    AccumData, DefaultRendererSettings, FifLabel, PipelineSettings, RendererSettings,
+};
+use crate::renderer::scene_manager::SceneManager;
 use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::ffi::CStr;
-use std::fmt::Display;
-use std::ops::Deref;
 use std::rc::Rc;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
-use truvis_rhi::{
-    basic::color::LabelColor,
-    core::{command_queue::RhiSubmitInfo, synchronize::RhiImageBarrier},
-    rhi::Rhi,
-};
+use truvis_rhi::{core::command_queue::RhiSubmitInfo, rhi::Rhi};
 
 /// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
 pub struct Renderer {
-    /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
-    pub render_context: Option<RenderContext>,
-
-    /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
-    pub render_swapchain: Option<RenderSwapchain>,
-
-    pipeline_settings: PipelineSettings,
-    accum_data: AccumData,
-
     pub rhi: Rc<Rhi>,
 
-    pub bindless_mgr: Rc<RefCell<BindlessManager>>,
-    pub scene_mgr: Rc<RefCell<TheWorld>>,
-    pub gpu_scene: GpuScene,
-    pub per_frame_data_buffers: Vec<RhiStructuredBuffer<shader::PerFrameData>>,
+    /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
+    pub frame_ctx: Option<FrameContext>,
 
-    blit_pass: ComputePass<shader::blit::PushConstant>,
-    gui_pass: GuiPass,
+    pipeline_settings: PipelineSettings,
+
+    pub bindless_mgr: Rc<RefCell<BindlessManager>>,
+    pub scene_mgr: Rc<RefCell<SceneManager>>,
+    pub gpu_scene: GpuScene,
+
+    pub per_frame_data_buffers: Vec<RhiStructuredBuffer<shader::PerFrameData>>,
+    accum_data: AccumData,
 }
 impl Drop for Renderer {
     fn drop(&mut self) {
@@ -53,57 +41,55 @@ impl Drop for Renderer {
         // 在 Renderer 被销毁时，等待 Rhi 设备空闲
         self.wait_idle();
 
-        if let Some(render_context) = self.render_context.take() {
+        if let Some(render_context) = self.frame_ctx.take() {
             render_context.destroy(&mut self.bindless_mgr.borrow_mut());
-        }
-        if let Some(render_swapchain) = self.render_swapchain.take() {
-            render_swapchain.destroy(&mut self.bindless_mgr.borrow_mut());
         }
     }
 }
 // getter
 impl Renderer {
     #[inline]
-    pub fn swapchain_extent(&self) -> vk::Extent2D {
-        self.render_swapchain.as_ref().unwrap().extent()
-    }
-
-    #[inline]
-    pub fn color_format(&self) -> vk::Format {
-        self.render_swapchain.as_ref().unwrap().color_format()
-    }
-
-    #[inline]
-    pub fn pipeline_settings(&self) -> PipelineSettings {
-        self.pipeline_settings
+    pub fn renderer_settings(&self) -> RendererSettings {
+        RendererSettings {
+            pipeline_settings: self.pipeline_settings,
+            frame_settings: self.frame_ctx.as_ref().unwrap().frame_settings(),
+        }
     }
 
     #[inline]
     pub fn crt_frame_label(&self) -> FifLabel {
-        self.render_context.as_ref().unwrap().current_frame_label()
+        self.frame_ctx.as_ref().unwrap().crt_frame_label()
     }
 
     #[inline]
-    pub fn render_context_mut(&mut self) -> &mut RenderContext {
-        self.render_context.as_mut().unwrap()
+    pub fn frame_context_mut(&mut self) -> &mut FrameContext {
+        self.frame_ctx.as_mut().unwrap()
     }
 
     #[inline]
-    pub fn render_context(&self) -> &RenderContext {
-        self.render_context.as_ref().unwrap()
+    pub fn frame_context(&self) -> &FrameContext {
+        self.frame_ctx.as_ref().unwrap()
     }
 
-    #[inline]
-    pub fn swapchain(&self) -> &RenderSwapchain {
-        self.render_swapchain.as_ref().unwrap()
+    /// 根据 vulkan 实例和显卡，获取合适的深度格式
+    fn get_depth_format(rhi: &Rhi) -> vk::Format {
+        rhi.find_supported_format(
+            DefaultRendererSettings::DEPTH_FORMAT_CANDIDATES,
+            vk::ImageTiling::OPTIMAL,
+            vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+        )
+        .first()
+        .copied()
+        .unwrap_or(vk::Format::UNDEFINED)
     }
 }
+// init
 impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         let rhi = Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext));
 
         let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, FifLabel::FRAMES_IN_FLIGHT)));
-        let scene_mgr = Rc::new(RefCell::new(TheWorld::new(bindless_mgr.clone())));
+        let scene_mgr = Rc::new(RefCell::new(SceneManager::new(bindless_mgr.clone())));
         let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), FifLabel::FRAMES_IN_FLIGHT);
         let per_frame_data_buffers = (0..FifLabel::FRAMES_IN_FLIGHT)
             .map(|idx| {
@@ -111,29 +97,16 @@ impl Renderer {
             })
             .collect();
 
-        let blit_pass = ComputePass::<shader::blit::PushConstant>::new(
-            &rhi,
-            &bindless_mgr.borrow(),
-            cstr::cstr!("main"),
-            "shader/build/imgui/blit.slang.spv",
-        );
-
         let pipeline_settings = PipelineSettings {
-            color_format: DefaultRenderSettings::DEFAULT_SURFACE_FORMAT.format,
+            color_format: DefaultRendererSettings::DEFAULT_SURFACE_FORMAT.format,
             depth_format: Self::get_depth_format(&rhi),
             frames_in_flight: FifLabel::FRAMES_IN_FLIGHT,
-            frame_settings: Default::default(),
         };
-
-        let gui_pass = GuiPass::new(&rhi, &pipeline_settings, bindless_mgr.clone());
 
         Self {
             pipeline_settings,
             accum_data: Default::default(),
-            blit_pass,
-            gui_pass,
-            render_context: None,
-            render_swapchain: None,
+            frame_ctx: None,
             rhi,
             bindless_mgr,
             scene_mgr,
@@ -146,104 +119,25 @@ impl Renderer {
     pub fn init_after_window(&mut self, window: &MainWindow) {
         self.rebuild_after_resized(window);
     }
-
-    /// 根据 vulkan 实例和显卡，获取合适的深度格式
-    fn get_depth_format(rhi: &Rhi) -> vk::Format {
-        rhi.find_supported_format(
-            DefaultRenderSettings::DEPTH_FORMAT_CANDIDATES,
-            vk::ImageTiling::OPTIMAL,
-            vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
-        )
-        .first()
-        .copied()
-        .unwrap_or(vk::Format::UNDEFINED)
-    }
-
+}
+// phase call
+impl Renderer {
     pub fn begin_frame(&mut self) {
-        let render_context = self.render_context.as_mut().unwrap();
-        let render_swapchain = self.render_swapchain.as_mut().unwrap();
-
-        render_context.begin_frame();
-        render_swapchain.acquire(&render_context.current_present_complete_semaphore(), None);
-        render_context.before_render(render_swapchain.current_present_image());
+        self.frame_ctx.as_mut().unwrap().begin_frame();
     }
 
     pub fn end_frame(&mut self) {
-        // ui pass
-        self.rhi.device.debug_utils().begin_queue_label(
-            self.rhi.graphics_queue.handle(),
-            "[ui-pass]",
-            LabelColor::COLOR_PASS,
-        );
-
-        let render_context = self.render_context.as_mut().unwrap();
-        let render_swapchain = self.render_swapchain.as_mut().unwrap();
-        {
-            let barrier_cmd = render_context.alloc_command_buffer("ui pipeline barrier");
-            barrier_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[uipass]color-attach-barrier");
-            {
-                barrier_cmd.image_memory_barrier(
-                    vk::DependencyFlags::empty(),
-                    &[RhiImageBarrier::new()
-                        .image(render_swapchain.current_present_image())
-                        .layout_transfer(
-                            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                        )
-                        .src_mask(
-                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                        )
-                        .dst_mask(
-                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                        )
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)],
-                );
-            }
-            barrier_cmd.end();
-
-            self.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[barrier_cmd])], None);
-        }
-        self.rhi.device.debug_utils().end_queue_label(self.rhi.graphics_queue.handle());
-
-        render_context.after_render(render_swapchain.current_present_image());
-        render_swapchain.submit(&self.rhi.graphics_queue, &[render_context.current_render_complete_semaphore()]);
-        render_context.end_frame();
+        self.frame_ctx.as_mut().unwrap().end_frame(&self.rhi);
     }
 
     pub fn before_render(&mut self, input_state: &InputState, timer: &Timer, camera: &DrsCamera) {
         let current_camera_dir = glam::vec3(camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg);
         self.accum_data.update_accum_frames(current_camera_dir, camera.position);
         self.update_gpu_scene(input_state, timer, camera);
-
-        // main pass
-        self.rhi.device.debug_utils().begin_queue_label(
-            self.rhi.graphics_queue.handle(),
-            "[render]",
-            LabelColor::COLOR_PASS,
-        );
     }
 
-    pub fn after_render(&mut self, gui: &mut Gui) {
-        self.rhi.device.debug_utils().end_queue_label(self.rhi.graphics_queue.handle());
-
-        // blit
-        self.blit();
-
-        // gui
-        let cmd = self.render_context_mut().alloc_command_buffer("gui-pass");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[gui-pass]draw");
-        self.gui_pass.draw(
-            &self.rhi,
-            self.render_context.as_mut().unwrap(),
-            self.render_swapchain.as_ref().unwrap(),
-            &self.pipeline_settings.frame_settings,
-            &cmd,
-            gui,
-        );
-        cmd.end();
-        self.render_context().graphics_queue().submit(vec![RhiSubmitInfo::new(&[cmd])], None);
+    pub fn after_render(&mut self) {
+        self.frame_ctx.as_mut().unwrap().after_render();
     }
 
     pub fn wait_idle(&self) {
@@ -252,43 +146,42 @@ impl Renderer {
         }
     }
 
+    pub fn collect_render_ctx(&mut self) -> TempPipelineCtx {
+        let crt_frame_label = self.crt_frame_label();
+
+        TempPipelineCtx {
+            rhi: Some(&self.rhi),
+            gpu_scene: Some(&self.gpu_scene),
+            bindless_mgr: Some(self.bindless_mgr.clone()),
+            per_frame_data: Some(&self.per_frame_data_buffers[*crt_frame_label]),
+            frame_ctx: Some(self.frame_ctx.as_mut().unwrap()),
+
+            gui: None,
+            timer: None,
+        }
+    }
+
     /// 在窗口大小改变是，重建 swapchain
     pub fn rebuild_after_resized(&mut self, window: &MainWindow) {
         // 确保 swapchain 已经 drop 掉之后，再创建新的 swapchian，
         // 因为同一时间只能有一个 swapchain 在使用 window
-        if let Some(render_context) = self.render_context.take() {
+        if let Some(render_context) = self.frame_ctx.take() {
             render_context.destroy(&mut self.bindless_mgr.borrow_mut());
         }
-        if let Some(render_swapchain) = self.render_swapchain.take() {
-            render_swapchain.destroy(&mut self.bindless_mgr.borrow_mut());
-        }
 
-        self.render_swapchain = Some(RenderSwapchain::new(
-            &self.rhi,
-            window,
-            DefaultRenderSettings::DEFAULT_PRESENT_MODE,
-            DefaultRenderSettings::DEFAULT_SURFACE_FORMAT,
-            &mut self.bindless_mgr.borrow_mut(),
-        ));
-
-        self.pipeline_settings.frame_settings = FrameSettings {
-            viewport_extent: self.swapchain_extent(),
-            rt_extent: self.swapchain_extent(),
-            rt_offset: vk::Offset2D { x: 0, y: 0 },
-        };
         self.accum_data.reset();
-        self.render_context =
-            Some(RenderContext::new(&self.rhi, &self.pipeline_settings, &mut self.bindless_mgr.borrow_mut()));
+        self.frame_ctx =
+            Some(FrameContext::new(&self.rhi, window, &self.pipeline_settings, &mut self.bindless_mgr.borrow_mut()));
     }
 
     fn update_gpu_scene(&mut self, input_state: &InputState, timer: &Timer, camera: &DrsCamera) {
-        let render_context = self.render_context.as_mut().unwrap();
-        let render_swapchain = self.render_swapchain.as_mut().unwrap();
+        let frame_ctx = self.frame_ctx.as_mut().unwrap();
+        let viewport_extent = frame_ctx.frame_settings().viewport_extent;
 
-        let crt_frame_label = render_context.current_frame_label();
+        let crt_frame_label = frame_ctx.crt_frame_label();
 
         // 将数据上传到 gpu buffer 中
-        let cmd = render_context.alloc_command_buffer("update-draw-buffer");
+        let cmd = frame_ctx.alloc_command_buffer("update-draw-buffer");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
 
         let transfer_barrier_mask = RhiBarrierMask {
@@ -306,7 +199,6 @@ impl Renderer {
         // 准备好当前帧的数据
         let per_frame_data = {
             let mouse_pos = input_state.crt_mouse_pos;
-            let extent = render_swapchain.extent();
 
             let view = camera.get_view_matrix();
             let projection = camera.get_projection_matrix();
@@ -320,16 +212,16 @@ impl Renderer {
                 camera_forward: camera.camera_forward().into(),
                 time_ms: timer.duration.as_millis() as f32,
                 delta_time_ms: timer.delta_time_s * 1000.0,
-                frame_id: render_context.current_frame_num() as u64,
+                frame_id: frame_ctx.crt_frame_id() as u64,
                 mouse_pos: shader::Float2 {
                     x: mouse_pos.x as f32,
                     y: mouse_pos.y as f32,
                 },
                 resolution: shader::Float2 {
-                    x: extent.width as f32,
-                    y: extent.height as f32,
+                    x: viewport_extent.width as f32,
+                    y: viewport_extent.height as f32,
                 },
-                rt_render_target: render_context.current_rt_bindless_handle(&self.bindless_mgr.borrow()),
+                rt_render_target: frame_ctx.crt_rt_bindless_handle(&self.bindless_mgr.borrow()),
                 accum_frames: self.accum_data.accum_frames_num as u32,
             }
         };
@@ -345,139 +237,6 @@ impl Renderer {
                 .mask(transfer_barrier_mask)],
         );
         cmd.end();
-        render_context.graphics_queue().submit(vec![RhiSubmitInfo::new(std::slice::from_ref(&cmd))], None);
+        self.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(std::slice::from_ref(&cmd))], None);
     }
-
-    /// 将光追渲染的内容 blit 到 framebuffer 上面
-    fn blit(&mut self) {
-        let cmd = self.render_context_mut().alloc_command_buffer("blit");
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit-pass");
-        {
-            cmd.image_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[
-                    RhiImageBarrier::new()
-                        .image(self.swapchain().current_present_image())
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                        .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
-                        .src_mask(
-                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                        )
-                        .dst_mask(vk::PipelineStageFlags2::COMPUTE_SHADER, vk::AccessFlags2::SHADER_WRITE),
-                    RhiImageBarrier::new()
-                        .image(self.render_context().current_rt_image().handle())
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                        .src_mask(
-                            vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
-                            vk::AccessFlags2::SHADER_STORAGE_WRITE,
-                        )
-                        .dst_mask(vk::PipelineStageFlags2::COMPUTE_SHADER, vk::AccessFlags2::SHADER_READ),
-                ],
-            );
-
-            let rt_image_extent = self.pipeline_settings.frame_settings.rt_extent;
-            let rt_image_offset = self.pipeline_settings.frame_settings.rt_offset;
-            self.blit_pass.exec(
-                &cmd,
-                &self.bindless_mgr.borrow(),
-                &shader::blit::PushConstant {
-                    src_image: self.render_context().current_rt_bindless_handle(&self.bindless_mgr.borrow()),
-                    dst_image: self.swapchain().current_present_bindless_handle(&self.bindless_mgr.borrow()),
-                    src_image_size: glam::uvec2(rt_image_extent.width, rt_image_extent.height).into(),
-                    offset: glam::uvec2(rt_image_offset.x as u32, rt_image_offset.y as u32).into(),
-                },
-                glam::uvec3(
-                    rt_image_extent.width.div_ceil(shader::blit::SHADER_X as u32),
-                    rt_image_extent.height.div_ceil(shader::blit::SHADER_Y as u32),
-                    1,
-                ),
-            );
-
-            cmd.image_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[RhiImageBarrier::new()
-                    .image(self.swapchain().current_present_image())
-                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                    .layout_transfer(vk::ImageLayout::GENERAL, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                    .src_mask(vk::PipelineStageFlags2::COMPUTE_SHADER, vk::AccessFlags2::SHADER_WRITE)
-                    .dst_mask(
-                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                        vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                    )],
-            );
-        }
-        cmd.end();
-
-        self.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
-    }
-}
-
-/// frames in flight 中每一帧的 label
-#[derive(Debug, Clone, Copy)]
-pub enum FifLabel {
-    A,
-    B,
-    C,
-}
-impl Deref for FifLabel {
-    type Target = usize;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::A => &Self::INDEX[0],
-            Self::B => &Self::INDEX[1],
-            Self::C => &Self::INDEX[2],
-        }
-    }
-}
-impl Display for FifLabel {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::A => write!(f, "A"),
-            Self::B => write!(f, "B"),
-            Self::C => write!(f, "C"),
-        }
-    }
-}
-impl FifLabel {
-    pub const FRAMES_IN_FLIGHT: usize = 3;
-
-    const INDEX: [usize; 3] = [0, 1, 2];
-
-    #[inline]
-    pub fn from_usize(idx: usize) -> Self {
-        match idx {
-            0 => Self::A,
-            1 => Self::B,
-            2 => Self::C,
-            _ => panic!("Invalid frame index: {idx}"),
-        }
-    }
-
-    #[inline]
-    pub fn next_frame(&mut self) {
-        *self = match self {
-            Self::A => Self::B,
-            Self::B => Self::C,
-            Self::C => Self::A,
-        };
-    }
-}
-
-struct DefaultRenderSettings;
-impl DefaultRenderSettings {
-    pub const DEPTH_FORMAT_CANDIDATES: &'static [vk::Format] = &[
-        vk::Format::D32_SFLOAT_S8_UINT,
-        vk::Format::D32_SFLOAT,
-        vk::Format::D24_UNORM_S8_UINT,
-        vk::Format::D16_UNORM_S8_UINT,
-        vk::Format::D16_UNORM,
-    ];
-    pub const DEFAULT_SURFACE_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
-        format: vk::Format::B8G8R8A8_UNORM,
-        color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
-    };
-    pub const DEFAULT_PRESENT_MODE: vk::PresentModeKHR = vk::PresentModeKHR::MAILBOX;
 }

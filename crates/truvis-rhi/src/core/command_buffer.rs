@@ -4,6 +4,7 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::core::debug_utils::RhiDebugType;
+use crate::core::framebuffer::RhiRenderingInfo;
 use crate::core::synchronize::RhiBufferBarrier;
 use crate::{
     basic::color::LabelColor,
@@ -179,6 +180,13 @@ impl RhiCommandBuffer {
     pub fn cmd_begin_rendering(&self, render_info: &vk::RenderingInfo) {
         unsafe {
             self.device.dynamic_rendering_pf().cmd_begin_rendering(self.handle, render_info);
+        }
+    }
+
+    pub fn cmd_begin_rendering2(&self, rendering_info: &RhiRenderingInfo) {
+        let rendering_info = rendering_info.rendering_info();
+        unsafe {
+            self.device.dynamic_rendering_pf().cmd_begin_rendering(self.handle, &rendering_info);
         }
     }
 
