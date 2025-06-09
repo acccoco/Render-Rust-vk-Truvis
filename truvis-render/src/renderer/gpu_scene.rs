@@ -1,5 +1,5 @@
-use crate::renderer::pipeline_settings::FifLabel;
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::pipeline_settings::FifLabel;
 use crate::renderer::scene_manager::SceneManager;
 use ash::vk;
 use glam::Vec4Swizzles;
@@ -190,6 +190,11 @@ impl GpuScene {
     pub fn tlas(&self, frame_label: usize) -> Option<&RhiAcceleration> {
         self.gpu_scene_buffers[frame_label].tlas.as_ref()
     }
+
+    #[inline]
+    pub fn scene_device_address(&self, frame_idx: FifLabel) -> vk::DeviceAddress {
+        self.gpu_scene_buffers[*frame_idx].scene_buffer.device_address()
+    }
 }
 impl GpuScene {
     pub fn new(
@@ -219,10 +224,8 @@ impl GpuScene {
         }
     }
 
-    pub fn scene_device_address(&self, frame_idx: FifLabel) -> vk::DeviceAddress {
-        self.gpu_scene_buffers[*frame_idx].scene_buffer.device_address()
-    }
-
+    /// # Phase: Before Render
+    ///
     /// 在每一帧开始时调用，将场景数据转换为 GPU 可读的形式
     pub fn prepare_render_data(&mut self, frame_label: FifLabel) {
         self.bindless_mgr.borrow_mut().prepare_render_data(frame_label);
@@ -232,6 +235,8 @@ impl GpuScene {
         self.flatten_instance_data();
     }
 
+    /// # Phase: Before Render
+    ///
     /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
     pub fn upload_to_buffer(
         &mut self,
@@ -251,7 +256,7 @@ impl GpuScene {
         self.upload_scene_buffer(frame_label, cmd, barrier_mask);
     }
 
-    /// 绘制场景中的所有示例
+    /// 绘制场景中的所有实例
     ///
     /// before_draw(instance_idx, submesh_idx)
     pub fn draw(&self, cmd: &RhiCommandBuffer, mut before_draw: impl FnMut(u32, u32)) {

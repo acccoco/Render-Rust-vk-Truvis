@@ -93,6 +93,8 @@ impl BindlessManager {
         &self.bindless_sets[*self.frame_label]
     }
 
+    /// # Phase: Before Render
+    ///
     /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
     pub fn prepare_render_data(&mut self, frame_label: FifLabel) {
         self.frame_label = frame_label;
