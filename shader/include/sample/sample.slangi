@@ -1,0 +1,29 @@
+#pragma once
+#include "common.slangi"
+#include "random.slangi"
+
+struct Sample
+{
+
+    /// 半球方向上随机采样
+    static float3 sampling_hemisphere(inout uint seed)
+    {
+
+        float r1 = Random::rnd(seed);
+        float r2 = Random::rnd(seed);
+        float sq = sqrt(r1);
+
+        float3 direction = float3(cos(2 * M_PI * r2) * sq, sin(2 * M_PI * r2) * sq, sqrt(1. - r1));
+        return direction;
+    }
+
+    /// 根据输入的法线，创建一个局部坐标系
+    static void create_loacl_coord(in float3 normal, out float3 tangent, out float3 bitangent)
+    {
+        if (abs(normal.x) > abs(normal.y))
+            tangent = float3(normal.z, 0, -normal.x) / sqrt(normal.x * normal.x + normal.z * normal.z);
+        else
+            tangent = float3(0, -normal.z, normal.y) / sqrt(normal.y * normal.y + normal.z * normal.z);
+        bitangent = cross(normal, tangent);
+    }
+};

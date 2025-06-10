@@ -1,20 +1,19 @@
 #pragma once
 
 #ifdef __SLANG__
-
-// TODO 可能需要 nonuniform，表示同一个 wavefront 的下标是不同的
+// 注意：需要 nonuniform，表示同一个 wavefront 的下标是不同的
 [[vk::binding(0, 0)]]
 Sampler2D<float4> bindless_textures[];
 
 [[vk::binding(1, 0)]]
 RWTexture2D<float4> bindless_images[];
-
 #endif
 
 const static int INVALID_TEX_ID = -1;
 
 struct TextureHandle
 {
+    /// 纹理的索引
     int index;
 
 #ifdef __SLANG__
@@ -23,11 +22,12 @@ struct TextureHandle
     {
         if (index == INVALID_TEX_ID)
         {
-            return float4(1.0f); // 返回一个默认颜色
+            // 返回一个默认颜色，表示访问错误
+            return float4(1.0f, 0.0f, 1.0f, 1.0f); // 紫色
         }
         else
         {
-            return bindless_textures[index].Sample(uv);
+            return bindless_textures[NonUniformResourceIndex(index)].Sample(uv);
         }
     }
 
@@ -41,19 +41,20 @@ struct TextureHandle
 
 struct ImageHandle
 {
-    int index; // 纹理的索引
+    /// 纹理的索引
+    int index;
 
 #ifdef __SLANG__
     [ForceInline]
     void store(uint2 coord, float4 value)
     {
-        bindless_images[index].Store(coord, value);
+        bindless_images[NonUniformResourceIndex(index)].Store(coord, value);
     }
 
     [ForceInline]
     float4 load(uint2 coord)
     {
-        return bindless_images[index].Load(coord);
+        return bindless_images[NonUniformResourceIndex(index)].Load(coord);
     }
 #endif
 };

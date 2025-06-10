@@ -1,7 +1,7 @@
 #pragma once
-#include "../frame_data.slangi"
-#include "../ptr.slangi"
-#include "../scene.slangi"
+#include "frame_data.slangi"
+#include "ptr.slangi"
+#include "scene.slangi"
 
 namespace rt
 {

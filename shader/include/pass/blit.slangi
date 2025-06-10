@@ -1,6 +1,6 @@
 #pragma once
-#include "../bindless.slangi"
-#include "../ptr.slangi"
+#include "bindless.slangi"
+#include "ptr.slangi"
 
 /// blit 这个 pass 需要的数据
 namespace blit

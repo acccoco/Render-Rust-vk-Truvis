@@ -1,23 +1,30 @@
 #include "pass/rt.slangi"
-#include "random.slangi"
+#include "sample/random.slangi"
+#include "sample/sample.slangi"
 #include "scene.slangi"
 
 /// 太幽默了哥，为啥我需要手动限制最大递归深度啊，pipeline 里面的设置算啥？
-const static uint max_depth = 8;
+const static uint max_depth = 10;
 
 /// 超过一定数量后，就不再重新计算了
-const static uint max_accum_frames = 100;
+const static uint max_accum_frames = 512;
 
 [[vk::push_constant]]
 rt::PushConstants push_const;
 
-struct MainPayload
+struct HitPayload
 {
-    float3 color;
-    float3 attenuation;
-    int done;
+    /// 当前发射出的光线的颜色
+    float3 radiance;
+    /// 当前命中位置的衰减：BRDF * cos(theta) / pdf
+    float3 weight;
+    /// 是否需要提前中止
+    bool done;
+    /// 下一次光线的起点
     float3 ray_origin;
+    /// 下一次光线的方向
     float3 ray_dir;
+    uint random_seed;
 };
 
 struct ShadowMissPayload
@@ -30,7 +37,7 @@ struct MatPayload
     uint instance_id;
     uint geometry_id;
     float2 uv;
-    float3 color;
+    float3 out_color;
 };
 
 [shader("raygeneration")]
@@ -45,9 +52,9 @@ void main_ray_gen()
 
     uint2 thread_id = DispatchRaysIndex().xy;
 
-    Random random = Random(thread_id.y * DispatchRaysDimensions().x + thread_id.x, frame_data.accum_frames);
-    const float r1 = random.next();
-    const float r2 = random.next();
+    uint random_seed = Random::tea(thread_id.y * DispatchRaysDimensions().x + thread_id.x, frame_data.accum_frames);
+    const float r1 = Random::rnd(random_seed);
+    const float r2 = Random::rnd(random_seed);
     const float2 subpixel_jitter = frame_data.accum_frames == 0 ? float2(0.5f) : float2(r1, r2);
 
     const float2 pixel_center = float2(thread_id) + subpixel_jitter;
@@ -61,26 +68,33 @@ void main_ray_gen()
     ray.TMin = 0.001f;
     ray.TMax = 10000.0f;
 
-    MainPayload payload = {};
-    payload.color = float3(0.0f, 0.0f, 0.0f); // 初始化颜色
-    payload.attenuation = float3(1.0f, 1.0f, 1.0f);
-    payload.done = 0;
+    HitPayload payload = {};
+    payload.radiance = float3(0.0f, 0.0f, 0.0f); // 初始化颜色
+    payload.weight = float3(1.0f, 1.0f, 1.0f);
+    payload.done = false;
+    payload.random_seed = random_seed;
 
     Scene *scene = push_const.scene;
     RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
 
+    // E 直接光照
+    // w = BRDF * cos(theta) / pdf
+    // Lo = w_0 * Li_0 + E_0
+    // Li_0 = w_1 * Li_1 + E_1
+    // Lo = E_0 + w_0 * E_1 + w_0 * w_1 * E_2 + ...
+    //      + w_0 * ... * w_n * Li_n
     float3 color = float3(0.0f, 0.0f, 0.0f);
-    for (uint depth = 0; depth < max_depth && payload.done == 0; ++depth)
+    float3 weight = float3(1.f, 1.f, 1.f);
+    for (uint depth = 0; depth < max_depth && !payload.done; ++depth)
     {
-        float3 attenuation = payload.attenuation;
-
         TraceRay(tlas_, RAY_FLAG_NONE, 0xFF, //
                  0,                          // sbt record offset
                  0,                          // sbt record stride
                  0,                          // sky miss shader
                  ray, payload);
 
-        color += payload.color * attenuation;
+        color += payload.radiance * weight;
+        weight *= payload.weight;
         ray.Origin = payload.ray_origin;
         ray.Direction = payload.ray_dir;
     }
@@ -101,7 +115,7 @@ void main_ray_gen()
 static const float3 directional_light = normalize(float3(0.1f, -0.98995f, -0.1f)); // 方向光
 
 [shader("closesthit")]
-void main_closest_hit(inout MainPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
     PerFrameData *frame_data = push_const.frame_data;
     Scene *scene = push_const.scene;
@@ -116,93 +130,47 @@ void main_closest_hit(inout MainPayload payload, in BuiltInTriangleIntersectionA
     const float3 world_pos = mul(ObjectToWorld3x4(), float4(interp_vertex.position, 1.f));
     const float3 world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
 
-    float3 tex_color;
-    if (mat.diffuse_map.is_valid())
+    float3 tex_color = float3(0.f, 0.f, 0.f);
     {
-        MatPayload mat_payload;
+        MatPayload mat_payload = {};
         mat_payload.instance_id = instance_id;
         mat_payload.geometry_id = geometry_id;
         mat_payload.uv = interp_vertex.uv;
-        mat_payload.color = float3(0.f);
-        CallShader(0, mat_payload);
-
-        tex_color = mat_payload.color;
-        // tex_color = mat.diffuse_map.sample(interp_vertex.uv).xyz;
-
-        payload.attenuation *= 0.4f;
-        if (payload.attenuation.x > 0.1f)
-        {
-            payload.done = 0;
-            payload.ray_dir = reflect(WorldRayDirection(), world_normal);
-            payload.ray_origin = world_pos + payload.ray_dir * 0.001f; // 偏移一点，避免自交
-        }
-        else
-        {
-            payload.done = 1;
-        }
+        diffuse_callable(mat_payload);
+        tex_color = mat_payload.out_color;
+    }
+    // mat.diffuse_map.sample(interp_vertex.uv).xyz;
+    if (mat.diffuse_map.is_valid())
+    {
+        payload.radiance = tex_color * 0.01f;
     }
     else
     {
-        tex_color = float3(mat.reflection);
-        payload.attenuation *= 0.7;
-        if (payload.attenuation.x > 0.2)
-        {
-            payload.done = 0;
-            payload.ray_dir = reflect(WorldRayDirection(), world_normal);
-            payload.ray_origin = world_pos + payload.ray_dir * 0.001f; // 偏移一点，避免自交
-        }
-        else
-        {
-            payload.done = 1;
-        }
+        payload.radiance = tex_color;
     }
 
-    float attenuation = 1.f;
-    if (dot(directional_light, world_normal) > 0.f)
+    const float3 lambert_brdf = tex_color / M_PI;
     {
-        attenuation = 0.3f;
-    }
-    else
-    {
-        RayDesc ray;
-        ray.Origin = world_pos - directional_light * 0.001f; // 偏移一点，避免自交
-        ray.Direction = -directional_light;
-        ray.TMin = 0.001f;
-        ray.TMax = 10000.0f;
-        ShadowMissPayload shadow_payload = { false };
-        RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
+        float3 tangent, bitangent;
+        Sample::create_loacl_coord(world_normal, tangent, bitangent);
+        const float3 local_dir = Sample::sampling_hemisphere(payload.random_seed);
+        payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
+        payload.ray_origin = world_pos;
+    } 
 
-        const uint ray_flags =                         //
-            RAY_FLAG_FORCE_OPAQUE                      // 强制不透明
-            | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH // 接受第一个命中并结束搜索
-            | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER         // 跳过 closest hit shader
-            ;
-
-        TraceRay(tlas_, ray_flags, 0xFF, //
-                 0,                      // sbt record offset
-                 0,                      // sbt record stride
-                 1,                      // shadow miss shader
-                 ray, shadow_payload);
-
-        if (!shadow_payload.miss) // 无法接收到方向光
-        {
-            attenuation = 0.3f;
-        }
-    }
-
-    payload.color = float3(mat.base_color * tex_color.xyz * attenuation);
+    payload.weight = lambert_brdf * M_PI;
+    payload.done = false;
 }
 
 [shader("callable")]
 void diffuse_callable(inout MatPayload payload)
 {
     PBRMaterial *mat = push_const.scene.get_material(payload.instance_id, payload.geometry_id);
-    payload.color = mat.diffuse_map.sample(payload.uv).xyz;
+    payload.out_color = mat.diffuse_map.sample(payload.uv).xyz;
 }
 
-/// FIXME 这个效率很低
 [shader("anyhit")]
-void trans_any(inout MainPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
     PerFrameData *frame_data = push_const.frame_data;
     Scene *scene = push_const.scene;
@@ -227,8 +195,6 @@ void trans_any(inout MainPayload payload, in BuiltInTriangleIntersectionAttribut
     }
 }
 
-const static float PI = 3.14159265358979323846f;
-
 /// right-hand, -z front, y up
 /// phi = 0, -z
 /// phi = 90, -x
@@ -242,17 +208,22 @@ float2 dir_to_angle(const float3 dir)
 }
 
 [shader("miss")]
-void sky_miss(inout MainPayload payload)
+void sky_miss(inout HitPayload payload)
 {
     const float2 angle = dir_to_angle(WorldRayDirection());
     // phi: [-pi, pi] -> [0, 1]
     // theta: [-pi/2, pi/2] -> [1, 0]
-    const float2 uv = float2(angle.x / PI * 0.5 + 0.5, 0.5 - angle.y / PI);
-    payload.color = float3(push_const.scene.sky.sample(uv).xyz);
-    // payload.color = float4(0.8f, 0.8f, 0.8f, 1.0f); // 蓝色背景
-    payload.done = 1; 
+    const float2 uv = float2(angle.x / M_PI * 0.5 + 0.5, 0.5 - angle.y / M_PI);
+    payload.radiance = float3(push_const.scene.sky.sample(uv).xyz) * 3.f;
+    payload.done = true;
 }
 
+// shadow miss 的 flag
+// const uint ray_flags =                         //
+//     RAY_FLAG_FORCE_OPAQUE                      // 强制不透明
+//     | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH // 接受第一个命中并结束搜索
+//     | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER         // 跳过 closest hit shader
+//     ;
 [shader("miss")]
 void shadow_miss(inout ShadowMissPayload payload)
 {
