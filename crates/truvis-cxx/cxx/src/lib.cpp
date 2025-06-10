@@ -8,7 +8,7 @@
 
 void* load_scene(const char* mesh_path)
 {
-    const auto loader = new truvis::MeshLoader(mesh_path);
+    const auto loader = new truvis::SceneLoader(mesh_path);
     const auto load_ok = loader->load_scene();
     if (!load_ok)
     {
@@ -20,35 +20,35 @@ void* load_scene(const char* mesh_path)
 
 void free_scene(void* loader)
 {
-    delete static_cast<truvis::MeshLoader*>(loader);
+    delete static_cast<truvis::SceneLoader*>(loader);
 }
 
 size_t get_mesh_cnt(void* loader)
 {
-    return loader ? static_cast<truvis::MeshLoader*>(loader)->get_geometry_count() : 0;
+    return loader ? static_cast<truvis::SceneLoader*>(loader)->get_geometry_count() : 0;
 }
 
 size_t get_mat_cnt(void* loader)
 {
-    return loader ? static_cast<truvis::MeshLoader*>(loader)->get_material_count() : 0;
+    return loader ? static_cast<truvis::SceneLoader*>(loader)->get_material_count() : 0;
 }
 
 size_t get_instance_cnt(void* loader)
 {
-    return loader ? static_cast<truvis::MeshLoader*>(loader)->get_instance_count() : 0;
+    return loader ? static_cast<truvis::SceneLoader*>(loader)->get_instance_count() : 0;
 }
 
 const CxxInstance* get_instance(void* loader, size_t idx)
 {
-    return loader ? static_cast<truvis::MeshLoader*>(loader)->get_instance(idx) : nullptr;
+    return loader ? static_cast<truvis::SceneLoader*>(loader)->get_instance(idx) : nullptr;
 }
 
 const CxxRasterGeometry* get_mesh(void* loader, size_t idx)
 {
-    return loader ? static_cast<truvis::MeshLoader*>(loader)->get_geometry(idx) : nullptr;
+    return loader ? static_cast<truvis::SceneLoader*>(loader)->get_geometry(idx) : nullptr;
 }
 
 const CxxMaterial* get_mat(void* loader, size_t idx)
 {
-    return loader ? static_cast<truvis::MeshLoader*>(loader)->get_material(idx) : nullptr;
+    return loader ? static_cast<truvis::SceneLoader*>(loader)->get_material(idx) : nullptr;
 }

@@ -11,7 +11,7 @@
 
 namespace truvis
 {
-bool MeshLoader::load_scene()
+bool SceneLoader::load_scene()
 {
     // 检查 mesh_path 和 dir_path 是否存在
     if (!std::filesystem::exists(this->mesh_path_) || !std::filesystem::is_regular_file(this->mesh_path_)
@@ -94,7 +94,7 @@ bool MeshLoader::load_scene()
 }
 
 
-bool MeshLoader::process_node(CxxInstance& instance, const aiNode& ai_node, const aiMatrix4x4& parent_transform) const
+bool SceneLoader::process_node(CxxInstance& instance, const aiNode& ai_node, const aiMatrix4x4& parent_transform) const
 {
     instance.world_transform = DataConvert::mat4(parent_transform * ai_node.mTransformation);
     instance.init(ai_node.mNumMeshes);
@@ -108,7 +108,7 @@ bool MeshLoader::process_node(CxxInstance& instance, const aiNode& ai_node, cons
     return true;
 }
 
-bool MeshLoader::process_material(CxxMaterial& material, const aiMaterial& ai_mat) const
+bool SceneLoader::process_material(CxxMaterial& material, const aiMaterial& ai_mat) const
 {
     // 提取出各种颜色
     {
@@ -161,7 +161,7 @@ bool MeshLoader::process_material(CxxMaterial& material, const aiMaterial& ai_ma
     return true;
 }
 
-bool MeshLoader::process_geometry(CxxRasterGeometry& geometry, const aiMesh& ai_mesh)
+bool SceneLoader::process_geometry(CxxRasterGeometry& geometry, const aiMesh& ai_mesh)
 {
     geometry.init(ai_mesh.mNumVertices, ai_mesh.mNumFaces);
 

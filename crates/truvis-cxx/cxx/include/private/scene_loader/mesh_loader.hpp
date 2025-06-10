@@ -12,25 +12,27 @@
 namespace truvis
 {
 
-struct MeshLoader
+/// 场景加载器，使用 Assimp 库加载场景文件
+struct SceneLoader
 {
-    explicit MeshLoader(const std::filesystem::path& mesh_path)
+    explicit SceneLoader(const std::filesystem::path& mesh_path)
         : mesh_path_(mesh_path),
           dir_path_(mesh_path.parent_path())
     {}
-    ~MeshLoader() = default;
-    MeshLoader(const MeshLoader&) = delete;
-    MeshLoader(MeshLoader&&) = delete;
-    MeshLoader& operator=(const MeshLoader&) = delete;
-    MeshLoader& operator=(MeshLoader&&) = delete;
+    ~SceneLoader() = default;
+    SceneLoader(const SceneLoader&) = delete;
+    SceneLoader(SceneLoader&&) = delete;
+    SceneLoader& operator=(const SceneLoader&) = delete;
+    SceneLoader& operator=(SceneLoader&&) = delete;
 
+    /// 加载场景文件，将所有的实例、几何体和材质信息提取出来
     bool load_scene();
 
+#pragma region getter
     [[nodiscard]] const CxxInstance* get_instance(const size_t index) const
     {
         return index < instances_.size() ? &instances_[index] : nullptr;
     }
-
     [[nodiscard]] const CxxRasterGeometry* get_geometry(const size_t index) const
     {
         return index < geometries_.size() ? &geometries_[index] : nullptr;
@@ -44,6 +46,7 @@ struct MeshLoader
     [[nodiscard]] size_t get_instance_count() const { return instances_.size(); }
     [[nodiscard]] size_t get_geometry_count() const { return geometries_.size(); }
     [[nodiscard]] size_t get_material_count() const { return materials_.size(); }
+#pragma endregion
 
 private:
     /// 处理一个节点，节点中包括多个 mesh，不考虑子节点

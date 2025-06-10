@@ -10,7 +10,13 @@
 
 
 extern "C" {
+/// 加载场景文件
+///
+/// @return 返回一个指向加载器的指针，调用者需要在不需要时调用 free_scene() 释放资源
 DLL_API void* load_scene(const char* mesh_path);
+
+/// 释放加载器资源
+/// @param loader 指向加载器的指针，必须是通过 load_scene() 返回的指针
 DLL_API void free_scene(void* loader);
 
 DLL_API size_t get_mesh_cnt(void* loader);
