@@ -4,6 +4,7 @@
 
 # resource
 assets
+tools/slang
 
 # operating system
 .DS_Store
