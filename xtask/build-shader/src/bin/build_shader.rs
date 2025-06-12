@@ -166,7 +166,7 @@ impl ShaderCompileTask {
 
     /// 使用 slangc 编译 slang 文件
     fn build_slang(&self) {
-        let output = std::process::Command::new("slangc")
+        let output = std::process::Command::new("tools/slang/bin/slangc.exe")
             .args([
                 "-I",
                 "shader/include",
