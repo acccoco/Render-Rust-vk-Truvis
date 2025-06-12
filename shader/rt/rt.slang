@@ -7,7 +7,7 @@
 const static uint max_depth = 10;
 
 /// 超过一定数量后，就不再重新计算了
-const static uint max_accum_frames = 512;
+const static uint max_accum_frames = 1024;
 
 [[vk::push_constant]]
 rt::PushConstants push_const;
@@ -214,7 +214,7 @@ void sky_miss(inout HitPayload payload)
     // phi: [-pi, pi] -> [0, 1]
     // theta: [-pi/2, pi/2] -> [1, 0]
     const float2 uv = float2(angle.x / M_PI * 0.5 + 0.5, 0.5 - angle.y / M_PI);
-    payload.radiance = float3(push_const.scene.sky.sample(uv).xyz) * 3.f;
+    payload.radiance = float3(push_const.scene.sky.sample(uv).xyz) * 8.f;
     payload.done = true;
 }
 
