@@ -28,7 +28,7 @@ struct alignas(4) CxxVec4f
 /// 4x4 矩阵结构体 (列主序)
 struct alignas(4) CxxMat4f
 {
-    float m[16];    // m[0]..m[3] 是第一列，以此类推
+    float m[16]; // m[0]..m[3] 是第一列，以此类推
 };
 
 /// 三角形面结构体
@@ -121,5 +121,5 @@ private:
 
     /// 几何体索引数量
     unsigned int mesh_cnt_ = 0;
-    int padding_ = 0;
+    int _padding_ = 0;
 };
