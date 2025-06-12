@@ -1,5 +1,5 @@
 #include "private/scene_loader/data_convert.hpp"
-#include "private/scene_loader/mesh_loader.hpp"
+#include "private/scene_loader/scene_loader.hpp"
 
 #include <assimp/matrix4x4.h>
 #include <cassert>

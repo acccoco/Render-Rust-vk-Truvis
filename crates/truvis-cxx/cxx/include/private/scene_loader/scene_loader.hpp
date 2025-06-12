@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assert.h>
 #include <assimp/matrix4x4.h>
 #include <filesystem>
 #include <vector>
@@ -17,8 +18,8 @@ struct SceneLoader
 {
     explicit SceneLoader(const std::filesystem::path& mesh_path)
         : mesh_path_(mesh_path),
-          dir_path_(mesh_path.parent_path())
-    {}
+          dir_path_(mesh_path.parent_path()) {}
+
     ~SceneLoader() = default;
     SceneLoader(const SceneLoader&) = delete;
     SceneLoader(SceneLoader&&) = delete;
@@ -33,6 +34,7 @@ struct SceneLoader
     {
         return index < instances_.size() ? &instances_[index] : nullptr;
     }
+
     [[nodiscard]] const CxxRasterGeometry* get_geometry(const size_t index) const
     {
         return index < geometries_.size() ? &geometries_[index] : nullptr;
@@ -46,6 +48,18 @@ struct SceneLoader
     [[nodiscard]] size_t get_instance_count() const { return instances_.size(); }
     [[nodiscard]] size_t get_geometry_count() const { return geometries_.size(); }
     [[nodiscard]] size_t get_material_count() const { return materials_.size(); }
+
+    /// 获取 mesh 的顶点位置
+    /// @param mesh_idx mesh 在 assimp 场景中的索引
+    /// @param [out]vertex_cnt 返回顶点数量
+    /// @return 指向顶点位置的指针，指针类型为 float*，每三个 float 代表一个顶点的 x, y, z 坐标
+    float* get_position(size_t mesh_idx, size_t& vertex_cnt)
+    {
+        assert(sizeof( aiVector3D) == sizeof(float) * 3);
+        const auto mesh = this->ai_scene_->mMeshes[mesh_idx];
+        vertex_cnt = mesh->mNumVertices;
+        return reinterpret_cast<float*>(mesh->mVertices);
+    }
 #pragma endregion
 
 private:
@@ -62,13 +76,13 @@ private:
     static bool process_geometry(CxxRasterGeometry& geometry, const aiMesh& ai_mesh);
 
 private:
-    const std::filesystem::path mesh_path_;    // mesh 文件对应的路径
-    const std::filesystem::path dir_path_;     // mesh 文件所在的文件夹，形式："xx/xxx"
+    const std::filesystem::path mesh_path_; // mesh 文件对应的路径
+    const std::filesystem::path dir_path_;  // mesh 文件所在的文件夹，形式："xx/xxx"
 
-    std::vector<CxxInstance> instances_;           // 所有的实例
-    std::vector<CxxRasterGeometry> geometries_;    // 所有的几何体
-    std::vector<CxxMaterial> materials_;           // 所有的材质
+    std::vector<CxxInstance> instances_;        // 所有的实例
+    std::vector<CxxRasterGeometry> geometries_; // 所有的几何体
+    std::vector<CxxMaterial> materials_;        // 所有的材质
 
     const aiScene* ai_scene_ = nullptr;
 };
-}    // namespace truvis
+} // namespace truvis
