@@ -1,11 +1,12 @@
-use crate::renderer::pipeline_settings::{DefaultRendererSettings, FifLabel, FrameSettings, PipelineSettings};
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::pipeline_settings::{DefaultRendererSettings, FifLabel, FrameSettings, PipelineSettings};
 use crate::renderer::swapchain::RenderSwapchain;
 use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
 use std::rc::Rc;
+use truvis_rhi::core::texture::RhiTexture2D;
 use truvis_rhi::{
     core::{
         command_buffer::RhiCommandBuffer,
@@ -117,6 +118,9 @@ impl FrameContext {
             Self::create_rt_images(rhi, pipeline_settings.color_format, frame_settings.rt_extent);
         let rt_keyword = "rt-image".to_string();
         bindless_mgr.register_image(rt_keyword.clone(), rt_image_view.clone());
+
+        let tex = RhiTexture2D::new(rhi, rt_image.clone(), "imgui-texture-114");
+        bindless_mgr.register_texture("imgui-texture-114".to_string(), tex);
 
         Self {
             render_swapchain: swapchain,

@@ -89,7 +89,9 @@ impl Gui {
                 }),
             },
         ]);
-        imgui_ctx.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
+        let io = imgui_ctx.io_mut();
+        io.font_global_scale = (1.0 / hidpi_factor) as f32;
+        io.config_flags |= imgui::ConfigFlags::DOCKING_ENABLE;
 
         let fonts_texture = {
             let fonts = imgui_ctx.fonts();

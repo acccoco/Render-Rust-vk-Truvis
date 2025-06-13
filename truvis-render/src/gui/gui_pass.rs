@@ -209,7 +209,9 @@ impl GuiPass {
                         // 加载 texture，如果和上一个 command 使用的 texture 不是同一个，则需要重新加载
                         if Some(texture_id) != last_texture_id {
                             let texture_key = Gui::get_texture_key(texture_id);
-                            let texture_handle = bindless_mgr.get_texture_idx(&texture_key).unwrap();
+                            let texture_handle = bindless_mgr
+                                .get_texture_idx(&texture_key)
+                                .expect(&format!("Texture not found: {}", texture_key));
                             cmd.cmd_push_constants(
                                 self.pipeline_layout.handle(),
                                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
