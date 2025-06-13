@@ -1,4 +1,4 @@
-use crate::gui::ui::Gui;
+use crate::gui::gui::Gui;
 use crate::platform::camera::DrsCamera;
 use crate::platform::camera_controller::CameraController;
 use crate::platform::input_manager::InputManager;
@@ -141,10 +141,14 @@ impl<T: OuterApp> TruvisApp<T> {
         // 更新相机控制器
         self.camera_controller.update(self.timer.delta_time_s);
 
-        // ===================== Phase: Update =====================
-        self.gui.get_mut().unwrap().update(self.window_system.get().unwrap().window(), |ui| {
+        // ===================== Phase: Gui Update =====================
+        let gui = self.gui.get_mut().unwrap();
+        gui.update(self.window_system.get().unwrap().window(), |ui| {
             self.outer_app.get_mut().unwrap().draw_ui(ui);
         });
+        self.renderer.on_render_area_changed(gui.get_render_region());
+
+        // ===================== Phase: Update =====================
         self.outer_app.get_mut().unwrap().update(&mut self.renderer);
 
         // ===================== Phase: Before Render =====================

@@ -1,6 +1,5 @@
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::FrameContext;
-use truvis_rhi::core::framebuffer::FrameBuffer;
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::pipeline_settings::{FifLabel, RendererSettings};
 use ash::vk;
@@ -13,6 +12,7 @@ use std::rc::Rc;
 use truvis_rhi::basic::color::LabelColor;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
+use truvis_rhi::core::rendering_info::RhiRenderingInfo;
 use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
 use truvis_rhi::rhi::Rhi;
 
@@ -108,18 +108,16 @@ impl PhongPass {
         gpu_scene: &GpuScene,
         frame_label: FifLabel,
     ) {
-        let color_attach = FrameBuffer::get_color_attachment(frame_ctx.crt_present_image_view().handle());
-        let depth_attach = FrameBuffer::get_depth_attachment(frame_ctx.depth_view().handle());
-        let render_info = FrameBuffer::get_render_info(
+        let rendering_info = RhiRenderingInfo::new(
+            vec![frame_ctx.crt_present_image_view().handle()],
+            Some(frame_ctx.depth_view().handle()),
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
                 extent: frame_ctx.frame_settings().viewport_extent,
             },
-            std::slice::from_ref(&color_attach),
-            &depth_attach,
         );
 
-        cmd.cmd_begin_rendering(&render_info);
+        cmd.cmd_begin_rendering2(&rendering_info);
         cmd.begin_label("[phong-pass]draw", LabelColor::COLOR_PASS);
 
         self.bind(

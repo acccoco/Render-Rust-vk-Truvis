@@ -5,7 +5,7 @@ use std::ops::Deref;
 pub struct DefaultRendererSettings;
 impl DefaultRendererSettings {
     pub const DEFAULT_SURFACE_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
-        format: vk::Format::B8G8R8A8_UNORM,
+        format: vk::Format::R8G8B8A8_UNORM,
         color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
     };
     pub const DEFAULT_PRESENT_MODE: vk::PresentModeKHR = vk::PresentModeKHR::MAILBOX;

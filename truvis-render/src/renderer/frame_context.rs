@@ -1,5 +1,5 @@
-use crate::renderer::pipeline_settings::{DefaultRendererSettings, FifLabel, FrameSettings, PipelineSettings};
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::pipeline_settings::{DefaultRendererSettings, FifLabel, FrameSettings, PipelineSettings};
 use crate::renderer::swapchain::RenderSwapchain;
 use crate::renderer::window_system::MainWindow;
 use ash::vk;
@@ -17,56 +17,103 @@ use truvis_rhi::{
     rhi::Rhi,
 };
 
-pub struct FrameContext {
-    render_swapchain: RenderSwapchain,
-
-    frame_settings: FrameSettings,
-
-    /// 当前处在 in-flight 的第几帧：A, B, C
-    fif_label: FifLabel,
-
-    /// 当前的帧序号，一直累加
-    frame_id: usize,
-
-    /// 为每个 frame 分配一个 command pool
-    graphics_command_pools: Vec<Rc<RhiCommandPool>>,
-
-    /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
-    allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
+/// 各种各样和 frame 以及 viewport 相关的 buffers
+struct FrameBuffers {
+    rt_image: Rc<RhiImage2D>,
+    _rt_image_view: Rc<RhiImage2DView>,
+    rt_bindless_key: String,
 
     /// 来自于 swpachain，生命周期跟随 swapchain
     present_images: Vec<vk::Image>,
     present_image_views: Vec<Rc<RhiImage2DView>>,
     present_image_bindless_keys: Vec<String>,
 
-    /// FIXME 听说可以只需要一个 depth view，因为不需要同时渲染两帧
     _depth_image: Rc<RhiImage2D>,
     _depth_view: Rc<RhiImage2DView>,
-
-    present_complete_semaphores: Vec<RhiSemaphore>,
-    render_complete_semaphores: Vec<RhiSemaphore>,
-    fence_frame_in_flight: Vec<RhiFence>,
-
-    rt_image: Rc<RhiImage2D>,
-    _rt_image_view: Rc<RhiImage2DView>,
-    rt_bindless_key: String,
-
-    device: Rc<RhiDevice>,
 }
-// init
-impl FrameContext {
+impl Drop for FrameBuffers {
+    fn drop(&mut self) {
+        assert_eq!(Rc::strong_count(&self._rt_image_view), 1);
+        assert_eq!(Rc::strong_count(&self.rt_image), 2); // 1 for self, 1 for image view
+        assert_eq!(Rc::strong_count(&self._depth_view), 1);
+        assert_eq!(Rc::strong_count(&self._depth_image), 2); // 1 for self, 1 for image view
+        for present_image_view in &self.present_image_views {
+            assert_eq!(Rc::strong_count(present_image_view), 1);
+        }
+    }
+}
+impl FrameBuffers {
     pub fn new(
         rhi: &Rhi,
-        window: &MainWindow,
         pipeline_settings: &PipelineSettings,
+        frame_settings: &FrameSettings,
         bindless_mgr: &mut BindlessManager,
+        swapchain: &RenderSwapchain,
     ) -> Self {
-        let swapchain = RenderSwapchain::new(
-            rhi,
-            window,
-            DefaultRendererSettings::DEFAULT_PRESENT_MODE,
-            DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
-        );
+        let (present_images, present_image_views) = Self::create_present_images(rhi, swapchain, pipeline_settings);
+        let (depth_image, depth_image_view) = Self::create_depth_image(rhi, pipeline_settings, frame_settings);
+        let (rt_image, rt_image_view) = Self::create_rt_image(rhi, pipeline_settings, frame_settings);
+
+        // 将相关的 image 注册到 bindless manager 中
+        let rt_bindless_key = "Renderer::RtImageView".to_string();
+        let present_image_bindless_keys = present_image_views
+            .iter()
+            .enumerate()
+            .map(|(idx, _)| format!("Renderer::PresentImageView-{idx}"))
+            .collect_vec();
+        bindless_mgr.register_image(rt_bindless_key.clone(), rt_image_view.clone());
+        for (key, view) in present_image_bindless_keys.iter().zip(present_image_views.iter()) {
+            bindless_mgr.register_image(key.clone(), view.clone());
+        }
+
+        Self {
+            rt_image,
+            _rt_image_view: rt_image_view,
+            rt_bindless_key,
+
+            present_images,
+            present_image_views,
+            present_image_bindless_keys,
+
+            _depth_image: depth_image,
+            _depth_view: depth_image_view,
+        }
+    }
+
+    pub fn unregister_bindless_images(&self, bindless_mgr: &mut BindlessManager) {
+        bindless_mgr.unregister_image(&self.rt_bindless_key);
+        for key in &self.present_image_bindless_keys {
+            bindless_mgr.unregister_image(key);
+        }
+    }
+
+    /// 渲染区域发生变化时，重建一些 buffers
+    pub fn on_draw_area_resized(
+        &mut self,
+        rhi: &Rhi,
+        pipeline_settings: &PipelineSettings,
+        frame_settings: &FrameSettings,
+        bindless_mgr: &mut BindlessManager,
+    ) {
+        log::info!("rebuild rt image: {:?}", frame_settings.rt_extent);
+
+        // 移除 bindless 中记录的 rt images
+        bindless_mgr.unregister_image(&self.rt_bindless_key);
+        assert_eq!(Rc::strong_count(&self._rt_image_view), 1);
+        assert_eq!(Rc::strong_count(&self.rt_image), 2); // 1 for self, 1 for image view
+
+        let (rt_image, rt_image_view) = Self::create_rt_image(rhi, pipeline_settings, frame_settings);
+        self.rt_image = rt_image;
+        self._rt_image_view = rt_image_view;
+        bindless_mgr.register_image(self.rt_bindless_key.clone(), self._rt_image_view.clone());
+    }
+
+    /// 创建用于 present 的 image 和 view
+    fn create_present_images(
+        rhi: &Rhi,
+        swapchain: &RenderSwapchain,
+        pipeline_settings: &PipelineSettings,
+    ) -> (Vec<vk::Image>, Vec<Rc<RhiImage2DView>>) {
         let present_images = swapchain.present_images();
         let present_image_views = present_images
             .iter()
@@ -83,146 +130,65 @@ impl FrameContext {
                 ))
             })
             .collect_vec();
-        let present_image_bindless_keys =
-            present_image_views.iter().enumerate().map(|(idx, _)| format!("present-image-{}", idx)).collect_vec();
-        for (key, view) in present_image_bindless_keys.iter().zip(present_image_views.iter()) {
-            bindless_mgr.register_image(key.clone(), view.clone());
-        }
 
-        let frame_settings = FrameSettings {
-            viewport_extent: swapchain.extent(),
-            rt_extent: swapchain.extent(),
-            rt_offset: vk::Offset2D { x: 0, y: 0 },
-        };
-
-        let (depth_image, depth_image_view) =
-            Self::create_depth_image_and_view(rhi, frame_settings.viewport_extent, pipeline_settings.depth_format);
-
-        let create_semaphore = |name: &str| {
-            (0..pipeline_settings.frames_in_flight)
-                .map(|i| FifLabel::from_usize(i))
-                .map(|frame_label| RhiSemaphore::new(rhi, &format!("{name}_{frame_label}")))
-                .collect_vec()
-        };
-        let present_complete_semaphores = create_semaphore("present_complete_semaphore");
-        let render_complete_semaphores = create_semaphore("render_complete_semaphores");
-
-        let fence_frame_in_flight = (0..pipeline_settings.frames_in_flight)
-            .map(|i| FifLabel::from_usize(i))
-            .map(|frame_label| RhiFence::new(rhi, true, &format!("frame_in_flight_fence_{frame_label}")))
-            .collect();
-
-        let graphics_command_pools = Self::init_command_pool(rhi, pipeline_settings.frames_in_flight);
-        let (rt_image, rt_image_view) =
-            Self::create_rt_images(rhi, pipeline_settings.color_format, frame_settings.rt_extent);
-        let rt_keyword = "rt-image".to_string();
-        bindless_mgr.register_image(rt_keyword.clone(), rt_image_view.clone());
-
-        Self {
-            render_swapchain: swapchain,
-            present_images,
-            present_image_views,
-            present_image_bindless_keys,
-
-            frame_settings,
-
-            fif_label: FifLabel::A, // 初始为 A
-            frame_id: 0,
-
-            graphics_command_pools,
-            allocated_command_buffers: vec![Vec::new(); pipeline_settings.frames_in_flight],
-
-            _depth_image: depth_image,
-            _depth_view: depth_image_view,
-
-            rt_image,
-            _rt_image_view: rt_image_view,
-            rt_bindless_key: rt_keyword,
-
-            present_complete_semaphores,
-            render_complete_semaphores,
-            fence_frame_in_flight,
-
-            device: rhi.device.clone(),
-        }
+        (present_images, present_image_views)
     }
 
-    /// 需要手动调用该函数释放资源
-    pub fn destroy(mut self, bindless_mgr: &mut BindlessManager) {
-        for semaphore in std::mem::take(&mut self.present_complete_semaphores).into_iter() {
-            semaphore.destroy();
-        }
-        for semaphore in std::mem::take(&mut self.render_complete_semaphores).into_iter() {
-            semaphore.destroy();
-        }
-        for fence in std::mem::take(&mut self.fence_frame_in_flight).into_iter() {
-            fence.destroy();
-        }
-
-        bindless_mgr.unregister_image(&self.rt_bindless_key);
-
-        for present_image_view in std::mem::take(&mut self.present_image_views).into_iter() {
-            drop(present_image_view);
-        }
-        for present_image_bindless_key in std::mem::take(&mut self.present_image_bindless_keys).into_iter() {
-            bindless_mgr.unregister_image(&present_image_bindless_key);
-        }
-    }
-
-    fn create_depth_image_and_view(
+    /// 创建深度图像和视图
+    fn create_depth_image(
         rhi: &Rhi,
-        extent: vk::Extent2D,
-        depth_format: vk::Format,
+        pipeline_settings: &PipelineSettings,
+        frame_settings: &FrameSettings,
     ) -> (Rc<RhiImage2D>, Rc<RhiImage2DView>) {
         let depth_image = Rc::new(RhiImage2D::new(
             rhi,
             Rc::new(RhiImageCreateInfo::new_image_2d_info(
-                extent,
-                depth_format,
+                frame_settings.viewport_extent,
+                pipeline_settings.depth_format,
                 vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
             )),
             &vk_mem::AllocationCreateInfo {
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
             },
-            "depth-image",
+            "depth",
         ));
 
         let depth_image_view = RhiImage2DView::new(
             rhi,
             depth_image.clone(),
-            RhiImageViewCreateInfo::new_image_view_2d_info(depth_format, vk::ImageAspectFlags::DEPTH),
-            "depth-image-view".to_string(),
+            RhiImageViewCreateInfo::new_image_view_2d_info(pipeline_settings.depth_format, vk::ImageAspectFlags::DEPTH),
+            "depth".to_string(),
         );
 
         (depth_image, Rc::new(depth_image_view))
     }
 
-    /// rt_extent: 表示的是 rt 渲染的分辨率，并不是最终 framebuffer 的分辨率
-    fn create_rt_images(
+    /// 创建 RayTracing 需要的 image
+    fn create_rt_image(
         rhi: &Rhi,
-        color_format: vk::Format,
-        rt_extent: vk::Extent2D,
+        pipeline_settings: &PipelineSettings,
+        frame_settings: &FrameSettings,
     ) -> (Rc<RhiImage2D>, Rc<RhiImage2DView>) {
         let rt_image = Rc::new(RhiImage2D::new(
             rhi,
             Rc::new(RhiImageCreateInfo::new_image_2d_info(
-                rt_extent,
-                color_format,
+                frame_settings.rt_extent,
+                pipeline_settings.color_format,
                 vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED,
             )),
             &vk_mem::AllocationCreateInfo {
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
             },
-            "rt-image",
+            "rt",
         ));
 
         let rt_image_view = Rc::new(RhiImage2DView::new(
             rhi,
             rt_image.clone(),
-            RhiImageViewCreateInfo::new_image_view_2d_info(color_format, vk::ImageAspectFlags::COLOR),
-            "rt-image-view".to_string(),
+            RhiImageViewCreateInfo::new_image_view_2d_info(pipeline_settings.color_format, vk::ImageAspectFlags::COLOR),
+            "rt".to_string(),
         ));
 
         // layout transfer
@@ -245,6 +211,103 @@ impl FrameContext {
 
         (rt_image, rt_image_view)
     }
+}
+
+pub struct FrameContext {
+    render_swapchain: RenderSwapchain,
+
+    frame_settings: FrameSettings,
+
+    /// 当前处在 in-flight 的第几帧：A, B, C
+    fif_label: FifLabel,
+
+    /// 当前的帧序号，一直累加
+    frame_id: usize,
+
+    /// 为每个 frame 分配一个 command pool
+    graphics_command_pools: Vec<Rc<RhiCommandPool>>,
+
+    /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
+    allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
+
+    frame_buffers: FrameBuffers,
+
+    present_complete_semaphores: Vec<RhiSemaphore>,
+    render_complete_semaphores: Vec<RhiSemaphore>,
+    fence_frame_in_flight: Vec<RhiFence>,
+
+    device: Rc<RhiDevice>,
+}
+impl Drop for FrameContext {
+    fn drop(&mut self) {
+        assert!(self.present_complete_semaphores.is_empty(), "need destroy render context manually");
+        assert!(self.render_complete_semaphores.is_empty(), "need destroy render context manually");
+        assert!(self.fence_frame_in_flight.is_empty(), "need destroy render context manually");
+    }
+}
+// region init
+impl FrameContext {
+    pub fn new(
+        rhi: &Rhi,
+        window: &MainWindow,
+        pipeline_settings: &PipelineSettings,
+        bindless_mgr: &mut BindlessManager,
+    ) -> Self {
+        let swapchain = RenderSwapchain::new(
+            rhi,
+            window,
+            DefaultRendererSettings::DEFAULT_PRESENT_MODE,
+            DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
+        );
+        let frame_settings = FrameSettings {
+            viewport_extent: swapchain.extent(),
+            rt_extent: swapchain.extent(),
+            rt_offset: vk::Offset2D { x: 0, y: 0 },
+        };
+
+        let present_complete_semaphores = (0..pipeline_settings.frames_in_flight)
+            .map(|i| RhiSemaphore::new(rhi, &format!("present_complete_{}", FifLabel::from_usize(i))))
+            .collect_vec();
+        let render_complete_semaphores = (0..pipeline_settings.frames_in_flight)
+            .map(|i| RhiSemaphore::new(rhi, &format!("render_complete_{}", FifLabel::from_usize(i))))
+            .collect_vec();
+        let fence_frame_in_flight = (0..pipeline_settings.frames_in_flight)
+            .map(|i| RhiFence::new(rhi, true, &format!("frame_in_flight_fence_{}", FifLabel::from_usize(i))))
+            .collect();
+
+        let graphics_command_pools = Self::init_command_pool(rhi, pipeline_settings.frames_in_flight);
+
+        let frame_buffers = FrameBuffers::new(rhi, pipeline_settings, &frame_settings, bindless_mgr, &swapchain);
+
+        Self {
+            render_swapchain: swapchain,
+            frame_settings,
+            fif_label: FifLabel::A,
+            frame_id: 0,
+            frame_buffers,
+            graphics_command_pools,
+            allocated_command_buffers: vec![Vec::new(); pipeline_settings.frames_in_flight],
+            present_complete_semaphores,
+            render_complete_semaphores,
+            fence_frame_in_flight,
+            device: rhi.device.clone(),
+        }
+    }
+
+    /// 需要手动调用该函数释放资源
+    pub fn destroy(mut self, bindless_mgr: &mut BindlessManager) {
+        for semaphore in std::mem::take(&mut self.present_complete_semaphores).into_iter() {
+            semaphore.destroy();
+        }
+        for semaphore in std::mem::take(&mut self.render_complete_semaphores).into_iter() {
+            semaphore.destroy();
+        }
+        for fence in std::mem::take(&mut self.fence_frame_in_flight).into_iter() {
+            fence.destroy();
+        }
+
+        self.frame_buffers.unregister_bindless_images(bindless_mgr);
+    }
 
     fn init_command_pool(rhi: &Rhi, frames_in_flight: usize) -> Vec<Rc<RhiCommandPool>> {
         (0..frames_in_flight)
@@ -259,7 +322,8 @@ impl FrameContext {
             .collect_vec()
     }
 }
-// getter
+// endregion
+// region getter
 impl FrameContext {
     #[inline]
     pub fn crt_fence(&self) -> &RhiFence {
@@ -296,40 +360,40 @@ impl FrameContext {
 
     #[inline]
     pub fn depth_view(&self) -> &RhiImage2DView {
-        &self._depth_view
+        &self.frame_buffers._depth_view
     }
 
     #[inline]
     pub fn crt_present_image_view(&self) -> &RhiImage2DView {
         let present_image_idx = self.render_swapchain.current_present_image_index();
-        &self.present_image_views[present_image_idx]
+        &self.frame_buffers.present_image_views[present_image_idx]
     }
 
     #[inline]
     pub fn crt_present_image(&self) -> vk::Image {
         let present_image_idx = self.render_swapchain.current_present_image_index();
-        self.present_images[present_image_idx]
+        self.frame_buffers.present_images[present_image_idx]
     }
 
     #[inline]
     pub fn crt_present_image_bindless_handle(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
         let present_image_idx = self.render_swapchain.current_present_image_index();
-        bindless_manager.get_image_idx(&self.present_image_bindless_keys[present_image_idx]).unwrap()
+        bindless_manager.get_image_idx(&self.frame_buffers.present_image_bindless_keys[present_image_idx]).unwrap()
     }
 
     #[inline]
     pub fn crt_rt_bindless_handle(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
-        bindless_manager.get_image_idx(&self.rt_bindless_key).unwrap()
+        bindless_manager.get_image_idx(&self.frame_buffers.rt_bindless_key).unwrap()
     }
 
     #[inline]
-    pub fn crt_rt_image_view(&self) -> &RhiImage2D {
-        &self.rt_image
+    pub fn crt_rt_image_view(&self) -> &RhiImage2DView {
+        &self.frame_buffers._rt_image_view
     }
 
     #[inline]
     pub fn crt_rt_image(&self) -> &RhiImage2D {
-        &self.rt_image
+        &self.frame_buffers.rt_image
     }
 
     #[inline]
@@ -337,7 +401,8 @@ impl FrameContext {
         self.frame_settings
     }
 }
-// tools
+// endregion
+// region tools
 impl FrameContext {
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer(&mut self, debug_name: &str) -> RhiCommandBuffer {
@@ -349,7 +414,8 @@ impl FrameContext {
         cmd
     }
 }
-// phase methods
+// endregion
+// region phase methods
 impl FrameContext {
     pub fn begin_frame(&mut self) {
         {
@@ -380,11 +446,25 @@ impl FrameContext {
     }
 
     pub fn after_render(&mut self) {}
-}
-impl Drop for FrameContext {
-    fn drop(&mut self) {
-        assert!(self.present_complete_semaphores.is_empty(), "need destroy render context manually");
-        assert!(self.render_complete_semaphores.is_empty(), "need destroy render context manually");
-        assert!(self.fence_frame_in_flight.is_empty(), "need destroy render context manually");
+
+    /// 在渲染区域发生变化后，调整 rt buffers 的大小
+    pub fn on_render_area_changed(
+        &mut self,
+        rhi: &Rhi,
+        pipeline_settings: &PipelineSettings,
+        new_rect: vk::Rect2D,
+        bindless_manager: &mut BindlessManager,
+    ) {
+        self.frame_settings.rt_offset = new_rect.offset;
+
+        // 仅有 size 发生改变时，才需要重建 rt-image
+        if self.frame_settings.rt_extent.width != new_rect.extent.width
+            || self.frame_settings.rt_extent.height != new_rect.extent.height
+        {
+            self.frame_settings.rt_extent = new_rect.extent;
+            // 重新创建 rt image
+            self.frame_buffers.on_draw_area_resized(rhi, pipeline_settings, &self.frame_settings, bindless_manager);
+        }
     }
 }
+// endregion

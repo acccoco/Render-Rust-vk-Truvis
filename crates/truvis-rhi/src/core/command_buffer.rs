@@ -4,7 +4,7 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::core::debug_utils::RhiDebugType;
-use crate::core::framebuffer::RhiRenderingInfo;
+use crate::core::rendering_info::RhiRenderingInfo;
 use crate::core::synchronize::RhiBufferBarrier;
 use crate::{
     basic::color::LabelColor,

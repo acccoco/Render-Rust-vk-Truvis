@@ -1,4 +1,4 @@
-use imgui::Ui;
+use imgui::{TextureId, Ui};
 use shader_binding::shader;
 use truvis_render::app::{OuterApp, TruvisApp};
 use truvis_render::platform::camera::DrsCamera;
@@ -61,10 +61,7 @@ impl OuterApp for PhongApp {
         Self { rt_pipeline }
     }
 
-    fn draw_ui(&mut self, _ui: &mut Ui) {
-        // ui.text_wrapped("Hello world!");
-        // ui.text_wrapped("こんにちは世界！");
-    }
+    fn draw_ui(&mut self, ui: &mut Ui) {}
 
     fn draw(&self, pipeline_ctx: PipelineContext) {
         self.rt_pipeline.render(pipeline_ctx);

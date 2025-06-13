@@ -1,4 +1,4 @@
-use crate::gui::ui::Gui;
+use crate::gui::gui::Gui;
 use crate::platform::timer::Timer;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::FrameContext;

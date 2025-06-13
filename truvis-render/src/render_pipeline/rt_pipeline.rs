@@ -106,7 +106,7 @@ impl RtPipeline {
                     src_image: rt_image_handle,
                     dst_image: present_image_handle,
                     src_image_size: glam::uvec2(frame_settings.rt_extent.width, frame_settings.rt_extent.height).into(),
-                    offset: glam::uvec2(frame_settings.rt_offset.x as u32, frame_settings.rt_offset.x as u32).into(),
+                    offset: glam::uvec2(frame_settings.rt_offset.x as u32, frame_settings.rt_offset.y as u32).into(),
                 },
                 glam::uvec3(
                     frame_settings.rt_extent.width.div_ceil(shader::blit::SHADER_X as u32),

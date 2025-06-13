@@ -11,7 +11,7 @@ use truvis_render::platform::timer::Timer;
 use truvis_render::renderer::frame_context::FrameContext;
 use truvis_render::renderer::pipeline_settings::PipelineSettings;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::framebuffer::RhiRenderingInfo;
+use truvis_rhi::core::rendering_info::RhiRenderingInfo;
 use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
 use truvis_rhi::core::shader::RhiShaderStageInfo;
 use truvis_rhi::rhi::Rhi;

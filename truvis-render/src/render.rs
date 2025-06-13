@@ -46,7 +46,7 @@ impl Drop for Renderer {
         }
     }
 }
-// getter
+// region getter
 impl Renderer {
     #[inline]
     pub fn renderer_settings(&self) -> RendererSettings {
@@ -83,7 +83,8 @@ impl Renderer {
         .unwrap_or(vk::Format::UNDEFINED)
     }
 }
-// init
+// endregion
+// region init
 impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         let rhi = Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext));
@@ -120,7 +121,8 @@ impl Renderer {
         self.rebuild_after_resized(window);
     }
 }
-// phase call
+// endregion
+// region phase call
 impl Renderer {
     pub fn begin_frame(&mut self) {
         self.frame_ctx.as_mut().unwrap().begin_frame();
@@ -172,6 +174,20 @@ impl Renderer {
         self.accum_data.reset();
         self.frame_ctx =
             Some(FrameContext::new(&self.rhi, window, &self.pipeline_settings, &mut self.bindless_mgr.borrow_mut()));
+    }
+
+    pub fn on_render_area_changed(&mut self, region: vk::Rect2D) {
+        // 只有 frame_context 中的渲染区域发生变化时，才需要重新构建
+        if self.frame_context().frame_settings().rt_extent != region.extent {
+            self.wait_idle();
+        }
+
+        self.frame_ctx.as_mut().unwrap().on_render_area_changed(
+            &self.rhi,
+            &self.pipeline_settings,
+            region,
+            &mut self.bindless_mgr.borrow_mut(),
+        );
     }
 
     fn update_gpu_scene(&mut self, input_state: &InputState, timer: &Timer, camera: &DrsCamera) {
@@ -240,3 +256,4 @@ impl Renderer {
         self.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(std::slice::from_ref(&cmd))], None);
     }
 }
+// endregion
