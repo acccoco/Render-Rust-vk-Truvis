@@ -1,7 +1,8 @@
+use crate::pipeline_settings::{FrameLabel, FrameSettings};
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_context::FrameContext;
+use crate::renderer::frame_buffers::FrameBuffers;
+use crate::renderer::frame_controller::FrameController;
 use crate::renderer::gpu_scene::GpuScene;
-use crate::renderer::pipeline_settings::{FifLabel, RendererSettings};
 use ash::vk;
 use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
 use model_manager::vertex::VertexLayout;
@@ -12,8 +13,8 @@ use std::rc::Rc;
 use truvis_rhi::basic::color::LabelColor;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::rendering_info::RhiRenderingInfo;
 use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
+use truvis_rhi::core::rendering_info::RhiRenderingInfo;
 use truvis_rhi::rhi::Rhi;
 
 pub struct PhongPass {
@@ -21,11 +22,7 @@ pub struct PhongPass {
     bindless_manager: Rc<RefCell<BindlessManager>>,
 }
 impl PhongPass {
-    pub fn new(
-        rhi: &Rhi,
-        renderer_settings: &RendererSettings,
-        bindless_manager: Rc<RefCell<BindlessManager>>,
-    ) -> Self {
+    pub fn new(rhi: &Rhi, frame_settings: &FrameSettings, bindless_manager: Rc<RefCell<BindlessManager>>) -> Self {
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
         ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv", cstr::cstr!("main"));
         ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv", cstr::cstr!("main"));
@@ -33,11 +30,7 @@ impl PhongPass {
         ci.vertex_binding(VertexLayoutAos3D::vertex_input_bindings());
         ci.vertex_attribute(VertexLayoutAos3D::vertex_input_attributes());
 
-        ci.attach_info(
-            vec![renderer_settings.pipeline_settings.color_format],
-            Some(renderer_settings.pipeline_settings.depth_format),
-            None,
-        );
+        ci.attach_info(vec![frame_settings.color_format], Some(frame_settings.depth_format), None);
         ci.color_blend(
             vec![vk::PipelineColorBlendAttachmentState::default()
                 .blend_enable(false)
@@ -47,7 +40,7 @@ impl PhongPass {
 
         let pipeline_layout = Rc::new(RhiPipelineLayout::new(
             rhi.device.clone(),
-            &[bindless_manager.borrow().bindless_layout.handle()],
+            &[bindless_manager.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .offset(0)
@@ -68,7 +61,7 @@ impl PhongPass {
         cmd: &RhiCommandBuffer,
         viewport: &vk::Rect2D,
         push_constant: &shader::rt::PushConstants,
-        frame_idx: FifLabel,
+        frame_idx: FrameLabel,
     ) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
         cmd.cmd_set_viewport(
@@ -94,7 +87,7 @@ impl PhongPass {
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline.layout(),
             0,
-            &[self.bindless_manager.borrow().bindless_sets[*frame_idx].handle()],
+            &[self.bindless_manager.borrow().bindless_descriptor_sets[*frame_idx].handle()],
             None,
         );
     }
@@ -102,18 +95,19 @@ impl PhongPass {
     pub fn draw(
         &self,
         cmd: &RhiCommandBuffer,
-        frame_ctx: &FrameContext,
-        viewport: vk::Extent2D,
+        frame_ctx: &FrameController,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
-        frame_label: FifLabel,
+        frame_buffers: &FrameBuffers,
+        frame_settings: &FrameSettings,
     ) {
+        let frame_label = frame_ctx.frame_label();
         let rendering_info = RhiRenderingInfo::new(
-            vec![frame_ctx.crt_present_image_view().handle()],
-            Some(frame_ctx.depth_view().handle()),
+            vec![frame_buffers.render_target_image_view(frame_label).handle()],
+            Some(frame_buffers.depth_image_view().handle()),
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
-                extent: frame_ctx.frame_settings().viewport_extent,
+                extent: frame_settings.frame_extent,
             },
         );
 
@@ -122,7 +116,7 @@ impl PhongPass {
 
         self.bind(
             cmd,
-            &viewport.into(),
+            &frame_settings.frame_extent.into(),
             &shader::rt::PushConstants {
                 frame_data: per_frame_data.device_address(),
                 scene: gpu_scene.scene_device_address(frame_label),

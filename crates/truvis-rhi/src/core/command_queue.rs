@@ -38,6 +38,11 @@ impl RhiDebugType for RhiQueue {
 
 impl RhiQueue {
     #[inline]
+    pub fn queue_family(&self) -> &RhiQueueFamily {
+        &self.queue_family
+    }
+
+    #[inline]
     pub fn handle(&self) -> vk::Queue {
         self.handle
     }
@@ -45,7 +50,7 @@ impl RhiQueue {
     pub fn submit(&self, batches: Vec<RhiSubmitInfo>, fence: Option<RhiFence>) {
         unsafe {
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
-            let batches = batches.iter().map(|b| *b.inner()).collect_vec();
+            let batches = batches.iter().map(|b| b.submit_info()).collect_vec();
             self.device.queue_submit2(self.handle, &batches, fence.map_or(vk::Fence::null(), |f| f.handle())).unwrap()
         }
     }
@@ -92,31 +97,32 @@ impl RhiSubmitInfo {
     }
 
     #[inline]
-    pub fn inner(&self) -> &vk::SubmitInfo2 {
-        &self.inner
+    pub fn submit_info(&self) -> vk::SubmitInfo2 {
+        self.inner
+            .command_buffer_infos(&self._command_buffers)
+            .wait_semaphore_infos(&self.wait_infos)
+            .signal_semaphore_infos(&self.signal_infos)
     }
 
-    /// builder
     #[inline]
-    pub fn wait_infos(mut self, wait_semaphores: &[(RhiSemaphore, vk::PipelineStageFlags2)]) -> Self {
-        self.wait_infos = wait_semaphores
-            .iter()
-            .map(|(s, stage)| vk::SemaphoreSubmitInfo::default().semaphore(s.handle()).stage_mask(*stage))
-            .collect_vec();
-        self.inner.wait_semaphore_info_count = self.wait_infos.len() as u32;
-        self.inner.p_wait_semaphore_infos = self.wait_infos.as_ptr();
+    pub fn wait(mut self, semaphore: &RhiSemaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
+        self.wait_infos.push(
+            vk::SemaphoreSubmitInfo::default()
+                .semaphore(semaphore.handle())
+                .stage_mask(stage)
+                .value(value.unwrap_or_default()),
+        );
         self
     }
 
-    /// builder
     #[inline]
-    pub fn signal_infos(mut self, signal_semaphores: &[(RhiSemaphore, vk::PipelineStageFlags2)]) -> Self {
-        self.signal_infos = signal_semaphores
-            .iter()
-            .map(|(s, stage)| vk::SemaphoreSubmitInfo::default().semaphore(s.handle()).stage_mask(*stage))
-            .collect_vec();
-        self.inner.signal_semaphore_info_count = self.signal_infos.len() as u32;
-        self.inner.p_signal_semaphore_infos = self.signal_infos.as_ptr();
+    pub fn signal(mut self, semaphore: &RhiSemaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
+        self.signal_infos.push(
+            vk::SemaphoreSubmitInfo::default()
+                .semaphore(semaphore.handle())
+                .stage_mask(stage)
+                .value(value.unwrap_or_default()),
+        );
         self
     }
 }

@@ -20,33 +20,27 @@ impl DefaultRendererSettings {
 
 #[derive(Copy, Clone, Default)]
 pub struct FrameSettings {
-    /// 会随着 swapchain 的重建而刷新
-    pub viewport_extent: vk::Extent2D,
-    pub rt_extent: vk::Extent2D,
-    pub rt_offset: vk::Offset2D,
-}
-
-#[derive(Copy, Clone, Default)]
-pub struct PipelineSettings {
-    pub frames_in_flight: usize,
+    pub fif_num: usize,
     pub color_format: vk::Format,
     pub depth_format: vk::Format,
+    pub frame_extent: vk::Extent2D,
 }
 
 #[derive(Copy, Clone)]
-pub struct RendererSettings {
-    pub pipeline_settings: PipelineSettings,
-    pub frame_settings: FrameSettings,
+pub struct PresentSettings {
+    pub canvas_extent: vk::Extent2D,
+
+    pub swapchain_image_cnt: usize,
+    pub color_format: vk::Format,
 }
 
-/// frames in flight 中每一帧的 label
 #[derive(Debug, Clone, Copy)]
-pub enum FifLabel {
+pub enum FrameLabel {
     A,
     B,
     C,
 }
-impl Deref for FifLabel {
+impl Deref for FrameLabel {
     type Target = usize;
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -57,7 +51,7 @@ impl Deref for FifLabel {
         }
     }
 }
-impl Display for FifLabel {
+impl Display for FrameLabel {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -67,7 +61,7 @@ impl Display for FifLabel {
         }
     }
 }
-impl FifLabel {
+impl FrameLabel {
     pub const FRAMES_IN_FLIGHT: usize = 3;
 
     const INDEX: [usize; 3] = [0, 1, 2];
@@ -80,15 +74,6 @@ impl FifLabel {
             2 => Self::C,
             _ => panic!("Invalid frame index: {idx}"),
         }
-    }
-
-    #[inline]
-    pub fn next_frame(&mut self) {
-        *self = match self {
-            Self::A => Self::B,
-            Self::B => Self::C,
-            Self::C => Self::A,
-        };
     }
 }
 

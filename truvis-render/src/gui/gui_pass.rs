@@ -1,8 +1,7 @@
-use crate::gui::mesh::ImGuiVertex;
 use crate::gui::gui::Gui;
+use crate::gui::mesh::ImGuiVertex;
+use crate::pipeline_settings::FrameLabel;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_context::FrameContext;
-use crate::renderer::pipeline_settings::{FrameSettings, PipelineSettings};
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
@@ -47,10 +46,10 @@ pub struct GuiPass {
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
 impl GuiPass {
-    pub fn new(rhi: &Rhi, pipeline_settings: &PipelineSettings, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new(rhi: &Rhi, bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
         let pipeline_layout = Rc::new(RhiPipelineLayout::new(
             rhi.device.clone(),
-            &[bindless_mgr.borrow().bindless_layout.handle()],
+            &[bindless_mgr.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 offset: 0,
@@ -82,7 +81,8 @@ impl GuiPass {
             .cull_mode(vk::CullModeFlags::NONE, vk::FrontFace::CLOCKWISE)
             .color_blend(color_blend_attachments, [0.0; 4])
             .depth_test(Some(vk::CompareOp::ALWAYS), false, false)
-            .attach_info(vec![pipeline_settings.color_format], Some(pipeline_settings.depth_format), None);
+            // TODO 这里不应该由 depth
+            .attach_info(vec![color_format], None, None);
 
         let pipeline = RhiGraphicsPipeline::new(rhi.device.clone(), &create_info, pipeline_layout.clone(), "uipass");
 
@@ -96,32 +96,36 @@ impl GuiPass {
     pub fn draw(
         &self,
         rhi: &Rhi,
-        render_ctx: &mut FrameContext,
-        frame_settings: &FrameSettings,
+        canvas_color_view: vk::ImageView,
+        canvas_extent: vk::Extent2D,
         cmd: &RhiCommandBuffer,
         gui: &mut Gui,
+        frame_label: FrameLabel,
     ) {
+        // TODO mesh 应该放在 gui pass 中管理
         let color_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(render_ctx.crt_present_image_view().handle())
+            .image_view(canvas_color_view)
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
             .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);
-        let depth_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(render_ctx.depth_view().handle())
-            .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-            .load_op(vk::AttachmentLoadOp::LOAD)
-            .store_op(vk::AttachmentStoreOp::STORE);
+        // TODO remove gui pass depth attachment
+        // let depth_attach_info = vk::RenderingAttachmentInfo::default()
+        //     .image_view(canvas_depth_view)
+        //     .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        //     .load_op(vk::AttachmentLoadOp::LOAD)
+        //     .store_op(vk::AttachmentStoreOp::STORE);
         let render_info = vk::RenderingInfo::default()
             .layer_count(1)
-            .render_area(frame_settings.viewport_extent.into())
-            .color_attachments(std::slice::from_ref(&color_attach_info))
-            .depth_attachment(&depth_attach_info);
+            .render_area(canvas_extent.into())
+            .color_attachments(std::slice::from_ref(&color_attach_info));
 
         let mesh;
         let draw_data;
-        if let Some(r) = gui.imgui_render(rhi, cmd, render_ctx) {
-            (mesh, draw_data) = r;
+        let get_texture_key;
+        if let Some(r) = gui.imgui_render(rhi, cmd, frame_label) {
+            (mesh, draw_data, get_texture_key) = r;
         } else {
+            log::warn!("No ImGui draw data available, skipping GUI pass.");
             return;
         }
 
@@ -131,8 +135,6 @@ impl GuiPass {
             min_depth: 0.0,
             ..Default::default()
         };
-
-        let frame_label = render_ctx.crt_frame_label();
 
         cmd.cmd_begin_rendering(&render_info);
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
@@ -154,7 +156,7 @@ impl GuiPass {
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),
             0,
-            &[self.bindless_mgr.borrow().bindless_sets[*frame_label].handle()],
+            &[self.bindless_mgr.borrow().bindless_descriptor_sets[*frame_label].handle()],
             None,
         );
         cmd.cmd_push_constants(
@@ -208,10 +210,10 @@ impl GuiPass {
 
                         // 加载 texture，如果和上一个 command 使用的 texture 不是同一个，则需要重新加载
                         if Some(texture_id) != last_texture_id {
-                            let texture_key = Gui::get_texture_key(texture_id);
+                            let texture_key = get_texture_key(texture_id);
                             let texture_handle = bindless_mgr
-                                .get_texture_idx(&texture_key)
-                                .expect(&format!("Texture not found: {}", texture_key));
+                                .get_texture_handle(&texture_key)
+                                .unwrap_or_else(|| panic!("Texture not found: {}", texture_key));
                             cmd.cmd_push_constants(
                                 self.pipeline_layout.handle(),
                                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,

@@ -1,5 +1,5 @@
-use crate::renderer::pipeline_settings::FifLabel;
-use crate::resource::ImageLoader;
+use crate::pipeline_settings::FrameLabel;
+use crate::render_resource::ImageLoader;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
@@ -8,13 +8,13 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_rhi::core::descriptor::{RhiDescriptorSet, RhiDescriptorSetLayout};
 use truvis_rhi::core::device::RhiDevice;
-use truvis_rhi::core::image::RhiImage2DView;
-use truvis_rhi::core::texture::RhiTexture2D;
+use truvis_rhi::core::image::{Image2DViewContainer, Image2DViewUUID, RhiImage2DView};
+use truvis_rhi::core::texture::{RhiTexture2D, Texture2DContainer};
 use truvis_rhi::rhi::Rhi;
 use truvis_rhi::shader_cursor::ShaderCursor;
 
 #[derive(ShaderLayout)]
-pub struct BindlessTextureBindings {
+pub struct BindlessDescriptorBinding {
     #[binding = 0]
     #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
     #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR | COMPUTE"]
@@ -31,38 +31,38 @@ pub struct BindlessTextureBindings {
 }
 
 pub struct BindlessManager {
-    pub bindless_layout: RhiDescriptorSetLayout<BindlessTextureBindings>,
+    pub bindless_descriptor_layout: RhiDescriptorSetLayout<BindlessDescriptorBinding>,
 
     /// 每一个 frame in flights 都有一个 descriptor set
-    pub bindless_sets: Vec<RhiDescriptorSet<BindlessTextureBindings>>,
+    pub bindless_descriptor_sets: Vec<RhiDescriptorSet<BindlessDescriptorBinding>>,
 
     /// 每一帧都需要重新构建的映射
     ///
     /// key: texture path
     ///
     /// value: bindless idx
-    texture_map: HashMap<String, u32>,
-    textures: HashMap<String, RhiTexture2D>,
+    bindless_textures: HashMap<String, u32>,
+    textures: HashMap<String, Texture2DContainer>,
 
     /// 每一帧都需要重新构建的数据
-    image_map: HashMap<String, u32>,
-    images: HashMap<String, Rc<RhiImage2DView>>,
+    bindless_images: HashMap<Image2DViewUUID, u32>,
+    images: HashMap<Image2DViewUUID, Image2DViewContainer>,
 
     device: Rc<RhiDevice>,
 
     /// 当前 frame in flight 的标签，每帧更新
-    frame_label: FifLabel,
+    frame_label: FrameLabel,
 }
 impl BindlessManager {
     pub fn new(rhi: &Rhi, frames_in_flight: usize) -> Self {
-        let bindless_layout = RhiDescriptorSetLayout::<BindlessTextureBindings>::new(
+        let bindless_layout = RhiDescriptorSetLayout::<BindlessDescriptorBinding>::new(
             rhi,
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
             "bindless-layout",
         );
         let bindless_descriptor_sets = (0..frames_in_flight)
             .map(|idx| {
-                RhiDescriptorSet::<BindlessTextureBindings>::new(
+                RhiDescriptorSet::<BindlessDescriptorBinding>::new(
                     rhi,
                     rhi.descriptor_pool(),
                     &bindless_layout,
@@ -72,94 +72,123 @@ impl BindlessManager {
             .collect_vec();
 
         Self {
-            bindless_layout,
-            bindless_sets: bindless_descriptor_sets,
+            bindless_descriptor_layout: bindless_layout,
+            bindless_descriptor_sets,
 
-            texture_map: HashMap::new(),
+            bindless_textures: HashMap::new(),
             textures: HashMap::new(),
 
-            image_map: HashMap::new(),
+            bindless_images: HashMap::new(),
             images: HashMap::new(),
 
             device: rhi.device.clone(),
 
-            frame_label: FifLabel::A,
+            frame_label: FrameLabel::A,
         }
     }
 
     /// getter
     #[inline]
-    pub fn current_descriptor_set(&self) -> &RhiDescriptorSet<BindlessTextureBindings> {
-        &self.bindless_sets[*self.frame_label]
+    pub fn current_descriptor_set(&self) -> &RhiDescriptorSet<BindlessDescriptorBinding> {
+        &self.bindless_descriptor_sets[*self.frame_label]
     }
 
     /// # Phase: Before Render
     ///
     /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
-    pub fn prepare_render_data(&mut self, frame_label: FifLabel) {
+    pub fn prepare_render_data(&mut self, frame_label: FrameLabel) {
         self.frame_label = frame_label;
 
         let mut texture_infos = Vec::with_capacity(self.textures.iter().len());
-        self.texture_map.clear();
+        self.bindless_textures.clear();
         for (tex_idx, (tex_name, tex)) in self.textures.iter().enumerate() {
-            texture_infos.push(tex.descriptor_image_info(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL));
-            self.texture_map.insert(tex_name.clone(), tex_idx as u32);
+            texture_infos.push(tex.texture().descriptor_image_info(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL));
+            self.bindless_textures.insert(tex_name.clone(), tex_idx as u32);
         }
 
         let mut image_infos = Vec::with_capacity(self.images.iter().len());
-        self.image_map.clear();
-        for (image_idx, (image_name, image)) in self.images.iter().enumerate() {
+        self.bindless_images.clear();
+        for (image_idx, (image_key, image_view)) in self.images.iter().enumerate() {
             image_infos.push(
-                vk::DescriptorImageInfo::default().image_view(image.handle()).image_layout(vk::ImageLayout::GENERAL),
+                vk::DescriptorImageInfo::default()
+                    .image_view(image_view.vk_image_view())
+                    .image_layout(vk::ImageLayout::GENERAL),
             );
-            self.image_map.insert(image_name.clone(), image_idx as u32);
+            self.bindless_images.insert(*image_key, image_idx as u32);
         }
 
         let writes = [
-            BindlessTextureBindings::textures().write_image(
-                self.bindless_sets[*frame_label].handle(),
+            BindlessDescriptorBinding::textures().write_image(
+                self.bindless_descriptor_sets[*frame_label].handle(),
                 0,
                 texture_infos,
             ),
-            BindlessTextureBindings::images().write_image(self.bindless_sets[*frame_label].handle(), 0, image_infos),
+            BindlessDescriptorBinding::images().write_image(
+                self.bindless_descriptor_sets[*frame_label].handle(),
+                0,
+                image_infos,
+            ),
         ];
         self.device.write_descriptor_sets(&writes);
     }
 
-    pub fn register_texture_by_path(&mut self, rhi: &Rhi, texture_path: String) {
-        if self.texture_map.contains_key(&texture_path) {
-            log::error!("Texture {} is already registered", texture_path);
-            return;
-        }
-
-        let texture = ImageLoader::load_image(rhi, std::path::Path::new(&texture_path));
-
-        self.textures.insert(texture_path, texture);
+    /// 获得纹理在当前帧的 bindless 索引
+    pub fn get_texture_handle(&self, texture_path: &str) -> Option<shader::TextureHandle> {
+        self.bindless_textures.get(texture_path).copied().map(|idx| shader::TextureHandle { index: idx as _ })
     }
 
-    pub fn register_texture(&mut self, key: String, texture: RhiTexture2D) {
-        if self.texture_map.contains_key(&key) {
+    /// 获得图像在当前帧的 bindless 索引
+    pub fn get_image_handle(&self, image_uuid: &Image2DViewUUID) -> Option<shader::ImageHandle> {
+        self.bindless_images.get(image_uuid).copied().map(|idx| shader::ImageHandle { index: idx as _ })
+    }
+}
+
+// register & unregister
+impl BindlessManager {
+    pub fn register_texture_by_path(&mut self, rhi: &Rhi, texture_path: String) {
+        let texture = ImageLoader::load_image(rhi, std::path::Path::new(&texture_path));
+        self.register_texture(texture_path, Texture2DContainer::Owned(Box::new(texture)));
+    }
+
+    pub fn register_texture_owned(&mut self, key: String, texture: RhiTexture2D) {
+        self.register_texture(key, Texture2DContainer::Owned(Box::new(texture)));
+    }
+
+    pub fn register_texture_shared(&mut self, key: String, texture: Rc<RhiTexture2D>) {
+        self.register_texture(key, Texture2DContainer::Shared(texture));
+    }
+
+    #[inline]
+    fn register_texture(&mut self, key: String, texture: Texture2DContainer) {
+        if self.textures.contains_key(&key) {
             log::error!("Texture {} is already registered", key);
             return;
         }
         self.textures.insert(key, texture);
     }
 
-    pub fn register_image(&mut self, key: String, image: Rc<RhiImage2DView>) {
+    pub fn unregister_texture(&mut self, key: &str) {
+        self.textures.remove(key);
+    }
+
+    pub fn register_image_shared(&mut self, image: Rc<RhiImage2DView>) {
+        self.register_image(image.uuid(), Image2DViewContainer::Shared(image));
+    }
+
+    pub fn register_image_raw(&mut self, image: &RhiImage2DView) {
+        self.register_image(image.uuid(), Image2DViewContainer::Raw(image.handle()));
+    }
+
+    #[inline]
+    fn register_image(&mut self, key: Image2DViewUUID, image: Image2DViewContainer) {
+        if self.images.contains_key(&key) {
+            log::error!("Image with UUID {} is already registered", key);
+            return;
+        }
         self.images.insert(key, image);
     }
 
-    pub fn unregister_image(&mut self, key: &String) {
+    pub fn unregister_image(&mut self, key: &Image2DViewUUID) {
         self.images.remove(key);
-    }
-
-    /// 获得纹理在当前帧的 bindless 索引
-    pub fn get_texture_idx(&self, texture_path: &str) -> Option<shader::TextureHandle> {
-        self.texture_map.get(texture_path).copied().map(|idx| shader::TextureHandle { index: idx as _ })
-    }
-
-    /// 获得图像在当前帧的 bindless 索引
-    pub fn get_image_idx(&self, image_path: &str) -> Option<shader::ImageHandle> {
-        self.image_map.get(image_path).copied().map(|idx| shader::ImageHandle { index: idx as _ })
     }
 }

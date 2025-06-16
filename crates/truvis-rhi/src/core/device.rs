@@ -23,36 +23,9 @@ pub struct RhiDevice {
     /// 使用 Option 来控制 destroy 的时机
     debug_utils: Option<RhiDebugUtils>,
 }
-impl Drop for RhiDevice {
-    fn drop(&mut self) {
-        unsafe {
-            log::info!("destroying device");
-
-            // 需要确保 debug_utils 在 handle 销毁之前被销毁
-            self.debug_utils = None;
-            self.handle.destroy_device(None);
-        }
-    }
-}
-impl RhiDebugType for RhiDevice {
-    fn debug_type_name() -> &'static str {
-        "RhiDevice"
-    }
-    fn vk_handle(&self) -> impl vk::Handle {
-        self.handle.handle()
-    }
-}
-
-impl Deref for RhiDevice {
-    type Target = ash::Device;
-
-    fn deref(&self) -> &Self::Target {
-        &self.handle
-    }
-}
-
-// ctor
 impl RhiDevice {
+    // region ctor
+
     /// # return
     /// * (device, graphics queue, compute queue, transfer queue)
     pub fn new(
@@ -126,6 +99,7 @@ impl RhiDevice {
             Box::new(vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default().acceleration_structure(true)),
             Box::new(vk::PhysicalDeviceHostQueryResetFeatures::default().host_query_reset(true)),
             Box::new(vk::PhysicalDeviceSynchronization2Features::default().synchronization2(true)),
+            Box::new(vk::PhysicalDeviceTimelineSemaphoreFeatures::default().timeline_semaphore(true)),
             Box::new(
                 vk::PhysicalDeviceDescriptorIndexingFeatures::default()
                     .descriptor_binding_partially_bound(true) // 即使一些 descriptor 是 invalid
@@ -164,10 +138,11 @@ impl RhiDevice {
 
         exts
     }
-}
 
-// getters
-impl RhiDevice {
+    // endregion
+
+    // region getters
+
     #[inline]
     pub fn handle(&self) -> &ash::Device {
         &self.handle
@@ -225,15 +200,44 @@ impl RhiDevice {
     pub fn rt_pipeline_pf(&self) -> &ash::khr::ray_tracing_pipeline::Device {
         &self.vk_rt_pipeline_pf
     }
-}
 
-// tools
-impl RhiDevice {
+    // endregion
+
+    // region tools
+
     #[inline]
     pub fn write_descriptor_sets(&self, writes: &[RhiWriteDescriptorSet]) {
         let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();
         unsafe {
             self.handle.update_descriptor_sets(&writes, &[]);
         }
+    }
+
+    // endregion
+}
+impl Drop for RhiDevice {
+    fn drop(&mut self) {
+        unsafe {
+            log::info!("destroying device");
+
+            // 需要确保 debug_utils 在 handle 销毁之前被销毁
+            self.debug_utils = None;
+            self.handle.destroy_device(None);
+        }
+    }
+}
+impl RhiDebugType for RhiDevice {
+    fn debug_type_name() -> &'static str {
+        "RhiDevice"
+    }
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle.handle()
+    }
+}
+impl Deref for RhiDevice {
+    type Target = ash::Device;
+
+    fn deref(&self) -> &Self::Target {
+        &self.handle
     }
 }

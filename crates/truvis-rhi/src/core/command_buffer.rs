@@ -40,9 +40,8 @@ impl RhiDebugType for RhiCommandBuffer {
         self.handle
     }
 }
-
-// Basic
 impl RhiCommandBuffer {
+    // region Basic
     pub fn new(device: Rc<RhiDevice>, command_pool: Rc<RhiCommandPool>, debug_name: &str) -> Self {
         let info = vk::CommandBufferAllocateInfo::default()
             .command_pool(command_pool.handle())
@@ -122,10 +121,9 @@ impl RhiCommandBuffer {
         self.end_label();
         unsafe { self.device.end_command_buffer(self.handle).unwrap() }
     }
-}
+    // endregion
 
-// transfer 类型的命令
-impl RhiCommandBuffer {
+    // region transfer 类型的命令
     /// - command type: action
     /// - 支持的 queue：transfer，graphics，compute
     #[inline]
@@ -170,10 +168,9 @@ impl RhiCommandBuffer {
             self.device.cmd_push_constants(self.handle, pipeline_layout, stage, offset, data);
         }
     }
-}
+    // endregion
 
-// 绘制类型命令
-impl RhiCommandBuffer {
+    // region 绘制类型命令
     /// - command type: action, state
     /// - supported queue types: graphics
     #[inline]
@@ -302,10 +299,9 @@ impl RhiCommandBuffer {
             self.device.cmd_set_scissor(self.handle, first_scissor, scissors);
         }
     }
-}
+    // endregion
 
-// 同步命令
-impl RhiCommandBuffer {
+    // region 同步命令
     /// - command type: synchronize
     /// - supported queue types: graphics, compute, transfer
     #[inline]
@@ -339,10 +335,9 @@ impl RhiCommandBuffer {
             self.device.cmd_pipeline_barrier2(self.handle, &dependency_info);
         }
     }
-}
+    // endregion
 
-// RayTracing 相关的命令
-impl RhiCommandBuffer {
+    // region RayTracing 相关的命令
     /// - command type: action
     /// - supported queue types: compute
     #[inline]
@@ -416,20 +411,18 @@ impl RhiCommandBuffer {
             );
         }
     }
-}
+    // endregion
 
-// 计算着色器相关命令
-impl RhiCommandBuffer {
+    // region 计算着色器相关命令
     #[inline]
     pub fn cmd_dispatch(&self, group_cnt: glam::UVec3) {
         unsafe {
             self.device.cmd_dispatch(self.handle, group_cnt.x, group_cnt.y, group_cnt.z);
         }
     }
-}
+    // endregion
 
-// debug 相关的指令
-impl RhiCommandBuffer {
+    // region debug 相关的指令
     /// - command type: state, action
     /// - supported queue type: graphics, compute
     #[inline]
@@ -450,4 +443,5 @@ impl RhiCommandBuffer {
     pub fn insert_label(&self, label_name: &str, label_color: glam::Vec4) {
         self.device.debug_utils().cmd_insert_debug_label(self.handle, label_name, label_color);
     }
+    // endregion
 }

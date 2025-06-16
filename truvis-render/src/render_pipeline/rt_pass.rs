@@ -1,7 +1,7 @@
+use crate::pipeline_settings::FrameSettings;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_context::FrameContext;
+use crate::renderer::frame_controller::FrameController;
 use crate::renderer::gpu_scene::GpuScene;
-use crate::renderer::pipeline_settings::FrameSettings;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
@@ -338,7 +338,7 @@ impl SimlpeRtPass {
         let pipeline_layout = {
             let bineless_mgr = bindless_mgr.borrow();
 
-            let descriptor_sets = [bineless_mgr.bindless_layout.handle()];
+            let descriptor_sets = [bineless_mgr.bindless_descriptor_layout.handle()];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
@@ -384,12 +384,12 @@ impl SimlpeRtPass {
     pub fn ray_trace(
         &self,
         cmd: &RhiCommandBuffer,
-        render_ctx: &FrameContext,
+        frame_ctrl: &FrameController,
         framse_settings: &FrameSettings,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
     ) {
-        let frame_label = render_ctx.crt_frame_label();
+        let frame_label = frame_ctrl.frame_label();
 
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
@@ -398,7 +398,7 @@ impl SimlpeRtPass {
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
             0,
-            &[self._bindless_mgr.borrow().bindless_sets[*frame_label].handle()],
+            &[self._bindless_mgr.borrow().bindless_descriptor_sets[*frame_label].handle()],
             None,
         );
         let push_constant = shader::rt::PushConstants {
@@ -427,7 +427,11 @@ impl SimlpeRtPass {
             &self._sbt.sbt_region_miss,
             &self._sbt.sbt_region_hit,
             &self._sbt.sbt_region_callable,
-            [framse_settings.rt_extent.width, framse_settings.rt_extent.height, 1],
+            [
+                framse_settings.frame_extent.width,
+                framse_settings.frame_extent.height,
+                1,
+            ],
         );
 
         cmd.end_label();

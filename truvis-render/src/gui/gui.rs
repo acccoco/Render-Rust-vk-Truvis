@@ -1,9 +1,8 @@
 //! 参考 imgui-rs-vulkan-renderer
 
 use crate::gui::mesh::GuiMesh;
+use crate::pipeline_settings::{FrameLabel, PresentSettings};
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_context::FrameContext;
-use crate::renderer::pipeline_settings::RendererSettings;
 use ash::vk;
 use std::{cell::RefCell, rc::Rc};
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
@@ -23,20 +22,24 @@ pub struct Gui {
 
     /// 存放多帧 imgui 的 mesh 数据
     meshes: Vec<Option<GuiMesh>>,
+    render_image_key: Option<String>,
 
     _device: Rc<RhiDevice>,
 }
 impl Drop for Gui {
     fn drop(&mut self) {}
 }
-// region ctor
 impl Gui {
     const FONT_TEXTURE_ID: usize = 0;
+    const FONT_TEXTURE_KEY: &'static str = "imgui-fonts";
+    const RENDER_IMAGE_ID: usize = 1;
 
+    // region ctor
     pub fn new(
         rhi: &Rhi,
         window: &winit::window::Window,
-        renderer_settings: &RendererSettings,
+        fif_num: usize,
+        present_settings: &PresentSettings,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
     ) -> Self {
         let mut imgui_ctx = imgui::Context::create();
@@ -54,13 +57,11 @@ impl Gui {
 
             render_region: vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
-                extent: vk::Extent2D {
-                    width: renderer_settings.frame_settings.rt_extent.width,
-                    height: renderer_settings.frame_settings.rt_extent.height,
-                },
+                extent: present_settings.canvas_extent,
             },
 
-            meshes: (0..renderer_settings.pipeline_settings.frames_in_flight).map(|_| None).collect(),
+            meshes: (0..fif_num).map(|_| None).collect(),
+            render_image_key: None,
 
             _device: rhi.device.clone(),
         }
@@ -116,18 +117,17 @@ impl Gui {
                 atlas_texture.data,
                 "imgui-fonts",
             ));
-            RhiTexture2D::new(rhi, image, "imgui-fonts")
+            RhiTexture2D::new(rhi, image.clone(), "imgui-fonts")
         };
 
         let fonts_texture_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);
-        let fonts_texture_key = Self::get_texture_key(fonts_texture_id);
-        bindless_mgr.register_texture(fonts_texture_key.clone(), fonts_texture);
+        bindless_mgr.register_texture_owned(Self::FONT_TEXTURE_KEY.to_string(), fonts_texture);
         imgui_ctx.fonts().tex_id = fonts_texture_id;
     }
-}
-// endregion
-// region 一般的
-impl Gui {
+
+    // endregion
+
+    // region 一般的
     /// 接受 window 的事件
     pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>) {
         self.platform.handle_event(self.imgui_ctx.io_mut(), window, event);
@@ -238,7 +238,6 @@ impl Gui {
                 .draw_background(false)
                 .build(|| {
                     ui.text("render window");
-                    // imgui::Image::new(TextureId::new(114), [400.0, 400.0]).build(ui);
 
                     let window_size = ui.window_size();
                     let window_pos = ui.window_pos();
@@ -253,6 +252,12 @@ impl Gui {
                         width: (window_size[0] * hidpi_factor) as u32,
                         height: (window_size[1] * hidpi_factor) as u32,
                     };
+
+                    imgui::Image::new(
+                        imgui::TextureId::new(Self::RENDER_IMAGE_ID),
+                        [window_size[0] * hidpi_factor, window_size[1] * hidpi_factor],
+                    )
+                    .build(ui);
                 });
             ui.window("right").draw_background(false).build(|| {
                 ui.text("test window.");
@@ -274,6 +279,10 @@ impl Gui {
         self.platform.prepare_render(ui, window);
     }
 
+    pub fn register_render_image_key(&mut self, key: String) {
+        self.render_image_key = Some(key);
+    }
+
     /// # Phase: Render
     ///
     /// 使用 imgui 将 ui 操作编译为 draw data；构建 draw 需要的 mesh 数据
@@ -281,37 +290,35 @@ impl Gui {
         &mut self,
         rhi: &Rhi,
         cmd: &RhiCommandBuffer,
-        render_ctx: &mut FrameContext,
-    ) -> Option<(&GuiMesh, &imgui::DrawData)> {
+        frame_label: FrameLabel,
+    ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> String + use<'_>)> {
         let draw_data = self.imgui_ctx.render();
         if draw_data.total_vtx_count == 0 {
             return None;
         }
-
-        let frame_label = render_ctx.crt_frame_label();
 
         rhi.device.debug_utils().begin_queue_label(
             rhi.graphics_queue.handle(),
             "[ui-pass]create-mesh",
             LabelColor::COLOR_STAGE,
         );
-        self.meshes[*frame_label].replace(GuiMesh::from_draw_data(rhi, cmd, render_ctx, draw_data));
+        self.meshes[*frame_label].replace(GuiMesh::new(rhi, cmd, &format!("{frame_label}"), draw_data));
         rhi.device().debug_utils().end_queue_label(rhi.graphics_queue.handle());
 
         Some((
             self.meshes[*frame_label].as_ref().unwrap(), //
             draw_data,
+            |texture_id: imgui::TextureId| match texture_id.id() {
+                Self::RENDER_IMAGE_ID => self.render_image_key.as_ref().unwrap().clone(),
+                Self::FONT_TEXTURE_ID => Self::FONT_TEXTURE_KEY.to_string(),
+                _ => format!("imgui-texture-{}", texture_id.id()),
+            },
         ))
-    }
-
-    /// 根据 imgui 传来的 texture id，找到对应的 texture key，用于在 bindless manager 中得到 texture
-    pub fn get_texture_key(texture_id: imgui::TextureId) -> String {
-        format!("imgui-texture-{}", texture_id.id())
     }
 
     #[inline]
     pub fn get_render_region(&self) -> vk::Rect2D {
         self.render_region
     }
+    // endregion
 }
-// endregion

@@ -1,10 +1,11 @@
-use imgui::{TextureId, Ui};
+use imgui::Ui;
 use shader_binding::shader;
-use truvis_render::app::{OuterApp, TruvisApp};
+use truvis_render::app::TruvisApp;
+use truvis_render::outer_app::OuterApp;
 use truvis_render::platform::camera::DrsCamera;
-use truvis_render::render::Renderer;
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
 use truvis_render::render_pipeline::rt_pipeline::RtPipeline;
+use truvis_render::renderer::renderer::Renderer;
 
 struct PhongApp {
     rt_pipeline: RtPipeline,
@@ -50,18 +51,14 @@ impl PhongApp {
 
 impl OuterApp for PhongApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
-        let rt_pipeline = RtPipeline::new(
-            &renderer.rhi,
-            &renderer.renderer_settings().pipeline_settings,
-            renderer.bindless_mgr.clone(),
-        );
+        let rt_pipeline = RtPipeline::new(&renderer.rhi, renderer.bindless_mgr.clone());
 
         Self::create_scene(renderer, camera);
 
         Self { rt_pipeline }
     }
 
-    fn draw_ui(&mut self, ui: &mut Ui) {}
+    fn draw_ui(&mut self, _ui: &mut Ui) {}
 
     fn draw(&self, pipeline_ctx: PipelineContext) {
         self.rt_pipeline.render(pipeline_ctx);

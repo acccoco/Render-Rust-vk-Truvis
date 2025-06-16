@@ -5,10 +5,11 @@ use crate::shader_toy_pipeline::ShaderToyPipeline;
 use imgui::Ui;
 use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
-use truvis_render::app::{OuterApp, TruvisApp};
+use truvis_render::app::TruvisApp;
+use truvis_render::outer_app::OuterApp;
 use truvis_render::platform::camera::DrsCamera;
-use truvis_render::render::Renderer;
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
+use truvis_render::renderer::renderer::Renderer;
 
 struct ShaderToy {
     rectangle: DrsGeometry<VertexPosColor>,
@@ -19,11 +20,7 @@ impl OuterApp for ShaderToy {
         log::info!("shader toy.");
         Self {
             rectangle: VertexAosLayoutPosColor::rectangle(&renderer.rhi),
-            pipeline: ShaderToyPipeline::new(
-                &renderer.rhi,
-                &renderer.renderer_settings().pipeline_settings,
-                renderer.bindless_mgr.clone(),
-            ),
+            pipeline: ShaderToyPipeline::new(&renderer.rhi, &renderer.frame_settings()),
         }
     }
 

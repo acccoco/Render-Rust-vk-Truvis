@@ -7,12 +7,12 @@ use model_manager::vertex::VertexLayout;
 use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::create_named_array;
+use truvis_render::pipeline_settings::FrameSettings;
 use truvis_render::platform::timer::Timer;
-use truvis_render::renderer::frame_context::FrameContext;
-use truvis_render::renderer::pipeline_settings::PipelineSettings;
+use truvis_render::renderer::frame_controller::FrameController;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::rendering_info::RhiRenderingInfo;
 use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
+use truvis_rhi::core::rendering_info::RhiRenderingInfo;
 use truvis_rhi::core::shader::RhiShaderStageInfo;
 use truvis_rhi::rhi::Rhi;
 
@@ -64,14 +64,10 @@ pub struct ShaderToyPass {
     _pipeline_layout: Rc<RhiPipelineLayout>,
 }
 impl ShaderToyPass {
-    pub fn new(rhi: &Rhi, pipeline_settings: &PipelineSettings) -> Self {
+    pub fn new(rhi: &Rhi, frame_settings: &FrameSettings) -> Self {
         let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| *stage.value()).collect_vec());
-        pipeline_ci.attach_info(
-            vec![pipeline_settings.color_format],
-            Some(pipeline_settings.depth_format),
-            Some(vk::Format::UNDEFINED),
-        );
+        pipeline_ci.attach_info(vec![frame_settings.color_format], None, Some(vk::Format::UNDEFINED));
         pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
         pipeline_ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
         pipeline_ci.color_blend(
@@ -103,17 +99,19 @@ impl ShaderToyPass {
     pub fn draw(
         &self,
         cmd: &RhiCommandBuffer,
-        frame_ctx: &FrameContext,
+        frame_ctrl: &FrameController,
+        frame_settings: &FrameSettings,
+        render_target: vk::ImageView,
         timer: &Timer,
         rect: &DrsGeometry<VertexPosColor>,
     ) {
-        let viewport_extent = frame_ctx.frame_settings().viewport_extent;
+        let viewport_extent = frame_settings.frame_extent;
 
         let push_constants = PushConstants {
-            time: timer.total_time_s,
-            delta_time: timer.delta_time_s,
-            frame: timer.total_frame,
-            frame_rate: 1.0 / timer.delta_time_s,
+            time: timer.total_time.as_secs_f32(),
+            delta_time: timer.delta_time_s(),
+            frame: frame_ctrl.frame_id() as i32,
+            frame_rate: 1.0 / timer.delta_time_s(),
             resolution: glam::Vec2::new(viewport_extent.width as f32, viewport_extent.height as f32),
             mouse: glam::Vec4::new(
                 0.2 * (viewport_extent.width as f32),
@@ -125,8 +123,8 @@ impl ShaderToyPass {
         };
 
         let rendering_info = RhiRenderingInfo::new(
-            vec![frame_ctx.crt_present_image_view().handle()],
-            Some(frame_ctx.depth_view().handle()),
+            vec![render_target],
+            None,
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
                 extent: viewport_extent,

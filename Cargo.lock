@@ -2758,6 +2758,7 @@ dependencies = [
  "raw-window-handle",
  "shader-layout-macro",
  "shader-layout-trait",
+ "uuid",
  "vk-mem",
  "winit",
 ]

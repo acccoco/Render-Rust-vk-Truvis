@@ -12,7 +12,7 @@ impl ImageLoader {
         let image =
             Rc::new(RhiImage2D::from_rgba8(rhi, img.width(), img.height(), img.as_raw(), tex_path.to_str().unwrap()));
 
-        let tex = RhiTexture2D::new(rhi, image, tex_path.to_str().unwrap());
+        let tex = RhiTexture2D::new(rhi, image.clone(), tex_path.to_str().unwrap());
 
         tex
     }

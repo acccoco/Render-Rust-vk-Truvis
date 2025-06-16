@@ -17,6 +17,7 @@ ash-window = { workspace = true }
 winit = { workspace = true }
 raw-window-handle = { workspace = true }
 derive-getters = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 # graphics math
 # bytemuck：可以转换为 bytes slices
 glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
