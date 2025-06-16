@@ -65,28 +65,6 @@ pub struct RenderSwapchain {
 
     extent: vk::Extent2D,
 }
-// getter
-impl RenderSwapchain {
-    #[inline]
-    pub fn present_images(&self) -> Vec<vk::Image> {
-        self.images.clone()
-    }
-
-    #[inline]
-    pub fn extent(&self) -> vk::Extent2D {
-        self.extent
-    }
-
-    #[inline]
-    pub fn current_present_image(&self) -> vk::Image {
-        self.images[self.swapchain_image_index]
-    }
-
-    #[inline]
-    pub fn current_present_image_index(&self) -> usize {
-        self.swapchain_image_index
-    }
-}
 impl RenderSwapchain {
     pub fn new(
         rhi: &Rhi,
@@ -208,13 +186,13 @@ impl RenderSwapchain {
     }
 
     #[inline]
-    pub fn acquire(&mut self, semaphore: &RhiSemaphore, fence: Option<&RhiFence>) {
+    pub fn acquire(&mut self, semaphore: Option<&RhiSemaphore>, fence: Option<&RhiFence>, timeout: u64) {
         let (image_index, is_optimal) = unsafe {
             self.swapchain_pf
                 .acquire_next_image(
                     self.swapchain_handle,
-                    u64::MAX,
-                    semaphore.handle(),
+                    timeout,
+                    semaphore.map_or(vk::Semaphore::null(), |s| s.handle()),
                     fence.map_or(vk::Fence::null(), |f| f.handle()),
                 )
                 .unwrap()
@@ -239,6 +217,29 @@ impl RenderSwapchain {
 
         unsafe { self.swapchain_pf.queue_present(queue.handle(), &present_info).unwrap() };
     }
+
+    // region ============== getter ============
+
+    #[inline]
+    pub fn present_images(&self) -> Vec<vk::Image> {
+        self.images.clone()
+    }
+
+    #[inline]
+    pub fn extent(&self) -> vk::Extent2D {
+        self.extent
+    }
+
+    #[inline]
+    pub fn current_present_image(&self) -> vk::Image {
+        self.images[self.swapchain_image_index]
+    }
+
+    #[inline]
+    pub fn current_present_image_index(&self) -> usize {
+        self.swapchain_image_index
+    }
+    // endregion ===================
 }
 impl Drop for RenderSwapchain {
     fn drop(&mut self) {

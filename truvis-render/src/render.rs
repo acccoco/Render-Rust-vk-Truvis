@@ -6,7 +6,7 @@ use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::FrameContext;
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::pipeline_settings::{
-    AccumData, DefaultRendererSettings, FifLabel, PipelineSettings, RendererSettings,
+    AccumData, DefaultRendererSettings, FifLabel, FrameSettings, PipelineSettings, RendererSettings,
 };
 use crate::renderer::scene_manager::SceneManager;
 use crate::renderer::window_system::MainWindow;
@@ -46,8 +46,8 @@ impl Drop for Renderer {
         }
     }
 }
-// region getter
 impl Renderer {
+    // region getter
     #[inline]
     pub fn renderer_settings(&self) -> RendererSettings {
         RendererSettings {
@@ -82,10 +82,9 @@ impl Renderer {
         .copied()
         .unwrap_or(vk::Format::UNDEFINED)
     }
-}
-// endregion
-// region init
-impl Renderer {
+    // endregion
+
+    // region init
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         let rhi = Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext));
 
@@ -120,10 +119,9 @@ impl Renderer {
     pub fn init_after_window(&mut self, window: &MainWindow) {
         self.rebuild_after_resized(window);
     }
-}
-// endregion
-// region phase call
-impl Renderer {
+    // endregion
+
+    // region phase call
     pub fn begin_frame(&mut self) {
         self.frame_ctx.as_mut().unwrap().begin_frame();
     }
@@ -255,5 +253,5 @@ impl Renderer {
         cmd.end();
         self.rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(std::slice::from_ref(&cmd))], None);
     }
+    // endregion
 }
-// endregion

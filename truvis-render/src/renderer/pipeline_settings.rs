@@ -20,10 +20,7 @@ impl DefaultRendererSettings {
 
 #[derive(Copy, Clone, Default)]
 pub struct FrameSettings {
-    /// 会随着 swapchain 的重建而刷新
-    pub viewport_extent: vk::Extent2D,
-    pub rt_extent: vk::Extent2D,
-    pub rt_offset: vk::Offset2D,
+    pub frame_extent: vk::Extent2D,
 }
 
 #[derive(Copy, Clone, Default)]

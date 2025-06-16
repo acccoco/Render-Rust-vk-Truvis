@@ -5,6 +5,7 @@ use crate::platform::input_manager::InputManager;
 use crate::platform::timer::Timer;
 use crate::render::Renderer;
 use crate::render_pipeline::pipeline_context::{PipelineContext, TempPipelineCtx};
+use crate::renderer::swapchain::RenderSwapchain;
 use crate::renderer::window_system::{MainWindow, WindowCreateInfo};
 use raw_window_handle::HasDisplayHandle;
 use std::cell::{OnceCell, RefCell};
@@ -45,6 +46,8 @@ pub struct TruvisApp<T: OuterApp> {
     window_system: OnceCell<MainWindow>,
 
     input_manager: Rc<RefCell<InputManager>>,
+
+    render_swapchain: RenderSwapchain,
 
     /// 需要在 window 之后初始化，因此 OnceCell
     gui: OnceCell<Gui>,
@@ -182,6 +185,23 @@ impl<T: OuterApp> TruvisApp<T> {
         self.camera_controller.camera_mut().asp = width as f32 / height as f32;
 
         self.outer_app.get_mut().unwrap().rebuild(&mut self.renderer);
+    }
+
+    /// 更新 present image
+    pub fn update_present(&mut self) {
+        // 创建专属于 window 的 command buffer
+
+        // wait present, 暂时直接等待 fence，后续引入 time_to_render
+        // self.render_swapchain.acquire(None, )
+
+        // 从 renderer 得到 image to present
+
+        // 录制 blit 命令，该命令等待 present image 的 render timeline semaphore，
+        //  并且 signal: 当前的 timeline value
+
+        // 录制后续命令：ui 等
+
+        // 提交到 swapchain 去 present
     }
 }
 impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {

@@ -42,9 +42,8 @@ impl Drop for Rhi {
         log::info!("destroy rhi.");
     }
 }
-
-// init 相关
 impl Rhi {
+    // region init 相关
     const ENGINE_NAME: &'static str = "DruvisIII";
 
     pub fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
@@ -181,10 +180,9 @@ impl Rhi {
 
         RhiDescriptorPool::new(device, pool_ci, "rhi-descriptor-pool")
     }
-}
+    // endregion
 
-// 属性访问
-impl Rhi {
+    // region 属性访问
     #[inline]
     pub fn instance(&self) -> &RhiInstance {
         &self.instance
@@ -219,10 +217,9 @@ impl Rhi {
     pub fn transfer_queue_family(&self) -> RhiQueueFamily {
         self.physical_device.transfer_queue_family.clone()
     }
-}
+    // endregion
 
-// 工具方法
-impl Rhi {
+    // region 工具方法
     /// 根据给定的格式，返回支持的格式
     pub fn find_supported_format(
         &self,
@@ -245,4 +242,5 @@ impl Rhi {
             .copied()
             .collect()
     }
+    // endregion
 }
