@@ -1,3 +1,4 @@
+use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FifLabel, PipelineSettings, RendererSettings};
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
@@ -161,29 +162,11 @@ impl Renderer {
         }
     }
 
-    /// 在窗口大小改变是，重建 swapchain
-    pub fn rebuild_after_resized(&mut self, window: &MainWindow) {
-        // 确保 swapchain 已经 drop 掉之后，再创建新的 swapchian，
-        // 因为同一时间只能有一个 swapchain 在使用 window
-        if let Some(render_context) = self.frame_ctx.take() {
-            render_context.destroy(&mut self.bindless_mgr.borrow_mut());
-        }
-
-        self.accum_data.reset();
-        self.frame_ctx =
-            Some(FrameContext::new(&self.rhi, window, &self.pipeline_settings, &mut self.bindless_mgr.borrow_mut()));
-    }
-
-    pub fn on_render_area_changed(&mut self, region: vk::Rect2D) {
-        // 只有 frame_context 中的渲染区域发生变化时，才需要重新构建
-        if self.frame_context().frame_settings().rt_extent != region.extent {
-            self.wait_idle();
-        }
-
-        self.frame_ctx.as_mut().unwrap().on_render_area_changed(
+    pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
+        self.frame_ctx.as_mut().unwrap().rebuild_framebuffers(
             &self.rhi,
             &self.pipeline_settings,
-            region,
+            new_extent,
             &mut self.bindless_mgr.borrow_mut(),
         );
     }

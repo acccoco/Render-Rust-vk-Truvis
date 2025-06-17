@@ -1,4 +1,3 @@
-use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use itertools::Itertools;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
@@ -14,15 +13,15 @@ struct RhiSurface {
     pf: ash::khr::surface::Instance,
 }
 impl RhiSurface {
-    fn new(rhi: &Rhi, window: &MainWindow) -> Self {
+    fn new(rhi: &Rhi, window: &winit::window::Window) -> Self {
         let surface_pf = ash::khr::surface::Instance::new(&rhi.vk_pf, rhi.instance());
 
         let surface = unsafe {
             ash_window::create_surface(
                 &rhi.vk_pf,
                 rhi.instance(),
-                window.window().display_handle().unwrap().as_raw(),
-                window.window().window_handle().unwrap().as_raw(),
+                window.display_handle().unwrap().as_raw(),
+                window.window_handle().unwrap().as_raw(),
                 None,
             )
             .unwrap()
@@ -68,7 +67,7 @@ pub struct RenderSwapchain {
 impl RenderSwapchain {
     pub fn new(
         rhi: &Rhi,
-        window: &MainWindow,
+        window: &winit::window::Window,
         present_mode: vk::PresentModeKHR,
         surface_format: vk::SurfaceFormatKHR,
     ) -> Self {

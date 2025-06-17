@@ -47,8 +47,6 @@ pub struct TruvisApp<T: OuterApp> {
 
     input_manager: Rc<RefCell<InputManager>>,
 
-    render_swapchain: RenderSwapchain,
-
     /// 需要在 window 之后初始化，因此 OnceCell
     gui: OnceCell<Gui>,
 
@@ -110,7 +108,8 @@ impl<T: OuterApp> TruvisApp<T> {
             title: "Truvis".to_string(),
         };
 
-        let window_system = MainWindow::new(event_loop, window_init_info);
+        let window_system = MainWindow::new(event_loop, &self.renderer.rhi, window_init_info);
+
         self.renderer.init_after_window(&window_system);
         let gui = Gui::new(
             &self.renderer.rhi,

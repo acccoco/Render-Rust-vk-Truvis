@@ -1,4 +1,7 @@
+use crate::pipeline_settings::DefaultRendererSettings;
+use crate::renderer::swapchain::RenderSwapchain;
 use derive_getters::Getters;
+use truvis_rhi::rhi::Rhi;
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
 fn load_icon(bytes: &[u8]) -> winit::window::Icon {
@@ -20,13 +23,14 @@ pub struct WindowCreateInfo {
 #[derive(Getters)]
 pub struct MainWindow {
     window: Window,
+    swapchain: RenderSwapchain,
 
     width: i32,
     height: i32,
 }
 
 impl MainWindow {
-    pub fn new(event_loop: &ActiveEventLoop, create_info: WindowCreateInfo) -> Self {
+    pub fn new(event_loop: &ActiveEventLoop, rhi: &Rhi, create_info: WindowCreateInfo) -> Self {
         let icon = load_icon(include_bytes!("../../resources/DruvisIII.png"));
         let window_attr = Window::default_attributes()
             .with_title(create_info.title.clone())
@@ -37,10 +41,23 @@ impl MainWindow {
 
         let window = event_loop.create_window(window_attr).unwrap();
 
+        let swapchain = RenderSwapchain::new(
+            rhi,
+            &window,
+            DefaultRendererSettings::DEFAULT_PRESENT_MODE,
+            DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
+        );
+
         Self {
             window,
+            swapchain,
             width: create_info.width,
             height: create_info.height,
         }
+    }
+
+    pub fn on_window_resize(&mut self, width: u32, height: u32) {
+        self.width = width as i32;
+        self.height = height as i32;
     }
 }

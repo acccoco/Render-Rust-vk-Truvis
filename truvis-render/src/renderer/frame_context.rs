@@ -1,5 +1,5 @@
+use crate::pipeline_settings::{FifLabel, FrameSettings, PipelineSettings};
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::pipeline_settings::{FifLabel, FrameSettings, PipelineSettings};
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
