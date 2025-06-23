@@ -1,43 +1,31 @@
 #[derive(Debug)]
 pub struct Timer {
     pub start_time: std::time::SystemTime,
-    pub last_time: std::time::SystemTime,
-    // FIXME 改成 Duration
-    pub delta_time_s: f32,
-    pub total_time_s: f32,
-    pub total_frame: i32,
-    pub duration: std::time::Duration,
+    pub current_time: std::time::SystemTime,
+
+    pub elapse: std::time::Duration,
+    pub total_time: std::time::Duration,
 }
 
 impl Default for Timer {
     fn default() -> Self {
         Self {
             start_time: std::time::SystemTime::now(),
-            last_time: std::time::SystemTime::now(),
-            total_frame: 0,
-            delta_time_s: 0.0,
-            total_time_s: 0.0,
-            duration: std::time::Duration::new(0, 0),
+            current_time: std::time::SystemTime::now(),
+            elapse: std::time::Duration::new(0, 0),
+            total_time: std::time::Duration::new(0, 0),
         }
     }
 }
 
 impl Timer {
-    pub fn reset(&mut self) {
-        self.start_time = std::time::SystemTime::now();
-        self.last_time = std::time::SystemTime::now();
-        self.total_frame = 0;
-        self.delta_time_s = 0.0;
-        self.total_time_s = 0.0;
+    pub fn tic(&mut self) {
+        self.current_time = std::time::SystemTime::now();
     }
 
-    pub fn update(&mut self) {
+    pub fn toc(&mut self) -> std::time::Duration {
         let now = std::time::SystemTime::now();
-        self.duration = now.duration_since(self.start_time).unwrap();
-        let delta_time = now.duration_since(self.last_time).unwrap().as_secs_f32();
-        self.last_time = now;
-        self.total_frame += 1;
-        self.total_time_s = self.duration.as_secs_f32();
-        self.delta_time_s = delta_time;
+        let duration = now.duration_since(self.current_time).unwrap();
+        duration
     }
 }

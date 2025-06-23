@@ -29,10 +29,10 @@ pub struct Gui {
 impl Drop for Gui {
     fn drop(&mut self) {}
 }
-// region ctor
 impl Gui {
     const FONT_TEXTURE_ID: usize = 0;
 
+    // region ctor
     pub fn new(
         rhi: &Rhi,
         window: &winit::window::Window,
@@ -124,10 +124,10 @@ impl Gui {
         bindless_mgr.register_texture(fonts_texture_key.clone(), fonts_texture);
         imgui_ctx.fonts().tex_id = fonts_texture_id;
     }
-}
-// endregion
-// region 一般的
-impl Gui {
+
+    // endregion
+
+    // region 一般的
     /// 接受 window 的事件
     pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>) {
         self.platform.handle_event(self.imgui_ctx.io_mut(), window, event);
@@ -313,5 +313,5 @@ impl Gui {
     pub fn get_render_region(&self) -> vk::Rect2D {
         self.render_region
     }
+    // endregion
 }
-// endregion

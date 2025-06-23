@@ -1,5 +1,6 @@
 pub mod app;
 pub mod gui;
+pub mod outer_app;
 pub mod pipeline_settings;
 pub mod platform;
 pub mod render;

@@ -29,6 +29,7 @@ pub struct Rhi {
     pub graphics_queue: Rc<RhiQueue>,
     pub compute_queue: Rc<RhiQueue>,
     pub transfer_queue: Rc<RhiQueue>,
+    pub present_queue: Rc<RhiQueue>,
 
     descriptor_pool: RhiDescriptorPool,
 }
@@ -58,7 +59,7 @@ impl Rhi {
         let queue_create_infos = [
             vk::DeviceQueueCreateInfo::default()
                 .queue_family_index(physical_device.graphics_queue_family.queue_family_index)
-                .queue_priorities(&[1.0]),
+                .queue_priorities(&[1.0, 1.0]),
             vk::DeviceQueueCreateInfo::default()
                 .queue_family_index(physical_device.compute_queue_family.queue_family_index)
                 .queue_priorities(&[1.0]),
@@ -72,6 +73,11 @@ impl Rhi {
 
         let graphics_queue = Rc::new(RhiQueue {
             handle: unsafe { device.get_device_queue(physical_device.graphics_queue_family.queue_family_index, 0) },
+            queue_family: physical_device.graphics_queue_family.clone(),
+            device: device.clone(),
+        });
+        let present_queue = Rc::new(RhiQueue {
+            handle: unsafe { device.get_device_queue(physical_device.graphics_queue_family.queue_family_index, 1) },
             queue_family: physical_device.graphics_queue_family.clone(),
             device: device.clone(),
         });
@@ -89,6 +95,7 @@ impl Rhi {
         log::info!("graphics queue's queue family:\n{:#?}", graphics_queue.queue_family);
         log::info!("compute queue's queue family:\n{:#?}", compute_queue.queue_family);
         log::info!("transfer queue's queue family:\n{:#?}", transfer_queue.queue_family);
+        log::info!("present queue's queue family:\n{:#?}", present_queue.queue_family);
 
         // 在 device 以及 debug_utils 之前创建的 vk::Handle
         {
@@ -99,25 +106,26 @@ impl Rhi {
             device.debug_utils().set_debug_name(graphics_queue.as_ref(), "graphics");
             device.debug_utils().set_debug_name(compute_queue.as_ref(), "compute");
             device.debug_utils().set_debug_name(transfer_queue.as_ref(), "transfer");
+            device.debug_utils().set_debug_name(present_queue.as_ref(), "present");
         }
 
         let graphics_command_pool = Rc::new(RhiCommandPool::new(
             device.clone(),
             physical_device.graphics_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),
-            "rhi-graphics-command-pool",
+            "rhi-graphics",
         ));
         let compute_command_pool = Rc::new(RhiCommandPool::new(
             device.clone(),
             physical_device.compute_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),
-            "rhi-compute-command-pool",
+            "rhi-compute",
         ));
         let transfer_command_pool = Rc::new(RhiCommandPool::new(
             device.clone(),
             physical_device.transfer_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),
-            "rhi-transfer-command-pool",
+            "rhi-transfer",
         ));
 
         let allocator = Rc::new(RhiAllocator::new(instance.clone(), physical_device.clone(), device.clone()));
@@ -137,6 +145,7 @@ impl Rhi {
             compute_queue,
             transfer_queue,
             descriptor_pool,
+            present_queue,
         }
     }
 

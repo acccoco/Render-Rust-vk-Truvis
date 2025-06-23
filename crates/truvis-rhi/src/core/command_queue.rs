@@ -38,6 +38,11 @@ impl RhiDebugType for RhiQueue {
 
 impl RhiQueue {
     #[inline]
+    pub fn queue_family(&self) -> &RhiQueueFamily {
+        &self.queue_family
+    }
+
+    #[inline]
     pub fn handle(&self) -> vk::Queue {
         self.handle
     }

@@ -1,4 +1,5 @@
 use crate::gui::gui::Gui;
+use crate::outer_app::OuterApp;
 use crate::platform::camera::DrsCamera;
 use crate::platform::camera_controller::CameraController;
 use crate::platform::input_manager::InputManager;
@@ -7,12 +8,14 @@ use crate::render::Renderer;
 use crate::render_pipeline::pipeline_context::{PipelineContext, TempPipelineCtx};
 use crate::renderer::swapchain::RenderSwapchain;
 use crate::renderer::window_system::{MainWindow, WindowCreateInfo};
+use ash::vk;
 use raw_window_handle::HasDisplayHandle;
 use std::cell::{OnceCell, RefCell};
 use std::ffi::CStr;
 use std::rc::Rc;
 use std::sync::OnceLock;
 use truvis_crate_tools::init_log::init_log;
+use truvis_rhi::core::command_queue::RhiQueue;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
@@ -23,20 +26,6 @@ pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     // std::thread::sleep(std::time::Duration::from_secs(30));
 }
 
-pub trait OuterApp {
-    fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self;
-
-    fn draw_ui(&mut self, _ui: &mut imgui::Ui) {}
-
-    fn update(&mut self, _renderer: &mut Renderer) {}
-
-    /// 发生于 acquire_frame 之后，submit_frame 之前
-    fn draw(&self, _pipeline_ctx: PipelineContext) {}
-
-    /// window 发生改变后，重建
-    fn rebuild(&mut self, _renderer: &mut Renderer) {}
-}
-
 pub struct UserEvent;
 
 pub struct TruvisApp<T: OuterApp> {
@@ -44,6 +33,7 @@ pub struct TruvisApp<T: OuterApp> {
 
     /// 需要等待窗口事件初始化，因此 OnceCell
     window_system: OnceCell<MainWindow>,
+    last_render_area: vk::Rect2D,
 
     input_manager: Rc<RefCell<InputManager>>,
 

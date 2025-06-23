@@ -207,7 +207,7 @@ impl Renderer {
                 inv_projection: projection.inverse().into(),
                 camera_pos: camera.position.into(),
                 camera_forward: camera.camera_forward().into(),
-                time_ms: timer.duration.as_millis() as f32,
+                time_ms: timer.elapse.as_millis() as f32,
                 delta_time_ms: timer.delta_time_s * 1000.0,
                 frame_id: frame_ctx.crt_frame_id() as u64,
                 mouse_pos: shader::Float2 {

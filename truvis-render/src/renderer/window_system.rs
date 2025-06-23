@@ -1,6 +1,12 @@
+use crate::gui::gui::Gui;
 use crate::pipeline_settings::DefaultRendererSettings;
 use crate::renderer::swapchain::RenderSwapchain;
+use ash::vk;
 use derive_getters::Getters;
+use std::rc::Rc;
+use truvis_rhi::core::command_buffer::RhiCommandBuffer;
+use truvis_rhi::core::command_pool::RhiCommandPool;
+use truvis_rhi::core::command_queue::RhiQueue;
 use truvis_rhi::rhi::Rhi;
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
@@ -23,7 +29,13 @@ pub struct WindowCreateInfo {
 #[derive(Getters)]
 pub struct MainWindow {
     window: Window,
+
     swapchain: RenderSwapchain,
+    gui: Gui,
+
+    cmd_buffer: RhiCommandBuffer,
+    command_pool: RhiCommandPool,
+    present_queue: Rc<RhiQueue>,
 
     width: i32,
     height: i32,
@@ -47,6 +59,17 @@ impl MainWindow {
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
         );
+
+        let present_queue = rhi.present_queue.clone();
+
+        let present_command_pool = RhiCommandPool::new(
+            rhi.device.clone(),
+            present_queue.queue_family().clone(),
+            vk::CommandPoolCreateFlags::empty(),
+            "window-present",
+        );
+        
+        let cmd_buffer = 
 
         Self {
             window,
