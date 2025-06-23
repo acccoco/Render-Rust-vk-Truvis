@@ -1,9 +1,8 @@
 //! 参考 imgui-rs-vulkan-renderer
 
 use crate::gui::mesh::GuiMesh;
+use crate::pipeline_settings::{FrameLabel, RendererSettings};
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_context::FrameContext;
-use crate::renderer::pipeline_settings::RendererSettings;
 use ash::vk;
 use std::{cell::RefCell, rc::Rc};
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
@@ -36,6 +35,7 @@ impl Gui {
     pub fn new(
         rhi: &Rhi,
         window: &winit::window::Window,
+        // TODO 是否不需要这个参数
         renderer_settings: &RendererSettings,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
     ) -> Self {
@@ -55,8 +55,8 @@ impl Gui {
             render_region: vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: vk::Extent2D {
-                    width: renderer_settings.frame_settings.rt_extent.width,
-                    height: renderer_settings.frame_settings.rt_extent.height,
+                    width: renderer_settings.frame_settings.frame_extent.width,
+                    height: renderer_settings.frame_settings.frame_extent.height,
                 },
             },
 
@@ -281,21 +281,19 @@ impl Gui {
         &mut self,
         rhi: &Rhi,
         cmd: &RhiCommandBuffer,
-        render_ctx: &mut FrameContext,
+        frame_label: FrameLabel,
     ) -> Option<(&GuiMesh, &imgui::DrawData)> {
         let draw_data = self.imgui_ctx.render();
         if draw_data.total_vtx_count == 0 {
             return None;
         }
 
-        let frame_label = render_ctx.crt_frame_label();
-
         rhi.device.debug_utils().begin_queue_label(
             rhi.graphics_queue.handle(),
             "[ui-pass]create-mesh",
             LabelColor::COLOR_STAGE,
         );
-        self.meshes[*frame_label].replace(GuiMesh::from_draw_data(rhi, cmd, render_ctx, draw_data));
+        self.meshes[*frame_label].replace(GuiMesh::new(rhi, cmd, &format!("{frame_label}"), draw_data));
         rhi.device().debug_utils().end_queue_label(rhi.graphics_queue.handle());
 
         Some((

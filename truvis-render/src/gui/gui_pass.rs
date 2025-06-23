@@ -1,8 +1,7 @@
-use crate::gui::mesh::ImGuiVertex;
 use crate::gui::gui::Gui;
+use crate::gui::mesh::ImGuiVertex;
+use crate::pipeline_settings::{FrameLabel, FrameSettings, PipelineSettings};
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_context::FrameContext;
-use crate::renderer::pipeline_settings::{FrameSettings, PipelineSettings};
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
@@ -96,30 +95,34 @@ impl GuiPass {
     pub fn draw(
         &self,
         rhi: &Rhi,
-        render_ctx: &mut FrameContext,
-        frame_settings: &FrameSettings,
+        canvas_color_view: vk::ImageView,
+        canvas_depth_view: vk::ImageView,
+        canvas_extent: vk::Extent2D,
         cmd: &RhiCommandBuffer,
         gui: &mut Gui,
     ) {
+        // TODO frame label 应该轮换
+        let frame_label = FrameLabel::A;
+
         let color_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(render_ctx.crt_present_image_view().handle())
+            .image_view(canvas_color_view)
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
             .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);
         let depth_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(render_ctx.depth_view().handle())
+            .image_view(canvas_depth_view)
             .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
             .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);
         let render_info = vk::RenderingInfo::default()
             .layer_count(1)
-            .render_area(frame_settings.viewport_extent.into())
+            .render_area(canvas_extent.into())
             .color_attachments(std::slice::from_ref(&color_attach_info))
             .depth_attachment(&depth_attach_info);
 
         let mesh;
         let draw_data;
-        if let Some(r) = gui.imgui_render(rhi, cmd, render_ctx) {
+        if let Some(r) = gui.imgui_render(rhi, cmd, frame_label) {
             (mesh, draw_data) = r;
         } else {
             return;
@@ -131,8 +134,6 @@ impl GuiPass {
             min_depth: 0.0,
             ..Default::default()
         };
-
-        let frame_label = render_ctx.crt_frame_label();
 
         cmd.cmd_begin_rendering(&render_info);
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());

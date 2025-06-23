@@ -56,10 +56,11 @@ impl ShaderToyPipeline {
 
             cmd.end();
             rhi.graphics_queue.submit(
-                vec![RhiSubmitInfo::new(&[cmd]).wait_infos(&[(
+                vec![RhiSubmitInfo::new(&[cmd]).wait(
                     frame_ctx.current_present_complete_semaphore(),
                     vk::PipelineStageFlags2::COMPUTE_SHADER,
-                )])],
+                    None,
+                )],
                 None,
             );
         }
@@ -96,10 +97,11 @@ impl ShaderToyPipeline {
             cmd.end();
 
             rhi.graphics_queue.submit(
-                vec![RhiSubmitInfo::new(&[cmd]).signal_infos(&[(
+                vec![RhiSubmitInfo::new(&[cmd]).signal(
                     frame_ctx.crt_render_complete_semaphore(),
                     vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
-                )])],
+                    None,
+                )],
                 Some(frame_ctx.crt_fence().clone()),
             );
         }

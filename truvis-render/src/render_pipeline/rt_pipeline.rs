@@ -1,9 +1,9 @@
 use crate::gui::gui_pass::GuiPass;
+use crate::pipeline_settings::PipelineSettings;
 use crate::render_pipeline::compute_pass::ComputePass;
 use crate::render_pipeline::pipeline_context::PipelineContext;
 use crate::render_pipeline::rt_pass::SimlpeRtPass;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::pipeline_settings::PipelineSettings;
 use ash::vk;
 use shader_binding::shader;
 use std::cell::RefCell;
@@ -73,7 +73,7 @@ impl RtPipeline {
 
             cmd.end();
 
-            rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd]).wait_infos(&[])], None);
+            rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
         }
 
         // blit
@@ -117,10 +117,11 @@ impl RtPipeline {
 
             cmd.end();
             rhi.graphics_queue.submit(
-                vec![RhiSubmitInfo::new(&[cmd]).wait_infos(&[(
+                vec![*RhiSubmitInfo::new(&[cmd]).wait(
                     frame_ctx.current_present_complete_semaphore(),
                     vk::PipelineStageFlags2::COMPUTE_SHADER,
-                )])],
+                    None,
+                )],
                 None,
             );
         }
@@ -159,10 +160,11 @@ impl RtPipeline {
             cmd.end();
 
             rhi.graphics_queue.submit(
-                vec![RhiSubmitInfo::new(&[cmd]).signal_infos(&[(
+                vec![*RhiSubmitInfo::new(&[cmd]).signal(
                     frame_ctx.crt_render_complete_semaphore(),
                     vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
-                )])],
+                    None,
+                )],
                 Some(frame_ctx.crt_fence().clone()),
             );
         }

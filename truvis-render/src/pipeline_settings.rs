@@ -36,14 +36,13 @@ pub struct RendererSettings {
     pub frame_settings: FrameSettings,
 }
 
-/// frames in flight 中每一帧的 label
 #[derive(Debug, Clone, Copy)]
-pub enum FifLabel {
+pub enum FrameLabel {
     A,
     B,
     C,
 }
-impl Deref for FifLabel {
+impl Deref for FrameLabel {
     type Target = usize;
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -54,7 +53,7 @@ impl Deref for FifLabel {
         }
     }
 }
-impl Display for FifLabel {
+impl Display for FrameLabel {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -64,7 +63,7 @@ impl Display for FifLabel {
         }
     }
 }
-impl FifLabel {
+impl FrameLabel {
     pub const FRAMES_IN_FLIGHT: usize = 3;
 
     const INDEX: [usize; 3] = [0, 1, 2];

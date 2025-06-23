@@ -184,6 +184,7 @@ impl RenderSwapchain {
         (surface_format.format, surface_format.color_space)
     }
 
+    /// timeout: nano seconds
     #[inline]
     pub fn acquire(&mut self, semaphore: Option<&RhiSemaphore>, fence: Option<&RhiFence>, timeout: u64) {
         let (image_index, is_optimal) = unsafe {

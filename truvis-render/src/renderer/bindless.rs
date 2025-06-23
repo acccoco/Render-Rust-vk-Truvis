@@ -1,4 +1,4 @@
-use crate::renderer::pipeline_settings::FifLabel;
+use crate::pipeline_settings::FrameLabel;
 use crate::resource::ImageLoader;
 use ash::vk;
 use itertools::Itertools;
@@ -51,7 +51,7 @@ pub struct BindlessManager {
     device: Rc<RhiDevice>,
 
     /// 当前 frame in flight 的标签，每帧更新
-    frame_label: FifLabel,
+    frame_label: FrameLabel,
 }
 impl BindlessManager {
     pub fn new(rhi: &Rhi, frames_in_flight: usize) -> Self {
@@ -83,7 +83,7 @@ impl BindlessManager {
 
             device: rhi.device.clone(),
 
-            frame_label: FifLabel::A,
+            frame_label: FrameLabel::A,
         }
     }
 
@@ -96,7 +96,7 @@ impl BindlessManager {
     /// # Phase: Before Render
     ///
     /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
-    pub fn prepare_render_data(&mut self, frame_label: FifLabel) {
+    pub fn prepare_render_data(&mut self, frame_label: FrameLabel) {
         self.frame_label = frame_label;
 
         let mut texture_infos = Vec::with_capacity(self.textures.iter().len());

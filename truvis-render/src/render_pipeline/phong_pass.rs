@@ -1,7 +1,7 @@
+use crate::pipeline_settings::{FrameLabel, RendererSettings};
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::FrameContext;
 use crate::renderer::gpu_scene::GpuScene;
-use crate::renderer::pipeline_settings::{FifLabel, RendererSettings};
 use ash::vk;
 use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
 use model_manager::vertex::VertexLayout;
@@ -12,8 +12,8 @@ use std::rc::Rc;
 use truvis_rhi::basic::color::LabelColor;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::rendering_info::RhiRenderingInfo;
 use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
+use truvis_rhi::core::rendering_info::RhiRenderingInfo;
 use truvis_rhi::rhi::Rhi;
 
 pub struct PhongPass {
@@ -68,7 +68,7 @@ impl PhongPass {
         cmd: &RhiCommandBuffer,
         viewport: &vk::Rect2D,
         push_constant: &shader::rt::PushConstants,
-        frame_idx: FifLabel,
+        frame_idx: FrameLabel,
     ) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
         cmd.cmd_set_viewport(
@@ -106,14 +106,14 @@ impl PhongPass {
         viewport: vk::Extent2D,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
-        frame_label: FifLabel,
+        frame_label: FrameLabel,
     ) {
         let rendering_info = RhiRenderingInfo::new(
             vec![frame_ctx.crt_present_image_view().handle()],
             Some(frame_ctx.depth_view().handle()),
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
-                extent: frame_ctx.frame_settings().viewport_extent,
+                extent: frame_ctx.frame_settings().frame_extent,
             },
         );
 

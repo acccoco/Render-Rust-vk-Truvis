@@ -1,9 +1,10 @@
-use crate::pipeline_settings::{FifLabel, FrameSettings, PipelineSettings};
+use crate::pipeline_settings::{FrameLabel, FrameSettings, PipelineSettings};
 use crate::renderer::bindless::BindlessManager;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
 use std::rc::Rc;
+use truvis_rhi::core::synchronize::RhiSemaphore;
 use truvis_rhi::{
     core::{
         command_buffer::RhiCommandBuffer,
@@ -50,7 +51,7 @@ impl FrameBuffers {
         let rt_bindless_keys = rt_images
             .iter()
             .enumerate()
-            .map(|(i, _)| format!("Renderer::RtImageView_{}", FifLabel::from_usize(i)))
+            .map(|(i, _)| format!("Renderer::RtImageView_{}", FrameLabel::from_usize(i)))
             .collect_vec();
         for (rt_bindless_key, rt_image_view) in rt_bindless_keys.iter().zip(rt_image_views.iter()) {
             bindless_mgr.register_image(rt_bindless_key.clone(), rt_image_view.clone());
@@ -121,7 +122,7 @@ impl FrameBuffers {
                         usage: vk_mem::MemoryUsage::AutoPreferDevice,
                         ..Default::default()
                     },
-                    &format!("rt-{}", FifLabel::from_usize(i)),
+                    &format!("rt-{}", FrameLabel::from_usize(i)),
                 ))
             })
             .collect_vec();
@@ -137,7 +138,7 @@ impl FrameBuffers {
                         pipeline_settings.color_format,
                         vk::ImageAspectFlags::COLOR,
                     ),
-                    format!("rt-{}", FifLabel::from_usize(i)),
+                    format!("rt-{}", FrameLabel::from_usize(i)),
                 ))
             })
             .collect_vec();
@@ -169,9 +170,16 @@ impl FrameBuffers {
     }
 }
 
+pub struct PresentData {
+    pub image: Rc<RhiImage2DView>,
+    pub wait_timeline_value: u64,
+    pub wait_semaphore: RhiSemaphore,
+    pub signal_timeline_semaphore: RhiSemaphore,
+}
+
 pub struct FrameContext {
     /// 当前处在 in-flight 的第几帧：A, B, C
-    fif_label: FifLabel,
+    fif_label: FrameLabel,
 
     /// 当前的帧序号，一直累加
     frame_id: usize,
@@ -244,7 +252,7 @@ impl FrameContext {
             // 初始值应该是 1，因为 timeline semaphore 初始值是 0
             frame_id: 1,
             // 由于初始的 frame_id 是 1，所以初始的 fif_label 是 B
-            fif_label: FifLabel::B,
+            fif_label: FrameLabel::B,
             // 在此之前的帧都被销毁了
             rebuild_frame_id: 1,
             fif_count: pipeline_settings.frames_in_flight,
@@ -264,7 +272,7 @@ impl FrameContext {
 
     /// 当前处在第几帧：A, B, C
     #[inline]
-    pub fn crt_frame_label(&self) -> FifLabel {
+    pub fn crt_frame_label(&self) -> FrameLabel {
         self.fif_label
     }
 

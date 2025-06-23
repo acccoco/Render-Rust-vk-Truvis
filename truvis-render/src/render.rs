@@ -1,4 +1,4 @@
-use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FifLabel, PipelineSettings, RendererSettings};
+use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, PipelineSettings, RendererSettings};
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
@@ -58,7 +58,7 @@ impl Renderer {
     }
 
     #[inline]
-    pub fn crt_frame_label(&self) -> FifLabel {
+    pub fn crt_frame_label(&self) -> FrameLabel {
         self.frame_ctx.as_ref().unwrap().crt_frame_label()
     }
 
@@ -89,10 +89,10 @@ impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         let rhi = Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext));
 
-        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, FifLabel::FRAMES_IN_FLIGHT)));
+        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, FrameLabel::FRAMES_IN_FLIGHT)));
         let scene_mgr = Rc::new(RefCell::new(SceneManager::new(bindless_mgr.clone())));
-        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), FifLabel::FRAMES_IN_FLIGHT);
-        let per_frame_data_buffers = (0..FifLabel::FRAMES_IN_FLIGHT)
+        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), FrameLabel::FRAMES_IN_FLIGHT);
+        let per_frame_data_buffers = (0..FrameLabel::FRAMES_IN_FLIGHT)
             .map(|idx| {
                 RhiStructuredBuffer::<shader::PerFrameData>::new_ubo(&rhi, 1, format!("per-frame-data-buffer-{idx}"))
             })
@@ -101,7 +101,7 @@ impl Renderer {
         let pipeline_settings = PipelineSettings {
             color_format: DefaultRendererSettings::DEFAULT_SURFACE_FORMAT.format,
             depth_format: Self::get_depth_format(&rhi),
-            frames_in_flight: FifLabel::FRAMES_IN_FLIGHT,
+            frames_in_flight: FrameLabel::FRAMES_IN_FLIGHT,
         };
 
         Self {
