@@ -141,7 +141,12 @@ impl Gui {
     }
 
     /// # Phase: Update
-    pub fn update(&mut self, window: &winit::window::Window, ui_func: impl FnOnce(&mut imgui::Ui)) {
+    pub fn update(
+        &mut self,
+        window: &winit::window::Window,
+        present_img_bindless_key: Option<String>,
+        ui_func: impl FnOnce(&mut imgui::Ui),
+    ) {
         let ui = self.imgui_ctx.new_frame();
 
         unsafe {
@@ -299,6 +304,7 @@ impl Gui {
         ))
     }
 
+    // TODO 可能用不上这个了
     /// 根据 imgui 传来的 texture id，找到对应的 texture key，用于在 bindless manager 中得到 texture
     pub fn get_texture_key(texture_id: imgui::TextureId) -> String {
         format!("imgui-texture-{}", texture_id.id())

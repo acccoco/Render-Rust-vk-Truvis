@@ -87,6 +87,20 @@ impl RhiSemaphore {
         semaphore
     }
 
+    pub fn new_timeline(rhi: &Rhi, initial_value: u64, debug_name: &str) -> Self {
+        let mut timeline_type_ci =
+            vk::SemaphoreTypeCreateInfo::default().semaphore_type(vk::SemaphoreType::TIMELINE).initial_value(0);
+        let timeline_semaphore_ci = vk::SemaphoreCreateInfo::default().push_next(&mut timeline_type_ci);
+        let semaphore = unsafe { rhi.device.create_semaphore(&timeline_semaphore_ci, None).unwrap() };
+
+        let semaphore = Self {
+            semaphore,
+            device: rhi.device.clone(),
+        };
+        rhi.device.debug_utils().set_debug_name(&semaphore, debug_name);
+        semaphore
+    }
+
     #[inline]
     pub fn handle(&self) -> vk::Semaphore {
         self.semaphore

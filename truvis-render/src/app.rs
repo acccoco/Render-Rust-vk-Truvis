@@ -37,11 +37,6 @@ pub struct TruvisApp<T: OuterApp> {
 
     input_manager: Rc<RefCell<InputManager>>,
 
-    /// 需要在 window 之后初始化，因此 OnceCell
-    gui: OnceCell<Gui>,
-
-    timer: Timer,
-
     camera_controller: CameraController,
 
     outer_app: OnceCell<T>,
@@ -118,19 +113,29 @@ impl<T: OuterApp> TruvisApp<T> {
     }
 
     pub fn update(&mut self) {
+        // Part 1: upate window
+        let window = self.window_system.get_mut().unwrap();
+        if window.time_to_update() {
+            let renderer_data = self.renderer.get_renderer_data();
+
+            window.update(
+                &self.renderer.rhi,
+                |ui| {
+                    self.outer_app.get_mut().unwrap().draw_ui(ui);
+                },
+                renderer_data,
+            );
+        }
+
+        // Part 2: update renderer
+
         // ===================== Phase: Begin Frame =====================
         self.renderer.begin_frame();
 
         // ===================== Phase: IO =====================
-        // 更新计时器
-        self.timer.update();
-        let duration = std::time::Duration::from_secs_f32(self.timer.delta_time_s);
-        self.gui.get_mut().unwrap().prepare_frame(self.window_system.get().unwrap().window(), duration);
-
-        // 更新输入状态
+        // TODO 这个 input manager, 以及 camera controller
+        //  应该是只服务于 renderer 的，因此更新频率也应该和 renderer 一致
         self.input_manager.borrow_mut().update();
-
-        // 更新相机控制器
         self.camera_controller.update(self.timer.delta_time_s);
 
         // ===================== Phase: Gui Update =====================
@@ -139,6 +144,11 @@ impl<T: OuterApp> TruvisApp<T> {
             self.outer_app.get_mut().unwrap().draw_ui(ui);
         });
         self.renderer.on_render_area_changed(gui.get_render_region());
+
+        // update render
+        if self.renderer.time_to_render() {
+            todo!()
+        }
 
         // ===================== Phase: Update =====================
         self.outer_app.get_mut().unwrap().update(&mut self.renderer);
@@ -236,6 +246,7 @@ impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
             }
             WindowEvent::RedrawRequested => {
                 self.update();
+                // TODO 是否应该手动调用 redraw，实现死循环？
             }
             _ => {}
         }

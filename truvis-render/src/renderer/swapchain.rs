@@ -6,6 +6,7 @@ use std::rc::Rc;
 use truvis_rhi::core::command_queue::RhiQueue;
 use truvis_rhi::core::debug_utils::RhiDebugType;
 use truvis_rhi::core::device::RhiDevice;
+use truvis_rhi::core::image::{RhiImage2DView, RhiImageViewCreateInfo};
 use truvis_rhi::core::synchronize::{RhiFence, RhiSemaphore};
 use truvis_rhi::rhi::Rhi;
 
@@ -66,6 +67,7 @@ pub struct RenderSwapchain {
 
     /// 这里的 image 并非手动创建的，因此无法使用 RhiImage 类型
     images: Vec<vk::Image>,
+    image_views: Vec<RhiImage2DView>,
     swapchain_image_index: usize,
 
     color_format: vk::Format,
@@ -96,6 +98,18 @@ impl RenderSwapchain {
         );
 
         let images = unsafe { swapchain_pf.get_swapchain_images(swapchain_handle).unwrap() };
+        let image_views = images
+            .iter()
+            .enumerate()
+            .map(|(idx, img)| {
+                RhiImage2DView::new_with_raw_image(
+                    rhi,
+                    *img,
+                    RhiImageViewCreateInfo::new_image_view_2d_info(surface_format.format, vk::ImageAspectFlags::COLOR),
+                    format!("swapchain-{}", idx),
+                )
+            })
+            .collect_vec();
 
         Self {
             _device: rhi.device.clone(),
@@ -103,6 +117,7 @@ impl RenderSwapchain {
             swapchain_pf,
             swapchain_handle,
             images,
+            image_views,
             swapchain_image_index: 0,
             extent,
             color_format: surface_format.format,
@@ -168,13 +183,18 @@ impl RenderSwapchain {
     }
 
     #[inline]
-    pub fn current_present_image(&self) -> vk::Image {
+    pub fn current_image(&self) -> vk::Image {
         self.images[self.swapchain_image_index]
     }
 
     #[inline]
-    pub fn current_present_image_index(&self) -> usize {
+    pub fn current_image_index(&self) -> usize {
         self.swapchain_image_index
+    }
+
+    #[inline]
+    pub fn current_image_view(&self) -> &RhiImage2DView {
+        &self.image_views[self.swapchain_image_index]
     }
 
     #[inline]
@@ -190,7 +210,7 @@ impl RenderSwapchain {
 
     /// timeout: nano seconds
     #[inline]
-    pub fn acquire(&mut self, semaphore: Option<&RhiSemaphore>, fence: Option<&RhiFence>, timeout: u64) {
+    pub fn acquire_next_image(&mut self, semaphore: Option<&RhiSemaphore>, fence: Option<&RhiFence>, timeout: u64) {
         let (image_index, is_optimal) = unsafe {
             self.swapchain_pf
                 .acquire_next_image(
@@ -211,7 +231,7 @@ impl RenderSwapchain {
     }
 
     #[inline]
-    pub fn submit(&self, queue: &RhiQueue, wait_semaphores: &[RhiSemaphore]) {
+    pub fn present_image(&self, queue: &RhiQueue, wait_semaphores: &[RhiSemaphore]) {
         let wait_semaphores = wait_semaphores.iter().map(|s| s.handle()).collect_vec();
         let image_indices = [self.swapchain_image_index as u32];
         let present_info = vk::PresentInfoKHR::default()

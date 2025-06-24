@@ -4,7 +4,7 @@ use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
 use crate::render_pipeline::pipeline_context::TempPipelineCtx;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_context::FrameContext;
+use crate::renderer::frame_context::{FrameContext, RendererData};
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::pipeline_settings::{
     AccumData, DefaultRendererSettings, FifLabel, FrameSettings, PipelineSettings, RendererSettings,
@@ -24,6 +24,7 @@ use truvis_rhi::{core::command_queue::RhiSubmitInfo, rhi::Rhi};
 pub struct Renderer {
     pub rhi: Rc<Rhi>,
 
+    // TODO 移除这个 Option
     /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
     pub frame_ctx: Option<FrameContext>,
 
@@ -83,6 +84,11 @@ impl Renderer {
         .copied()
         .unwrap_or(vk::Format::UNDEFINED)
     }
+
+    pub fn get_renderer_data(&self) -> Option<RendererData> {
+        self.frame_context().get_renderer_data()
+    }
+
     // endregion
 
     // region init
@@ -129,6 +135,10 @@ impl Renderer {
 
     pub fn end_frame(&mut self) {
         self.frame_ctx.as_mut().unwrap().end_frame(&self.rhi);
+    }
+
+    pub fn time_to_render(&self) -> bool {
+        self.frame_ctx.as_ref().unwrap().time_to_render()
     }
 
     pub fn before_render(&mut self, input_state: &InputState, timer: &Timer, camera: &DrsCamera) {

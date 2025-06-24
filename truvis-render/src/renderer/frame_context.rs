@@ -170,11 +170,12 @@ impl FrameBuffers {
     }
 }
 
-pub struct RendererData {
-    pub image: Rc<RhiImage2DView>,
+pub struct RendererData<'a> {
+    pub image: &'a RhiImage2DView,
+    pub image_bindless_key: String,
     pub wait_timeline_value: u64,
-    pub wait_semaphore: RhiSemaphore,
-    pub signal_timeline_semaphore: RhiSemaphore,
+    pub wait_timeline_semaphore: &'a RhiSemaphore,
+    pub signal_timeline_semaphore: &'a RhiSemaphore,
 }
 
 pub struct FrameContext {
@@ -199,10 +200,10 @@ pub struct FrameContext {
     frame_buffers: FrameBuffers,
 
     /// 帧渲染完成的 timeline，value 就等于 frame_id
-    render_timeline: vk::Semaphore,
+    render_timeline_semaphore: RhiSemaphore,
 
     /// 渲染帧依赖的外部时间线
-    present_timeline: vk::Semaphore,
+    present_timeline_semaphore: RhiSemaphore,
 
     /// 每一帧依赖的外部时间线的 value
     frame_present_time_value: Vec<Vec<u64>>,
@@ -236,18 +237,8 @@ impl FrameContext {
 
         let frame_buffers = FrameBuffers::new(rhi, pipeline_settings, &frame_settings, bindless_mgr);
 
-        let render_timeline = {
-            let mut timeline_type_ci =
-                vk::SemaphoreTypeCreateInfo::default().semaphore_type(vk::SemaphoreType::TIMELINE).initial_value(0);
-            let timeline_semaphore_ci = vk::SemaphoreCreateInfo::default().push_next(&mut timeline_type_ci);
-            unsafe { rhi.device.create_semaphore(&timeline_semaphore_ci, None).unwrap() }
-        };
-        let external_timeline = {
-            let mut timeline_type_ci =
-                vk::SemaphoreTypeCreateInfo::default().semaphore_type(vk::SemaphoreType::TIMELINE).initial_value(0);
-            let timeline_semaphore_ci = vk::SemaphoreCreateInfo::default().push_next(&mut timeline_type_ci);
-            unsafe { rhi.device.create_semaphore(&timeline_semaphore_ci, None).unwrap() }
-        };
+        let render_timeline_semaphore = RhiSemaphore::new_timeline(rhi, 0, "frame-render-complete");
+        let present_timeline_semaphore = RhiSemaphore::new_timeline(rhi, 0, "frame-present-complete");
 
         Self {
             frame_settings,
@@ -259,9 +250,9 @@ impl FrameContext {
             rebuild_frame_id: 1,
             fif_count: pipeline_settings.frames_in_flight,
             frame_buffers,
-            render_timeline,
-            present_timeline: external_timeline,
-            frame_present_time_value: vec![0; pipeline_settings.frames_in_flight],
+            render_timeline_semaphore,
+            present_timeline_semaphore,
+            frame_present_time_value: vec![vec![]; pipeline_settings.frames_in_flight],
             graphics_command_pools,
             allocated_command_buffers: vec![Vec::new(); pipeline_settings.frames_in_flight],
             device: rhi.device.clone(),
@@ -271,6 +262,27 @@ impl FrameContext {
     // endregion
 
     // region getter
+
+    /// 获取用于 present 的 image
+    ///
+    /// 一起返回的还有 timeline value，表示该 image 渲染完成的时间点
+    pub fn get_renderer_data(&self) -> Option<RendererData> {
+        // 使用刚渲染好的一帧进行 present
+        let frame_id_to_present = self.frame_id - 1; // 注意溢出
+        let frame_label_to_present = FrameLabel::from_usize(frame_id_to_present % self.fif_count);
+
+        if frame_id_to_present > 0 && frame_id_to_present >= self.rebuild_frame_id {
+            Some(RendererData {
+                image: &self.frame_buffers.rt_image_views[*frame_label_to_present],
+                image_bindless_key: self.frame_buffers.rt_bindless_keys[*frame_label_to_present].clone(),
+                wait_timeline_semaphore: &self.render_timeline_semaphore,
+                signal_timeline_semaphore: &self.present_timeline_semaphore,
+                wait_timeline_value: frame_id_to_present as u64,
+            })
+        } else {
+            None
+        }
+    }
 
     /// 当前处在第几帧：A, B, C
     #[inline]
@@ -293,29 +305,6 @@ impl FrameContext {
     #[inline]
     pub fn depth_view(&self) -> &RhiImage2DView {
         &self.frame_buffers._depth_view
-    }
-
-    /// 获取用于 present 的 image
-    ///
-    /// 一起返回的还有 timeline value，表示该 image 渲染完成的时间点
-    #[inline]
-    pub fn get_present_image(&self) -> Option<(&RhiImage2DView, u64)> {
-        // 使用刚渲染好的一帧进行 present
-        let frame_id_to_present = self.frame_id - 1; // 注意溢出
-        if frame_id_to_present > 0 && frame_id_to_present >= self.rebuild_frame_id {
-            Some((
-                &self.frame_buffers.rt_image_views[frame_id_to_present % self.fif_count], //
-                frame_id_to_present as u64,
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// 当前需要渲染的帧，等待的 present 的 timeline
-    #[inline]
-    fn crt_frame_wait_semaphore_value(&self) -> u64 {
-        self.frame_present_time_value[*self.fif_label]
     }
 
     #[inline]
@@ -348,11 +337,12 @@ impl FrameContext {
     pub fn begin_frame(&mut self) {
         // wait semaphore 的 timeout 设为 0，表示 assert
         // TODO 改成 wait time == 0， 引入 time_to_render()
+        // TODO 既要等待 -2 帧渲染完成，又要等待 -3 帧渲染完成，使用完成
         unsafe {
-            let wait_value = if self.frame_id > 3 { self.frame_id as u64 - 3 } else { 0 };
+            let wait_timeline_value = if self.frame_id > 3 { self.frame_id as u64 - 3 } else { 0 };
             let wait_info = vk::SemaphoreWaitInfo::default()
-                .semaphores(std::slice::from_ref(&self.render_timeline))
-                .values(std::slice::from_ref(&wait_value));
+                .semaphores(&[self.render_timeline_semaphore.handle()])
+                .values(std::slice::from_ref(&wait_timeline_value));
             self.device.wait_semaphores(&wait_info, u64::MAX).unwrap();
         }
 
@@ -375,7 +365,7 @@ impl FrameContext {
             let result = unsafe {
                 self.device.wait_semaphores(
                     &vk::SemaphoreWaitInfo::default()
-                        .semaphores(&[self.render_timeline])
+                        .semaphores(&[self.render_timeline_semaphore.handle()])
                         // 确保即将被 present 的 frame 已经渲染好了即可
                         .values(&[self.frame_id as u64 - 2]),
                     1,

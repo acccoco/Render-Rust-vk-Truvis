@@ -23,7 +23,7 @@ impl Timer {
         self.current_time = std::time::SystemTime::now();
     }
 
-    pub fn toc(&mut self) -> std::time::Duration {
+    pub fn toc(&self) -> std::time::Duration {
         let now = std::time::SystemTime::now();
         let duration = now.duration_since(self.current_time).unwrap();
         duration
