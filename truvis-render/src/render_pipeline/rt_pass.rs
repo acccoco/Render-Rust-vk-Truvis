@@ -1,7 +1,7 @@
+use crate::pipeline_settings::FrameSettings;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::FrameContext;
 use crate::renderer::gpu_scene::GpuScene;
-use crate::renderer::pipeline_settings::FrameSettings;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
@@ -427,7 +427,11 @@ impl SimlpeRtPass {
             &self._sbt.sbt_region_miss,
             &self._sbt.sbt_region_hit,
             &self._sbt.sbt_region_callable,
-            [framse_settings.rt_extent.width, framse_settings.rt_extent.height, 1],
+            [
+                framse_settings.frame_extent.width,
+                framse_settings.frame_extent.height,
+                1,
+            ],
         );
 
         cmd.end_label();

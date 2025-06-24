@@ -170,7 +170,7 @@ impl FrameBuffers {
     }
 }
 
-pub struct PresentData {
+pub struct RendererData {
     pub image: Rc<RhiImage2DView>,
     pub wait_timeline_value: u64,
     pub wait_semaphore: RhiSemaphore,
@@ -181,8 +181,10 @@ pub struct FrameContext {
     /// 当前处在 in-flight 的第几帧：A, B, C
     fif_label: FrameLabel,
 
-    /// 当前的帧序号，一直累加
+    /// 当前的帧序号，一直累加，初始序号是 1
     frame_id: usize,
+
+    /// 发生重建时，当时的帧序号
     rebuild_frame_id: usize,
     fif_count: usize,
 
@@ -203,7 +205,7 @@ pub struct FrameContext {
     present_timeline: vk::Semaphore,
 
     /// 每一帧依赖的外部时间线的 value
-    frame_present_time_value: Vec<u64>,
+    frame_present_time_value: Vec<Vec<u64>>,
 
     device: Rc<RhiDevice>,
 }
@@ -365,11 +367,45 @@ impl FrameContext {
         }
     }
 
+    pub fn time_to_render(&self) -> bool {
+        // framebuffer 未填满时，尽快填满
+        if (self.frame_id - self.rebuild_frame_id) <= self.fif_count {
+            true
+        } else {
+            let result = unsafe {
+                self.device.wait_semaphores(
+                    &vk::SemaphoreWaitInfo::default()
+                        .semaphores(&[self.render_timeline])
+                        // 确保即将被 present 的 frame 已经渲染好了即可
+                        .values(&[self.frame_id as u64 - 2]),
+                    1,
+                )
+            };
+            match result {
+                Ok(_) => true,
+                Err(err) => {
+                    match err {
+                        vk::Result::TIMEOUT => {
+                            // 如果等待超时，说明当前帧还没有渲染完成
+                            false
+                        }
+                        vk::Result::SUCCESS => true,
+                        _ => {
+                            // 其他错误
+                            log::error!("wait render timeline failed: {:?}", err);
+                            false
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn before_render(&mut self) {}
 
     pub fn end_frame(&mut self, _rhi: &Rhi) {
-        self.fif_label.next_frame();
         self.frame_id += 1;
+        self.fif_label = FrameLabel::from_usize(self.frame_id % self.fif_count);
     }
 
     pub fn after_render(&mut self) {}

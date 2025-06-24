@@ -1,6 +1,6 @@
 use crate::gui::gui::Gui;
 use crate::gui::mesh::ImGuiVertex;
-use crate::pipeline_settings::{FrameLabel, FrameSettings, PipelineSettings};
+use crate::pipeline_settings::{FrameLabel, PresentSettings};
 use crate::renderer::bindless::BindlessManager;
 use ash::vk;
 use itertools::Itertools;
@@ -46,7 +46,7 @@ pub struct GuiPass {
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
 impl GuiPass {
-    pub fn new(rhi: &Rhi, pipeline_settings: &PipelineSettings, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new(rhi: &Rhi, bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
         let pipeline_layout = Rc::new(RhiPipelineLayout::new(
             rhi.device.clone(),
             &[bindless_mgr.borrow().bindless_layout.handle()],
@@ -81,7 +81,8 @@ impl GuiPass {
             .cull_mode(vk::CullModeFlags::NONE, vk::FrontFace::CLOCKWISE)
             .color_blend(color_blend_attachments, [0.0; 4])
             .depth_test(Some(vk::CompareOp::ALWAYS), false, false)
-            .attach_info(vec![pipeline_settings.color_format], Some(pipeline_settings.depth_format), None);
+            // TODO 这里不应该由 depth
+            .attach_info(vec![color_format], None, None);
 
         let pipeline = RhiGraphicsPipeline::new(rhi.device.clone(), &create_info, pipeline_layout.clone(), "uipass");
 
@@ -96,12 +97,12 @@ impl GuiPass {
         &self,
         rhi: &Rhi,
         canvas_color_view: vk::ImageView,
-        canvas_depth_view: vk::ImageView,
         canvas_extent: vk::Extent2D,
         cmd: &RhiCommandBuffer,
         gui: &mut Gui,
     ) {
         // TODO frame label 应该轮换
+        // TODO mesh 应该放在 gui pass 中管理
         let frame_label = FrameLabel::A;
 
         let color_attach_info = vk::RenderingAttachmentInfo::default()
@@ -109,16 +110,16 @@ impl GuiPass {
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
             .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);
-        let depth_attach_info = vk::RenderingAttachmentInfo::default()
-            .image_view(canvas_depth_view)
-            .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-            .load_op(vk::AttachmentLoadOp::LOAD)
-            .store_op(vk::AttachmentStoreOp::STORE);
+        // TODO remove gui pass depth attachment
+        // let depth_attach_info = vk::RenderingAttachmentInfo::default()
+        //     .image_view(canvas_depth_view)
+        //     .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        //     .load_op(vk::AttachmentLoadOp::LOAD)
+        //     .store_op(vk::AttachmentStoreOp::STORE);
         let render_info = vk::RenderingInfo::default()
             .layer_count(1)
             .render_area(canvas_extent.into())
-            .color_attachments(std::slice::from_ref(&color_attach_info))
-            .depth_attachment(&depth_attach_info);
+            .color_attachments(std::slice::from_ref(&color_attach_info));
 
         let mesh;
         let draw_data;

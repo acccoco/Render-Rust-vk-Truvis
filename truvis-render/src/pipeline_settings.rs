@@ -36,6 +36,14 @@ pub struct RendererSettings {
     pub frame_settings: FrameSettings,
 }
 
+#[derive(Copy, Clone)]
+pub struct PresentSettings {
+    pub canvas_extent: vk::Extent2D,
+
+    pub swapchain_image_cnt: usize,
+    pub color_format: vk::Format,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum FrameLabel {
     A,
@@ -76,15 +84,6 @@ impl FrameLabel {
             2 => Self::C,
             _ => panic!("Invalid frame index: {idx}"),
         }
-    }
-
-    #[inline]
-    pub fn next_frame(&mut self) {
-        *self = match self {
-            Self::A => Self::B,
-            Self::B => Self::C,
-            Self::C => Self::A,
-        };
     }
 }
 

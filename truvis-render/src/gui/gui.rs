@@ -1,7 +1,7 @@
 //! 参考 imgui-rs-vulkan-renderer
 
 use crate::gui::mesh::GuiMesh;
-use crate::pipeline_settings::{FrameLabel, RendererSettings};
+use crate::pipeline_settings::{FrameLabel, PresentSettings};
 use crate::renderer::bindless::BindlessManager;
 use ash::vk;
 use std::{cell::RefCell, rc::Rc};
@@ -35,8 +35,8 @@ impl Gui {
     pub fn new(
         rhi: &Rhi,
         window: &winit::window::Window,
-        // TODO 是否不需要这个参数
-        renderer_settings: &RendererSettings,
+        // TODO 使用 swapchian image 数量作为参数是否合适
+        present_settings: &PresentSettings,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
     ) -> Self {
         let mut imgui_ctx = imgui::Context::create();
@@ -54,13 +54,10 @@ impl Gui {
 
             render_region: vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
-                extent: vk::Extent2D {
-                    width: renderer_settings.frame_settings.frame_extent.width,
-                    height: renderer_settings.frame_settings.frame_extent.height,
-                },
+                extent: present_settings.canvas_extent,
             },
 
-            meshes: (0..renderer_settings.pipeline_settings.frames_in_flight).map(|_| None).collect(),
+            meshes: (0..present_settings.swapchain_image_cnt).map(|_| None).collect(),
 
             _device: rhi.device.clone(),
         }

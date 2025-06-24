@@ -27,7 +27,9 @@ impl RtPipeline {
             cstr::cstr!("main"),
             "shader/build/imgui/blit.slang.spv",
         );
-        let gui_pass = GuiPass::new(rhi, pipeline_settings, bindless_mgr.clone());
+        // TODO 这里不需要这个 pass
+        let gui_pass =
+            GuiPass::new(rhi, bindless_mgr.clone(), pipeline_settings.color_format, pipeline_settings.depth_format);
 
         Self {
             rt_pass,
