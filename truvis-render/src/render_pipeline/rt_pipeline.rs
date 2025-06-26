@@ -1,5 +1,5 @@
 use crate::gui::gui_pass::GuiPass;
-use crate::pipeline_settings::PipelineSettings;
+use crate::pipeline_settings::FrameSettings;
 use crate::render_pipeline::compute_pass::ComputePass;
 use crate::render_pipeline::pipeline_context::PipelineContext;
 use crate::render_pipeline::rt_pass::SimlpeRtPass;
@@ -19,7 +19,7 @@ pub struct RtPipeline {
     gui_pass: GuiPass,
 }
 impl RtPipeline {
-    pub fn new(rhi: &Rhi, pipeline_settings: &PipelineSettings, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new(rhi: &Rhi, pipeline_settings: &FrameSettings, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         let rt_pass = SimlpeRtPass::new(rhi, bindless_mgr.clone());
         let blit_pass = ComputePass::<shader::blit::PushConstant>::new(
             rhi,

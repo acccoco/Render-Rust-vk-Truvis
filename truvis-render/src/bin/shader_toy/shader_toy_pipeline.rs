@@ -5,7 +5,7 @@ use model_manager::vertex::vertex_pc::VertexPosColor;
 use std::cell::RefCell;
 use std::rc::Rc;
 use truvis_render::gui::gui_pass::GuiPass;
-use truvis_render::pipeline_settings::PipelineSettings;
+use truvis_render::pipeline_settings::FrameSettings;
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
 use truvis_render::renderer::bindless::BindlessManager;
 use truvis_render::renderer::pipeline_settings::PipelineSettings;
@@ -18,7 +18,7 @@ pub struct ShaderToyPipeline {
     gui_pass: GuiPass,
 }
 impl ShaderToyPipeline {
-    pub fn new(rhi: &Rhi, pipeline_settings: &PipelineSettings, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new(rhi: &Rhi, pipeline_settings: &FrameSettings, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         let shader_toy_pass = ShaderToyPass::new(rhi, pipeline_settings);
         let gui_pass = GuiPass::new(rhi, bindless_mgr, pipeline_settings.color_format, pipeline_settings.depth_format);
         Self {

@@ -75,8 +75,6 @@ impl<T: OuterApp> TruvisApp<T> {
             renderer: Renderer::new(extra_instance_ext),
             window_system: OnceCell::new(),
             input_manager,
-            gui: OnceCell::new(),
-            timer,
             camera_controller,
             outer_app: OnceCell::new(),
         };

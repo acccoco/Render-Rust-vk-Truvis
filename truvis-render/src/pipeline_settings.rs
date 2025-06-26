@@ -20,20 +20,10 @@ impl DefaultRendererSettings {
 
 #[derive(Copy, Clone, Default)]
 pub struct FrameSettings {
-    pub frame_extent: vk::Extent2D,
-}
-
-#[derive(Copy, Clone, Default)]
-pub struct PipelineSettings {
-    pub frames_in_flight: usize,
+    pub fif_num: usize,
     pub color_format: vk::Format,
     pub depth_format: vk::Format,
-}
-
-#[derive(Copy, Clone)]
-pub struct RendererSettings {
-    pub pipeline_settings: PipelineSettings,
-    pub frame_settings: FrameSettings,
+    pub frame_extent: vk::Extent2D,
 }
 
 #[derive(Copy, Clone)]

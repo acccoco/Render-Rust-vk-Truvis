@@ -1,4 +1,4 @@
-use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, PipelineSettings, RendererSettings};
+use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, RendererSettings};
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
@@ -6,9 +6,6 @@ use crate::render_pipeline::pipeline_context::TempPipelineCtx;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::{FrameContext, RendererData};
 use crate::renderer::gpu_scene::GpuScene;
-use crate::renderer::pipeline_settings::{
-    AccumData, DefaultRendererSettings, FifLabel, FrameSettings, PipelineSettings, RendererSettings,
-};
 use crate::renderer::scene_manager::SceneManager;
 use crate::renderer::window_system::MainWindow;
 use ash::vk;
@@ -26,9 +23,9 @@ pub struct Renderer {
 
     // TODO 移除这个 Option
     /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
-    pub frame_ctx: Option<FrameContext>,
+    pub frame_ctx: FrameContext,
 
-    pipeline_settings: PipelineSettings,
+    pipeline_settings: FrameSettings,
 
     pub bindless_mgr: Rc<RefCell<BindlessManager>>,
     pub scene_mgr: Rc<RefCell<SceneManager>>,
@@ -42,10 +39,6 @@ impl Drop for Renderer {
         log::info!("Dropping Renderer");
         // 在 Renderer 被销毁时，等待 Rhi 设备空闲
         self.wait_idle();
-
-        if let Some(render_context) = self.frame_ctx.take() {
-            render_context.destroy(&mut self.bindless_mgr.borrow_mut());
-        }
     }
 }
 impl Renderer {
@@ -54,7 +47,7 @@ impl Renderer {
     pub fn renderer_settings(&self) -> RendererSettings {
         RendererSettings {
             pipeline_settings: self.pipeline_settings,
-            frame_settings: self.frame_ctx.as_ref().unwrap().frame_settings(),
+            frame_settings: self.frame_ctx.frame_settings(),
         }
     }
 
@@ -104,16 +97,17 @@ impl Renderer {
             })
             .collect();
 
-        let pipeline_settings = PipelineSettings {
+        let pipeline_settings = FrameSettings {
             color_format: DefaultRendererSettings::DEFAULT_SURFACE_FORMAT.format,
             depth_format: Self::get_depth_format(&rhi),
-            frames_in_flight: FrameLabel::FRAMES_IN_FLIGHT,
+            fif_num: FrameLabel::FRAMES_IN_FLIGHT,
         };
+        let frame_ctx = FrameContext::new(&rhi, &pipeline_settings, &mut bindless_mgr.borrow_mut());
 
         Self {
             pipeline_settings,
             accum_data: Default::default(),
-            frame_ctx: None,
+            frame_ctx,
             rhi,
             bindless_mgr,
             scene_mgr,
