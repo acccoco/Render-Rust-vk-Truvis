@@ -278,7 +278,7 @@ impl FrameContext {
 
     // endregion
 
-    // region tools
+    // region phase methods
 
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer(&mut self, debug_name: &str) -> RhiCommandBuffer {
@@ -289,10 +289,6 @@ impl FrameContext {
         self.allocated_command_buffers[*self.fif_label].push(cmd.clone());
         cmd
     }
-
-    // endregion
-
-    // region phase methods
 
     /// 获取用于 present 的 image
     ///
