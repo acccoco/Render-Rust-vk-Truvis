@@ -22,7 +22,6 @@ impl RhiDebugType for RhiFence {
         self.fence
     }
 }
-
 impl RhiFence {
     /// # param
     /// * signaled - 是否创建时就 signaled
@@ -74,7 +73,6 @@ pub struct RhiSemaphore {
     semaphore: vk::Semaphore,
     device: Rc<RhiDevice>,
 }
-
 impl RhiSemaphore {
     pub fn new(rhi: &Rhi, debug_name: &str) -> Self {
         let semaphore = unsafe { rhi.device().create_semaphore(&vk::SemaphoreCreateInfo::default(), None).unwrap() };
@@ -112,6 +110,17 @@ impl RhiSemaphore {
             self.device.destroy_semaphore(self.semaphore, None);
         }
     }
+
+    #[inline]
+    pub fn wait_timeline(&self, timeline_value: u64, timeout_ns: u64) {
+        unsafe {
+            let wait_semaphore = [self.semaphore];
+            let wait_info = vk::SemaphoreWaitInfo::default()
+                .semaphores(&wait_semaphore)
+                .values(std::slice::from_ref(&timeline_value));
+            self.device.wait_semaphores(&wait_info, timeout_ns).unwrap();
+        }
+    }
 }
 impl RhiDebugType for RhiSemaphore {
     fn debug_type_name() -> &'static str {
@@ -127,7 +136,6 @@ impl RhiDebugType for RhiSemaphore {
 pub struct RhiImageBarrier {
     inner: vk::ImageMemoryBarrier2<'static>,
 }
-
 impl Default for RhiImageBarrier {
     fn default() -> Self {
         Self {
@@ -148,7 +156,6 @@ impl Default for RhiImageBarrier {
         }
     }
 }
-
 impl RhiImageBarrier {
     pub fn new() -> Self {
         Self::default()
@@ -221,7 +228,6 @@ pub struct RhiBarrierMask {
 pub struct RhiBufferBarrier {
     inner: vk::BufferMemoryBarrier2<'static>,
 }
-
 impl Default for RhiBufferBarrier {
     fn default() -> Self {
         Self {
@@ -233,7 +239,6 @@ impl Default for RhiBufferBarrier {
         }
     }
 }
-
 impl RhiBufferBarrier {
     #[inline]
     pub fn inner(&self) -> &vk::BufferMemoryBarrier2 {

@@ -20,6 +20,7 @@ impl Default for Timer {
 
 impl Timer {
     pub fn tic(&mut self) {
+        self.elapse = self.toc();
         self.current_time = std::time::SystemTime::now();
     }
 
@@ -27,5 +28,13 @@ impl Timer {
         let now = std::time::SystemTime::now();
         let duration = now.duration_since(self.current_time).unwrap();
         duration
+    }
+
+    pub fn elapse_ms(&self) -> f32 {
+        self.elapse.as_micros() as f32 / 1000.0
+    }
+
+    pub fn elapse_s(&self) -> f32 {
+        self.elapse.as_secs_f32()
     }
 }

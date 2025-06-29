@@ -52,7 +52,7 @@ impl OuterApp for PhongApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
         let rt_pipeline = RtPipeline::new(
             &renderer.rhi,
-            &renderer.renderer_settings().pipeline_settings,
+            &renderer.frame_settings().pipeline_settings,
             renderer.bindless_mgr.clone(),
         );
 

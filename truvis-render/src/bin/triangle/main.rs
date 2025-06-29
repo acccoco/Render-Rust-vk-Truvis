@@ -22,7 +22,7 @@ impl OuterApp for HelloTriangle {
         Self {
             triangle_pipeline: TrianglePipeline::new(
                 &renderer.rhi,
-                &renderer.renderer_settings().pipeline_settings,
+                &renderer.frame_settings().pipeline_settings,
                 renderer.bindless_mgr.clone(),
             ),
             triangle: VertexAosLayoutPosColor::triangle(&renderer.rhi),

@@ -21,7 +21,7 @@ impl OuterApp for ShaderToy {
             rectangle: VertexAosLayoutPosColor::rectangle(&renderer.rhi),
             pipeline: ShaderToyPipeline::new(
                 &renderer.rhi,
-                &renderer.renderer_settings().pipeline_settings,
+                &renderer.frame_settings().pipeline_settings,
                 renderer.bindless_mgr.clone(),
             ),
         }

@@ -1,4 +1,4 @@
-use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, RendererSettings};
+use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, FrameSettings};
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
@@ -7,7 +7,6 @@ use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::{FrameContext, RendererData};
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::SceneManager;
-use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use shader_binding::shader;
 use std::cell::RefCell;
@@ -21,18 +20,20 @@ use truvis_rhi::{core::command_queue::RhiSubmitInfo, rhi::Rhi};
 pub struct Renderer {
     pub rhi: Rc<Rhi>,
 
-    // TODO 移除这个 Option
-    /// 需要在 window 存在后创建，且需要手动释放和重新创建，因此使用 Option
     pub frame_ctx: FrameContext,
 
-    pipeline_settings: FrameSettings,
+    frame_settings: FrameSettings,
 
     pub bindless_mgr: Rc<RefCell<BindlessManager>>,
     pub scene_mgr: Rc<RefCell<SceneManager>>,
     pub gpu_scene: GpuScene,
 
+    // TODO 优化一下这个 buffer，不该放在这里
     pub per_frame_data_buffers: Vec<RhiStructuredBuffer<shader::PerFrameData>>,
     accum_data: AccumData,
+
+    timer: Timer,
+    fps_limit: f32,
 }
 impl Drop for Renderer {
     fn drop(&mut self) {
@@ -43,27 +44,10 @@ impl Drop for Renderer {
 }
 impl Renderer {
     // region getter
-    #[inline]
-    pub fn renderer_settings(&self) -> RendererSettings {
-        RendererSettings {
-            pipeline_settings: self.pipeline_settings,
-            frame_settings: self.frame_ctx.frame_settings(),
-        }
-    }
 
     #[inline]
-    pub fn crt_frame_label(&self) -> FrameLabel {
-        self.frame_ctx.as_ref().unwrap().crt_frame_label()
-    }
-
-    #[inline]
-    pub fn frame_context_mut(&mut self) -> &mut FrameContext {
-        self.frame_ctx.as_mut().unwrap()
-    }
-
-    #[inline]
-    pub fn frame_context(&self) -> &FrameContext {
-        self.frame_ctx.as_ref().unwrap()
+    pub fn frame_settings(&self) -> FrameSettings {
+        self.frame_settings
     }
 
     /// 根据 vulkan 实例和显卡，获取合适的深度格式
@@ -79,12 +63,13 @@ impl Renderer {
     }
 
     pub fn get_renderer_data(&self) -> Option<RendererData> {
-        self.frame_context().get_renderer_data()
+        self.frame_ctx.get_renderer_data()
     }
 
     // endregion
 
-    // region init
+    // region ===================================== init =====================================
+
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         let rhi = Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext));
 
@@ -97,15 +82,19 @@ impl Renderer {
             })
             .collect();
 
-        let pipeline_settings = FrameSettings {
+        let frame_settings = FrameSettings {
+            fif_num: FrameLabel::FRAMES_IN_FLIGHT,
             color_format: DefaultRendererSettings::DEFAULT_SURFACE_FORMAT.format,
             depth_format: Self::get_depth_format(&rhi),
-            fif_num: FrameLabel::FRAMES_IN_FLIGHT,
+            frame_extent: vk::Extent2D {
+                width: 400,
+                height: 400,
+            },
         };
-        let frame_ctx = FrameContext::new(&rhi, &pipeline_settings, &mut bindless_mgr.borrow_mut());
+        let frame_ctx = FrameContext::new(&rhi, &frame_settings, &mut bindless_mgr.borrow_mut());
 
         Self {
-            pipeline_settings,
+            frame_settings,
             accum_data: Default::default(),
             frame_ctx,
             rhi,
@@ -113,36 +102,42 @@ impl Renderer {
             scene_mgr,
             gpu_scene,
             per_frame_data_buffers,
+            timer: Timer::default(),
+            fps_limit: 59.9,
         }
     }
 
-    /// 在 window 创建之后调用，初始化其他资源
-    pub fn init_after_window(&mut self, window: &MainWindow) {
-        self.rebuild_after_resized(window);
-    }
-    // endregion
+    // endregion ====================================================================
 
-    // region phase call
+    // region ================================== phase call ====================================
+
     pub fn begin_frame(&mut self) {
-        self.frame_ctx.as_mut().unwrap().begin_frame();
+        self.frame_ctx.begin_frame();
+        self.timer.tic();
     }
 
     pub fn end_frame(&mut self) {
-        self.frame_ctx.as_mut().unwrap().end_frame(&self.rhi);
+        self.frame_ctx.end_frame(&self.rhi);
     }
 
     pub fn time_to_render(&self) -> bool {
-        self.frame_ctx.as_ref().unwrap().time_to_render()
+        // 时间未到时，直接返回 false
+        let limit_elapsed_us = 1000.0 * 1000.0 / self.fps_limit;
+        if limit_elapsed_us > self.timer.toc().as_micros() as f32 {
+            return false;
+        }
+
+        self.frame_ctx.time_to_render()
     }
 
-    pub fn before_render(&mut self, input_state: &InputState, timer: &Timer, camera: &DrsCamera) {
+    pub fn before_render(&mut self, input_state: &InputState, camera: &DrsCamera) {
         let current_camera_dir = glam::vec3(camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg);
         self.accum_data.update_accum_frames(current_camera_dir, camera.position);
-        self.update_gpu_scene(input_state, timer, camera);
+        self.update_gpu_scene(input_state, camera);
     }
 
     pub fn after_render(&mut self) {
-        self.frame_ctx.as_mut().unwrap().after_render();
+        self.frame_ctx.after_render();
     }
 
     pub fn wait_idle(&self) {
@@ -152,14 +147,14 @@ impl Renderer {
     }
 
     pub fn collect_render_ctx(&mut self) -> TempPipelineCtx {
-        let crt_frame_label = self.crt_frame_label();
+        let crt_frame_label = self.frame_ctx.crt_frame_label();
 
         TempPipelineCtx {
             rhi: Some(&self.rhi),
             gpu_scene: Some(&self.gpu_scene),
             bindless_mgr: Some(self.bindless_mgr.clone()),
             per_frame_data: Some(&self.per_frame_data_buffers[*crt_frame_label]),
-            frame_ctx: Some(self.frame_ctx.as_mut().unwrap()),
+            frame_ctx: Some(&mut self.frame_ctx),
 
             gui: None,
             timer: None,
@@ -167,22 +162,16 @@ impl Renderer {
     }
 
     pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
-        self.frame_ctx.as_mut().unwrap().rebuild_framebuffers(
-            &self.rhi,
-            &self.pipeline_settings,
-            new_extent,
-            &mut self.bindless_mgr.borrow_mut(),
-        );
+        self.frame_settings.frame_extent = new_extent;
+        self.frame_ctx.rebuild_framebuffers(&self.rhi, &self.frame_settings, &mut self.bindless_mgr.borrow_mut());
     }
 
-    fn update_gpu_scene(&mut self, input_state: &InputState, timer: &Timer, camera: &DrsCamera) {
-        let frame_ctx = self.frame_ctx.as_mut().unwrap();
-        let viewport_extent = frame_ctx.frame_settings().viewport_extent;
-
-        let crt_frame_label = frame_ctx.crt_frame_label();
+    fn update_gpu_scene(&mut self, input_state: &InputState, camera: &DrsCamera) {
+        let frame_extent = self.frame_settings.frame_extent;
+        let crt_frame_label = self.frame_ctx.crt_frame_label();
 
         // 将数据上传到 gpu buffer 中
-        let cmd = frame_ctx.alloc_command_buffer("update-draw-buffer");
+        let cmd = self.frame_ctx.alloc_command_buffer("update-draw-buffer");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
 
         let transfer_barrier_mask = RhiBarrierMask {
@@ -211,18 +200,18 @@ impl Renderer {
                 inv_projection: projection.inverse().into(),
                 camera_pos: camera.position.into(),
                 camera_forward: camera.camera_forward().into(),
-                time_ms: timer.elapse.as_millis() as f32,
-                delta_time_ms: timer.delta_time_s * 1000.0,
-                frame_id: frame_ctx.crt_frame_id() as u64,
+                time_ms: self.timer.total_time.as_micros() as f32 / 1000.0,
+                delta_time_ms: self.timer.elapse_ms(),
+                frame_id: self.frame_ctx.crt_frame_id() as u64,
                 mouse_pos: shader::Float2 {
                     x: mouse_pos.x as f32,
                     y: mouse_pos.y as f32,
                 },
                 resolution: shader::Float2 {
-                    x: viewport_extent.width as f32,
-                    y: viewport_extent.height as f32,
+                    x: frame_extent.width as f32,
+                    y: frame_extent.height as f32,
                 },
-                rt_render_target: frame_ctx.crt_rt_bindless_handle(&self.bindless_mgr.borrow()),
+                rt_render_target: self.frame_ctx.crt_frame_bindless_handle(&self.bindless_mgr.borrow()),
                 accum_frames: self.accum_data.accum_frames_num as u32,
             }
         };

@@ -7,7 +7,7 @@ use crate::platform::timer::Timer;
 use crate::render::Renderer;
 use crate::render_pipeline::pipeline_context::{PipelineContext, TempPipelineCtx};
 use crate::renderer::swapchain::RenderSwapchain;
-use crate::renderer::window_system::{MainWindow, WindowCreateInfo};
+use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use raw_window_handle::HasDisplayHandle;
 use std::cell::{OnceCell, RefCell};
@@ -97,7 +97,7 @@ impl<T: OuterApp> TruvisApp<T> {
         let gui = Gui::new(
             &self.renderer.rhi,
             window_system.window(),
-            &self.renderer.renderer_settings(),
+            &self.renderer.frame_settings(),
             self.renderer.bindless_mgr.clone(),
         );
 

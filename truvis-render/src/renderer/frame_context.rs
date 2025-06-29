@@ -1,5 +1,4 @@
 use crate::pipeline_settings::{FrameLabel, FrameSettings};
-use crate::platform::timer::Timer;
 use crate::renderer::bindless::BindlessManager;
 use ash::vk;
 use itertools::Itertools;
@@ -182,9 +181,6 @@ pub struct FrameContext {
     rebuild_frame_id: usize,
     fif_count: usize,
 
-    timer: Timer,
-    fps_limit: f32,
-
     /// 为每个 frame 分配一个 command pool
     graphics_command_pools: Vec<Rc<RhiCommandPool>>,
 
@@ -234,8 +230,6 @@ impl FrameContext {
             fif_label: FrameLabel::from_usize(init_frame_id),
             rebuild_frame_id: init_frame_id,
             fif_count: frame_settings.fif_num,
-            timer: Timer::default(),
-            fps_limit: 59.9,
             frame_buffers,
             render_timeline_semaphore,
             present_timeline_semaphore,
@@ -300,7 +294,7 @@ impl FrameContext {
             return None;
         }
 
-        let frame_id_to_present = self.frame_id - 2; // 注意溢出
+        let frame_id_to_present = self.frame_id - 2;
         if frame_id_to_present < self.rebuild_frame_id {
             return None; // 还没有重建过
         }
@@ -317,14 +311,10 @@ impl FrameContext {
 
     pub fn begin_frame(&mut self) {
         // 等待 command buffer 之类的资源复用
-        unsafe {
+        {
             let wait_timeline_value = if self.frame_id > 3 { self.frame_id as u64 - 3 } else { 0 };
-            let wait_semaphore = [self.render_timeline_semaphore.handle()];
-            let wait_info = vk::SemaphoreWaitInfo::default()
-                .semaphores(&wait_semaphore)
-                .values(std::slice::from_ref(&wait_timeline_value));
-            // timeout: 5 * 1000 * 1000 * 1000 ns
-            self.device.wait_semaphores(&wait_info, 5 * 1000 * 1000 * 1000).unwrap();
+            let timeout_ns = 5 * 1000 * 1000 * 1000;
+            self.render_timeline_semaphore.wait_timeline(wait_timeline_value, timeout_ns);
         }
 
         // 释放当前 frame 的 command buffer 的资源
@@ -340,12 +330,6 @@ impl FrameContext {
 
     // TODO 需要确认一下时机
     pub fn time_to_render(&self) -> bool {
-        // 时间未到时，直接返回 false
-        let limit_elapsed_us = 1000.0 * 1000.0 / self.fps_limit;
-        if limit_elapsed_us > self.timer.toc().as_micros() as f32 {
-            return false;
-        }
-
         // framebuffer 未填满时，尽快填满
         if (self.frame_id - self.rebuild_frame_id) <= self.fif_count {
             return true;
@@ -357,20 +341,18 @@ impl FrameContext {
                 &vk::SemaphoreWaitInfo::default()
                     .semaphores(&[self.render_timeline_semaphore.handle()])
                     .values(&[self.frame_id as u64 - 2]),
-                1,
+                0,
             )
         };
         match wait_result {
             Ok(_) => true,
             Err(err) => {
                 match err {
-                    vk::Result::TIMEOUT => {
-                        // 如果等待超时，说明当前帧还没有渲染完成
-                        false
-                    }
                     vk::Result::SUCCESS => true,
+                    // 等待超时，说明当前帧还没有渲染完成
+                    vk::Result::TIMEOUT => false,
+                    // 其他错误
                     _ => {
-                        // 其他错误
                         panic!("wait render timeline failed: {:?}", err);
                     }
                 }

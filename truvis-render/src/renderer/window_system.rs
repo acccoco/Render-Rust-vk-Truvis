@@ -39,7 +39,15 @@ pub struct MainWindow {
     command_pool: Rc<RhiCommandPool>,
     present_queue: Rc<RhiQueue>,
 
-    fence: RhiFence,
+    render_complete_fence: RhiFence,
+    /// 只需要一个，由 timeline 来确保其 signal 和 wait 都已经完成
+    present_complete_semaphore: RhiSemaphore,
+    /// 表示 gui 的绘制已经完成；
+    ///
+    /// 数量和 swapchain 的 image 数量相同，
+    /// 因为每个 image 都需要一个对应的 semaphore 来等待 gui 绘制完成后再进行呈现
+    ///
+    /// timeline 可以确保 signal 已经完成，但是无法确保 present 操作对其的 wait 已经完成
     render_complete_semaphores: Vec<RhiSemaphore>,
 
     timer: Timer,
@@ -76,6 +84,7 @@ impl MainWindow {
         let gui = Gui::new(rhi, &window, &present_settings, bindless_mgr.clone());
         let gui_pass = GuiPass::new(rhi, bindless_mgr.clone(), present_settings.color_format);
 
+        let present_complete_semaphore = RhiSemaphore::new(rhi, "window-present-complete");
         let render_complete_semaphores = (0..present_settings.swapchain_image_cnt)
             .map(|i| RhiSemaphore::new(rhi, &format!("window-render-complete-{}", i)))
             .collect_vec();
@@ -94,13 +103,14 @@ impl MainWindow {
         Self {
             window,
             swapchain: Some(swapchain),
+            present_complete_semaphore,
             render_complete_semaphores,
             gui,
             gui_pass,
             present_queue,
             command_pool: present_command_pool,
             cmd_buffer,
-            fence: RhiFence::new(rhi, true, "window-acquire-image"),
+            render_complete_fence: RhiFence::new(rhi, true, "window-acquire-image"),
             timer: Timer::default(),
             fps_limit: 59.9,
             frame_id: 1,
@@ -123,7 +133,7 @@ impl MainWindow {
         let rtn = renderer_data.as_ref().map(|_| self.frame_id);
 
         self.gui.prepare_frame(&self.window, elapsed);
-        // TODO 这里将 render-image 送入 gui 中，让 gui 记住，然后在 gui-draw 时可以找到这个 image，再去 bindless-mgr 中获取 handle
+        // TODO 这里将 render-image 的 bindless-key 送入 gui 中，让 gui 记住，然后在 gui-draw 时可以找到这个 image，再去 bindless-mgr 中获取 handle
         self.gui.update(&self.window, renderer_data.as_ref().map(|d| d.image_bindless_key.clone()), ui_func);
         self.draw(rhi, renderer_data);
 
@@ -148,15 +158,18 @@ impl MainWindow {
     }
 
     fn draw(&mut self, rhi: &Rhi, renderer_data: Option<RendererData>) {
+        // 直接阻塞等待，确保上一帧的 command buffer，present complete semaphore 都是空闲的
+        {
+            self.render_complete_fence.wait();
+            self.render_complete_fence.reset();
+            self.command_pool.reset_all_buffers();
+        }
+
+        // 从 swapchain 获取图像
         let swapchain = self.swapchain.as_mut().unwrap();
-
-        swapchain.acquire_next_image(None, Some(&self.fence), 10 * 1000 * 1000 * 1000);
-        self.fence.wait();
-        self.fence.reset();
-
+        let timeout_ns = 10 * 1000 * 1000 * 1000;
+        swapchain.acquire_next_image(Some(&self.present_complete_semaphore), None, timeout_ns);
         let canvas_idx = swapchain.current_image_index();
-
-        self.command_pool.reset_all_buffers();
 
         self.cmd_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         // TODO 注意参数来源
@@ -171,12 +184,12 @@ impl MainWindow {
 
         let render_complete_semaphore = &self.render_complete_semaphores[canvas_idx];
 
-        // TODO 核实：因为前面 wait fence，因此此处不需要 wait semaphore
-        let mut submit_info = RhiSubmitInfo::new(std::slice::from_ref(&self.cmd_buffer)).signal(
-            render_complete_semaphore,
-            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-            None,
-        );
+        // 等待 swapchain 的 image 准备好；通知 swapchain 的 image 已经绘制完成
+        let mut submit_info = RhiSubmitInfo::new(std::slice::from_ref(&self.cmd_buffer))
+            .wait(&self.present_complete_semaphore, vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT, None)
+            .signal(render_complete_semaphore, vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT, None);
+
+        // 等待 renderer 数据的绘制完成；通知 renderer 数据的绘制已经使用完毕
         if let Some(renderer_data) = renderer_data {
             submit_info = submit_info
                 .wait(
@@ -190,7 +203,7 @@ impl MainWindow {
                     Some(self.frame_id),
                 );
         }
-        self.present_queue.submit(vec![submit_info], None);
+        self.present_queue.submit(vec![submit_info], Some(self.render_complete_fence.clone()));
 
         swapchain.present_image(&self.present_queue, std::slice::from_ref(render_complete_semaphore));
     }
