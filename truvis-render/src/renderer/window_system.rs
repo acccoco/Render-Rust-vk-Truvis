@@ -12,7 +12,7 @@ use std::rc::Rc;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::command_pool::RhiCommandPool;
 use truvis_rhi::core::command_queue::{RhiQueue, RhiSubmitInfo};
-use truvis_rhi::core::synchronize::{RhiFence, RhiSemaphore};
+use truvis_rhi::core::synchronize::{RhiFence, RhiImageBarrier, RhiSemaphore};
 use truvis_rhi::rhi::Rhi;
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
@@ -29,7 +29,7 @@ mod helper {
 }
 
 pub struct MainWindow {
-    window: Window,
+    winit_window: Window,
 
     swapchain: Option<RenderSwapchain>,
     gui: Gui,
@@ -101,7 +101,7 @@ impl MainWindow {
         let cmd_buffer = RhiCommandBuffer::new(rhi.device.clone(), present_command_pool.clone(), "present");
 
         Self {
-            window,
+            winit_window: window,
             swapchain: Some(swapchain),
             present_complete_semaphore,
             render_complete_semaphores,
@@ -115,6 +115,11 @@ impl MainWindow {
             fps_limit: 59.9,
             frame_id: 1,
         }
+    }
+
+    #[inline]
+    pub fn window(&self) -> &Window {
+        &self.winit_window
     }
 
     pub fn time_to_update(&self) -> bool {
@@ -132,13 +137,17 @@ impl MainWindow {
         self.timer.tic();
         let rtn = renderer_data.as_ref().map(|_| self.frame_id);
 
-        self.gui.prepare_frame(&self.window, elapsed);
+        self.gui.prepare_frame(&self.winit_window, elapsed);
         // TODO 这里将 render-image 的 bindless-key 送入 gui 中，让 gui 记住，然后在 gui-draw 时可以找到这个 image，再去 bindless-mgr 中获取 handle
-        self.gui.update(&self.window, renderer_data.as_ref().map(|d| d.image_bindless_key.clone()), ui_func);
+        self.gui.update(&self.winit_window, renderer_data.as_ref().map(|d| d.image_bindless_key.clone()), ui_func);
         self.draw(rhi, renderer_data);
 
         self.frame_id += 1;
         rtn
+    }
+
+    pub fn handle_event<T>(&mut self, event: &winit::event::Event<T>) {
+        self.gui.handle_event(&self.winit_window, event);
     }
 
     /// imgui 中用于绘制图形的区域大小
@@ -151,7 +160,7 @@ impl MainWindow {
 
         self.swapchain = Some(RenderSwapchain::new(
             rhi,
-            &self.window,
+            &self.winit_window,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
         ));
@@ -172,6 +181,23 @@ impl MainWindow {
         let canvas_idx = swapchain.current_image_index();
 
         self.cmd_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
+
+        // 将 image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
+        // 注：这里 bottom 是必须的
+        // 可能有 blend 操作，因此需要 COLOR_ATTACHMENT_READ
+        self.cmd_buffer.image_memory_barrier(
+            vk::DependencyFlags::empty(),
+            &[RhiImageBarrier::new()
+                .image(swapchain.current_image())
+                .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
+                .dst_mask(
+                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                    vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
+                )],
+        );
+
         // TODO 注意参数来源
         self.gui_pass.draw(
             rhi,
@@ -181,6 +207,19 @@ impl MainWindow {
             &mut self.gui,
         );
         self.cmd_buffer.end();
+
+        self.cmd_buffer.image_memory_barrier(
+            vk::DependencyFlags::empty(),
+            &[RhiImageBarrier::new()
+                .image(swapchain.current_image())
+                .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
+                .src_mask(
+                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                    vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
+                )
+                .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())],
+        );
 
         let render_complete_semaphore = &self.render_complete_semaphores[canvas_idx];
 

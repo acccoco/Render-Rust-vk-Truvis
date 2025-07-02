@@ -16,56 +16,115 @@ use truvis_rhi::{
     rhi::Rhi,
 };
 
-/// 各种各样和 frame 以及 viewport 相关的 buffers
-struct FrameBuffers {
+pub struct RendererData<'a> {
+    pub image: &'a RhiImage2DView,
+    pub image_bindless_key: String,
+    pub wait_timeline_value: u64,
+    pub wait_timeline_semaphore: &'a RhiSemaphore,
+    pub signal_timeline_semaphore: &'a RhiSemaphore,
+}
+
+pub struct FrameContext {
+    /// 当前处在 in-flight 的第几帧：A, B, C
+    fif_label: FrameLabel,
+
+    /// 当前的帧序号，一直累加，初始序号是 1
+    frame_id: usize,
+
+    /// 发生重建时，当时的帧序号
+    rebuild_frame_id: usize,
+    fif_count: usize,
+
+    /// 为每个 frame 分配一个 command pool
+    graphics_command_pools: Vec<Rc<RhiCommandPool>>,
+
+    /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
+    allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
+
     rt_images: Vec<Rc<RhiImage2D>>,
     rt_image_views: Vec<Rc<RhiImage2DView>>,
     rt_bindless_keys: Vec<String>,
 
     _depth_image: Rc<RhiImage2D>,
     _depth_view: Rc<RhiImage2DView>,
+
+    /// 帧渲染完成的 timeline，value 就等于 frame_id
+    render_timeline_semaphore: RhiSemaphore,
+
+    /// 渲染帧依赖的外部时间线
+    present_timeline_semaphore: RhiSemaphore,
+
+    /// 每一帧依赖的外部时间线的 value
+    frame_present_time_value: Vec<Vec<u64>>,
+
+    device: Rc<RhiDevice>,
 }
-impl Drop for FrameBuffers {
-    fn drop(&mut self) {
-        assert_eq!(Rc::strong_count(&self._depth_view), 1);
-        assert_eq!(Rc::strong_count(&self._depth_image), 2); // 1 for self, 1 for image view
-        for rt_image in &self.rt_images {
-            assert_eq!(Rc::strong_count(rt_image), 2); // 1 for self, 1 for image view
-        }
-        for rt_view in &self.rt_image_views {
-            assert_eq!(Rc::strong_count(rt_view), 1);
-        }
-    }
+impl Drop for FrameContext {
+    fn drop(&mut self) {}
 }
-impl FrameBuffers {
+impl FrameContext {
+    // region ctor
+
     pub fn new(rhi: &Rhi, frame_settings: &FrameSettings, bindless_mgr: &mut BindlessManager) -> Self {
+        let graphics_command_pools = (0..frame_settings.fif_num)
+            .map(|i| {
+                Rc::new(RhiCommandPool::new(
+                    rhi.device.clone(),
+                    rhi.graphics_queue_family(),
+                    vk::CommandPoolCreateFlags::TRANSIENT,
+                    &format!("render_context_graphics_command_pool_{}", i),
+                ))
+            })
+            .collect_vec();
+
         let (depth_image, depth_image_view) =
             Self::create_depth_image(rhi, frame_settings.depth_format, frame_settings.frame_extent);
         let (rt_images, rt_image_views) = Self::create_rt_image(rhi, frame_settings);
-
-        // 将相关的 image 注册到 bindless manager 中
         let rt_bindless_keys = rt_images
             .iter()
             .enumerate()
             .map(|(i, _)| format!("Renderer::RtImageView_{}", FrameLabel::from_usize(i)))
             .collect_vec();
-        for (rt_bindless_key, rt_image_view) in rt_bindless_keys.iter().zip(rt_image_views.iter()) {
-            bindless_mgr.register_image(rt_bindless_key.clone(), rt_image_view.clone());
-        }
 
-        Self {
+        let render_timeline_semaphore = RhiSemaphore::new_timeline(rhi, 0, "frame-render-complete");
+        let present_timeline_semaphore = RhiSemaphore::new_timeline(rhi, 0, "frame-present-complete");
+
+        // 初始值应该是 1，因为 timeline semaphore 初始值是 0
+        let init_frame_id = 1;
+        let frame_context = Self {
+            frame_id: init_frame_id,
+            fif_label: FrameLabel::from_usize(init_frame_id),
+            rebuild_frame_id: init_frame_id,
+            fif_count: frame_settings.fif_num,
+            _depth_view: depth_image_view,
+            _depth_image: depth_image,
             rt_images,
             rt_image_views,
             rt_bindless_keys,
+            render_timeline_semaphore,
+            present_timeline_semaphore,
+            frame_present_time_value: vec![vec![]; frame_settings.fif_num],
+            graphics_command_pools,
+            allocated_command_buffers: vec![Vec::new(); frame_settings.fif_num],
+            device: rhi.device.clone(),
+        };
+        frame_context.register_bindless(bindless_mgr);
+        frame_context
+    }
 
-            _depth_image: depth_image,
-            _depth_view: depth_image_view,
+    // endregion
+
+    // region ================== framebuffers ===================
+
+    fn unregister_bindless(&self, bindless_mgr: &mut BindlessManager) {
+        for rt_bindless_key in &self.rt_bindless_keys {
+            bindless_mgr.unregister_image(rt_bindless_key);
         }
     }
 
-    pub fn unregister_bindless(&self, bindless_mgr: &mut BindlessManager) {
-        for rt_bindless_key in &self.rt_bindless_keys {
-            bindless_mgr.unregister_image(rt_bindless_key);
+    fn register_bindless(&self, bindless_mgr: &mut BindlessManager) {
+        for (rt_bindless_key, rt_image_view) in self.rt_bindless_keys.iter().zip(self.rt_image_views.iter()) {
+            bindless_mgr.register_image(rt_bindless_key.clone(), rt_image_view.clone());
         }
     }
 
@@ -160,89 +219,10 @@ impl FrameBuffers {
 
         (rt_images, rt_image_views)
     }
-}
-
-pub struct RendererData<'a> {
-    pub image: &'a RhiImage2DView,
-    pub image_bindless_key: String,
-    pub wait_timeline_value: u64,
-    pub wait_timeline_semaphore: &'a RhiSemaphore,
-    pub signal_timeline_semaphore: &'a RhiSemaphore,
-}
-
-pub struct FrameContext {
-    /// 当前处在 in-flight 的第几帧：A, B, C
-    fif_label: FrameLabel,
-
-    /// 当前的帧序号，一直累加，初始序号是 1
-    frame_id: usize,
-
-    /// 发生重建时，当时的帧序号
-    rebuild_frame_id: usize,
-    fif_count: usize,
-
-    /// 为每个 frame 分配一个 command pool
-    graphics_command_pools: Vec<Rc<RhiCommandPool>>,
-
-    /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
-    allocated_command_buffers: Vec<Vec<RhiCommandBuffer>>,
-
-    frame_buffers: FrameBuffers,
-
-    /// 帧渲染完成的 timeline，value 就等于 frame_id
-    render_timeline_semaphore: RhiSemaphore,
-
-    /// 渲染帧依赖的外部时间线
-    present_timeline_semaphore: RhiSemaphore,
-
-    /// 每一帧依赖的外部时间线的 value
-    frame_present_time_value: Vec<Vec<u64>>,
-
-    device: Rc<RhiDevice>,
-}
-impl Drop for FrameContext {
-    fn drop(&mut self) {}
-}
-impl FrameContext {
-    // region ctor
-
-    pub fn new(rhi: &Rhi, frame_settings: &FrameSettings, bindless_mgr: &mut BindlessManager) -> Self {
-        let graphics_command_pools = (0..frame_settings.fif_num)
-            .map(|i| {
-                Rc::new(RhiCommandPool::new(
-                    rhi.device.clone(),
-                    rhi.graphics_queue_family(),
-                    vk::CommandPoolCreateFlags::TRANSIENT,
-                    &format!("render_context_graphics_command_pool_{}", i),
-                ))
-            })
-            .collect_vec();
-
-        let frame_buffers = FrameBuffers::new(rhi, frame_settings, bindless_mgr);
-
-        let render_timeline_semaphore = RhiSemaphore::new_timeline(rhi, 0, "frame-render-complete");
-        let present_timeline_semaphore = RhiSemaphore::new_timeline(rhi, 0, "frame-present-complete");
-
-        // 初始值应该是 1，因为 timeline semaphore 初始值是 0
-        let init_frame_id = 1;
-        Self {
-            frame_id: init_frame_id,
-            fif_label: FrameLabel::from_usize(init_frame_id),
-            rebuild_frame_id: init_frame_id,
-            fif_count: frame_settings.fif_num,
-            frame_buffers,
-            render_timeline_semaphore,
-            present_timeline_semaphore,
-            frame_present_time_value: vec![vec![]; frame_settings.fif_num],
-            graphics_command_pools,
-            allocated_command_buffers: vec![Vec::new(); frame_settings.fif_num],
-            device: rhi.device.clone(),
-        }
-    }
 
     // endregion
 
-    // region getter
+    // region ================== getter ==================
 
     #[inline]
     pub fn crt_frame_label(&self) -> FrameLabel {
@@ -261,18 +241,18 @@ impl FrameContext {
 
     #[inline]
     pub fn depth_view(&self) -> &RhiImage2DView {
-        &self.frame_buffers._depth_view
+        &self._depth_view
     }
 
     // TODO 为每个 image 分配一个 uuid，bindless 就使用这个 uuid 即可
     #[inline]
     pub fn crt_frame_bindless_handle(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
-        bindless_manager.get_image_idx(&self.frame_buffers.rt_bindless_keys[*self.fif_label]).unwrap()
+        bindless_manager.get_image_idx(&self.rt_bindless_keys[*self.fif_label]).unwrap()
     }
 
     // endregion
 
-    // region phase methods
+    // region ================== phase methods ==================
 
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer(&mut self, debug_name: &str) -> RhiCommandBuffer {
@@ -301,8 +281,8 @@ impl FrameContext {
 
         let frame_label_to_present = FrameLabel::from_usize(frame_id_to_present % self.fif_count);
         Some(RendererData {
-            image: &self.frame_buffers.rt_image_views[*frame_label_to_present],
-            image_bindless_key: self.frame_buffers.rt_bindless_keys[*frame_label_to_present].clone(),
+            image: &self.rt_image_views[*frame_label_to_present],
+            image_bindless_key: self.rt_bindless_keys[*frame_label_to_present].clone(),
             wait_timeline_semaphore: &self.render_timeline_semaphore,
             signal_timeline_semaphore: &self.present_timeline_semaphore,
             wait_timeline_value: frame_id_to_present as u64,
@@ -375,8 +355,26 @@ impl FrameContext {
         frame_settings: &FrameSettings,
         bindless_mgr: &mut BindlessManager,
     ) {
-        self.frame_buffers.unregister_bindless(bindless_mgr);
-        self.frame_buffers = FrameBuffers::new(rhi, frame_settings, bindless_mgr);
+        self.unregister_bindless(bindless_mgr);
+
+        assert_eq!(Rc::strong_count(&self._depth_view), 1);
+        assert_eq!(Rc::strong_count(&self._depth_image), 2); // 1 for self, 1 for image view
+        for rt_image in &self.rt_images {
+            assert_eq!(Rc::strong_count(rt_image), 2); // 1 for self, 1 for image view
+        }
+        for rt_view in &self.rt_image_views {
+            assert_eq!(Rc::strong_count(rt_view), 1);
+        }
+
+        // FIXME 这个写法实在是不怎么样
+        let (depth_image, depth_image_view) =
+            Self::create_depth_image(rhi, frame_settings.depth_format, frame_settings.frame_extent);
+        let (rt_images, rt_image_views) = Self::create_rt_image(rhi, frame_settings);
+        self._depth_view = depth_image_view;
+        self._depth_image = depth_image;
+        self.rt_images = rt_images;
+        self.rt_image_views = rt_image_views;
+        self.register_bindless(bindless_mgr);
 
         self.rebuild_frame_id = self.frame_id;
     }

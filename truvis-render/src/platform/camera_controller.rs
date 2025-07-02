@@ -26,7 +26,8 @@ impl CameraController {
     }
 
     /// 根据输入更新相机状态
-    pub fn update(&mut self, delta_time_s: f32) {
+    pub fn update(&mut self, deltatime: std::time::Duration) {
+        let delta_time_s = deltatime.as_secs_f32();
         let input_manager = self.input_manager.borrow();
 
         if input_manager.is_right_button_pressed() {

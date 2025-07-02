@@ -2,7 +2,7 @@ use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, F
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
-use crate::render_pipeline::pipeline_context::TempPipelineCtx;
+use crate::render_pipeline::pipeline_context::PipelineContext;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::{FrameContext, RendererData};
 use crate::renderer::gpu_scene::GpuScene;
@@ -48,6 +48,11 @@ impl Renderer {
     #[inline]
     pub fn frame_settings(&self) -> FrameSettings {
         self.frame_settings
+    }
+
+    // TODO remove me: 外部不应该用到这个时间
+    pub fn deltatime(&self) -> std::time::Duration {
+        self.timer.elapse
     }
 
     /// 根据 vulkan 实例和显卡，获取合适的深度格式
@@ -146,18 +151,16 @@ impl Renderer {
         }
     }
 
-    pub fn collect_render_ctx(&mut self) -> TempPipelineCtx {
+    pub fn collect_render_ctx(&mut self) -> PipelineContext {
         let crt_frame_label = self.frame_ctx.crt_frame_label();
 
-        TempPipelineCtx {
-            rhi: Some(&self.rhi),
-            gpu_scene: Some(&self.gpu_scene),
-            bindless_mgr: Some(self.bindless_mgr.clone()),
-            per_frame_data: Some(&self.per_frame_data_buffers[*crt_frame_label]),
-            frame_ctx: Some(&mut self.frame_ctx),
-
-            gui: None,
-            timer: None,
+        PipelineContext {
+            rhi: &self.rhi,
+            gpu_scene: &self.gpu_scene,
+            bindless_mgr: self.bindless_mgr.clone(),
+            per_frame_data: &self.per_frame_data_buffers[*crt_frame_label],
+            frame_ctx: &mut self.frame_ctx,
+            timer: &self.timer,
         }
     }
 

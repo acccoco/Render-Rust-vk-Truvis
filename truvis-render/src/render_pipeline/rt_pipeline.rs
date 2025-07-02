@@ -16,7 +16,6 @@ use truvis_rhi::rhi::Rhi;
 pub struct RtPipeline {
     rt_pass: SimlpeRtPass,
     blit_pass: ComputePass<shader::blit::PushConstant>,
-    gui_pass: GuiPass,
 }
 impl RtPipeline {
     pub fn new(rhi: &Rhi, pipeline_settings: &FrameSettings, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
@@ -27,15 +26,8 @@ impl RtPipeline {
             cstr::cstr!("main"),
             "shader/build/imgui/blit.slang.spv",
         );
-        // TODO 这里不需要这个 pass
-        let gui_pass =
-            GuiPass::new(rhi, bindless_mgr.clone(), pipeline_settings.color_format, pipeline_settings.depth_format);
 
-        Self {
-            rt_pass,
-            blit_pass,
-            gui_pass,
-        }
+        Self { rt_pass, blit_pass }
     }
 
     pub fn render(&self, ctx: PipelineContext) {
@@ -44,7 +36,6 @@ impl RtPipeline {
             gpu_scene,
             bindless_mgr,
             frame_ctx,
-            gui,
             timer: _,
             per_frame_data,
         } = ctx;
@@ -58,6 +49,7 @@ impl RtPipeline {
         {
             let cmd = frame_ctx.alloc_command_buffer("ray-tracing");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
+            // TODO 需要确保上一个 frame 的 rt 已经写入完毕
             // frams in flight 使用同一个 rt image，因此需要确保之前的 rt 写入已经完成
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
@@ -83,6 +75,7 @@ impl RtPipeline {
             let cmd = frame_ctx.alloc_command_buffer("blit");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit");
 
+            // FIXME remove me
             // 只需要建立起执行依赖即可，确保 present 完成后，再进行 layout trans
             // COLOR_ATTACHMENT_READ 对应 blend 等操作
             let present_image_barrier = RhiImageBarrier::new()

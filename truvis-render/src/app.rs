@@ -1,12 +1,8 @@
-use crate::gui::gui::Gui;
 use crate::outer_app::OuterApp;
 use crate::platform::camera::DrsCamera;
 use crate::platform::camera_controller::CameraController;
 use crate::platform::input_manager::InputManager;
-use crate::platform::timer::Timer;
 use crate::render::Renderer;
-use crate::render_pipeline::pipeline_context::{PipelineContext, TempPipelineCtx};
-use crate::renderer::swapchain::RenderSwapchain;
 use crate::renderer::window_system::MainWindow;
 use ash::vk;
 use raw_window_handle::HasDisplayHandle;
@@ -15,7 +11,6 @@ use std::ffi::CStr;
 use std::rc::Rc;
 use std::sync::OnceLock;
 use truvis_crate_tools::init_log::init_log;
-use truvis_rhi::core::command_queue::RhiQueue;
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
@@ -33,7 +28,7 @@ pub struct TruvisApp<T: OuterApp> {
 
     /// 需要等待窗口事件初始化，因此 OnceCell
     window_system: OnceCell<MainWindow>,
-    last_render_area: vk::Rect2D,
+    last_render_area: vk::Extent2D,
 
     input_manager: Rc<RefCell<InputManager>>,
 
@@ -56,7 +51,6 @@ impl<T: OuterApp> TruvisApp<T> {
 
         // 创建输入管理器和计时器
         let input_manager = Rc::new(RefCell::new(InputManager::new()));
-        let timer = Timer::default();
 
         // 创建相机控制器
         let camera_controller = CameraController::new(DrsCamera::default(), input_manager.clone());
@@ -74,6 +68,7 @@ impl<T: OuterApp> TruvisApp<T> {
         let mut app = Self {
             renderer: Renderer::new(extra_instance_ext),
             window_system: OnceCell::new(),
+            last_render_area: Default::default(),
             input_manager,
             camera_controller,
             outer_app: OnceCell::new(),
@@ -85,29 +80,21 @@ impl<T: OuterApp> TruvisApp<T> {
 
     /// 在 window 创建之后调用，初始化 Renderer 和 GUI
     pub fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
-        let window_init_info = WindowCreateInfo {
-            height: 800,
-            width: 800,
-            title: "Truvis".to_string(),
-        };
-
-        let window_system = MainWindow::new(event_loop, &self.renderer.rhi, window_init_info);
-
-        self.renderer.init_after_window(&window_system);
-        let gui = Gui::new(
+        let window_system = MainWindow::new(
+            event_loop,
             &self.renderer.rhi,
-            window_system.window(),
-            &self.renderer.frame_settings(),
+            "Truvis".to_string(),
+            vk::Extent2D {
+                width: 800,
+                height: 800,
+            },
             self.renderer.bindless_mgr.clone(),
         );
 
         let outer_app = T::init(&mut self.renderer, self.camera_controller.camera_mut());
 
         self.window_system.set(window_system).map_err(|_| ()).unwrap();
-        self.gui.set(gui).map_err(|_| ()).unwrap();
         self.outer_app.set(outer_app).map_err(|_| ()).unwrap();
-
-        self.timer.reset();
     }
 
     pub fn update(&mut self) {
@@ -126,58 +113,46 @@ impl<T: OuterApp> TruvisApp<T> {
         }
 
         // Part 2: update renderer
+        // resize framebuffer
+        {
+            let extent = self.window_system.get().unwrap().get_render_extent();
+            if self.last_render_area != extent {
+                self.renderer.resize_frame_buffer(extent);
+                self.last_render_area = extent;
+            }
+        }
 
-        // ===================== Phase: Begin Frame =====================
-        self.renderer.begin_frame();
-
-        // ===================== Phase: IO =====================
-        // TODO 这个 input manager, 以及 camera controller
-        //  应该是只服务于 renderer 的，因此更新频率也应该和 renderer 一致
-        self.input_manager.borrow_mut().update();
-        self.camera_controller.update(self.timer.delta_time_s);
-
-        // ===================== Phase: Gui Update =====================
-        let gui = self.gui.get_mut().unwrap();
-        gui.update(self.window_system.get().unwrap().window(), |ui| {
-            self.outer_app.get_mut().unwrap().draw_ui(ui);
-        });
-        self.renderer.on_render_area_changed(gui.get_render_region());
-
-        // update render
+        // update renderer
+        // FIXME 应该移动到 Renderer 里面去
         if self.renderer.time_to_render() {
-            todo!()
+            self.renderer.begin_frame();
+
+            // TODO 这个 input manager, 以及 camera controller
+            //  应该是只服务于 renderer 的，因此更新频率也应该和 renderer 一致
+            //  将其移动到 Renderer 中
+            self.input_manager.borrow_mut().update();
+            self.camera_controller.update(self.renderer.deltatime());
+
+            self.outer_app.get_mut().unwrap().update(&mut self.renderer);
+
+            self.renderer.before_render(&self.input_manager.borrow().state, self.camera_controller.camera());
+
+            // 构建出 PipelineContext
+            let pipeline_ctx = self.renderer.collect_render_ctx();
+            self.outer_app.get_mut().unwrap().draw(pipeline_ctx);
+
+            self.renderer.after_render();
+            self.renderer.end_frame();
         }
-
-        // ===================== Phase: Update =====================
-        self.outer_app.get_mut().unwrap().update(&mut self.renderer);
-
-        // ===================== Phase: Before Render =====================
-        self.renderer.before_render(&self.input_manager.borrow().state, &self.timer, self.camera_controller.camera());
-
-        // ===================== Phase: Render =====================
-        // 构建出 PipelineContext
-        let pipeline_ctx = self.renderer.collect_render_ctx();
-        let pipeline_ctx = TempPipelineCtx {
-            gui: Some(self.gui.get_mut().unwrap()),
-            timer: Some(&self.timer),
-            ..pipeline_ctx
-        }
-        .to_pipeline_context();
-        self.outer_app.get_mut().unwrap().draw(pipeline_ctx);
-
-        // ===================== Phase: After Render =====================
-        self.renderer.after_render();
-
-        // ===================== Phase: End Frame =====================
-        self.renderer.end_frame();
     }
 
     pub fn rebuild(&mut self, width: u32, height: u32) {
         self.renderer.wait_idle();
+        self.window_system.get_mut().unwrap().rebuild_after_resized(&self.renderer.rhi);
 
         log::info!("try to rebuild render context");
-        self.renderer.rebuild_after_resized(self.window_system.get().unwrap());
 
+        // TODO 这里使用 swapchian 的长宽？
         // 更新相机的宽高比
         self.camera_controller.camera_mut().asp = width as f32 / height as f32;
 
@@ -222,14 +197,12 @@ impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
-        self.gui.get_mut().unwrap().handle_event::<UserEvent>(
-            self.window_system.get().unwrap().window(),
-            &winit::event::Event::WindowEvent {
-                window_id,
-                event: event.clone(),
-            },
-        );
+        self.window_system.get_mut().unwrap().handle_event::<UserEvent>(&winit::event::Event::WindowEvent {
+            window_id,
+            event: event.clone(),
+        });
 
+        // FIXME 这一部分应该接收 imgui 的事件
         // 使用InputManager处理窗口事件
         self.input_manager.borrow_mut().handle_window_event(&event);
 
