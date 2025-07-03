@@ -113,12 +113,12 @@ impl Gui {
                 atlas_texture.data,
                 "imgui-fonts",
             ));
-            RhiTexture2D::new(rhi, image, "imgui-fonts")
+            RhiTexture2D::new(rhi, &image, "imgui-fonts")
         };
 
         let fonts_texture_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);
         let fonts_texture_key = Self::get_texture_key(fonts_texture_id);
-        bindless_mgr.register_texture(fonts_texture_key.clone(), fonts_texture);
+        bindless_mgr.register_texture_owned(fonts_texture_key.clone(), fonts_texture);
         imgui_ctx.fonts().tex_id = fonts_texture_id;
     }
 

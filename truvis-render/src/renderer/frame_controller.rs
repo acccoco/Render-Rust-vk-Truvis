@@ -16,7 +16,7 @@ use truvis_rhi::{
     rhi::Rhi,
 };
 
-pub struct RendererData<'a> {
+pub struct PresentData<'a> {
     pub image: &'a RhiImage2DView,
     pub image_bindless_key: String,
     pub wait_timeline_value: u64,
@@ -114,114 +114,6 @@ impl FrameController {
 
     // endregion
 
-    // region ================== framebuffers ===================
-
-    fn unregister_bindless(&self, bindless_mgr: &mut BindlessManager) {
-        for rt_bindless_key in &self.rt_bindless_keys {
-            bindless_mgr.unregister_image(rt_bindless_key);
-        }
-    }
-
-    fn register_bindless(&self, bindless_mgr: &mut BindlessManager) {
-        for (rt_bindless_key, rt_image_view) in self.rt_bindless_keys.iter().zip(self.rt_image_views.iter()) {
-            bindless_mgr.register_image(rt_bindless_key.clone(), rt_image_view.clone());
-        }
-    }
-
-    /// 创建深度图像和视图
-    fn create_depth_image(
-        rhi: &Rhi,
-        depth_format: vk::Format,
-        frame_extent: vk::Extent2D,
-    ) -> (Rc<RhiImage2D>, Rc<RhiImage2DView>) {
-        let depth_image = Rc::new(RhiImage2D::new(
-            rhi,
-            Rc::new(RhiImageCreateInfo::new_image_2d_info(
-                frame_extent,
-                depth_format,
-                vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-            )),
-            &vk_mem::AllocationCreateInfo {
-                usage: vk_mem::MemoryUsage::AutoPreferDevice,
-                ..Default::default()
-            },
-            "depth",
-        ));
-
-        let depth_image_view = RhiImage2DView::new(
-            rhi,
-            depth_image.clone(),
-            RhiImageViewCreateInfo::new_image_view_2d_info(depth_format, vk::ImageAspectFlags::DEPTH),
-            "depth".to_string(),
-        );
-
-        (depth_image, Rc::new(depth_image_view))
-    }
-
-    /// 创建 RayTracing 需要的 image
-    fn create_rt_image(rhi: &Rhi, frame_settings: &FrameSettings) -> (Vec<Rc<RhiImage2D>>, Vec<Rc<RhiImage2DView>>) {
-        let rt_images = (0..frame_settings.fif_num)
-            .map(|i| {
-                Rc::new(RhiImage2D::new(
-                    rhi,
-                    Rc::new(RhiImageCreateInfo::new_image_2d_info(
-                        frame_settings.frame_extent,
-                        frame_settings.color_format,
-                        vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED,
-                    )),
-                    &vk_mem::AllocationCreateInfo {
-                        usage: vk_mem::MemoryUsage::AutoPreferDevice,
-                        ..Default::default()
-                    },
-                    &format!("rt-{}", FrameLabel::from_usize(i)),
-                ))
-            })
-            .collect_vec();
-
-        let rt_image_views = rt_images
-            .iter()
-            .enumerate()
-            .map(|(i, rt_image)| {
-                Rc::new(RhiImage2DView::new(
-                    rhi,
-                    rt_image.handle(),
-                    RhiImageViewCreateInfo::new_image_view_2d_info(
-                        frame_settings.color_format,
-                        vk::ImageAspectFlags::COLOR,
-                    ),
-                    format!("rt-{}", FrameLabel::from_usize(i)),
-                ))
-            })
-            .collect_vec();
-
-        // layout transfer
-        RhiCommandBuffer::one_time_exec(
-            rhi,
-            rhi.graphics_command_pool.clone(),
-            &rhi.graphics_queue,
-            |cmd| {
-                let barriers = rt_images
-                    .iter()
-                    .map(|rt_image| {
-                        RhiImageBarrier::new()
-                            .image(rt_image.handle())
-                            .src_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())
-                            .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
-                            .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL)
-                            .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                    })
-                    .collect_vec();
-
-                cmd.image_memory_barrier(vk::DependencyFlags::empty(), &barriers);
-            },
-            "transfer-rt-image-layout",
-        );
-
-        (rt_images, rt_image_views)
-    }
-
-    // endregion
-
     // region ================== getter ==================
 
     #[inline]
@@ -237,17 +129,6 @@ impl FrameController {
     #[inline]
     pub fn crt_frame_name(&self) -> String {
         format!("[F{}{}]", self.frame_id, self.fif_label)
-    }
-
-    #[inline]
-    pub fn depth_view(&self) -> &RhiImage2DView {
-        &self._depth_view
-    }
-
-    // TODO 为每个 image 分配一个 uuid，bindless 就使用这个 uuid 即可
-    #[inline]
-    pub fn crt_frame_bindless_handle(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
-        bindless_manager.get_image_idx(&self.rt_bindless_keys[*self.fif_label]).unwrap()
     }
 
     // endregion
@@ -267,7 +148,7 @@ impl FrameController {
     /// 获取用于 present 的 image
     ///
     /// 一起返回的还有 timeline value，表示该 image 渲染完成的时间点
-    pub fn get_renderer_data(&self) -> Option<RendererData> {
+    pub fn get_renderer_data(&self) -> Option<PresentData> {
         // TODO 需要确认一下时机
         // 使用前 2 帧去进行 present
         if self.frame_id <= 2 {
@@ -280,7 +161,7 @@ impl FrameController {
         }
 
         let frame_label_to_present = FrameLabel::from_usize(frame_id_to_present % self.fif_count);
-        Some(RendererData {
+        Some(PresentData {
             image: &self.rt_image_views[*frame_label_to_present],
             image_bindless_key: self.rt_bindless_keys[*frame_label_to_present].clone(),
             wait_timeline_semaphore: &self.render_timeline_semaphore,

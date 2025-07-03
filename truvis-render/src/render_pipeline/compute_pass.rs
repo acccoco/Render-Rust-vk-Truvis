@@ -30,7 +30,7 @@ impl<P: bytemuck::Pod> ComputePass<P> {
                 .offset(0)
                 .size(size_of::<P>() as u32);
 
-            let descriptor_sets = [bindless_mgr.bindless_layout.handle()];
+            let descriptor_sets = [bindless_mgr.bindless_descriptor_layout.handle()];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));

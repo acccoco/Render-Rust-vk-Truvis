@@ -337,8 +337,8 @@ impl GpuScene {
             spot_light_count: 0, // TODO 暂时无用
             tlas: crt_gpu_buffers.tlas.as_ref().map_or(vk::DeviceAddress::default(), |tlas| tlas.get_device_address()),
 
-            sky: bindless_mgr.get_texture_idx(&self.resources.sky).unwrap(),
-            uv_checker: bindless_mgr.get_texture_idx(&self.resources.uv_checker).unwrap(),
+            sky: bindless_mgr.get_texture_handle(&self.resources.sky).unwrap(),
+            uv_checker: bindless_mgr.get_texture_handle(&self.resources.uv_checker).unwrap(),
         };
 
         cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.handle(), 0, bytemuck::bytes_of(&scene_data));
@@ -463,10 +463,10 @@ impl GpuScene {
                 emissive: mat.emissive.xyz().into(),
                 metallic: 0.5,
                 roughness: 0.5,
-                diffuse_map: bindless_mgr.get_texture_idx(&mat.diffuse_map).unwrap_or(shader::TextureHandle {
+                diffuse_map: bindless_mgr.get_texture_handle(&mat.diffuse_map).unwrap_or(shader::TextureHandle {
                     index: shader::INVALID_TEX_ID,
                 }),
-                normal_map: bindless_mgr.get_texture_idx(&mat.normal_map).unwrap_or(shader::TextureHandle {
+                normal_map: bindless_mgr.get_texture_handle(&mat.normal_map).unwrap_or(shader::TextureHandle {
                     index: shader::INVALID_TEX_ID,
                 }),
                 reflection: mat.reflection,

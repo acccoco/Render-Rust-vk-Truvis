@@ -338,7 +338,7 @@ impl SimlpeRtPass {
         let pipeline_layout = {
             let bineless_mgr = bindless_mgr.borrow();
 
-            let descriptor_sets = [bineless_mgr.bindless_layout.handle()];
+            let descriptor_sets = [bineless_mgr.bindless_descriptor_layout.handle()];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
@@ -398,7 +398,7 @@ impl SimlpeRtPass {
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
             0,
-            &[self._bindless_mgr.borrow().bindless_sets[*frame_label].handle()],
+            &[self._bindless_mgr.borrow().bindless_descriptor_sets[*frame_label].handle()],
             None,
         );
         let push_constant = shader::rt::PushConstants {

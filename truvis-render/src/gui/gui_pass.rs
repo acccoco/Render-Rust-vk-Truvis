@@ -49,7 +49,7 @@ impl GuiPass {
     pub fn new(rhi: &Rhi, bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
         let pipeline_layout = Rc::new(RhiPipelineLayout::new(
             rhi.device.clone(),
-            &[bindless_mgr.borrow().bindless_layout.handle()],
+            &[bindless_mgr.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 offset: 0,
@@ -156,7 +156,7 @@ impl GuiPass {
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),
             0,
-            &[self.bindless_mgr.borrow().bindless_sets[*frame_label].handle()],
+            &[self.bindless_mgr.borrow().bindless_descriptor_sets[*frame_label].handle()],
             None,
         );
         cmd.cmd_push_constants(
@@ -212,7 +212,7 @@ impl GuiPass {
                         if Some(texture_id) != last_texture_id {
                             let texture_key = Gui::get_texture_key(texture_id);
                             let texture_handle = bindless_mgr
-                                .get_texture_idx(&texture_key)
+                                .get_texture_handle(&texture_key)
                                 .expect(&format!("Texture not found: {}", texture_key));
                             cmd.cmd_push_constants(
                                 self.pipeline_layout.handle(),

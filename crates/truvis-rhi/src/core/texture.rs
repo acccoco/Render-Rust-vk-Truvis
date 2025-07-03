@@ -1,7 +1,4 @@
-use std::rc::Rc;
-
-use ash::vk;
-
+use crate::core::image::ImageContainer;
 use crate::{
     core::{
         image::{RhiImage2D, RhiImage2DView, RhiImageViewCreateInfo},
@@ -9,36 +6,39 @@ use crate::{
     },
     rhi::Rhi,
 };
+use ash::vk;
+use std::rc::Rc;
+
+#[derive(PartialOrd, PartialEq, Hash, Copy, Clone, Ord, Eq)]
+pub struct Texture2DUUID(pub uuid::Uuid);
 
 pub struct RhiTexture2D {
-    image: Rc<RhiImage2D>,
-    sampler: Rc<RhiSampler>,
-    image_view: Rc<RhiImage2DView>,
+    image: ImageContainer,
+    sampler: RhiSampler,
+    image_view: RhiImage2DView,
+
+    uuid: Texture2DUUID,
 }
 
 impl RhiTexture2D {
     #[inline]
     pub fn new(rhi: &Rhi, image: Rc<RhiImage2D>, name: &str) -> Self {
-        let sampler = Rc::new(RhiSampler::new(rhi, Rc::new(RhiSamplerCreateInfo::new()), name));
+        let sampler = RhiSampler::new(rhi, Rc::new(RhiSamplerCreateInfo::new()), name);
 
-        let image_view = Rc::new(RhiImage2DView::new(
+        let image_view = RhiImage2DView::new(
             rhi,
             image.handle(),
             RhiImageViewCreateInfo::new_image_view_2d_info(vk::Format::R8G8B8A8_UNORM, vk::ImageAspectFlags::COLOR),
             name.to_string(),
-        ));
+        );
 
         Self {
-            image,
+            image: ImageContainer::Shared(image),
             sampler,
             image_view,
-        }
-    }
 
-    /// getter
-    #[inline]
-    pub fn image(&self) -> &RhiImage2D {
-        &self.image
+            uuid: Texture2DUUID(uuid::Uuid::new_v4()),
+        }
     }
 
     /// getter
@@ -59,5 +59,19 @@ impl RhiTexture2D {
             .sampler(self.sampler().handle())
             .image_view(self.image_view().handle())
             .image_layout(layout)
+    }
+}
+
+pub enum Texture2DContainer {
+    Owned(Box<RhiTexture2D>),
+    Shared(Rc<RhiTexture2D>),
+}
+impl Texture2DContainer {
+    #[inline]
+    pub fn texture(&self) -> &RhiTexture2D {
+        match self {
+            Texture2DContainer::Owned(tex) => tex,
+            Texture2DContainer::Shared(tex) => tex.as_ref(),
+        }
     }
 }

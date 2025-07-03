@@ -4,7 +4,7 @@ use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
 use crate::render_pipeline::pipeline_context::PipelineContext;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_controller::{FrameController, RendererData};
+use crate::renderer::frame_controller::{FrameController, PresentData};
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::SceneManager;
 use ash::vk;
@@ -70,7 +70,7 @@ impl Renderer {
         .unwrap_or(vk::Format::UNDEFINED)
     }
 
-    pub fn get_renderer_data(&self) -> Option<RendererData> {
+    pub fn get_renderer_data(&self) -> Option<PresentData> {
         self.frame_ctrl.get_renderer_data()
     }
 

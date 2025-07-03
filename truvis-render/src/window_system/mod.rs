@@ -15,7 +15,7 @@ use crate::gui::gui_pass::GuiPass;
 use crate::pipeline_settings::DefaultRendererSettings;
 use crate::platform::timer::Timer;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_controller::RendererData;
+use crate::renderer::frame_controller::PresentData;
 use crate::renderer::swapchain::RenderSwapchain;
 
 mod helper {
@@ -133,7 +133,7 @@ impl MainWindow {
         &mut self,
         rhi: &Rhi,
         ui_func: impl FnOnce(&mut imgui::Ui),
-        renderer_data: Option<RendererData>,
+        renderer_data: Option<PresentData>,
     ) -> Option<u64> {
         let elapsed = self.timer.toc();
         self.timer.tic();
@@ -168,7 +168,7 @@ impl MainWindow {
         ));
     }
 
-    fn draw(&mut self, rhi: &Rhi, renderer_data: Option<RendererData>) {
+    fn draw(&mut self, rhi: &Rhi, renderer_data: Option<PresentData>) {
         // 直接阻塞等待，确保上一帧的 command buffer，present complete semaphore 都是空闲的
         {
             self.render_complete_fence.wait();

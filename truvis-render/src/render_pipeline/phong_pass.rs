@@ -47,7 +47,7 @@ impl PhongPass {
 
         let pipeline_layout = Rc::new(RhiPipelineLayout::new(
             rhi.device.clone(),
-            &[bindless_manager.borrow().bindless_layout.handle()],
+            &[bindless_manager.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .offset(0)
@@ -94,7 +94,7 @@ impl PhongPass {
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline.layout(),
             0,
-            &[self.bindless_manager.borrow().bindless_sets[*frame_idx].handle()],
+            &[self.bindless_manager.borrow().bindless_descriptor_sets[*frame_idx].handle()],
             None,
         );
     }
