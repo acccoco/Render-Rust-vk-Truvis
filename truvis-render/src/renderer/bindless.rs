@@ -1,5 +1,5 @@
 use crate::pipeline_settings::FrameLabel;
-use crate::resource::ImageLoader;
+use crate::render_resource::ImageLoader;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;

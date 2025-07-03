@@ -268,7 +268,6 @@ impl RhiImage2D {
 pub struct RhiImage2DView {
     handle: vk::ImageView,
 
-    _image: Option<Rc<RhiImage2D>>,
     _info: Rc<RhiImageViewCreateInfo>,
     _name: String,
 
@@ -292,27 +291,11 @@ impl RhiDebugType for RhiImage2DView {
 }
 
 impl RhiImage2DView {
-    pub fn new(rhi: &Rhi, image: Rc<RhiImage2D>, mut info: RhiImageViewCreateInfo, name: String) -> Self {
-        info.inner.image = image.handle;
+    pub fn new(rhi: &Rhi, image: vk::Image, mut info: RhiImageViewCreateInfo, name: String) -> Self {
+        info.inner.image = image;
         let handle = unsafe { rhi.device.create_image_view(&info.inner, None).unwrap() };
         let image_view = Self {
             handle,
-            _image: Some(image),
-            _info: Rc::new(info),
-            _name: name.clone(),
-            device: rhi.device.clone(),
-        };
-        rhi.device.debug_utils().set_debug_name(&image_view, &name);
-        image_view
-    }
-
-    /// 主要用于创建 swapchain 的 image view
-    pub fn new_with_raw_image(rhi: &Rhi, vk_image: vk::Image, mut info: RhiImageViewCreateInfo, name: String) -> Self {
-        info.inner.image = vk_image;
-        let handle = unsafe { rhi.device.create_image_view(&info.inner, None).unwrap() };
-        let image_view = Self {
-            handle,
-            _image: None,
             _info: Rc::new(info),
             _name: name.clone(),
             device: rhi.device.clone(),

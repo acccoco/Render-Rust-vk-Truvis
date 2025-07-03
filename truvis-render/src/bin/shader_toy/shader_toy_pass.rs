@@ -8,7 +8,7 @@ use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::create_named_array;
 use truvis_render::platform::timer::Timer;
-use truvis_render::renderer::frame_context::FrameContext;
+use truvis_render::renderer::frame_controller::FrameController;
 use truvis_render::renderer::pipeline_settings::PipelineSettings;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::rendering_info::RhiRenderingInfo;
@@ -103,7 +103,7 @@ impl ShaderToyPass {
     pub fn draw(
         &self,
         cmd: &RhiCommandBuffer,
-        frame_ctx: &FrameContext,
+        frame_ctx: &FrameController,
         timer: &Timer,
         rect: &DrsGeometry<VertexPosColor>,
     ) {

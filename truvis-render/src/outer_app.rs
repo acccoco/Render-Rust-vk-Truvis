@@ -1,5 +1,5 @@
 use crate::platform::camera::DrsCamera;
-use crate::render::Renderer;
+use crate::renderer::renderer::Renderer;
 use crate::render_pipeline::pipeline_context::PipelineContext;
 
 pub trait OuterApp {

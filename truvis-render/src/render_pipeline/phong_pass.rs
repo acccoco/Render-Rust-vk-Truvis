@@ -1,6 +1,6 @@
 use crate::pipeline_settings::{FrameLabel, RendererSettings};
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_context::FrameContext;
+use crate::renderer::frame_controller::FrameController;
 use crate::renderer::gpu_scene::GpuScene;
 use ash::vk;
 use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
@@ -102,7 +102,7 @@ impl PhongPass {
     pub fn draw(
         &self,
         cmd: &RhiCommandBuffer,
-        frame_ctx: &FrameContext,
+        frame_ctx: &FrameController,
         viewport: vk::Extent2D,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,

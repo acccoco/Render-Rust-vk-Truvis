@@ -102,7 +102,7 @@ impl RenderSwapchain {
             .iter()
             .enumerate()
             .map(|(idx, img)| {
-                RhiImage2DView::new_with_raw_image(
+                RhiImage2DView::new(
                     rhi,
                     *img,
                     RhiImageViewCreateInfo::new_image_view_2d_info(surface_format.format, vk::ImageAspectFlags::COLOR),

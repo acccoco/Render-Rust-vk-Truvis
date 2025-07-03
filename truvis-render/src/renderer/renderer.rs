@@ -4,7 +4,7 @@ use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
 use crate::render_pipeline::pipeline_context::PipelineContext;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_context::{FrameContext, RendererData};
+use crate::renderer::frame_controller::{FrameController, RendererData};
 use crate::renderer::gpu_scene::GpuScene;
 use crate::renderer::scene_manager::SceneManager;
 use ash::vk;
@@ -13,14 +13,15 @@ use std::cell::RefCell;
 use std::ffi::CStr;
 use std::rc::Rc;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
+use truvis_rhi::core::command_queue::RhiSubmitInfo;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
-use truvis_rhi::{core::command_queue::RhiSubmitInfo, rhi::Rhi};
+use truvis_rhi::rhi::Rhi;
 
 /// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
 pub struct Renderer {
     pub rhi: Rc<Rhi>,
 
-    pub frame_ctx: FrameContext,
+    pub frame_ctrl: FrameController,
 
     frame_settings: FrameSettings,
 
@@ -35,6 +36,7 @@ pub struct Renderer {
     timer: Timer,
     fps_limit: f32,
 }
+
 impl Drop for Renderer {
     fn drop(&mut self) {
         log::info!("Dropping Renderer");
@@ -42,6 +44,7 @@ impl Drop for Renderer {
         self.wait_idle();
     }
 }
+
 impl Renderer {
     // region getter
 
@@ -68,7 +71,7 @@ impl Renderer {
     }
 
     pub fn get_renderer_data(&self) -> Option<RendererData> {
-        self.frame_ctx.get_renderer_data()
+        self.frame_ctrl.get_renderer_data()
     }
 
     // endregion
@@ -96,12 +99,12 @@ impl Renderer {
                 height: 400,
             },
         };
-        let frame_ctx = FrameContext::new(&rhi, &frame_settings, &mut bindless_mgr.borrow_mut());
+        let frame_ctx = FrameController::new(&rhi, &frame_settings, &mut bindless_mgr.borrow_mut());
 
         Self {
             frame_settings,
             accum_data: Default::default(),
-            frame_ctx,
+            frame_ctrl: frame_ctx,
             rhi,
             bindless_mgr,
             scene_mgr,
@@ -117,12 +120,12 @@ impl Renderer {
     // region ================================== phase call ====================================
 
     pub fn begin_frame(&mut self) {
-        self.frame_ctx.begin_frame();
+        self.frame_ctrl.begin_frame();
         self.timer.tic();
     }
 
     pub fn end_frame(&mut self) {
-        self.frame_ctx.end_frame(&self.rhi);
+        self.frame_ctrl.end_frame(&self.rhi);
     }
 
     pub fn time_to_render(&self) -> bool {
@@ -132,7 +135,7 @@ impl Renderer {
             return false;
         }
 
-        self.frame_ctx.time_to_render()
+        self.frame_ctrl.time_to_render()
     }
 
     pub fn before_render(&mut self, input_state: &InputState, camera: &DrsCamera) {
@@ -142,7 +145,7 @@ impl Renderer {
     }
 
     pub fn after_render(&mut self) {
-        self.frame_ctx.after_render();
+        self.frame_ctrl.after_render();
     }
 
     pub fn wait_idle(&self) {
@@ -152,29 +155,29 @@ impl Renderer {
     }
 
     pub fn collect_render_ctx(&mut self) -> PipelineContext {
-        let crt_frame_label = self.frame_ctx.crt_frame_label();
+        let crt_frame_label = self.frame_ctrl.crt_frame_label();
 
         PipelineContext {
             rhi: &self.rhi,
             gpu_scene: &self.gpu_scene,
             bindless_mgr: self.bindless_mgr.clone(),
             per_frame_data: &self.per_frame_data_buffers[*crt_frame_label],
-            frame_ctx: &mut self.frame_ctx,
+            frame_ctx: &mut self.frame_ctrl,
             timer: &self.timer,
         }
     }
 
     pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
         self.frame_settings.frame_extent = new_extent;
-        self.frame_ctx.rebuild_framebuffers(&self.rhi, &self.frame_settings, &mut self.bindless_mgr.borrow_mut());
+        self.frame_ctrl.rebuild_framebuffers(&self.rhi, &self.frame_settings, &mut self.bindless_mgr.borrow_mut());
     }
 
     fn update_gpu_scene(&mut self, input_state: &InputState, camera: &DrsCamera) {
         let frame_extent = self.frame_settings.frame_extent;
-        let crt_frame_label = self.frame_ctx.crt_frame_label();
+        let crt_frame_label = self.frame_ctrl.crt_frame_label();
 
         // 将数据上传到 gpu buffer 中
-        let cmd = self.frame_ctx.alloc_command_buffer("update-draw-buffer");
+        let cmd = self.frame_ctrl.alloc_command_buffer("update-draw-buffer");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
 
         let transfer_barrier_mask = RhiBarrierMask {
@@ -205,7 +208,7 @@ impl Renderer {
                 camera_forward: camera.camera_forward().into(),
                 time_ms: self.timer.total_time.as_micros() as f32 / 1000.0,
                 delta_time_ms: self.timer.elapse_ms(),
-                frame_id: self.frame_ctx.crt_frame_id() as u64,
+                frame_id: self.frame_ctrl.crt_frame_id() as u64,
                 mouse_pos: shader::Float2 {
                     x: mouse_pos.x as f32,
                     y: mouse_pos.y as f32,
@@ -214,7 +217,7 @@ impl Renderer {
                     x: frame_extent.width as f32,
                     y: frame_extent.height as f32,
                 },
-                rt_render_target: self.frame_ctx.crt_frame_bindless_handle(&self.bindless_mgr.borrow()),
+                rt_render_target: self.frame_ctrl.crt_frame_bindless_handle(&self.bindless_mgr.borrow()),
                 accum_frames: self.accum_data.accum_frames_num as u32,
             }
         };

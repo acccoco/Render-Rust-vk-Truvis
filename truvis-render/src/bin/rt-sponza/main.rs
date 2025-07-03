@@ -2,7 +2,7 @@ use imgui::{TextureId, Ui};
 use shader_binding::shader;
 use truvis_render::app::{OuterApp, TruvisApp};
 use truvis_render::platform::camera::DrsCamera;
-use truvis_render::render::Renderer;
+use truvis_render::renderer::renderer::Renderer;
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
 use truvis_render::render_pipeline::rt_pipeline::RtPipeline;
 

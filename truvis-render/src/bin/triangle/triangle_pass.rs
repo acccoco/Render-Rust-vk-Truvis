@@ -6,7 +6,7 @@ use model_manager::vertex::VertexLayout;
 use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::create_named_array;
-use truvis_render::renderer::frame_context::FrameContext;
+use truvis_render::renderer::frame_controller::FrameController;
 use truvis_render::renderer::pipeline_settings::PipelineSettings;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::rendering_info::RhiRenderingInfo;
@@ -74,7 +74,7 @@ impl TrianglePass {
         }
     }
 
-    pub fn draw(&self, cmd: &RhiCommandBuffer, frame_ctx: &FrameContext, shape: &DrsGeometry<VertexPosColor>) {
+    pub fn draw(&self, cmd: &RhiCommandBuffer, frame_ctx: &FrameController, shape: &DrsGeometry<VertexPosColor>) {
         let viewport_extent = frame_ctx.frame_settings().viewport_extent;
         let rendering_info = RhiRenderingInfo::new(
             vec![frame_ctx.crt_present_image_view().handle()],

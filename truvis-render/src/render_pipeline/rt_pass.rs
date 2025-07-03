@@ -1,6 +1,6 @@
 use crate::pipeline_settings::FrameSettings;
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_context::FrameContext;
+use crate::renderer::frame_controller::FrameController;
 use crate::renderer::gpu_scene::GpuScene;
 use ash::vk;
 use itertools::Itertools;
@@ -384,7 +384,7 @@ impl SimlpeRtPass {
     pub fn ray_trace(
         &self,
         cmd: &RhiCommandBuffer,
-        render_ctx: &FrameContext,
+        render_ctx: &FrameController,
         framse_settings: &FrameSettings,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,

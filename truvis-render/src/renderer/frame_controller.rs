@@ -24,7 +24,7 @@ pub struct RendererData<'a> {
     pub signal_timeline_semaphore: &'a RhiSemaphore,
 }
 
-pub struct FrameContext {
+pub struct FrameController {
     /// 当前处在 in-flight 的第几帧：A, B, C
     fif_label: FrameLabel,
 
@@ -59,10 +59,10 @@ pub struct FrameContext {
 
     device: Rc<RhiDevice>,
 }
-impl Drop for FrameContext {
+impl Drop for FrameController {
     fn drop(&mut self) {}
 }
-impl FrameContext {
+impl FrameController {
     // region ctor
 
     pub fn new(rhi: &Rhi, frame_settings: &FrameSettings, bindless_mgr: &mut BindlessManager) -> Self {
@@ -184,7 +184,7 @@ impl FrameContext {
             .map(|(i, rt_image)| {
                 Rc::new(RhiImage2DView::new(
                     rhi,
-                    rt_image.clone(),
+                    rt_image.handle(),
                     RhiImageViewCreateInfo::new_image_view_2d_info(
                         frame_settings.color_format,
                         vk::ImageAspectFlags::COLOR,

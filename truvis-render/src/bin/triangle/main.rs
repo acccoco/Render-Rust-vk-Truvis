@@ -7,7 +7,7 @@ use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use truvis_render::app::{OuterApp, TruvisApp};
 use truvis_render::platform::camera::DrsCamera;
-use truvis_render::render::Renderer;
+use truvis_render::renderer::renderer::Renderer;
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
 
 struct HelloTriangle {
