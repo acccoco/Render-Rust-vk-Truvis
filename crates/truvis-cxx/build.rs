@@ -17,46 +17,12 @@ fn main() {
 }
 
 /// # 默认目录结构
-/// * cargo 默认的环境变量：${OUTDIR} = $PROJECT/target/debug/build/$CRATE-$HASH/out
-/// * 默认情况下，cmake 的 build 目录 = ${OUTDIR}/build
-/// * 其中：${OUTDIR}/build/Debug 或者 ${OUTDIR}/build/Release 就是存放 lib, dll, exe, pdb 的位置
-struct Dirs;
-impl Dirs {
-    /// 当前项目的 target 文件夹
-    fn _rust_target_dir() -> std::path::PathBuf {
-        let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
-        let debug_or_release_dir = out_dir.parent().unwrap().parent().unwrap().parent().unwrap().parent().unwrap();
-        debug_or_release_dir.to_path_buf()
-    }
-
-    /// 自定义的 cmake 输出目录，里面存放 cmake 的 build 文件夹
-    fn cmake_custom_output_dir() -> std::path::PathBuf {
-        Self::build_dir().join("cargo-cmake-output")
-    }
-
-    /// 自定义的 cmake install 的文件夹，里面存放着 dll
-    ///
-    /// 该文件夹在 CMakeLists.txt 中指定
-    fn cmake_custom_install_bin_dir() -> std::path::PathBuf {
-        std::path::PathBuf::from(format!(
-            "{}/{}/bin",
-            Self::cmake_custom_output_dir().display(),
-            if cfg!(debug_assertions) { "Debug" } else { "Release" }
-        ))
-    }
-
-    /// 自定义的 cmake install 的文件夹，里面存放着 lib
-    ///
-    /// 该文件夹在 CMakeLists.txt 中指定
-    fn cmake_custom_install_lib_dir() -> std::path::PathBuf {
-        std::path::PathBuf::from(format!(
-            "{}/{}/lib",
-            Self::cmake_custom_output_dir().display(),
-            if cfg!(debug_assertions) { "Debug" } else { "Release" }
-        ))
-    }
-
-    /// rust 项目编译结果的文件夹，放置 exe, d, dll
+/// * cargo 默认的环境变量：${OUT_DIR} = $PROJECT/target/debug/build/$CRATE-$HASH/out
+/// * 默认情况下，cmake 的 build 目录 = ${OUT_DIR}/build
+/// * 其中：${OUT_DIR}/build/Debug 或者 ${OUT_DIR}/build/Release 就是存放 lib, dll, exe, pdb 的位置
+struct CrateDirs;
+impl CrateDirs {
+    /// rust 整个 workspace 链接结果的文件夹，放置 exe, d, dll
     /// target/debug 或者 target/release
     fn rust_bin_dir() -> std::path::PathBuf {
         let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
@@ -64,9 +30,36 @@ impl Dirs {
         debug_dir.to_path_buf()
     }
 
-    /// build.rs 所在的文件夹
-    fn build_dir() -> std::path::PathBuf {
+    /// 当前 workspace 的 target 文件夹
+    fn _rust_target_dir() -> std::path::PathBuf {
+        Self::rust_bin_dir().parent().unwrap().to_path_buf()
+    }
+
+    /// 当前 crate 的文件夹，也就是 build.rs 所在的文件夹
+    fn crate_dir() -> std::path::PathBuf {
         std::env::current_dir().unwrap()
+    }
+}
+
+struct CMakeDirs;
+impl CMakeDirs {
+    /// 自定义的 cmake 输出目录，里面存放 cmake 的 build 文件夹
+    fn cmake_custom_output_dir() -> std::path::PathBuf {
+        CrateDirs::crate_dir().join("cargo-cmake-output")
+    }
+
+    /// cmake build 的文件夹，里面存放着 cmake 的构建结果
+    fn cmake_build_dir() -> std::path::PathBuf {
+        std::path::PathBuf::from(format!("{}/build", Self::cmake_custom_output_dir().display()))
+    }
+
+    /// cmake build 文件夹下的 Debug 或 Release 目录，里面存放在 lib 以及 dll, pdb
+    fn cmake_custom_output_lib_dir() -> std::path::PathBuf {
+        std::path::PathBuf::from(format!(
+            "{}/{}",
+            Self::cmake_build_dir().display(),
+            if cfg!(debug_assertions) { "Debug" } else { "Release" }
+        ))
     }
 }
 
@@ -78,11 +71,11 @@ fn build_cmake_project() {
             "CMAKE_TOOLCHAIN_FILE",
             format!("{}/scripts/buildsystems/vcpkg.cmake", std::env::var("VCPKG_ROOT").unwrap()),
         )
-        .out_dir(Dirs::cmake_custom_output_dir())
+        .out_dir(CMakeDirs::cmake_custom_output_dir())
+        .build_target("ALL_BUILD")
         .build();
 
-    println!("cargo:rustc-link-search=native={}", Dirs::cmake_custom_install_lib_dir().display());
-    println!("cargo:rustc-link-search=native={}", Dirs::cmake_custom_install_bin_dir().display());
+    println!("cargo:rustc-link-search=native={}", CMakeDirs::cmake_custom_output_lib_dir().display());
 
     let cxx_target = "truvis-assimp-cxx";
     println!("cargo:rustc-link-lib=static={}", cxx_target);
@@ -94,7 +87,7 @@ fn copy_dll_files() {
     // println!("cargo:warning=src dir: {}", Dirs::cmake_custom_install_bin_dir().display());
 
     // 只需要复制 dll 文件到 target/debug 目录下
-    for entry in std::fs::read_dir(Dirs::cmake_custom_install_bin_dir()).unwrap() {
+    for entry in std::fs::read_dir(CMakeDirs::cmake_custom_output_lib_dir()).unwrap() {
         let entry = entry.unwrap();
         let file_name = entry.file_name();
         let source_path = entry.path();
@@ -103,8 +96,8 @@ fn copy_dll_files() {
             continue;
         }
 
-        std::fs::copy(&source_path, Dirs::rust_bin_dir().join(&file_name)).unwrap();
-        std::fs::copy(&source_path, Dirs::rust_bin_dir().join("examples").join(&file_name)).unwrap();
+        std::fs::copy(&source_path, CrateDirs::rust_bin_dir().join(&file_name)).unwrap();
+        std::fs::copy(&source_path, CrateDirs::rust_bin_dir().join("examples").join(&file_name)).unwrap();
     }
 }
 

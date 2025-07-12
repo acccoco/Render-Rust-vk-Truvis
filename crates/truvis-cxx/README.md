@@ -1,6 +1,6 @@
 目录结构
 
-* $OUTDIR = $PROJECT/target/debug/build/$CRATE-$HASH/out
+* ${OUT_DIR} = /target/debug/build/${CRATE-HASH}/out
 * 其中：build/Debug 或者 build/Release 就是存放 lib, dll, exe, pdb 的位置
 
 ```
@@ -12,3 +12,8 @@
 //     fn get_vert_cnts() -> u32;
 // }
 ```
+
+基本思路：
+
+- cmake 将编译好的 lib 文件放入特定文件夹，在 build.rs 中指定该文件夹以及需要链接的 lib 名称，静态链接
+- cmake 将编译好的 dll 放入特定文件夹，将这些文件复制到 /target/debug/ 目录下，确保 exe 在运行时可以找到这些文件
