@@ -9,13 +9,6 @@ use truvis_rhi::{
     rhi::Rhi,
 };
 
-pub enum RenderTimelinePhase {
-    RenderComplete = 0,
-    FrameEnd,
-
-    Count,
-}
-
 pub struct FrameController {
     /// 当前处在 in-flight 的第几帧：A, B, C
     fif_label: FrameLabel,
@@ -82,14 +75,6 @@ impl FrameController {
     pub fn frame_name(&self) -> String {
         format!("[F{}{}]", self.frame_id, self.fif_label)
     }
-
-    #[inline]
-    pub fn render_timeline_semaphore(&self, phase: RenderTimelinePhase) -> (&RhiSemaphore, u64) {
-        (
-            &self.render_timeline_semaphore, //
-            self.frame_id as u64 * RenderTimelinePhase::Count as u64 + phase as u64,
-        )
-    }
 }
 
 // phase methods
@@ -108,11 +93,7 @@ impl FrameController {
         // 等待 command buffer 之类的资源复用
         {
             let wait_frame = if self.frame_id > 3 { self.frame_id as u64 - 3 } else { 0 };
-            let wait_timeline_value = if wait_frame == 0 {
-                0
-            } else {
-                wait_frame as u64 * RenderTimelinePhase::Count as u64 + RenderTimelinePhase::FrameEnd as u64
-            };
+            let wait_timeline_value = if wait_frame == 0 { 0 } else { wait_frame };
             let timeout_ns = 30 * 1000 * 1000 * 1000;
             self.render_timeline_semaphore.wait_timeline(wait_timeline_value, timeout_ns);
         }
@@ -128,15 +109,7 @@ impl FrameController {
         }
     }
 
-    pub fn end_render(&self, rhi: &Rhi) {
-        // 设置渲染帧结束的 semaphore
-        let submit_info = RhiSubmitInfo::new(&[]).signal(
-            &self.render_timeline_semaphore,
-            vk::PipelineStageFlags2::NONE,
-            Some(self.render_timeline_semaphore(RenderTimelinePhase::RenderComplete).1),
-        );
-        rhi.graphics_queue.submit(vec![submit_info], None);
-    }
+    pub fn end_render(&self, _rhi: &Rhi) {}
 
     pub fn end_frame(&mut self, rhi: &Rhi) {
         // 设置当前帧结束的 semaphore，用于保护当前帧的资源
@@ -144,7 +117,7 @@ impl FrameController {
             let submit_info = RhiSubmitInfo::new(&[]).signal(
                 &self.render_timeline_semaphore,
                 vk::PipelineStageFlags2::NONE,
-                Some(self.render_timeline_semaphore(RenderTimelinePhase::FrameEnd).1),
+                Some(self.frame_id as u64),
             );
             rhi.graphics_queue.submit(vec![submit_info], None);
         }

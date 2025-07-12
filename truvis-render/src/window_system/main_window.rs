@@ -2,7 +2,6 @@ use crate::gui::gui::Gui;
 use crate::gui::gui_pass::GuiPass;
 use crate::pipeline_settings::{DefaultRendererSettings, FrameLabel};
 use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_controller::RenderTimelinePhase;
 use crate::renderer::renderer::PresentData;
 use crate::renderer::swapchain::RenderSwapchain;
 use ash::vk;
@@ -111,17 +110,25 @@ impl MainWindow {
             // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
             // 注1: 可能有 blend 操作，因此需要 COLOR_ATTACHMENT_READ
             // 注2: 这里的 bottom 表示 layout transfer 等待 present 完成
+            let swapchain_image_layout_transfer_barrier = RhiImageBarrier::new()
+                .image(swapchain.current_image())
+                .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
+                .dst_mask(
+                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                    vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
+                );
+
+            let render_target_barrier = RhiImageBarrier::new()
+                .image(renderer_data.render_target.image())
+                .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                .src_mask(renderer_data.render_target_barrier.src_stage, renderer_data.render_target_barrier.src_access)
+                .dst_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ);
+
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[RhiImageBarrier::new()
-                    .image(swapchain.current_image())
-                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                    .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                    .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
-                    .dst_mask(
-                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                        vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-                    )],
+                &[swapchain_image_layout_transfer_barrier, render_target_barrier],
             );
 
             self.gui_pass.draw(
@@ -151,7 +158,7 @@ impl MainWindow {
         cmd.end();
 
         // 等待 swapchain 的 image 准备好；通知 swapchain 的 image 已经绘制完成
-        let mut submit_info = RhiSubmitInfo::new(std::slice::from_ref(&cmd))
+        let submit_info = RhiSubmitInfo::new(std::slice::from_ref(&cmd))
             .wait(
                 &self.present_complete_semaphores[*frame_label],
                 vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
@@ -162,11 +169,6 @@ impl MainWindow {
                 vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
                 None,
             );
-
-        let wait_timeline =
-            renderer_data.frame_controller.render_timeline_semaphore(RenderTimelinePhase::RenderComplete);
-        submit_info =
-            submit_info.wait(wait_timeline.0, vk::PipelineStageFlags2::FRAGMENT_SHADER, Some(wait_timeline.1));
 
         self.rhi.graphics_queue.submit(vec![submit_info], None);
     }

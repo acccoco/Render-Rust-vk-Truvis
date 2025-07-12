@@ -22,6 +22,7 @@ use truvis_rhi::rhi::Rhi;
 pub struct PresentData<'a> {
     pub render_target: &'a RhiTexture2D,
     pub render_target_bindless_key: String,
+    pub render_target_barrier: RhiBarrierMask,
     pub frame_controller: &'a mut FrameController,
 }
 
@@ -84,6 +85,12 @@ impl Renderer {
         PresentData {
             render_target,
             render_target_bindless_key,
+            render_target_barrier: RhiBarrierMask {
+                src_stage: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                src_access: vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                dst_stage: vk::PipelineStageFlags2::NONE,
+                dst_access: vk::AccessFlags2::NONE,
+            },
             frame_controller: &mut self.frame_ctrl,
         }
     }

@@ -99,81 +99,87 @@ impl<T: OuterApp> TruvisApp<T> {
     }
 
     pub fn update(&mut self) {
+        // Begin Frame ============================
         if !self.renderer.time_to_render() {
             return;
         }
 
-        // >>> Renderer: Begin Frame
         self.renderer.begin_frame();
         let frame_label = self.renderer.frame_controller().frame_label();
         let elapsed = self.renderer.deltatime();
 
-        // >>> Window: Acquire Image from Swapchain
-        {
-            self.window_system.get_mut().unwrap().acquire_image(frame_label);
-        }
+        self.window_system.get_mut().unwrap().acquire_image(frame_label);
 
-        // >>> Window: Update Gui
+        // Update Gui ==================================
         {
             self.window_system.get_mut().unwrap().update_gui(elapsed, |ui| {
                 self.outer_app.get_mut().unwrap().draw_ui(ui);
             });
         }
 
-        // >>> Renderer: Resize Framebuffer
+        // Rendere Update ==================================
         {
-            let extent = self.window_system.get().unwrap().get_render_extent();
-            if self.last_render_area != extent {
-                self.renderer.resize_frame_buffer(extent);
-                self.last_render_area = extent;
+            // Renderer: Resize Framebuffer
+            {
+                let extent = self.window_system.get().unwrap().get_render_extent();
+                if self.last_render_area != extent {
+                    self.renderer.resize_frame_buffer(extent);
+                    self.last_render_area = extent;
+                }
+            }
+
+            // Renderer: Update Input and Camera
+            {
+                // TODO 这个 input manager, 以及 camera controller
+                //  应该是只服务于 renderer 的，因此更新频率也应该和 renderer 一致
+                //  将其移动到 Renderer 中
+                self.input_manager.borrow_mut().update();
+                self.camera_controller.update(self.renderer.deltatime());
+            }
+
+            // Outer App: Update
+            {
+                self.outer_app.get_mut().unwrap().update(&mut self.renderer);
             }
         }
 
-        // >>> Renderer: Update Input and Camera
+        // Renderer Render ==================================
         {
-            // TODO 这个 input manager, 以及 camera controller
-            //  应该是只服务于 renderer 的，因此更新频率也应该和 renderer 一致
-            //  将其移动到 Renderer 中
-            self.input_manager.borrow_mut().update();
-            self.camera_controller.update(self.renderer.deltatime());
+            // Renderer: Before Render
+            {
+                self.renderer.before_render(&self.input_manager.borrow().state, self.camera_controller.camera());
+            }
+
+            // >>> Renderer: Render
+            {
+                // 构建出 PipelineContext
+                let pipeline_ctx = self.renderer.collect_render_ctx();
+                self.outer_app.get_mut().unwrap().draw(pipeline_ctx);
+            }
+
+            // >>> Renderer: After Render
+            {
+                self.renderer.after_render();
+            }
         }
 
-        // >>> Renderer: Update
-        {
-            self.outer_app.get_mut().unwrap().update(&mut self.renderer);
-        }
-
-        // >>> Renderer: Before Render
-        {
-            self.renderer.before_render(&self.input_manager.borrow().state, self.camera_controller.camera());
-        }
-
-        // >>> Renderer: Render
-        {
-            // 构建出 PipelineContext
-            let pipeline_ctx = self.renderer.collect_render_ctx();
-            self.outer_app.get_mut().unwrap().draw(pipeline_ctx);
-        }
-
-        // >>> Renderer: After Render
-        {
-            self.renderer.after_render();
-        }
-
-        // >>> Window: Draw Gui
+        // Window: Draw Gui ===============================
         {
             let present_data = self.renderer.get_renderer_data();
             self.window_system.get_mut().unwrap().draw_gui(present_data);
         }
 
-        // >>> Window: Present Image
+        // End Frame ===================================
         {
-            self.window_system.get_mut().unwrap().present_image();
-        }
+            // >>> Window: Present Image
+            {
+                self.window_system.get_mut().unwrap().present_image();
+            }
 
-        // >>> Renderer: End Frame
-        {
-            self.renderer.end_frame();
+            // >>> Renderer: End Frame
+            {
+                self.renderer.end_frame();
+            }
         }
     }
 
