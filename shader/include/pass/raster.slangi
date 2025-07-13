@@ -3,15 +3,17 @@
 #include "ptr.slangi"
 #include "scene.slangi"
 
-namespace rt
+namespace raster
 {
 struct PushConstants
 {
     PTR(PerFrameData, frame_data);
     PTR(Scene, scene);
 
-    ImageHandle rt_render_target;
-    uint _padding_0;
+    /// raster only
+    uint instance_idx;
+    /// raster only
+    uint submesh_idx;
     uint _padding_1;
     uint _padding_2;
 };

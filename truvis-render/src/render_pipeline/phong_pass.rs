@@ -44,7 +44,7 @@ impl PhongPass {
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .offset(0)
-                .size(size_of::<shader::rt::PushConstants>() as u32)],
+                .size(size_of::<shader::raster::PushConstants>() as u32)],
             "phong-pass",
         ));
 
@@ -60,7 +60,7 @@ impl PhongPass {
         &self,
         cmd: &RhiCommandBuffer,
         viewport: &vk::Rect2D,
-        push_constant: &shader::rt::PushConstants,
+        push_constant: &shader::raster::PushConstants,
         frame_idx: FrameLabel,
     ) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
@@ -117,7 +117,7 @@ impl PhongPass {
         self.bind(
             cmd,
             &frame_settings.frame_extent.into(),
-            &shader::rt::PushConstants {
+            &shader::raster::PushConstants {
                 frame_data: per_frame_data.device_address(),
                 scene: gpu_scene.scene_device_address(frame_label),
 
@@ -135,7 +135,7 @@ impl PhongPass {
             cmd.cmd_push_constants(
                 self.pipeline.layout(),
                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                offset_of!(shader::rt::PushConstants, instance_idx) as u32,
+                offset_of!(shader::raster::PushConstants, instance_idx) as u32,
                 bytemuck::bytes_of(&data),
             );
         });

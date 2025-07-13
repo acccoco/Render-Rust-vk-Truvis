@@ -3,7 +3,6 @@
 #include "sample/sample.slangi"
 #include "scene.slangi"
 
-/// 太幽默了哥，为啥我需要手动限制最大递归深度啊，pipeline 里面的设置算啥？
 const static uint max_depth = 10;
 
 /// 超过一定数量后，就不再重新计算了
@@ -102,13 +101,13 @@ void main_ray_gen()
     if (frame_data.accum_frames > 0)
     {
         float a = 1.f / float(frame_data.accum_frames + 1);
-        const float3 old_color = frame_data.rt_render_target.load(thread_id).xyz;
+        const float3 old_color = push_const.rt_render_target.load(thread_id).xyz;
         // const float3 old_color = float3(1.f, 0.f, 0.f);
-        frame_data.rt_render_target.store(thread_id, float4(lerp(old_color, color, a), 1.f));
+        push_const.rt_render_target.store(thread_id, float4(lerp(old_color, color, a), 1.f));
     }
     else
     {
-        frame_data.rt_render_target.store(thread_id, float4(color, 1.f));
+        push_const.rt_render_target.store(thread_id, float4(color, 1.f));
     }
 }
 
@@ -156,7 +155,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         const float3 local_dir = Sample::sampling_hemisphere(payload.random_seed);
         payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
         payload.ray_origin = world_pos;
-    } 
+    }
 
     payload.weight = lambert_brdf * M_PI;
     payload.done = false;

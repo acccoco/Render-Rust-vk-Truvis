@@ -5,6 +5,7 @@ use crate::renderer::gpu_scene::GpuScene;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
+use shader_binding::shader::ImageHandle;
 use std::cell::RefCell;
 use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
@@ -386,6 +387,7 @@ impl SimlpeRtPass {
         cmd: &RhiCommandBuffer,
         frame_ctrl: &FrameController,
         framse_settings: &FrameSettings,
+        rt_handle: ImageHandle,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
     ) {
@@ -405,9 +407,8 @@ impl SimlpeRtPass {
             frame_data: per_frame_data.device_address(),
             scene: gpu_scene.scene_device_address(frame_label),
 
-            instance_idx: 0, // RT 不需要这个
-            submesh_idx: 0,  // RT 不需要这个
-
+            rt_render_target: rt_handle,
+            _padding_0: Default::default(),
             _padding_1: Default::default(),
             _padding_2: Default::default(),
         };

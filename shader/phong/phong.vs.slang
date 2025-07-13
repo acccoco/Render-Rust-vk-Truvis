@@ -1,6 +1,6 @@
 #include "scene.slangi"
 #include "./phong.slangi"
-#include "pass/rt.slangi"
+#include "pass/raster.slangi"
 
 struct VsInput
 {

@@ -1,6 +1,6 @@
 #include "./phong.slangi"
 #include "bindless.slangi"
-#include "pass/rt.slangi"
+#include "pass/raster.slangi"
 #include "scene.slangi"
 
 struct PsInput

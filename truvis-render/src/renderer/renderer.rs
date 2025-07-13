@@ -243,8 +243,8 @@ impl Renderer {
                     x: frame_extent.width as f32,
                     y: frame_extent.height as f32,
                 },
-                rt_render_target: self.framebuffers.color_image_bindless_handle(&self.bindless_mgr.borrow()),
                 accum_frames: self.accum_data.accum_frames_num as u32,
+                _padding_0: Default::default(),
             }
         };
         cmd.cmd_update_buffer(

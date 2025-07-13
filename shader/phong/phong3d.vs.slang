@@ -1,4 +1,4 @@
-#include "pass/rt.slangi"
+#include "pass/raster.slangi"
 #include "phong.slangi"
 #include "scene.slangi"
 

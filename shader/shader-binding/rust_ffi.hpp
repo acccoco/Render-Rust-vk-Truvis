@@ -10,3 +10,4 @@
 #include "pass/blit.slangi"
 #include "pass/rt.slangi"
 #include "pass/imgui.slangi"
+#include "pass/raster.slangi"
