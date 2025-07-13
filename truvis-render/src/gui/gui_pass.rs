@@ -106,14 +106,13 @@ impl GuiPass {
         let color_attach_info = vk::RenderingAttachmentInfo::default()
             .image_view(canvas_color_view)
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-            .load_op(vk::AttachmentLoadOp::LOAD)
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .clear_value(vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.0, 1.0],
+                },
+            })
             .store_op(vk::AttachmentStoreOp::STORE);
-        // TODO remove gui pass depth attachment
-        // let depth_attach_info = vk::RenderingAttachmentInfo::default()
-        //     .image_view(canvas_depth_view)
-        //     .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-        //     .load_op(vk::AttachmentLoadOp::LOAD)
-        //     .store_op(vk::AttachmentStoreOp::STORE);
         let render_info = vk::RenderingInfo::default()
             .layer_count(1)
             .render_area(canvas_extent.into())

@@ -25,7 +25,7 @@ impl OuterApp for HelloTriangle {
         }
     }
 
-    fn draw_ui(&mut self, _ui: &mut Ui) {
+    fn draw_ui(&mut self, _ui: &Ui) {
         static mut _UI_VALUE: usize = 0;
     }
 

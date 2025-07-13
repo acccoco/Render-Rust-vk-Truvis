@@ -58,7 +58,7 @@ impl OuterApp for PhongApp {
         Self { rt_pipeline }
     }
 
-    fn draw_ui(&mut self, _ui: &mut Ui) {}
+    fn draw_ui(&mut self, _ui: &Ui) {}
 
     fn draw(&self, pipeline_ctx: PipelineContext) {
         self.rt_pipeline.render(pipeline_ctx);

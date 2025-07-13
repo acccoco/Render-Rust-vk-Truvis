@@ -144,14 +144,6 @@ impl RhiDebugUtils {
         }
     }
 
-    #[inline]
-    pub fn set_object_debug_tag<T>(&self, _handle: T, _tag: u64)
-    where
-        T: vk::Handle + Copy,
-    {
-        todo!("暂时还不知道这个有什么作用")
-    }
-
     /// - command type: state, action
     /// - supported queue type: graphics, compute
     #[inline]

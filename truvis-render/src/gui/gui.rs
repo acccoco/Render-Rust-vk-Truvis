@@ -144,7 +144,7 @@ impl Gui {
     }
 
     /// # Phase: Update
-    pub fn update(&mut self, window: &winit::window::Window, ui_func: impl FnOnce(&mut imgui::Ui)) {
+    pub fn update(&mut self, window: &winit::window::Window, ui_func: impl FnOnce(&imgui::Ui)) {
         let ui = self.imgui_ctx.new_frame();
 
         unsafe {
@@ -152,56 +152,61 @@ impl Gui {
             let viewport_size = (*viewport).Size;
             let root_node_id = imgui::sys::igGetID_Str(c"MainDockSpace".as_ptr());
 
-            let window_flags = imgui::WindowFlags::NO_MOVE
-                | imgui::WindowFlags::NO_TITLE_BAR
-                | imgui::WindowFlags::MENU_BAR
-                | imgui::WindowFlags::NO_COLLAPSE
-                | imgui::WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS
-                | imgui::WindowFlags::NO_NAV_FOCUS
-                | imgui::WindowFlags::NO_DOCKING
-                | imgui::WindowFlags::NO_BACKGROUND
-                | imgui::WindowFlags::NO_RESIZE;
-
             ui.window("main dock space")
                 .position([0.0, 0.0], imgui::Condition::Always)
                 .size([viewport_size.x, viewport_size.y], imgui::Condition::Always)
-                .flags(window_flags)
+                .flags(
+                    imgui::WindowFlags::NO_MOVE
+                    | imgui::WindowFlags::NO_TITLE_BAR
+                    // | imgui::WindowFlags::MENU_BAR
+                    | imgui::WindowFlags::NO_COLLAPSE
+                    | imgui::WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS
+                    | imgui::WindowFlags::NO_NAV_FOCUS
+                    | imgui::WindowFlags::NO_DOCKING
+                    | imgui::WindowFlags::NO_BACKGROUND
+                    | imgui::WindowFlags::NO_RESIZE,
+                )
                 .build(|| {
                     if imgui::sys::igDockBuilderGetNode(root_node_id).is_null() {
                         imgui::sys::igDockBuilderRemoveNode(root_node_id);
                         imgui::sys::igDockBuilderAddNode(root_node_id, imgui::sys::ImGuiDockNodeFlags_NoCloseButton);
                         imgui::sys::igDockBuilderSetNodeSize(root_node_id, (*imgui::sys::igGetMainViewport()).Size);
-                        // imgui::sys::igDockBuilderSetNodePos(root_id, imgui::sys::ImVec2 { x: 0.0, y: 0.0 });
-                        // let root_node = imgui::sys::igDockBuilderGetNode(root_id);
-                        // (*root_node).LocalFlags |= imgui::sys::ImGuiDockNodeFlags_HiddenTabBar;
+                        imgui::sys::igDockBuilderSetNodePos(root_node_id, imgui::sys::ImVec2 { x: 0.0, y: 0.0 });
 
+                        // 首先将整个窗口分为左右两部分
                         let mut dock_main_id = root_node_id;
                         let dock_right_id = imgui::sys::igDockBuilderSplitNode(
                             dock_main_id,
                             imgui::sys::ImGuiDir_Right,
-                            0.2,
-                            std::ptr::null_mut(),
-                            std::ptr::from_mut(&mut dock_main_id),
-                        );
-                        let dock_left_id = imgui::sys::igDockBuilderSplitNode(
-                            dock_main_id,
-                            imgui::sys::ImGuiDir_Left,
-                            0.2,
-                            std::ptr::null_mut(),
-                            std::ptr::from_mut(&mut dock_main_id),
-                        );
-                        let dock_down_id = imgui::sys::igDockBuilderSplitNode(
-                            dock_main_id,
-                            imgui::sys::ImGuiDir_Down,
-                            0.2,
+                            0.3,
                             std::ptr::null_mut(),
                             std::ptr::from_mut(&mut dock_main_id),
                         );
 
+                        // 将左边部分再分为左右两部分
+                        // let dock_left_id = imgui::sys::igDockBuilderSplitNode(
+                        //     dock_main_id,
+                        //     imgui::sys::ImGuiDir_Left,
+                        //     0.2,
+                        //     std::ptr::null_mut(),
+                        //     std::ptr::from_mut(&mut dock_main_id),
+                        // );
+
+                        // 将中间部分在分为上下两部分
+                        // let dock_down_id = imgui::sys::igDockBuilderSplitNode(
+                        //     dock_main_id,
+                        //     imgui::sys::ImGuiDir_Down,
+                        //     0.2,
+                        //     std::ptr::null_mut(),
+                        //     std::ptr::from_mut(&mut dock_main_id),
+                        // );
+
+                        // 隐藏中央节点的 Tab
+                        // let center_node = imgui::sys::igDockBuilderGetNode(dock_main_id);
+                        // (*center_node).LocalFlags |= imgui::sys::ImGuiDockNodeFlags_HiddenTabBar;
+
                         log::info!("main node id: {}", dock_main_id);
-                        imgui::sys::igDockBuilderDockWindow(c"left".as_ptr(), dock_left_id);
                         imgui::sys::igDockBuilderDockWindow(c"right".as_ptr(), dock_right_id);
-                        imgui::sys::igDockBuilderDockWindow(c"down".as_ptr(), dock_down_id);
                         imgui::sys::igDockBuilderDockWindow(c"render".as_ptr(), dock_main_id);
                         imgui::sys::igDockBuilderFinish(root_node_id);
                     }
@@ -214,35 +219,23 @@ impl Gui {
                     );
                 });
 
-            ui.window("left")
-                // .size([100.0, 100.0], imgui::Condition::Always)
-                // .movable(false)
-                // .resizable(false)
-                .draw_background(false)
-                .title_bar(false)
-                .menu_bar(false)
-                .build(|| {
-                    ui.text_wrapped("Hello world!");
-                    ui.text_wrapped("こんにちは世界！");
-                    ui.button("This...is...imgui-rs!");
-                    ui.separator();
-                    let mouse_pos = ui.io().mouse_pos;
-                    ui.text(format!("Mouse Position: ({:.1},{:.1})", mouse_pos[0], mouse_pos[1]));
-                });
-            let hidpi_factor = self.platform.hidpi_factor() as f32;
+            // 中间的窗口，用于放置渲染内容
             ui.window("render")
-                .title_bar(false)
+                .title_bar(true)
                 .menu_bar(false)
                 // .resizable(false)
                 // .bg_alpha(0.0)
                 .draw_background(false)
                 .build(|| {
-                    ui.text("render window");
-
-                    let window_size = ui.window_size();
                     let window_pos = ui.window_pos();
-                    ui.text(format!("Window Size: ({:.1},{:.1})", window_size[0], window_size[1]));
-                    ui.text(format!("Window Position: ({:.1},{:.1})", window_pos[0], window_pos[1]));
+                    let window_region_max = ui.window_content_region_max();
+                    let window_region_min = ui.window_content_region_min();
+                    let window_size = [
+                        window_region_max[0] - window_region_min[0],
+                        window_region_max[1] - window_region_min[1],
+                    ];
+                    // let hidpi_factor = self.platform.hidpi_factor() as f32;
+                    let hidpi_factor = 1.0;
 
                     self.render_region.offset = vk::Offset2D {
                         x: (window_pos[0] * hidpi_factor) as i32,
@@ -253,12 +246,11 @@ impl Gui {
                         height: (window_size[1] * hidpi_factor) as u32,
                     };
 
-                    imgui::Image::new(
-                        imgui::TextureId::new(Self::RENDER_IMAGE_ID),
-                        [window_size[0] * hidpi_factor, window_size[1] * hidpi_factor],
-                    )
-                    .build(ui);
+                    imgui::Image::new(imgui::TextureId::new(Self::RENDER_IMAGE_ID), [window_size[0], window_size[1]])
+                        .build(ui);
                 });
+
+            // 右侧的窗口，用于放置各种设置
             ui.window("right").draw_background(false).build(|| {
                 ui.text("test window.");
                 let root_node = imgui::sys::igDockBuilderGetNode(root_node_id);
@@ -266,15 +258,16 @@ impl Gui {
                 let root_size = (*root_node).Size;
                 ui.text(format!("Root Node Position: ({:.1},{:.1})", root_pos.x, root_pos.y));
                 ui.text(format!("Root Node Size: ({:.1},{:.1})", root_size.x, root_size.y));
-            });
-            ui.window("down").build(|| {
-                ui.text("down window");
-                ui.text("This is a test window.");
-                ui.text("You can put anything you want here.");
+
+                let hidpi_factor = self.platform.hidpi_factor();
+                ui.text(format!("Hidpi Factor: {}", hidpi_factor));
+                ui.text(format!("Window Size: ({:?})", self.render_region.extent));
+                ui.text(format!("Window Position: ({:?})", self.render_region.offset));
+
+                ui_func(ui);
             });
         }
 
-        ui_func(ui);
         // 看源码可知：imgui 可能会隐藏鼠标指针
         self.platform.prepare_render(ui, window);
     }

@@ -191,6 +191,7 @@ impl Renderer {
     }
 
     pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
+        self.accum_data.reset();
         unsafe {
             self.rhi.device.device_wait_idle().unwrap();
         }

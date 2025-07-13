@@ -1,11 +1,11 @@
 use crate::platform::camera::DrsCamera;
-use crate::renderer::renderer::Renderer;
 use crate::render_pipeline::pipeline_context::PipelineContext;
+use crate::renderer::renderer::Renderer;
 
 pub trait OuterApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self;
 
-    fn draw_ui(&mut self, _ui: &mut imgui::Ui) {}
+    fn draw_ui(&mut self, _ui: &imgui::Ui) {}
 
     fn update(&mut self, _renderer: &mut Renderer) {}
 

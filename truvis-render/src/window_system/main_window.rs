@@ -191,7 +191,7 @@ impl MainWindow {
         );
     }
 
-    pub fn update_gui(&mut self, elapsed: std::time::Duration, ui_func: impl FnOnce(&mut imgui::Ui)) {
+    pub fn update_gui(&mut self, elapsed: std::time::Duration, ui_func: impl FnOnce(&imgui::Ui)) {
         self.gui.prepare_frame(&self.winit_window, elapsed);
         self.gui.update(&self.winit_window, ui_func);
     }

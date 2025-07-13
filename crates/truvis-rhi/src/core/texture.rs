@@ -17,7 +17,7 @@ pub struct RhiTexture2D {
     sampler: RhiSampler,
     image_view: RhiImage2DView,
 
-    // TODO 将 uuid 使用起来
+    // FIXME 将 uuid 使用起来
     _uuid: Texture2DUUID,
 }
 

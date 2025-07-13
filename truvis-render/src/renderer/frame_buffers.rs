@@ -47,8 +47,6 @@ impl FrameBuffers {
     }
 
     pub fn rebuild(&mut self, rhi: &Rhi, frame_settings: &FrameSettings, bindless_mgr: &mut BindlessManager) {
-        log::info!("Rebuilding FrameBuffers");
-
         self.unregister_bindless(bindless_mgr);
         *self = Self::new(rhi, frame_settings, bindless_mgr);
     }

@@ -86,7 +86,7 @@ impl<T: OuterApp> TruvisApp<T> {
             self.renderer.frame_settings().fif_num,
             "Truvis".to_string(),
             vk::Extent2D {
-                width: 800,
+                width: 1200,
                 height: 800,
             },
             self.renderer.bindless_mgr.clone(),
@@ -123,6 +123,7 @@ impl<T: OuterApp> TruvisApp<T> {
             {
                 let extent = self.window_system.get().unwrap().get_render_extent();
                 if self.last_render_area != extent {
+                    log::info!("resize frame buffer to: {}x{}", extent.width, extent.height);
                     self.renderer.resize_frame_buffer(extent);
                     self.last_render_area = extent;
                 }
