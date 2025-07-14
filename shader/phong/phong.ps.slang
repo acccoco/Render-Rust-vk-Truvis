@@ -15,7 +15,7 @@ struct PsOutput
 };
 
 [[vk::push_constant]]
-rt::PushConstants push_const;
+raster::PushConstants push_const;
 
 [shader("pixel")]
 PsOutput main(PsInput input)

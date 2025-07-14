@@ -29,7 +29,7 @@ struct VsOutput
 };
 
 [[vk::push_constant]]
-rt::PushConstants push_const;
+raster::PushConstants push_const;
 
 [shader("vertex")]
 VsOutput main(VsInput input)
