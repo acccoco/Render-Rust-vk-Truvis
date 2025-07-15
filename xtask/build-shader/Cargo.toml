@@ -12,3 +12,4 @@ log = { workspace = true }
 chrono = { workspace = true }
 env_logger = { workspace = true }
 anstyle = { workspace = true }
+rayon = { workspace = true }
