@@ -24,7 +24,7 @@ impl OuterApp for ShaderToy {
         }
     }
 
-    fn draw_ui(&mut self, ui: &mut Ui) {
+    fn draw_ui(&mut self, ui: &Ui) {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
     }

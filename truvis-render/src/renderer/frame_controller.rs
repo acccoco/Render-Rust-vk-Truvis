@@ -26,9 +26,7 @@ pub struct FrameController {
 
     device: Rc<RhiDevice>,
 }
-impl Drop for FrameController {
-    fn drop(&mut self) {}
-}
+
 // ctor
 impl FrameController {
     pub fn new(rhi: &Rhi, frame_settings: &FrameSettings) -> Self {
@@ -56,6 +54,13 @@ impl FrameController {
             allocated_command_buffers: vec![Vec::new(); frame_settings.fif_num],
             device: rhi.device.clone(),
         }
+    }
+}
+
+// 手动 drop
+impl FrameController {
+    pub fn destroy(self) {
+        self.render_timeline_semaphore.destroy()
     }
 }
 

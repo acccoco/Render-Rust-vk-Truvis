@@ -47,11 +47,12 @@ pub struct Renderer {
     fps_limit: f32,
 }
 
-impl Drop for Renderer {
-    fn drop(&mut self) {
-        log::info!("Dropping Renderer");
+// 手动 drop
+impl Renderer {
+    pub fn destroy(self) {
         // 在 Renderer 被销毁时，等待 Rhi 设备空闲
         self.wait_idle();
+        self.frame_ctrl.destroy()
     }
 }
 

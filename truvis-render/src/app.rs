@@ -36,12 +36,8 @@ pub struct TruvisApp<T: OuterApp> {
 
     outer_app: OnceCell<T>,
 }
-impl<T: OuterApp> Drop for TruvisApp<T> {
-    fn drop(&mut self) {
-        // 在 TruvisApp 被销毁时，等待 Renderer 设备空闲
-        self.renderer.wait_idle();
-    }
-}
+
+// 总的 main 函数
 impl<T: OuterApp> TruvisApp<T> {
     /// 整个程序的入口
     pub fn run() {
@@ -76,10 +72,14 @@ impl<T: OuterApp> TruvisApp<T> {
         event_loop.run_app(&mut app).unwrap();
 
         log::info!("end run.");
-    }
 
+        app.destroy();
+    }
+}
+
+impl<T: OuterApp> TruvisApp<T> {
     /// 在 window 创建之后调用，初始化 Renderer 和 GUI
-    pub fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
+    fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
         let window_system = MainWindow::new(
             event_loop,
             self.renderer.rhi.clone(),
@@ -98,7 +98,7 @@ impl<T: OuterApp> TruvisApp<T> {
         self.outer_app.set(outer_app).map_err(|_| ()).unwrap();
     }
 
-    pub fn update(&mut self) {
+    fn update(&mut self) {
         // Begin Frame ============================
         if !self.renderer.time_to_render() {
             return;
@@ -184,7 +184,7 @@ impl<T: OuterApp> TruvisApp<T> {
         }
     }
 
-    pub fn on_window_resized(&mut self, width: u32, height: u32) {
+    fn on_window_resized(&mut self, width: u32, height: u32) {
         self.window_system.get_mut().unwrap().rebuild_after_resized();
 
         log::info!("try to rebuild render context");
@@ -196,6 +196,17 @@ impl<T: OuterApp> TruvisApp<T> {
         self.outer_app.get_mut().unwrap().rebuild(&mut self.renderer);
     }
 }
+
+// 手动 drop
+impl<T: OuterApp> TruvisApp<T> {
+    fn destroy(mut self) {
+        self.renderer.wait_idle();
+
+        self.window_system.take().unwrap().destroy();
+        self.renderer.destroy();
+    }
+}
+
 impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
     fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: StartCause) {
         // TODO 确认一下发送时机

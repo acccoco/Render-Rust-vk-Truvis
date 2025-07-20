@@ -37,6 +37,7 @@ pub struct MainWindow {
 
     /// 数量和 fif num 相同
     present_complete_semaphores: Vec<RhiSemaphore>,
+
     /// 表示 gui 的绘制已经完成；
     ///
     /// 数量和 swapchain 的 image 数量相同，
@@ -171,6 +172,18 @@ impl MainWindow {
             );
 
         self.rhi.graphics_queue.submit(vec![submit_info], None);
+    }
+}
+
+// 手动 drop
+impl MainWindow {
+    pub fn destroy(self) {
+        for semaphore in self.present_complete_semaphores {
+            semaphore.destroy();
+        }
+        for semaphore in self.render_complete_semaphores {
+            semaphore.destroy();
+        }
     }
 }
 
