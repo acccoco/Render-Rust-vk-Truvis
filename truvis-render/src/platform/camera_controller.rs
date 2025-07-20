@@ -1,18 +1,23 @@
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputManager;
-use std::cell::RefCell;
-use std::rc::Rc;
 use winit::keyboard::KeyCode;
 
 pub struct CameraController {
     camera: DrsCamera,
-    input_manager: Rc<RefCell<InputManager>>,
+}
+
+impl Default for CameraController {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CameraController {
     /// 创建新的相机控制器
-    pub fn new(camera: DrsCamera, input_manager: Rc<RefCell<InputManager>>) -> Self {
-        Self { camera, input_manager }
+    pub fn new() -> Self {
+        Self {
+            camera: DrsCamera::default(),
+        }
     }
 
     /// 获取相机引用
@@ -26,34 +31,35 @@ impl CameraController {
     }
 
     /// 根据输入更新相机状态
-    pub fn update(&mut self, deltatime: std::time::Duration) {
+    pub fn update(&mut self, input_mgr: &InputManager, viewport_size: glam::Vec2, deltatime: std::time::Duration) {
         let delta_time_s = deltatime.as_secs_f32();
-        let input_manager = self.input_manager.borrow();
 
-        if input_manager.is_right_button_pressed() {
-            let mouse_delta = input_manager.get_mouse_delta() / 7.0;
+        self.camera.set_aspect_ratio(viewport_size.x / viewport_size.y);
+
+        if input_mgr.is_right_button_pressed() {
+            let mouse_delta = input_mgr.get_mouse_delta() / 7.0;
 
             self.camera.rotate_yaw(mouse_delta.x as f32);
             self.camera.rotate_pitch(mouse_delta.y as f32);
         }
 
         let move_speed = 60_f32;
-        if input_manager.is_key_pressed(KeyCode::KeyW) {
+        if input_mgr.is_key_pressed(KeyCode::KeyW) {
             self.camera.move_forward(delta_time_s * move_speed);
         }
-        if input_manager.is_key_pressed(KeyCode::KeyS) {
+        if input_mgr.is_key_pressed(KeyCode::KeyS) {
             self.camera.move_forward(-delta_time_s * move_speed);
         }
-        if input_manager.is_key_pressed(KeyCode::KeyA) {
+        if input_mgr.is_key_pressed(KeyCode::KeyA) {
             self.camera.move_right(-delta_time_s * move_speed);
         }
-        if input_manager.is_key_pressed(KeyCode::KeyD) {
+        if input_mgr.is_key_pressed(KeyCode::KeyD) {
             self.camera.move_right(delta_time_s * move_speed);
         }
-        if input_manager.is_key_pressed(KeyCode::KeyE) {
+        if input_mgr.is_key_pressed(KeyCode::KeyE) {
             self.camera.move_up(-delta_time_s * move_speed);
         }
-        if input_manager.is_key_pressed(KeyCode::KeyQ) {
+        if input_mgr.is_key_pressed(KeyCode::KeyQ) {
             self.camera.move_up(delta_time_s * move_speed);
         }
     }

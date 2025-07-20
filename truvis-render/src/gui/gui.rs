@@ -49,10 +49,8 @@ impl Gui {
         // theme
         {
             let style = imgui_ctx.style_mut();
-            style.use_light_colors();
+            style.use_dark_colors();
             style.colors[imgui::StyleColor::WindowBg as usize] = [1.0, 0.0, 0.0, 1.0];
-            style.colors[imgui::StyleColor::DockingEmptyBg as usize] = [0.0, 1.0, 0.0, 1.0];
-            style.colors[imgui::StyleColor::FrameBg as usize] = [0.0, 1.0, 0.0, 1.0];
         }
 
         let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui_ctx);
@@ -279,6 +277,7 @@ impl Gui {
                 ui.text(format!("Hidpi Factor: {}", hidpi_factor));
                 ui.text(format!("Window Size: ({:?})", self.render_region.extent));
                 ui.text(format!("Window Position: ({:?})", self.render_region.offset));
+                ui.new_line();
 
                 ui_func_right(ui);
             });

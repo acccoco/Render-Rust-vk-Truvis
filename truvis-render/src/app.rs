@@ -1,14 +1,12 @@
 use crate::outer_app::OuterApp;
-use crate::platform::camera::DrsCamera;
 use crate::platform::camera_controller::CameraController;
 use crate::platform::input_manager::InputManager;
 use crate::renderer::renderer::Renderer;
 use crate::window_system::main_window::MainWindow;
 use ash::vk;
 use raw_window_handle::HasDisplayHandle;
-use std::cell::{OnceCell, RefCell};
+use std::cell::OnceCell;
 use std::ffi::CStr;
-use std::rc::Rc;
 use std::sync::OnceLock;
 use truvis_crate_tools::init_log::init_log;
 use winit::application::ApplicationHandler;
@@ -30,8 +28,7 @@ pub struct TruvisApp<T: OuterApp> {
     window_system: OnceCell<MainWindow>,
     last_render_area: vk::Extent2D,
 
-    input_manager: Rc<RefCell<InputManager>>,
-
+    input_manager: InputManager,
     camera_controller: CameraController,
 
     outer_app: OnceCell<T>,
@@ -46,10 +43,10 @@ impl<T: OuterApp> TruvisApp<T> {
         init_log();
 
         // 创建输入管理器和计时器
-        let input_manager = Rc::new(RefCell::new(InputManager::new()));
+        let input_manager = InputManager::new();
 
         // 创建相机控制器
-        let camera_controller = CameraController::new(DrsCamera::default(), input_manager.clone());
+        let camera_controller = CameraController::new();
 
         let event_loop = winit::event_loop::EventLoop::<UserEvent>::with_user_event().build().unwrap();
 
@@ -113,15 +110,32 @@ impl<T: OuterApp> TruvisApp<T> {
         // Update Gui ==================================
         {
             self.window_system.get_mut().unwrap().update_gui(elapsed, |ui| {
+                // camera info
+                {
+                    let camera = self.camera_controller.camera();
+                    ui.text(format!(
+                        "CameraPos: ({:.2}, {:.2}, {:.2})",
+                        camera.position.x, camera.position.y, camera.position.z
+                    ));
+                    ui.text(format!(
+                        "CameraEuler: ({:.2}, {:.2}, {:.2})",
+                        camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg
+                    ));
+                    ui.text(format!("CameraAspect: {:.2}", camera.asp));
+                    ui.text(format!("CameraFov(Vertical): {:.2}°", camera.fov_deg_vertical));
+                    ui.new_line();
+                }
+
                 self.outer_app.get_mut().unwrap().draw_ui(ui);
             });
         }
 
         // Rendere Update ==================================
         {
+            let extent = self.window_system.get().unwrap().get_render_extent();
+
             // Renderer: Resize Framebuffer
             {
-                let extent = self.window_system.get().unwrap().get_render_extent();
                 if self.last_render_area != extent {
                     log::info!("resize frame buffer to: {}x{}", extent.width, extent.height);
                     self.renderer.resize_frame_buffer(extent);
@@ -131,11 +145,12 @@ impl<T: OuterApp> TruvisApp<T> {
 
             // Renderer: Update Input and Camera
             {
-                // TODO 这个 input manager, 以及 camera controller
-                //  应该是只服务于 renderer 的，因此更新频率也应该和 renderer 一致
-                //  将其移动到 Renderer 中
-                self.input_manager.borrow_mut().update();
-                self.camera_controller.update(self.renderer.deltatime());
+                self.input_manager.update();
+                self.camera_controller.update(
+                    &self.input_manager,
+                    glam::vec2(extent.width as f32, extent.height as f32),
+                    self.renderer.deltatime(),
+                );
             }
 
             // Outer App: Update
@@ -148,7 +163,7 @@ impl<T: OuterApp> TruvisApp<T> {
         {
             // Renderer: Before Render
             {
-                self.renderer.before_render(&self.input_manager.borrow().state, self.camera_controller.camera());
+                self.renderer.before_render(self.input_manager.state(), self.camera_controller.camera());
             }
 
             // >>> Renderer: Render
@@ -235,7 +250,7 @@ impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
 
         // FIXME 这一部分应该接收 imgui 的事件
         // 使用InputManager处理窗口事件
-        self.input_manager.borrow_mut().handle_window_event(&event);
+        self.input_manager.handle_window_event(&event);
 
         match event {
             WindowEvent::CloseRequested => {
@@ -256,7 +271,7 @@ impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
 
     fn device_event(&mut self, _event_loop: &ActiveEventLoop, _device_id: DeviceId, event: DeviceEvent) {
         // 使用InputManager处理设备事件
-        self.input_manager.borrow_mut().handle_device_event(&event);
+        self.input_manager.handle_device_event(&event);
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {

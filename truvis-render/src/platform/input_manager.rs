@@ -18,9 +18,23 @@ pub enum InputEvent {
 /// 输入管理器
 pub struct InputManager {
     /// 输入状态
-    pub state: InputState,
+    state: InputState,
     /// 事件队列
     events: VecDeque<InputEvent>,
+}
+
+impl Default for InputManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// getter
+impl InputManager {
+    #[inline]
+    pub fn state(&self) -> &InputState {
+        &self.state
+    }
 }
 
 impl InputManager {
@@ -72,11 +86,11 @@ impl InputManager {
     }
 
     /// 处理设备事件
-    pub fn handle_device_event(&mut self, event: &DeviceEvent) {
-        match event {
-            // 添加对其他设备事件的处理，如游戏手柄等
-            _ => {}
-        }
+    pub fn handle_device_event(&mut self, _event: &DeviceEvent) {
+        // match event {
+        //     // 添加对其他设备事件的处理，如游戏手柄等
+        //     _ => {}
+        // }
     }
 
     /// 更新输入状态

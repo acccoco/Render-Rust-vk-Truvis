@@ -6,10 +6,11 @@ pub struct DrsCamera {
     pub euler_roll_deg: f32,
 
     pub asp: f32,
-    pub fov_deg: f32,
+    pub fov_deg_vertical: f32,
     pub near: f32,
 }
 
+// 一些常量
 impl DrsCamera {
     /// 相机的上参考向量
     const CAMERA_UP: glam::Vec3 = glam::Vec3::new(0.0, 1.0, 0.0);
@@ -23,7 +24,10 @@ impl DrsCamera {
     const CAMERA_RIGHT: glam::Vec3 = glam::Vec3::new(1.0, 0.0, 0.0);
 
     const K_PITCH: f32 = 89.5;
+}
 
+// getter
+impl DrsCamera {
     #[inline]
     fn yaw_rad(&self) -> f32 {
         self.euler_yaw_deg.to_radians()
@@ -48,7 +52,7 @@ impl DrsCamera {
 
     /// 从 RightHand-Y-Up 的 ViewSpace 转换到 LeftHand-Y-Up 的 NDC
     pub fn get_projection_matrix(&self) -> glam::Mat4 {
-        glam::Mat4::perspective_infinite_rh(self.fov_deg.to_radians(), self.asp, self.near)
+        glam::Mat4::perspective_infinite_rh(self.fov_deg_vertical.to_radians(), self.asp, self.near)
     }
 
     pub fn camera_forward(&self) -> glam::Vec3 {
@@ -70,7 +74,10 @@ impl DrsCamera {
         );
         transform.transform_vector3(Self::CAMERA_UP)
     }
+}
 
+// 相机控制
+impl DrsCamera {
     /// 朝相机看向的方向进行移动
     pub fn move_forward(&mut self, length: f32) {
         self.position += self.camera_forward() * length;
@@ -78,6 +85,10 @@ impl DrsCamera {
 
     pub fn move_right(&mut self, length: f32) {
         self.position += self.camera_right() * length;
+    }
+
+    pub fn set_aspect_ratio(&mut self, asp: f32) {
+        self.asp = asp;
     }
 
     /// 朝世界的 Up 进行移动
@@ -107,7 +118,7 @@ impl Default for DrsCamera {
             euler_pitch_deg: 0.0,
             euler_roll_deg: 0.0,
             asp: 1.0,
-            fov_deg: 60.0,
+            fov_deg_vertical: 60.0,
             near: 0.1,
         }
     }
