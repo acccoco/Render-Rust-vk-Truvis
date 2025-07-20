@@ -105,7 +105,7 @@ impl RhiAcceleration {
         // 等待初步 build 完成
         RhiCommandBuffer::one_time_exec(
             rhi,
-            rhi.graphics_command_pool.clone(),
+            rhi.temp_graphics_command_pool.clone(),
             &rhi.graphics_queue,
             |cmd| {
                 cmd.build_acceleration_structure(&build_geometry_info, &range_infos);
@@ -137,7 +137,7 @@ impl RhiAcceleration {
 
         RhiCommandBuffer::one_time_exec(
             rhi,
-            rhi.graphics_command_pool.clone(),
+            rhi.temp_graphics_command_pool.clone(),
             &rhi.graphics_queue,
             |cmd| {
                 cmd.cmd_copy_acceleration_structure(
@@ -228,7 +228,7 @@ impl RhiAcceleration {
         // 正式构建 TLAS
         RhiCommandBuffer::one_time_exec(
             rhi,
-            rhi.graphics_command_pool.clone(),
+            rhi.temp_graphics_command_pool.clone(),
             &rhi.graphics_queue,
             |cmd| {
                 cmd.build_acceleration_structure(&build_geometry_info, std::slice::from_ref(&range_info));

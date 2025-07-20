@@ -7,6 +7,7 @@ use shader_layout_macro::ShaderLayout;
 use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_rhi::core::descriptor::{RhiDescriptorSet, RhiDescriptorSetLayout};
+use truvis_rhi::core::descriptor_pool::RhiDescriptorPool;
 use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::core::image::{Image2DViewContainer, Image2DViewUUID, RhiImage2DView};
 use truvis_rhi::core::texture::{RhiTexture2D, Texture2DContainer};
@@ -54,7 +55,7 @@ pub struct BindlessManager {
     frame_label: FrameLabel,
 }
 impl BindlessManager {
-    pub fn new(rhi: &Rhi, frames_in_flight: usize) -> Self {
+    pub fn new(rhi: &Rhi, descriptor_pool: &RhiDescriptorPool, frames_in_flight: usize) -> Self {
         let bindless_layout = RhiDescriptorSetLayout::<BindlessDescriptorBinding>::new(
             rhi,
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
@@ -64,7 +65,7 @@ impl BindlessManager {
             .map(|idx| {
                 RhiDescriptorSet::<BindlessDescriptorBinding>::new(
                     rhi,
-                    rhi.descriptor_pool(),
+                    descriptor_pool,
                     &bindless_layout,
                     format!("bindless-descriptor-set-{idx}"),
                 )

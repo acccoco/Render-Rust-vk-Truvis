@@ -1,7 +1,6 @@
 use std::{ffi::CStr, rc::Rc};
 
 use crate::core::command_queue::RhiQueueFamily;
-use crate::core::descriptor_pool::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo};
 use crate::core::{
     allocator::RhiAllocator, command_pool::RhiCommandPool, command_queue::RhiQueue, device::RhiDevice,
     instance::RhiInstance, physical_device::RhiPhysicalDevice,
@@ -22,26 +21,21 @@ pub struct Rhi {
 
     pub allocator: Rc<RhiAllocator>,
 
-    pub graphics_command_pool: Rc<RhiCommandPool>,
-    _transfer_command_pool: Rc<RhiCommandPool>,
-    _compute_command_pool: Rc<RhiCommandPool>,
+    /// 临时的 graphics command pool，主要用于临时的命令缓冲区
+    pub temp_graphics_command_pool: Rc<RhiCommandPool>,
 
     pub graphics_queue: Rc<RhiQueue>,
     pub compute_queue: Rc<RhiQueue>,
     pub transfer_queue: Rc<RhiQueue>,
-
-    descriptor_pool: RhiDescriptorPool,
 }
-
-const DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
-const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
-const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
 
 impl Drop for Rhi {
     fn drop(&mut self) {
         log::info!("destroy rhi.");
     }
 }
+
+// init
 impl Rhi {
     // region init 相关
     const ENGINE_NAME: &'static str = "DruvisIII";
@@ -107,22 +101,8 @@ impl Rhi {
             vk::CommandPoolCreateFlags::empty(),
             "rhi-graphics",
         ));
-        let compute_command_pool = Rc::new(RhiCommandPool::new(
-            device.clone(),
-            physical_device.compute_queue_family.clone(),
-            vk::CommandPoolCreateFlags::empty(),
-            "rhi-compute",
-        ));
-        let transfer_command_pool = Rc::new(RhiCommandPool::new(
-            device.clone(),
-            physical_device.transfer_queue_family.clone(),
-            vk::CommandPoolCreateFlags::empty(),
-            "rhi-transfer",
-        ));
 
         let allocator = Rc::new(RhiAllocator::new(instance.clone(), physical_device.clone(), device.clone()));
-
-        let descriptor_pool = Rhi::init_descriptor_pool(device.clone());
 
         Self {
             vk_pf,
@@ -130,59 +110,16 @@ impl Rhi {
             physical_device,
             device,
             allocator,
-            graphics_command_pool,
-            _transfer_command_pool: transfer_command_pool,
-            _compute_command_pool: compute_command_pool,
+            temp_graphics_command_pool: graphics_command_pool,
             graphics_queue,
             compute_queue,
             transfer_queue,
-            descriptor_pool,
         }
     }
+}
 
-    fn init_descriptor_pool(device: Rc<RhiDevice>) -> RhiDescriptorPool {
-        let pool_size = vec![
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
-                descriptor_count: 128,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                descriptor_count: DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::INPUT_ATTACHMENT,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_IMAGE,
-                descriptor_count: DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT + 32,
-            },
-        ];
-
-        let pool_ci = Rc::new(RhiDescriptorPoolCreateInfo::new(
-            vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET | vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND,
-            DESCRIPTOR_POOL_MAX_MATERIAL_CNT + DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
-            pool_size,
-        ));
-
-        RhiDescriptorPool::new(device, pool_ci, "rhi-descriptor-pool")
-    }
-    // endregion
-
-    // region 属性访问
+// getter
+impl Rhi {
     #[inline]
     pub fn instance(&self) -> &RhiInstance {
         &self.instance
@@ -199,11 +136,6 @@ impl Rhi {
     }
 
     #[inline]
-    pub fn descriptor_pool(&self) -> &RhiDescriptorPool {
-        &self.descriptor_pool
-    }
-
-    #[inline]
     pub fn graphics_queue_family(&self) -> RhiQueueFamily {
         self.physical_device.graphics_queue_family.clone()
     }
@@ -217,9 +149,10 @@ impl Rhi {
     pub fn transfer_queue_family(&self) -> RhiQueueFamily {
         self.physical_device.transfer_queue_family.clone()
     }
-    // endregion
+}
 
-    // region 工具方法
+// tools
+impl Rhi {
     /// 根据给定的格式，返回支持的格式
     pub fn find_supported_format(
         &self,
@@ -242,5 +175,5 @@ impl Rhi {
             .copied()
             .collect()
     }
-    // endregion
 }
+impl Rhi {}

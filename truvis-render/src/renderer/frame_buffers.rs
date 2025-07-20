@@ -95,7 +95,7 @@ impl FrameBuffers {
         // layout transfer
         RhiCommandBuffer::one_time_exec(
             rhi,
-            rhi.graphics_command_pool.clone(),
+            rhi.temp_graphics_command_pool.clone(),
             &rhi.graphics_queue,
             |cmd| {
                 cmd.image_memory_barrier(

@@ -362,7 +362,7 @@ impl RhiBuffer {
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
         RhiCommandBuffer::one_time_exec(
             rhi,
-            rhi.graphics_command_pool.clone(),
+            rhi.temp_graphics_command_pool.clone(),
             &rhi.graphics_queue,
             |cmd| {
                 cmd.cmd_copy_buffer(

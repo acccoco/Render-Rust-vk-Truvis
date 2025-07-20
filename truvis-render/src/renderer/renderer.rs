@@ -15,6 +15,8 @@ use std::ffi::CStr;
 use std::rc::Rc;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_queue::RhiSubmitInfo;
+use truvis_rhi::core::descriptor_pool::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo};
+use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 use truvis_rhi::core::texture::RhiTexture2D;
 use truvis_rhi::rhi::Rhi;
@@ -42,6 +44,8 @@ pub struct Renderer {
     // TODO 优化一下这个 buffer，不该放在这里
     pub per_frame_data_buffers: Vec<RhiStructuredBuffer<shader::PerFrameData>>,
     accum_data: AccumData,
+
+    _descriptor_pool: RhiDescriptorPool,
 
     timer: Timer,
     fps_limit: f32,
@@ -107,7 +111,10 @@ impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         let rhi = Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext));
 
-        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, FrameLabel::FRAMES_IN_FLIGHT)));
+        let descriptor_pool = Self::init_descriptor_pool(rhi.device.clone());
+
+        let bindless_mgr =
+            Rc::new(RefCell::new(BindlessManager::new(&rhi, &descriptor_pool, FrameLabel::FRAMES_IN_FLIGHT)));
         let scene_mgr = Rc::new(RefCell::new(SceneManager::new(bindless_mgr.clone())));
         let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), FrameLabel::FRAMES_IN_FLIGHT);
         let per_frame_data_buffers = (0..FrameLabel::FRAMES_IN_FLIGHT)
@@ -139,8 +146,54 @@ impl Renderer {
             gpu_scene,
             per_frame_data_buffers,
             timer: Timer::default(),
+            _descriptor_pool: descriptor_pool,
             fps_limit: 59.9,
         }
+    }
+
+    const DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
+    const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
+    const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
+
+    fn init_descriptor_pool(device: Rc<RhiDevice>) -> RhiDescriptorPool {
+        let pool_size = vec![
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
+                descriptor_count: 128,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_BUFFER,
+                descriptor_count: Self::DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                descriptor_count: Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::INPUT_ATTACHMENT,
+                descriptor_count: 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
+                descriptor_count: 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_IMAGE,
+                descriptor_count: Self::DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT + 32,
+            },
+        ];
+
+        let pool_ci = Rc::new(RhiDescriptorPoolCreateInfo::new(
+            vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET | vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND,
+            Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + Self::DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
+            pool_size,
+        ));
+
+        RhiDescriptorPool::new(device, pool_ci, "renderer")
     }
 }
 
