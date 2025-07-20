@@ -46,6 +46,15 @@ impl Gui {
         // disable automatic saving .ini file
         imgui_ctx.set_ini_filename(None);
 
+        // theme
+        {
+            let style = imgui_ctx.style_mut();
+            style.use_light_colors();
+            style.colors[imgui::StyleColor::WindowBg as usize] = [1.0, 0.0, 0.0, 1.0];
+            style.colors[imgui::StyleColor::DockingEmptyBg as usize] = [0.0, 1.0, 0.0, 1.0];
+            style.colors[imgui::StyleColor::FrameBg as usize] = [0.0, 1.0, 0.0, 1.0];
+        }
+
         let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui_ctx);
         platform.attach_window(imgui_ctx.io_mut(), window, imgui_winit_support::HiDpiMode::Rounded);
 
@@ -144,7 +153,12 @@ impl Gui {
     }
 
     /// # Phase: Update
-    pub fn update(&mut self, window: &winit::window::Window, ui_func: impl FnOnce(&imgui::Ui)) {
+    pub fn update(
+        &mut self,
+        window: &winit::window::Window,
+        ui_func_main: impl FnOnce(&imgui::Ui, [f32; 2]),
+        ui_func_right: impl FnOnce(&imgui::Ui),
+    ) {
         let ui = self.imgui_ctx.new_frame();
 
         unsafe {
@@ -248,6 +262,8 @@ impl Gui {
 
                     imgui::Image::new(imgui::TextureId::new(Self::RENDER_IMAGE_ID), [window_size[0], window_size[1]])
                         .build(ui);
+
+                    ui_func_main(ui, window_size);
                 });
 
             // 右侧的窗口，用于放置各种设置
@@ -264,7 +280,7 @@ impl Gui {
                 ui.text(format!("Window Size: ({:?})", self.render_region.extent));
                 ui.text(format!("Window Position: ({:?})", self.render_region.offset));
 
-                ui_func(ui);
+                ui_func_right(ui);
             });
         }
 

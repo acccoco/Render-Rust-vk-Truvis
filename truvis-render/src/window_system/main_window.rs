@@ -204,9 +204,18 @@ impl MainWindow {
         );
     }
 
-    pub fn update_gui(&mut self, elapsed: std::time::Duration, ui_func: impl FnOnce(&imgui::Ui)) {
+    pub fn update_gui(&mut self, elapsed: std::time::Duration, ui_func_right: impl FnOnce(&imgui::Ui)) {
         self.gui.prepare_frame(&self.winit_window, elapsed);
-        self.gui.update(&self.winit_window, ui_func);
+        self.gui.update(
+            &self.winit_window,
+            |ui, content_size| {
+                let min_pos = ui.window_content_region_min();
+                ui.set_cursor_pos([min_pos[0] + 5.0, min_pos[1] + 5.0]);
+                ui.text(format!("FPS: {:.2}", 1.0 / elapsed.as_secs_f32()));
+                ui.text(format!("size: {:.0}x{:.0}", content_size[0], content_size[1]));
+            },
+            ui_func_right,
+        );
     }
 
     pub fn draw_gui(&mut self, renderer_data: PresentData) {
