@@ -217,40 +217,6 @@ impl RhiBuffer {
     }
 
     #[inline]
-    pub fn new_index_buffer(rhi: &Rhi, size: usize, debug_name: impl AsRef<str>) -> Self {
-        Self::new_device_buffer(
-            rhi,
-            size as vk::DeviceSize,
-            vk::BufferUsageFlags::INDEX_BUFFER
-                | vk::BufferUsageFlags::TRANSFER_DST
-                | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
-                | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
-            debug_name,
-        )
-    }
-
-    /// 创建 index buffer，并向其内写入数据
-    #[inline]
-    pub fn new_index_buffer_sync(rhi: &Rhi, data: &[impl Sized + Copy], debug_name: impl AsRef<str>) -> Self {
-        let mut index_buffer = Self::new_index_buffer(rhi, size_of_val(data), debug_name);
-        index_buffer.transfer_data_sync(rhi, data);
-        index_buffer
-    }
-
-    #[inline]
-    pub fn new_vertex_buffer(rhi: &Rhi, size: usize, debug_name: impl AsRef<str>) -> Self {
-        Self::new_device_buffer(
-            rhi,
-            size as vk::DeviceSize,
-            vk::BufferUsageFlags::VERTEX_BUFFER
-                | vk::BufferUsageFlags::TRANSFER_DST
-                | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
-                | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
-            debug_name,
-        )
-    }
-
-    #[inline]
     pub fn new_accleration_buffer(rhi: &Rhi, size: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
             rhi,
@@ -288,6 +254,7 @@ impl RhiBuffer {
         self.size
     }
 }
+// tools
 impl RhiBuffer {
     #[inline]
     pub fn mapped_ptr(&self) -> *mut u8 {
@@ -534,7 +501,15 @@ impl_derive_buffer!(RhiIndexBuffer, RhiBuffer, inner);
 impl RhiIndexBuffer {
     pub fn new(rhi: &Rhi, index_cnt: usize, debug_name: impl AsRef<str>) -> Self {
         let size = index_cnt * size_of::<u32>();
-        let buffer = RhiBuffer::new_index_buffer(rhi, size, debug_name);
+        let buffer = RhiBuffer::new_device_buffer(
+            rhi,
+            size as vk::DeviceSize,
+            vk::BufferUsageFlags::INDEX_BUFFER
+                | vk::BufferUsageFlags::TRANSFER_DST
+                | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+            debug_name,
+        );
 
         let buffer = Self {
             inner: buffer,
@@ -542,6 +517,14 @@ impl RhiIndexBuffer {
         };
         rhi.device.debug_utils().set_debug_name(&buffer, &buffer.inner.debug_name);
         buffer
+    }
+
+    /// 创建 index buffer，并向其内写入数据
+    #[inline]
+    pub fn new_with_data(rhi: &Rhi, data: &[u32], debug_name: impl AsRef<str>) -> Self {
+        let mut index_buffer = Self::new(rhi, data.len(), debug_name);
+        index_buffer.transfer_data_sync(rhi, data);
+        index_buffer
     }
 
     #[inline]
@@ -555,7 +538,7 @@ impl RhiIndexBuffer {
     }
 }
 
-pub struct RhiVertexBuffer<V: bytemuck::Pod> {
+pub struct RhiVertexBuffer<V: Sized> {
     inner: RhiBuffer,
 
     /// 顶点数量
@@ -563,11 +546,19 @@ pub struct RhiVertexBuffer<V: bytemuck::Pod> {
 
     _phantom: PhantomData<V>,
 }
-impl_derive_buffer!(RhiVertexBuffer<V: bytemuck::Pod>, RhiBuffer, inner);
-impl<V: bytemuck::Pod> RhiVertexBuffer<V> {
+impl_derive_buffer!(RhiVertexBuffer<V: Sized>, RhiBuffer, inner);
+impl<V: Sized> RhiVertexBuffer<V> {
     pub fn new(rhi: &Rhi, vertex_cnt: usize, debug_name: impl AsRef<str>) -> Self {
         let size = vertex_cnt * size_of::<V>();
-        let buffer = RhiBuffer::new_vertex_buffer(rhi, size, debug_name);
+        let buffer = RhiBuffer::new_device_buffer(
+            rhi,
+            size as vk::DeviceSize,
+            vk::BufferUsageFlags::VERTEX_BUFFER
+                | vk::BufferUsageFlags::TRANSFER_DST
+                | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
+                | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+            debug_name,
+        );
 
         let buffer = Self {
             inner: buffer,

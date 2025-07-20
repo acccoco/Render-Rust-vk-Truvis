@@ -1,7 +1,7 @@
 use ash::vk;
 use std::mem::offset_of;
 use truvis_rhi::basic::color::LabelColor;
-use truvis_rhi::core::buffer::RhiBuffer;
+use truvis_rhi::core::buffer::{RhiBuffer, RhiIndexBuffer, RhiStageBuffer, RhiVertexBuffer};
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::rhi::Rhi;
@@ -48,11 +48,11 @@ impl ImGuiVertex {
 
 /// imgui 绘制所需的 vertex buffer 和 index buffer
 pub struct GuiMesh {
-    pub vertex_buffer: RhiBuffer,
+    pub vertex_buffer: RhiVertexBuffer<imgui::DrawVert>,
     _vertex_count: usize,
     _vertex_stage_buffer: RhiBuffer,
 
-    pub _index_buffer: RhiBuffer,
+    pub _index_buffer: RhiIndexBuffer,
     _index_count: usize,
     _index_stage_buffer: RhiBuffer,
 }
@@ -100,7 +100,7 @@ impl GuiMesh {
         frame_name: &str,
         cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (RhiBuffer, usize, RhiBuffer) {
+    ) -> (RhiVertexBuffer<imgui::DrawVert>, usize, RhiBuffer) {
         let vertex_count = draw_data.total_vtx_count as usize;
         let mut vertices = Vec::with_capacity(vertex_count);
         for draw_list in draw_data.draw_lists() {
@@ -109,8 +109,7 @@ impl GuiMesh {
 
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
         let mut vertex_buffer =
-            RhiBuffer::new_vertex_buffer(rhi, vertices_size, format!("{}-imgui-vertex", frame_name));
-
+            RhiVertexBuffer::<imgui::DrawVert>::new(rhi, vertex_count, format!("{}-imgui-vertex", frame_name));
         let mut stage_buffer = RhiBuffer::new_stage_buffer(
             rhi,
             vertices_size as vk::DeviceSize,
@@ -142,7 +141,7 @@ impl GuiMesh {
         frame_name: &str,
         cmd: &RhiCommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (RhiBuffer, usize, RhiBuffer) {
+    ) -> (RhiIndexBuffer, usize, RhiBuffer) {
         let index_count = draw_data.total_idx_count as usize;
         let mut indices = Vec::with_capacity(index_count);
         for draw_list in draw_data.draw_lists() {
@@ -150,7 +149,7 @@ impl GuiMesh {
         }
 
         let indices_size = index_count * size_of::<imgui::DrawIdx>();
-        let mut index_buffer = RhiBuffer::new_index_buffer(rhi, indices_size, format!("{}-imgui-index", frame_name));
+        let mut index_buffer = RhiIndexBuffer::new(rhi, indices_size, format!("{}-imgui-index", frame_name));
         let mut stage_buffer = RhiBuffer::new_stage_buffer(
             rhi,
             indices_size as vk::DeviceSize,
