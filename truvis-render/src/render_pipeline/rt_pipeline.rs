@@ -14,6 +14,7 @@ use truvis_rhi::rhi::Rhi;
 pub struct RtPipeline {
     rt_pass: SimlpeRtPass,
     blit_pass: ComputePass<shader::blit::PushConstant>,
+    sdr_pass: ComputePass<shader::sdr::PushConstant>,
 }
 impl RtPipeline {
     pub fn new(rhi: &Rhi, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
@@ -24,8 +25,18 @@ impl RtPipeline {
             cstr::cstr!("main"),
             "shader/build/imgui/blit.slang.spv",
         );
+        let sdr_pass = ComputePass::<shader::sdr::PushConstant>::new(
+            rhi,
+            &bindless_mgr.borrow(),
+            c"main",
+            "shader/build/pass/pp/sdr.slang.spv",
+        );
 
-        Self { rt_pass, blit_pass }
+        Self {
+            rt_pass,
+            blit_pass,
+            sdr_pass,
+        }
     }
 
     pub fn render(&self, ctx: PipelineContext) {
@@ -43,9 +54,11 @@ impl RtPipeline {
 
         let color_image = frame_buffers.color_image();
         let color_image_handle = frame_buffers.color_image_bindless_handle(&bindless_mgr.borrow());
+        let render_target = frame_buffers.render_target_image(frame_label);
         let render_target_handle =
             frame_buffers.render_target_image_bindless_handle(&bindless_mgr.borrow(), frame_label);
 
+        let mut submit_cmds = Vec::new();
         // ray tracing
         {
             let cmd = frame_ctrl.alloc_command_buffer("ray-tracing");
@@ -68,7 +81,7 @@ impl RtPipeline {
 
             cmd.end();
 
-            rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
+            submit_cmds.push(cmd);
         }
 
         // blit
@@ -102,8 +115,48 @@ impl RtPipeline {
             );
 
             cmd.end();
-
-            rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
+            submit_cmds.push(cmd);
         }
+
+        // hdr -> sdr
+        {
+            let cmd = frame_ctrl.alloc_command_buffer("hdr2sdr");
+            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "hdr2sdr");
+
+            // 等待之前的 compute shader 执行完成
+            let rt_barrier = RhiImageBarrier::new()
+                .image(render_target)
+                .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                .src_mask(
+                    vk::PipelineStageFlags2::COMPUTE_SHADER,
+                    vk::AccessFlags2::SHADER_WRITE | vk::AccessFlags2::SHADER_READ,
+                )
+                .dst_mask(
+                    vk::PipelineStageFlags2::COMPUTE_SHADER,
+                    vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
+                );
+            cmd.image_memory_barrier(vk::DependencyFlags::empty(), &[rt_barrier]);
+
+            self.sdr_pass.exec(
+                &cmd,
+                &bindless_mgr.borrow(),
+                &shader::sdr::PushConstant {
+                    src_image: color_image_handle,
+                    dst_image: render_target_handle,
+                    image_size: glam::uvec2(frame_settings.frame_extent.width, frame_settings.frame_extent.height)
+                        .into(),
+                },
+                glam::uvec3(
+                    frame_settings.frame_extent.width.div_ceil(shader::blit::SHADER_X as u32),
+                    frame_settings.frame_extent.height.div_ceil(shader::blit::SHADER_Y as u32),
+                    1,
+                ),
+            );
+
+            cmd.end();
+            submit_cmds.push(cmd);
+        }
+
+        rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&submit_cmds)], None);
     }
 }

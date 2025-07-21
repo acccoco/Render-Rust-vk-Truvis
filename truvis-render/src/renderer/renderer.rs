@@ -91,8 +91,8 @@ impl Renderer {
             render_target,
             render_target_bindless_key,
             render_target_barrier: RhiBarrierMask {
-                src_stage: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                src_access: vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                src_stage: vk::PipelineStageFlags2::COMPUTE_SHADER,
+                src_access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
                 dst_stage: vk::PipelineStageFlags2::NONE,
                 dst_access: vk::AccessFlags2::NONE,
             },
@@ -125,7 +125,7 @@ impl Renderer {
 
         let frame_settings = FrameSettings {
             fif_num: FrameLabel::FRAMES_IN_FLIGHT,
-            color_format: DefaultRendererSettings::DEFAULT_SURFACE_FORMAT.format,
+            color_format: vk::Format::R16G16B16A16_SFLOAT,
             depth_format: Self::get_depth_format(&rhi),
             frame_extent: vk::Extent2D {
                 width: 400,

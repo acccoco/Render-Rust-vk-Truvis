@@ -1,7 +1,7 @@
 use ash::vk;
 use std::mem::offset_of;
 use truvis_rhi::basic::color::LabelColor;
-use truvis_rhi::core::buffer::{RhiBuffer, RhiIndexBuffer, RhiStageBuffer, RhiVertexBuffer};
+use truvis_rhi::core::buffer::{RhiBuffer, RhiIndexBuffer, RhiVertexBuffer};
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::rhi::Rhi;
@@ -60,8 +60,8 @@ pub struct GuiMesh {
 impl GuiMesh {
     pub fn new(rhi: &Rhi, cmd: &RhiCommandBuffer, frame_name: &str, draw_data: &imgui::DrawData) -> Self {
         let (vertex_buffer, vertex_cnt, vertex_stage_buffer) =
-            Self::create_vertex_buffer(rhi, frame_name, &cmd, draw_data);
-        let (index_buffer, index_cnt, index_stage_buffer) = Self::create_index_buffer(rhi, frame_name, &cmd, draw_data);
+            Self::create_vertex_buffer(rhi, frame_name, cmd, draw_data);
+        let (index_buffer, index_cnt, index_stage_buffer) = Self::create_index_buffer(rhi, frame_name, cmd, draw_data);
 
         cmd.begin_label("uipass-mesh-transfer-barrier", LabelColor::COLOR_CMD);
         {

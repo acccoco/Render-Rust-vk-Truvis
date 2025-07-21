@@ -13,7 +13,7 @@ rt::PushConstants push_const;
 
 struct HitPayload
 {
-    /// 当前发射出的光线的颜色
+    /// 命中点的自发光颜色
     float3 radiance;
     /// 当前命中位置的衰减：BRDF * cos(theta) / pdf
     float3 weight;
@@ -138,15 +138,9 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         diffuse_callable(mat_payload);
         tex_color = mat_payload.out_color;
     }
-    // mat.diffuse_map.sample(interp_vertex.uv).xyz;
-    if (mat.diffuse_map.is_valid())
-    {
-        payload.radiance = tex_color * 0.01f;
-    }
-    else
-    {
-        payload.radiance = tex_color;
-    }
+
+    // 每个表面都有轻微的自发光：
+    payload.radiance = tex_color * 0.01f; 
 
     const float3 lambert_brdf = tex_color / M_PI;
     {
@@ -154,7 +148,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         Sample::create_loacl_coord(world_normal, tangent, bitangent);
         const float3 local_dir = Sample::sampling_hemisphere(payload.random_seed);
         payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
-        payload.ray_origin = world_pos;
+        payload.ray_origin = world_pos + 0.0001 * world_normal;
     }
 
     payload.weight = lambert_brdf * M_PI;
@@ -165,9 +159,17 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
 void diffuse_callable(inout MatPayload payload)
 {
     PBRMaterial *mat = push_const.scene.get_material(payload.instance_id, payload.geometry_id);
-    payload.out_color = mat.diffuse_map.sample(payload.uv).xyz;
+    if (mat.diffuse_map.is_valid())
+    {
+        payload.out_color = mat.diffuse_map.sample(payload.uv).xyz * mat.base_color;
+    }
+    else
+    {
+        payload.out_color = mat.base_color;
+    }
 }
 
+/// 根据 texture 的透明度，判断光线是否应该穿过
 [shader("anyhit")]
 void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {

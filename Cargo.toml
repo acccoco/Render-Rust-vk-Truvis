@@ -124,6 +124,8 @@ include_dir = "0.7.3"
 # 延迟初始化 static
 lazy_static = "1.4.0"
 
+# 遍历文件夹
+walkdir = "2.5.0"
 
 bitflags = "2.3.2"
 

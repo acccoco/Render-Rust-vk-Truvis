@@ -121,6 +121,12 @@ impl<T: OuterApp> TruvisApp<T> {
                         "CameraEuler: ({:.2}, {:.2}, {:.2})",
                         camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg
                     ));
+                    ui.text(format!(
+                        "CameraForward: ({:.2}, {:.2}, {:.2})",
+                        camera.camera_forward().x,
+                        camera.camera_forward().y,
+                        camera.camera_forward().z
+                    ));
                     ui.text(format!("CameraAspect: {:.2}", camera.asp));
                     ui.text(format!("CameraFov(Vertical): {:.2}°", camera.fov_deg_vertical));
                     ui.new_line();
@@ -137,7 +143,7 @@ impl<T: OuterApp> TruvisApp<T> {
             // Renderer: Resize Framebuffer
             {
                 if self.last_render_area != extent {
-                    log::info!("resize frame buffer to: {}x{}", extent.width, extent.height);
+                    // log::info!("resize frame buffer to: {}x{}", extent.width, extent.height);
                     self.renderer.resize_frame_buffer(extent);
                     self.last_render_area = extent;
                 }
@@ -199,15 +205,10 @@ impl<T: OuterApp> TruvisApp<T> {
         }
     }
 
-    fn on_window_resized(&mut self, width: u32, height: u32) {
+    fn on_window_resized(&mut self, _width: u32, _height: u32) {
         self.window_system.get_mut().unwrap().rebuild_after_resized();
 
-        log::info!("try to rebuild render context");
-
-        // TODO 这里使用 swapchian 的长宽？
-        // 更新相机的宽高比
-        self.camera_controller.camera_mut().asp = width as f32 / height as f32;
-
+        // log::info!("try to rebuild render context");
         self.outer_app.get_mut().unwrap().rebuild(&mut self.renderer);
     }
 }
@@ -258,7 +259,7 @@ impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
                 event_loop.exit();
             }
             WindowEvent::Resized(new_size) => {
-                log::info!("window was resized, new size is : {}x{}", new_size.width, new_size.height);
+                // log::info!("window was resized, new size is : {}x{}", new_size.width, new_size.height);
                 self.on_window_resized(new_size.width, new_size.height);
             }
             WindowEvent::RedrawRequested => {

@@ -22,7 +22,12 @@ pub struct PhongPass {
     bindless_manager: Rc<RefCell<BindlessManager>>,
 }
 impl PhongPass {
-    pub fn new(rhi: &Rhi, frame_settings: &FrameSettings, bindless_manager: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new(
+        rhi: &Rhi,
+        color_format: vk::Format,
+        depth_format: vk::Format,
+        bindless_manager: Rc<RefCell<BindlessManager>>,
+    ) -> Self {
         let mut ci = RhiGraphicsPipelineCreateInfo::default();
         ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv", cstr::cstr!("main"));
         ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv", cstr::cstr!("main"));
@@ -30,7 +35,7 @@ impl PhongPass {
         ci.vertex_binding(VertexLayoutAos3D::vertex_input_bindings());
         ci.vertex_attribute(VertexLayoutAos3D::vertex_input_attributes());
 
-        ci.attach_info(vec![frame_settings.color_format], Some(frame_settings.depth_format), None);
+        ci.attach_info(vec![color_format], Some(depth_format), None);
         ci.color_blend(
             vec![vk::PipelineColorBlendAttachmentState::default()
                 .blend_enable(false)

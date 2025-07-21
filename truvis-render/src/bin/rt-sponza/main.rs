@@ -7,11 +7,11 @@ use truvis_render::render_pipeline::pipeline_context::PipelineContext;
 use truvis_render::render_pipeline::rt_pipeline::RtPipeline;
 use truvis_render::renderer::renderer::Renderer;
 
-struct PhongApp {
+struct RtApp {
     rt_pipeline: RtPipeline,
 }
 
-impl PhongApp {
+impl RtApp {
     fn create_scene(renderer: &mut Renderer, camera: &mut DrsCamera) {
         camera.position = glam::vec3(270.0, 194.0, -64.0);
         camera.euler_yaw_deg = 90.0;
@@ -49,7 +49,7 @@ impl PhongApp {
     }
 }
 
-impl OuterApp for PhongApp {
+impl OuterApp for RtApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
         let rt_pipeline = RtPipeline::new(&renderer.rhi, renderer.bindless_mgr.clone());
 
@@ -66,5 +66,5 @@ impl OuterApp for PhongApp {
 }
 
 fn main() {
-    TruvisApp::<PhongApp>::run();
+    TruvisApp::<RtApp>::run();
 }

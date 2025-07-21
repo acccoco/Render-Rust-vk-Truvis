@@ -29,7 +29,7 @@ impl RhiTexture2D {
         let image_view = RhiImage2DView::new(
             rhi,
             image.handle(),
-            RhiImageViewCreateInfo::new_image_view_2d_info(vk::Format::R8G8B8A8_UNORM, vk::ImageAspectFlags::COLOR),
+            RhiImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
             name,
         );
 

@@ -1,8 +1,8 @@
 /// 当前项目的环境路径，基于 workspace 根目录
 pub struct EnvPath;
 impl EnvPath {
-    /// shader 所在的路径
-    pub const SHADER_DIR: &'static str = "shader";
+    /// shader src 的路径
+    pub const SHADER_SRC_DIR: &'static str = "shader/src";
 
     /// 编译 shader 的输出路径
     pub const SHADER_BUILD_DIR: &'static str = "shader/build";

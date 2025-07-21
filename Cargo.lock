@@ -321,6 +321,7 @@ dependencies = [
  "log",
  "rayon",
  "truvis-crate-tools",
+ "walkdir",
 ]
 
 [[package]]

@@ -136,6 +136,11 @@ impl RhiImage2D {
     pub fn handle(&self) -> vk::Image {
         self.handle
     }
+
+    #[inline]
+    pub fn format(&self) -> vk::Format {
+        self.image_info.format()
+    }
 }
 impl RhiImage2D {
     pub fn new(

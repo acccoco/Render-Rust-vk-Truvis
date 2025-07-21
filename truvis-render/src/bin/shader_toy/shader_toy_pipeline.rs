@@ -12,8 +12,8 @@ pub struct ShaderToyPipeline {
     shader_toy_pass: ShaderToyPass,
 }
 impl ShaderToyPipeline {
-    pub fn new(rhi: &Rhi, pipeline_settings: &FrameSettings) -> Self {
-        let shader_toy_pass = ShaderToyPass::new(rhi, pipeline_settings);
+    pub fn new(rhi: &Rhi, color_format: vk::Format) -> Self {
+        let shader_toy_pass = ShaderToyPass::new(rhi, color_format);
         Self { shader_toy_pass }
     }
 

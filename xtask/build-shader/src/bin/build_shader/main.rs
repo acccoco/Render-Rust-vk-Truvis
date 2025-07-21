@@ -58,18 +58,18 @@ impl ShaderCompileTask {
     /// 生成 shader compile 的任务
     ///
     /// entry 是相对于 workspace 的
-    fn new(entry: &std::fs::DirEntry) -> Option<Self> {
+    fn new(entry: &walkdir::DirEntry) -> Option<Self> {
         let shader_path = entry.path();
         // 相对于 shader 的路径
-        let relative_path = shader_path.strip_prefix(EnvPath::SHADER_DIR).unwrap();
-        let shader_name = entry.file_name().into_string().unwrap();
+        let relative_path = shader_path.strip_prefix(EnvPath::SHADER_SRC_DIR).unwrap();
+        let shader_name = entry.file_name().to_str().unwrap();
 
         let output_path = format!("{}/{}.spv", EnvPath::SHADER_BUILD_DIR, relative_path.to_str().unwrap());
-        let shader_stage = Self::get_shader_stage(shader_name.as_str())?;
-        let shader_type = Self::select_shader_compiler(shader_name.as_str());
+        let shader_stage = Self::get_shader_stage(shader_name)?;
+        let shader_type = Self::select_shader_compiler(shader_name);
 
         Some(Self {
-            shader_path,
+            shader_path: shader_path.to_path_buf(),
             shader_type,
             shader_stage,
             output_path: std::path::PathBuf::from(output_path),
@@ -217,20 +217,11 @@ fn main() {
     // 编译 shader 目录下的所有 shader 文件
     // 假定嵌套深度为 1
     // 以下 entry 都是相对于 workspace 的
-    std::fs::read_dir(EnvPath::SHADER_DIR)
-        .unwrap()
-        .map(|entry| entry.unwrap().path())
-        .filter(|entry| entry.is_dir())
-        // 跳过 shader-binding 文件夹
-        .filter(|entry| !entry.ends_with("shader-binding"))
-        .flat_map(|dir| {
-            // 遍历内存文件夹，尝试为每个文件建立一个 ShaderCompileTask
-            std::fs::read_dir(dir)
-                .unwrap()
-                .map(|entry| entry.unwrap())
-                .filter(|entry| entry.path().is_file())
-                .filter_map(|entry| ShaderCompileTask::new(&entry))
-        })
+    walkdir::WalkDir::new(EnvPath::SHADER_SRC_DIR)
+        .into_iter()
+        .map(|entry| entry.unwrap())
+        .filter(|entry| entry.path().is_file())
+        .filter_map(|dir| ShaderCompileTask::new(&dir))
         .par_bridge() // 并行化
         .for_each(|entry| {
             log::info!("compile shader: {:?}", entry.shader_path);

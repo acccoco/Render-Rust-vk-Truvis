@@ -1,0 +1,18 @@
+#pragma once
+#include "bindless.slangi"
+#include "ptr.slangi"
+
+namespace sdr
+{
+
+static const int SHADER_X = 8;
+static const int SHADER_Y = 8;
+
+struct PushConstant
+{
+    ImageHandle src_image;
+    ImageHandle dst_image;
+
+    uint2 image_size;
+};
+};

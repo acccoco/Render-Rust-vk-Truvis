@@ -64,10 +64,10 @@ pub struct ShaderToyPass {
     _pipeline_layout: Rc<RhiPipelineLayout>,
 }
 impl ShaderToyPass {
-    pub fn new(rhi: &Rhi, frame_settings: &FrameSettings) -> Self {
+    pub fn new(rhi: &Rhi, color_format: vk::Format) -> Self {
         let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| *stage.value()).collect_vec());
-        pipeline_ci.attach_info(vec![frame_settings.color_format], None, Some(vk::Format::UNDEFINED));
+        pipeline_ci.attach_info(vec![color_format], None, Some(vk::Format::UNDEFINED));
         pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
         pipeline_ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
         pipeline_ci.color_blend(

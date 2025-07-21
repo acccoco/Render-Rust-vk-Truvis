@@ -49,10 +49,4 @@
 
 已知 Blender 的坐标系是：Right-Handed, Z-Up
 
-从当前应用到 Blender，需要：
-
-```shell  
-x_blender = x
-y_blender = -z
-z_blender = y
-```
+Blender 导出为 fbx 的方法：需要指定 Forward = Y，Up = Z，就可以和 Renderer 对齐了。
