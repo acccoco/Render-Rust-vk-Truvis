@@ -1,17 +1,18 @@
 #pragma once
+#include "common.slangi"
 
 struct Random
 {
-    uint seed;
+    uint rng_stage;
     __init(uint a, uint b)
     {
-        seed = tea(a, b);
+        rng_stage = tea(a, b);
     }
 
     [mutating]
     float next()
     {
-        return rnd(seed);
+        return rnd(rng_stage);
     }
 
     // 生成随机数的初始种子
@@ -34,17 +35,29 @@ struct Random
 
     // Generate a random unsigned int in [0, 2^24) given the pre_seedious RNG state
     // using the Numerical Recipes linear congruential generator
-    static uint lcg(inout uint pre_seed)
+    static uint lcg(inout uint pre_state)
     {
         uint LCG_A = 1664525u;
         uint LCG_C = 1013904223u;
-        pre_seed = (LCG_A * pre_seed + LCG_C);
-        return pre_seed & 0x00FFFFFF;
+        pre_state = (LCG_A * pre_state + LCG_C);
+        return pre_state & 0x00FFFFFF;
     }
 
     // Generate a random float in [0, 1) given the pre_seedious RNG state
-    static float rnd(inout uint pre_seed)
+    static float rnd(inout uint pre_state)
     {
-        return (float(lcg(pre_seed)) / float(0x01000000));
+        return (float(lcg(pre_state)) / float(0x01000000));
+    }
+
+    /// 生成符合高斯分布的随机数：中心为 0，标准差为 1
+    static float2 rand_gaussian(inout uint pre_state)
+    {
+        // Almost uniform in (0,1] - make sure the value is never 0:
+        const float u1 = max(1e-38, rnd(pre_state));
+        const float u2 = rnd(pre_state); // In [0, 1]
+        // log = log_e
+        const float r = sqrt(-2.0 * log(u1));
+        const float theta = 2 * M_PI * u2; // Random in [0, 2pi]
+        return r * float2(cos(theta), sin(theta));
     }
 };

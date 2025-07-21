@@ -51,11 +51,13 @@ void main_ray_gen()
 
     uint2 thread_id = DispatchRaysIndex().xy;
 
+    // 下方的 0.375 来自于 Blender 的 Cycles
     uint random_seed = Random::tea(thread_id.y * DispatchRaysDimensions().x + thread_id.x, frame_data.accum_frames);
-    const float r1 = Random::rnd(random_seed);
-    const float r2 = Random::rnd(random_seed);
-    const float2 subpixel_jitter = frame_data.accum_frames == 0 ? float2(0.5f) : float2(r1, r2);
+    const float2 subpixel_jitter = frame_data.accum_frames == 0
+                                       ? float2(0.5f)
+                                       : float2(0.5) + 0.375 * Random::rand_gaussian(random_seed);
 
+    // 以 thread_id + 0.5 为中心，进行子像素抖动
     const float2 pixel_center = float2(thread_id) + subpixel_jitter;
     const float2 in_uv = pixel_center / float2(DispatchRaysDimensions().xy);
     const float4 target_in_view = mul(frame_data.inv_projection, float4(in_uv.x * 2.0 - 1.0, 1.0 - in_uv.y * 2.0, 1.0, 1.0));
@@ -127,7 +129,10 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
     const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
     const float3 world_pos = mul(ObjectToWorld3x4(), float4(interp_vertex.position, 1.f));
-    const float3 world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
+
+    // 双面材质：确保每次光线都命中物体的正面
+    const float3 origin_world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
+    const float3 world_normal = faceforward(origin_world_normal, WorldRayDirection(), origin_world_normal);
 
     float3 tex_color = float3(0.f, 0.f, 0.f);
     {
@@ -140,7 +145,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     }
 
     // 每个表面都有轻微的自发光：
-    payload.radiance = tex_color * 0.01f; 
+    payload.radiance = tex_color * 0.01f;
 
     const float3 lambert_brdf = tex_color / M_PI;
     {
