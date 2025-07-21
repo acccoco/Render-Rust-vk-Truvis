@@ -14,6 +14,7 @@ use truvis_rhi::core::buffer::{RhiSBTBuffer, RhiStructuredBuffer};
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::core::shader::{RhiShaderModule, RhiShaderStageInfo, ShaderGroupInfo};
+use truvis_rhi::core::synchronize::RhiImageBarrier;
 use truvis_rhi::rhi::Rhi;
 
 pub struct RhiRtPipeline {
@@ -387,6 +388,7 @@ impl SimlpeRtPass {
         cmd: &RhiCommandBuffer,
         frame_ctrl: &FrameController,
         framse_settings: &FrameSettings,
+        rt_image: vk::Image,
         rt_handle: ImageHandle,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
@@ -403,37 +405,58 @@ impl SimlpeRtPass {
             &[self._bindless_mgr.borrow().bindless_descriptor_sets[*frame_label].handle()],
             None,
         );
-        let push_constant = shader::rt::PushConstants {
+        let spp = 4;
+        let mut push_constant = shader::rt::PushConstants {
             frame_data: per_frame_data.device_address(),
             scene: gpu_scene.scene_device_address(frame_label),
-
             rt_render_target: rt_handle,
+            spp,
+            spp_idx: 0,
             _padding_0: Default::default(),
-            _padding_1: Default::default(),
-            _padding_2: Default::default(),
         };
-        cmd.cmd_push_constants(
-            self.pipeline.pipeline_layout,
-            vk::ShaderStageFlags::RAYGEN_KHR
-                | vk::ShaderStageFlags::MISS_KHR
-                | vk::ShaderStageFlags::ANY_HIT_KHR
-                | vk::ShaderStageFlags::CALLABLE_KHR
-                | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-            0,
-            bytemuck::bytes_of(&push_constant),
-        );
+        for spp_idx in 0..spp {
+            push_constant.spp_idx = spp_idx;
 
-        cmd.trace_rays(
-            &self._sbt.sbt_region_raygen,
-            &self._sbt.sbt_region_miss,
-            &self._sbt.sbt_region_hit,
-            &self._sbt.sbt_region_callable,
-            [
-                framse_settings.frame_extent.width,
-                framse_settings.frame_extent.height,
-                1,
-            ],
-        );
+            if spp_idx != 0 {
+                cmd.image_memory_barrier(
+                    vk::DependencyFlags::empty(),
+                    &[RhiImageBarrier::new()
+                        .image(rt_image)
+                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                        .src_mask(
+                            vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+                            vk::AccessFlags2::SHADER_WRITE | vk::AccessFlags2::SHADER_READ,
+                        )
+                        .dst_mask(
+                            vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+                            vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
+                        )],
+                );
+            }
+
+            cmd.cmd_push_constants(
+                self.pipeline.pipeline_layout,
+                vk::ShaderStageFlags::RAYGEN_KHR
+                    | vk::ShaderStageFlags::MISS_KHR
+                    | vk::ShaderStageFlags::ANY_HIT_KHR
+                    | vk::ShaderStageFlags::CALLABLE_KHR
+                    | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+                0,
+                bytemuck::bytes_of(&push_constant),
+            );
+
+            cmd.trace_rays(
+                &self._sbt.sbt_region_raygen,
+                &self._sbt.sbt_region_miss,
+                &self._sbt.sbt_region_hit,
+                &self._sbt.sbt_region_callable,
+                [
+                    framse_settings.frame_extent.width,
+                    framse_settings.frame_extent.height,
+                    1,
+                ],
+            );
+        }
 
         cmd.end_label();
     }

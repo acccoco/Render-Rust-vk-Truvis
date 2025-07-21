@@ -77,7 +77,15 @@ impl RtPipeline {
                     )],
             );
 
-            self.rt_pass.ray_trace(&cmd, frame_ctrl, frame_settings, color_image_handle, per_frame_data, gpu_scene);
+            self.rt_pass.ray_trace(
+                &cmd,
+                frame_ctrl,
+                frame_settings,
+                color_image.handle(),
+                color_image_handle,
+                per_frame_data,
+                gpu_scene,
+            );
 
             cmd.end();
 

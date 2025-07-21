@@ -11,8 +11,8 @@ struct PushConstants
     PTR(Scene, scene);
 
     ImageHandle rt_render_target;
+    uint spp;
+    uint spp_idx;
     uint _padding_0;
-    uint _padding_1;
-    uint _padding_2;
 };
 };

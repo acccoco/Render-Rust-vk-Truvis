@@ -6,7 +6,7 @@
 const static uint max_depth = 10;
 
 /// 超过一定数量后，就不再重新计算了
-const static uint max_accum_frames = 1024;
+const static uint max_accum_samples = 1024;
 
 [[vk::push_constant]]
 rt::PushConstants push_const;
@@ -43,7 +43,8 @@ struct MatPayload
 void main_ray_gen()
 {
     PerFrameData *frame_data = push_const.frame_data;
-    if (frame_data.accum_frames >= max_accum_frames)
+    const uint accum_samples = frame_data.accum_frames * push_const.spp + push_const.spp_idx;
+    if (accum_samples >= max_accum_samples)
     {
         // 达到最大累积帧数，直接返回
         return;
@@ -52,8 +53,8 @@ void main_ray_gen()
     uint2 thread_id = DispatchRaysIndex().xy;
 
     // 下方的 0.375 来自于 Blender 的 Cycles
-    uint random_seed = Random::tea(thread_id.y * DispatchRaysDimensions().x + thread_id.x, frame_data.accum_frames);
-    const float2 subpixel_jitter = frame_data.accum_frames == 0
+    uint random_seed = Random::tea(thread_id.y * DispatchRaysDimensions().x + thread_id.x, accum_samples);
+    const float2 subpixel_jitter = accum_samples == 0
                                        ? float2(0.5f)
                                        : float2(0.5) + 0.375 * Random::rand_gaussian(random_seed);
 
@@ -100,9 +101,9 @@ void main_ray_gen()
         ray.Direction = payload.ray_dir;
     }
 
-    if (frame_data.accum_frames > 0)
+    if (accum_samples > 0)
     {
-        float a = 1.f / float(frame_data.accum_frames + 1);
+        float a = 1.f / float(accum_samples + 1);
         const float3 old_color = push_const.rt_render_target.load(thread_id).xyz;
         // const float3 old_color = float3(1.f, 0.f, 0.f);
         push_const.rt_render_target.store(thread_id, float4(lerp(old_color, color, a), 1.f));
