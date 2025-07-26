@@ -13,6 +13,7 @@ struct Sample
         float r2 = Random::rnd(seed);
         float sq = sqrt(r1);
 
+        // TODO 这是不是有问题啊
         float3 direction = float3(cos(2 * M_PI * r2) * sq, sin(2 * M_PI * r2) * sq, sqrt(1. - r1));
         return direction;
     }

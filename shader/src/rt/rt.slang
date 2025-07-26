@@ -146,18 +146,39 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     }
 
     // 每个表面都有轻微的自发光：
-    payload.radiance = tex_color * 0.01f;
+    // payload.radiance = tex_color * 0.01f;
 
-    const float3 lambert_brdf = tex_color / M_PI;
+    // 光线的起点增加一个偏移量，避免自交
+    payload.ray_origin = world_pos + 0.0001 * world_normal;
+
+    // 半球均匀采样
+    // pdf = 1/2pi
+    // {
+    //     float3 tangent, bitangent;
+    //     Sample::create_loacl_coord(world_normal, tangent, bitangent);
+    //     const float3 local_dir = Sample::sampling_hemisphere(payload.random_seed);
+    //     payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
+
+    //     payload.weight = tex_color * 2.f * local_dir.z;
+    // }
+
+    // BRDF = tex_color / pi
+    // pdf = cos(theta)  
+    // theta = 0.5 * acos(1 - 2 * UniformRandom())
+    // phi = 2 * pi * UniformRandom()
     {
+        const float theta = 0.5f * acos(1.f - 2.f * Random::rnd(payload.random_seed));
+        const float phi = 2 * M_PI * Random::rnd(payload.random_seed);
+
         float3 tangent, bitangent;
         Sample::create_loacl_coord(world_normal, tangent, bitangent);
-        const float3 local_dir = Sample::sampling_hemisphere(payload.random_seed);
-        payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
-        payload.ray_origin = world_pos + 0.0001 * world_normal;
-    }
 
-    payload.weight = lambert_brdf * M_PI;
+        const float3 local_dir = float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
+        payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
+
+        payload.weight = tex_color;
+    } 
+
     payload.done = false;
 }
 
