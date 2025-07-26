@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use model_manager::component::{DrsInstance, DrsMesh, TruMaterial};
+use model_manager::component::{DrsInstance, DrsMesh, DrsMaterial};
 use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::rhi::Rhi;
 
@@ -7,7 +7,7 @@ fn main() {
     let rhi = Rhi::new("test".to_string(), vec![]);
 
     let mut mesh_map: HashMap<uuid::Uuid, DrsMesh> = HashMap::new();
-    let mut mat_map: HashMap<uuid::Uuid, TruMaterial> = HashMap::new();
+    let mut mat_map: HashMap<uuid::Uuid, DrsMaterial> = HashMap::new();
     let mut ins_map: HashMap<uuid::Uuid, DrsInstance> = HashMap::new();
 
     let uuids = AssimpSceneLoader::load_scene(
@@ -23,7 +23,7 @@ fn main() {
             mesh_map.insert(uuid, mesh);
             uuid
         },
-        |mat: TruMaterial| {
+        |mat: DrsMaterial| {
             let uuid = uuid::Uuid::new_v4();
             mat_map.insert(uuid, mat);
             uuid

@@ -20,7 +20,7 @@ impl OuterApp for ShaderToy {
         log::info!("shader toy.");
         Self {
             rectangle: VertexAosLayoutPosColor::rectangle(&renderer.rhi),
-            pipeline: ShaderToyPipeline::new(&renderer.rhi, &renderer.frame_settings()),
+            pipeline: ShaderToyPipeline::new(&renderer.rhi, renderer.frame_settings().color_format),
         }
     }
 

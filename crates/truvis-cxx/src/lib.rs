@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use model_manager::component::{DrsGeometry, DrsInstance, DrsMesh, TruMaterial};
+use model_manager::component::{DrsGeometry, DrsInstance, DrsMesh, DrsMaterial};
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
@@ -39,7 +39,7 @@ impl AssimpSceneLoader {
         model_file: &std::path::Path,
         instance_register: impl FnMut(DrsInstance) -> uuid::Uuid,
         mesh_register: impl FnMut(DrsMesh) -> uuid::Uuid,
-        mat_register: impl FnMut(TruMaterial) -> uuid::Uuid,
+        mat_register: impl FnMut(DrsMaterial) -> uuid::Uuid,
     ) -> Vec<uuid::Uuid> {
         validate_vertex_memory_layout();
 
@@ -120,7 +120,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中的所有材质
-    fn load_mats(&mut self, _rhi: &Rhi, mut mat_register: impl FnMut(TruMaterial) -> uuid::Uuid) {
+    fn load_mats(&mut self, _rhi: &Rhi, mut mat_register: impl FnMut(DrsMaterial) -> uuid::Uuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)
@@ -128,7 +128,7 @@ impl AssimpSceneLoader {
                 let mat = get_mat(self.loader, mat_idx);
                 let mat = &*mat;
 
-                let mat_uuid = mat_register(TruMaterial {
+                let mat_uuid = mat_register(DrsMaterial {
                     ambient: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.ambient),
                     diffuse: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.diffuse),
                     specular: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.specular),

@@ -6,7 +6,7 @@ use truvis_rhi::core::buffer::{RhiIndexBuffer, RhiVertexBuffer};
 use truvis_rhi::rhi::Rhi;
 
 #[derive(Default)]
-pub struct TruMaterial {
+pub struct DrsMaterial {
     pub ambient: glam::Vec4,
     pub diffuse: glam::Vec4,
     pub specular: glam::Vec4,

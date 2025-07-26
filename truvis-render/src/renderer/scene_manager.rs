@@ -1,5 +1,5 @@
 use crate::renderer::bindless::BindlessManager;
-use model_manager::component::{DrsInstance, DrsMesh, TruMaterial};
+use model_manager::component::{DrsInstance, DrsMesh, DrsMaterial};
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::rhi::Rhi;
 
 pub struct SceneManager {
-    mat_map: HashMap<uuid::Uuid, TruMaterial>,
+    mat_map: HashMap<uuid::Uuid, DrsMaterial>,
     instance_map: HashMap<uuid::Uuid, DrsInstance>,
     mesh_map: HashMap<uuid::Uuid, DrsMesh>,
 
@@ -19,7 +19,7 @@ pub struct SceneManager {
 // getter
 impl SceneManager {
     #[inline]
-    pub fn mat_map(&self) -> &HashMap<uuid::Uuid, TruMaterial> {
+    pub fn mat_map(&self) -> &HashMap<uuid::Uuid, DrsMaterial> {
         &self.mat_map
     }
     #[inline]
@@ -58,7 +58,7 @@ impl SceneManager {
     }
 
     #[inline]
-    pub fn get_material(&self, guid: &uuid::Uuid) -> Option<&TruMaterial> {
+    pub fn get_material(&self, guid: &uuid::Uuid) -> Option<&DrsMaterial> {
         self.mat_map.get(guid)
     }
 
@@ -100,7 +100,7 @@ impl SceneManager {
     }
 
     /// 向场景中添加材质
-    pub fn register_mat(&mut self, mat: TruMaterial) -> uuid::Uuid {
+    pub fn register_mat(&mut self, mat: DrsMaterial) -> uuid::Uuid {
         let guid = uuid::Uuid::new_v4();
         self.mat_map.insert(guid, mat);
         guid
