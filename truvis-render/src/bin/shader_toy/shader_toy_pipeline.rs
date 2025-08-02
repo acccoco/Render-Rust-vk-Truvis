@@ -2,7 +2,6 @@ use crate::shader_toy_pass::ShaderToyPass;
 use ash::vk;
 use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::VertexPosColor;
-use truvis_render::pipeline_settings::FrameSettings;
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
 use truvis_rhi::core::command_queue::RhiSubmitInfo;
 use truvis_rhi::core::synchronize::RhiImageBarrier;

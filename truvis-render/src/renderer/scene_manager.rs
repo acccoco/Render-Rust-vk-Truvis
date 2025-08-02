@@ -1,5 +1,6 @@
 use crate::renderer::bindless::BindlessManager;
-use model_manager::component::{DrsInstance, DrsMesh, DrsMaterial};
+use model_manager::component::{DrsInstance, DrsMaterial, DrsMesh};
+use model_manager::guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid};
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -8,30 +9,30 @@ use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::rhi::Rhi;
 
 pub struct SceneManager {
-    mat_map: HashMap<uuid::Uuid, DrsMaterial>,
-    instance_map: HashMap<uuid::Uuid, DrsInstance>,
-    mesh_map: HashMap<uuid::Uuid, DrsMesh>,
+    mat_map: HashMap<MatGuid, DrsMaterial>,
+    instance_map: HashMap<InsGuid, DrsInstance>,
+    mesh_map: HashMap<MeshGuid, DrsMesh>,
 
-    point_light_map: HashMap<uuid::Uuid, shader::PointLight>,
+    point_light_map: HashMap<LightGuid, shader::PointLight>,
 
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
 // getter
 impl SceneManager {
     #[inline]
-    pub fn mat_map(&self) -> &HashMap<uuid::Uuid, DrsMaterial> {
+    pub fn mat_map(&self) -> &HashMap<MatGuid, DrsMaterial> {
         &self.mat_map
     }
     #[inline]
-    pub fn instance_map(&self) -> &HashMap<uuid::Uuid, DrsInstance> {
+    pub fn instance_map(&self) -> &HashMap<InsGuid, DrsInstance> {
         &self.instance_map
     }
     #[inline]
-    pub fn mesh_map(&self) -> &HashMap<uuid::Uuid, DrsMesh> {
+    pub fn mesh_map(&self) -> &HashMap<MeshGuid, DrsMesh> {
         &self.mesh_map
     }
     #[inline]
-    pub fn point_light_map(&self) -> &HashMap<uuid::Uuid, shader::PointLight> {
+    pub fn point_light_map(&self) -> &HashMap<LightGuid, shader::PointLight> {
         &self.point_light_map
     }
 }
@@ -48,42 +49,42 @@ impl SceneManager {
 
     /// getter
     #[inline]
-    pub fn get_instance(&self, guid: &uuid::Uuid) -> Option<&DrsInstance> {
+    pub fn get_instance(&self, guid: &InsGuid) -> Option<&DrsInstance> {
         self.instance_map.get(guid)
     }
 
     #[inline]
-    pub fn get_mesh(&self, guid: &uuid::Uuid) -> Option<&DrsMesh> {
+    pub fn get_mesh(&self, guid: &MeshGuid) -> Option<&DrsMesh> {
         self.mesh_map.get(guid)
     }
 
     #[inline]
-    pub fn get_material(&self, guid: &uuid::Uuid) -> Option<&DrsMaterial> {
+    pub fn get_material(&self, guid: &MatGuid) -> Option<&DrsMaterial> {
         self.mat_map.get(guid)
     }
 
     /// 向世界中添加一个外部场景
-    pub fn load_scene(&mut self, rhi: &Rhi, model_path: &std::path::Path, transform: &glam::Mat4) -> Vec<uuid::Uuid> {
+    pub fn load_scene(&mut self, rhi: &Rhi, model_path: &std::path::Path, transform: &glam::Mat4) -> Vec<InsGuid> {
         let mut ins_guids = vec![];
 
         AssimpSceneLoader::load_scene(
             rhi,
             model_path,
             |mut ins| {
-                let guid = uuid::Uuid::new_v4();
+                let guid = InsGuid::new();
                 ins.transform = *transform * ins.transform;
                 self.instance_map.insert(guid, ins);
                 ins_guids.push(guid);
                 guid
             },
             |mut mesh| {
-                let guid = uuid::Uuid::new_v4();
+                let guid = MeshGuid::new();
                 mesh.build_blas(rhi);
                 self.mesh_map.insert(guid, mesh);
                 guid
             },
             |mat| {
-                let guid = uuid::Uuid::new_v4();
+                let guid = MatGuid::new();
 
                 // 注册纹理
                 let mut bindless_mgr = self.bindless_mgr.borrow_mut();
@@ -100,29 +101,29 @@ impl SceneManager {
     }
 
     /// 向场景中添加材质
-    pub fn register_mat(&mut self, mat: DrsMaterial) -> uuid::Uuid {
-        let guid = uuid::Uuid::new_v4();
+    pub fn register_mat(&mut self, mat: DrsMaterial) -> MatGuid {
+        let guid = MatGuid::new();
         self.mat_map.insert(guid, mat);
         guid
     }
 
     /// 向场景中添加 mesh
-    pub fn register_mesh(&mut self, mesh: DrsMesh) -> uuid::Uuid {
-        let guid = uuid::Uuid::new_v4();
+    pub fn register_mesh(&mut self, mesh: DrsMesh) -> MeshGuid {
+        let guid = MeshGuid::new();
         self.mesh_map.insert(guid, mesh);
         guid
     }
 
     /// 向场景中添加 instance
-    pub fn register_instance(&mut self, instance: DrsInstance) -> uuid::Uuid {
-        let guid = uuid::Uuid::new_v4();
+    pub fn register_instance(&mut self, instance: DrsInstance) -> InsGuid {
+        let guid = InsGuid::new();
         self.instance_map.insert(guid, instance);
         guid
     }
 
     /// 向场景中添加点光源
-    pub fn register_point_light(&mut self, light: shader::PointLight) -> uuid::Uuid {
-        let guid = uuid::Uuid::new_v4();
+    pub fn register_point_light(&mut self, light: shader::PointLight) -> LightGuid {
+        let guid = LightGuid::new();
         self.point_light_map.insert(guid, light);
         guid
     }

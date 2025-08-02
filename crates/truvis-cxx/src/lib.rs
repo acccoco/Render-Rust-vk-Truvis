@@ -1,8 +1,9 @@
 use itertools::Itertools;
-use model_manager::component::{DrsGeometry, DrsInstance, DrsMesh, DrsMaterial};
+use model_manager::component::{DrsGeometry, DrsInstance, DrsMaterial, DrsMesh};
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
+use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use truvis_rhi::core::buffer::RhiIndexBuffer;
 use truvis_rhi::rhi::Rhi;
 
@@ -26,9 +27,9 @@ pub struct AssimpSceneLoader {
     loader: *mut c_void,
     model_name: String,
 
-    meshes: Vec<uuid::Uuid>,
-    mats: Vec<uuid::Uuid>,
-    instances: Vec<uuid::Uuid>,
+    meshes: Vec<MeshGuid>,
+    mats: Vec<MatGuid>,
+    instances: Vec<InsGuid>,
 }
 
 impl AssimpSceneLoader {
@@ -37,10 +38,10 @@ impl AssimpSceneLoader {
     pub fn load_scene(
         rhi: &Rhi,
         model_file: &std::path::Path,
-        instance_register: impl FnMut(DrsInstance) -> uuid::Uuid,
-        mesh_register: impl FnMut(DrsMesh) -> uuid::Uuid,
-        mat_register: impl FnMut(DrsMaterial) -> uuid::Uuid,
-    ) -> Vec<uuid::Uuid> {
+        instance_register: impl FnMut(DrsInstance) -> InsGuid,
+        mesh_register: impl FnMut(DrsMesh) -> MeshGuid,
+        mat_register: impl FnMut(DrsMaterial) -> MatGuid,
+    ) -> Vec<InsGuid> {
         validate_vertex_memory_layout();
 
         let model_file = model_file.to_str().unwrap();
@@ -69,7 +70,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中基础的几何体
-    fn load_mesh(&mut self, rhi: &Rhi, mut mesh_register: impl FnMut(DrsMesh) -> uuid::Uuid) {
+    fn load_mesh(&mut self, rhi: &Rhi, mut mesh_register: impl FnMut(DrsMesh) -> MeshGuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -120,7 +121,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中的所有材质
-    fn load_mats(&mut self, _rhi: &Rhi, mut mat_register: impl FnMut(DrsMaterial) -> uuid::Uuid) {
+    fn load_mats(&mut self, _rhi: &Rhi, mut mat_register: impl FnMut(DrsMaterial) -> MatGuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)
@@ -155,7 +156,7 @@ impl AssimpSceneLoader {
     /// 由于 Assimp 的复用层级是 geometry，而应用需要的复用层级是 mesh
     ///
     /// 因此将 Assimp 中的一个 Instance 拆分为多个 Instance，将其 geometry 提升为 mesh
-    fn load_instance(&mut self, mut instance_register: impl FnMut(DrsInstance) -> uuid::Uuid) {
+    fn load_instance(&mut self, mut instance_register: impl FnMut(DrsInstance) -> InsGuid) {
         let instance_cnt = unsafe { get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)
             .filter_map(|instance_idx| unsafe {

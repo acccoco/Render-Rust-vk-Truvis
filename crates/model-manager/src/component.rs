@@ -1,3 +1,4 @@
+use crate::guid_new_type::{MatGuid, MeshGuid};
 use crate::vertex::vertex_3d::Vertex3D;
 use ash::vk;
 use itertools::Itertools;
@@ -109,7 +110,7 @@ impl DrsMesh {
 
 #[derive(Clone)]
 pub struct DrsInstance {
-    pub mesh: uuid::Uuid,
-    pub materials: Vec<uuid::Uuid>,
+    pub mesh: MeshGuid,
+    pub materials: Vec<MatGuid>,
     pub transform: glam::Mat4,
 }

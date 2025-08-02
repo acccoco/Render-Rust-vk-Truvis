@@ -5,6 +5,7 @@ use ash::vk;
 use glam::Vec4Swizzles;
 use itertools::Itertools;
 use model_manager::component::{DrsGeometry3D, DrsInstance};
+use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -167,18 +168,18 @@ pub struct GpuScene {
     /// GPU 中以顺序存储的 instance
     ///
     /// CPU 执行绘制时，会使用这个顺序来绘制实例
-    flatten_instances: Vec<uuid::Uuid>,
+    flatten_instances: Vec<InsGuid>,
 
     /// GPU 中以顺序存储的材质信息
-    flatten_materials: FlattenMap<uuid::Uuid>,
+    flatten_materials: FlattenMap<MatGuid>,
 
     /// GPU 中以顺序存储的 mesh 信息
     ///
     /// 每个 mesh 会被分为多个 submesh，且每个 mesh 的 submesh 会被顺序存储
-    flatten_meshes: FlattenMap<uuid::Uuid>,
+    flatten_meshes: FlattenMap<MeshGuid>,
 
     /// mesh 在 geometry buffer 中的 idx
-    mesh_geometry_map: HashMap<uuid::Uuid, usize>,
+    mesh_geometry_map: HashMap<MeshGuid, usize>,
 
     gpu_scene_buffers: Vec<GpuSceneBuffers>,
 
