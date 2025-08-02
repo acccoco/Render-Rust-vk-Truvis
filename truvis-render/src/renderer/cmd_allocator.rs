@@ -1,12 +1,11 @@
-use std::rc::Rc;
+use crate::renderer::frame_controller::FrameController;
 use ash::vk;
 use itertools::Itertools;
+use std::rc::Rc;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::command_pool::RhiCommandPool;
 use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::rhi::Rhi;
-use crate::pipeline_settings::FrameSettings;
-use crate::renderer::frame_controller::FrameController;
 
 pub struct CmdAllocator {
     /// 为每个 frame 分配一个 command pool
@@ -21,8 +20,8 @@ pub struct CmdAllocator {
 }
 
 impl CmdAllocator {
-    pub fn new(rhi: &Rhi, frame_settings: &FrameSettings, frame_ctrl: Rc<FrameController>) -> Self {
-        let graphics_command_pools = (0..frame_settings.fif_num)
+    pub fn new(rhi: &Rhi, frame_ctrl: Rc<FrameController>) -> Self {
+        let graphics_command_pools = (0..frame_ctrl.fif_count())
             .map(|i| {
                 Rc::new(RhiCommandPool::new(
                     rhi.device.clone(),
@@ -35,7 +34,7 @@ impl CmdAllocator {
 
         Self {
             graphics_command_pools,
-            allocated_command_buffers: vec![Vec::new(); frame_settings.fif_num],
+            allocated_command_buffers: vec![Vec::new(); frame_ctrl.fif_count()],
             device: rhi.device.clone(),
             frame_ctrl,
         }

@@ -1,5 +1,6 @@
 use crate::pipeline_settings::FrameLabel;
 use crate::render_resource::ImageLoader;
+use crate::renderer::frame_controller::FrameController;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
@@ -55,13 +56,13 @@ pub struct BindlessManager {
     frame_label: FrameLabel,
 }
 impl BindlessManager {
-    pub fn new(rhi: &Rhi, descriptor_pool: &RhiDescriptorPool, frames_in_flight: usize) -> Self {
+    pub fn new(rhi: &Rhi, descriptor_pool: &RhiDescriptorPool, frame_ctrl: Rc<FrameController>) -> Self {
         let bindless_layout = RhiDescriptorSetLayout::<BindlessDescriptorBinding>::new(
             rhi,
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
             "bindless-layout",
         );
-        let bindless_descriptor_sets = (0..frames_in_flight)
+        let bindless_descriptor_sets = (0..frame_ctrl.fif_count())
             .map(|idx| {
                 RhiDescriptorSet::<BindlessDescriptorBinding>::new(
                     rhi,

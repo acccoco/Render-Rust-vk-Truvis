@@ -1,5 +1,6 @@
 use crate::pipeline_settings::{FrameLabel, FrameSettings};
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::frame_controller::FrameController;
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
@@ -21,13 +22,20 @@ pub struct FrameBuffers {
     /// fif 每一帧的渲染结果
     render_targets: Vec<Rc<RhiTexture2D>>,
     render_target_bindless_keys: Vec<String>,
+
+    frame_ctrl: Rc<FrameController>,
 }
 
 impl FrameBuffers {
-    pub fn new(rhi: &Rhi, frame_settigns: &FrameSettings, bindless_mgr: &mut BindlessManager) -> Self {
+    pub fn new(
+        rhi: &Rhi,
+        frame_settigns: &FrameSettings,
+        frame_ctrl: Rc<FrameController>,
+        bindless_mgr: &mut BindlessManager,
+    ) -> Self {
         let (color_image, color_image_view) = Self::create_color_image(rhi, frame_settigns);
         let (depth_image, depth_image_view) = Self::create_depth_image(rhi, frame_settigns);
-        let render_targets = Self::create_render_targets(rhi, frame_settigns);
+        let render_targets = Self::create_render_targets(rhi, frame_settigns, &frame_ctrl);
         let render_target_bindless_keys = render_targets
             .iter()
             .enumerate()
@@ -41,6 +49,7 @@ impl FrameBuffers {
             depth_image_view,
             render_targets,
             render_target_bindless_keys,
+            frame_ctrl,
         };
         framebuffers.register_bindless(bindless_mgr);
         framebuffers
@@ -48,7 +57,7 @@ impl FrameBuffers {
 
     pub fn rebuild(&mut self, rhi: &Rhi, frame_settings: &FrameSettings, bindless_mgr: &mut BindlessManager) {
         self.unregister_bindless(bindless_mgr);
-        *self = Self::new(rhi, frame_settings, bindless_mgr);
+        *self = Self::new(rhi, frame_settings, self.frame_ctrl.clone(), bindless_mgr);
     }
 
     fn register_bindless(&self, bindless_mgr: &mut BindlessManager) {
@@ -139,7 +148,11 @@ impl FrameBuffers {
         (depth_image, Rc::new(depth_image_view))
     }
 
-    fn create_render_targets(rhi: &Rhi, frame_settings: &FrameSettings) -> Vec<Rc<RhiTexture2D>> {
+    fn create_render_targets(
+        rhi: &Rhi,
+        frame_settings: &FrameSettings,
+        frame_ctrl: &FrameController,
+    ) -> Vec<Rc<RhiTexture2D>> {
         let create_texture = |fif_labe: FrameLabel| {
             let name = format!("render-target-{}", fif_labe);
             let color_image = Rc::new(RhiImage2D::new(
@@ -161,7 +174,7 @@ impl FrameBuffers {
             RhiTexture2D::new(rhi, color_image, &name)
         };
 
-        (0..frame_settings.fif_num)
+        (0..frame_ctrl.fif_count())
             .map(|fif_label| {
                 let texture = create_texture(FrameLabel::from_usize(fif_label));
                 Rc::new(texture)

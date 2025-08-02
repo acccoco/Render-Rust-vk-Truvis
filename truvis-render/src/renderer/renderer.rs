@@ -1,4 +1,4 @@
-use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, FrameSettings};
+use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings};
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
@@ -120,19 +120,7 @@ impl Renderer {
         let rhi = Rc::new(Rhi::new("Truvis".to_string(), extra_instance_ext));
 
         let descriptor_pool = Self::init_descriptor_pool(rhi.device.clone());
-
-        let bindless_mgr =
-            Rc::new(RefCell::new(BindlessManager::new(&rhi, &descriptor_pool, FrameLabel::FRAMES_IN_FLIGHT)));
-        let scene_mgr = Rc::new(RefCell::new(SceneManager::new(bindless_mgr.clone())));
-        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), FrameLabel::FRAMES_IN_FLIGHT);
-        let per_frame_data_buffers = (0..FrameLabel::FRAMES_IN_FLIGHT)
-            .map(|idx| {
-                RhiStructuredBuffer::<shader::PerFrameData>::new_ubo(&rhi, 1, format!("per-frame-data-buffer-{idx}"))
-            })
-            .collect();
-
         let frame_settings = FrameSettings {
-            fif_num: FrameLabel::FRAMES_IN_FLIGHT,
             color_format: vk::Format::R16G16B16A16_SFLOAT,
             depth_format: Self::get_depth_format(&rhi),
             frame_extent: vk::Extent2D {
@@ -140,11 +128,21 @@ impl Renderer {
                 height: 400,
             },
         };
-        let frame_ctrl = Rc::new(FrameController::new(&frame_settings));
-        let framebuffers = FrameBuffers::new(&rhi, &frame_settings, &mut bindless_mgr.borrow_mut());
+        let frame_ctrl = Rc::new(FrameController::new());
+
+        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, &descriptor_pool, frame_ctrl.clone())));
+        let scene_mgr = Rc::new(RefCell::new(SceneManager::new(bindless_mgr.clone())));
+        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), frame_ctrl.clone());
+        let per_frame_data_buffers = (0..frame_ctrl.fif_count())
+            .map(|idx| {
+                RhiStructuredBuffer::<shader::PerFrameData>::new_ubo(&rhi, 1, format!("per-frame-data-buffer-{idx}"))
+            })
+            .collect();
+
+        let framebuffers = FrameBuffers::new(&rhi, &frame_settings, frame_ctrl.clone(), &mut bindless_mgr.borrow_mut());
 
         let render_timeline_semaphore = RhiSemaphore::new_timeline(&rhi, 0, "render-timeline");
-        let cmd_allocator = CmdAllocator::new(&rhi, &frame_settings, frame_ctrl.clone());
+        let cmd_allocator = CmdAllocator::new(&rhi, frame_ctrl.clone());
 
         Self {
             frame_settings,
@@ -301,8 +299,8 @@ impl Renderer {
             dst_access: vk::AccessFlags2::SHADER_READ,
         };
 
-        self.gpu_scene.prepare_render_data(crt_frame_label);
-        self.gpu_scene.upload_to_buffer(&self.rhi, crt_frame_label, &cmd, transfer_barrier_mask);
+        self.gpu_scene.prepare_render_data();
+        self.gpu_scene.upload_to_buffer(&self.rhi, &cmd, transfer_barrier_mask);
 
         // 准备好当前帧的数据
         let per_frame_data = {

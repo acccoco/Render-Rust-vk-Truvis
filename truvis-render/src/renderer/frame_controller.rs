@@ -1,4 +1,4 @@
-use crate::pipeline_settings::{FrameLabel, FrameSettings};
+use crate::pipeline_settings::FrameLabel;
 use std::cell::Cell;
 
 pub struct FrameController {
@@ -11,13 +11,13 @@ pub struct FrameController {
 
 // ctor
 impl FrameController {
-    pub fn new(frame_settings: &FrameSettings) -> Self {
+    pub fn new() -> Self {
         // 初始值应该是 1，因为 timeline semaphore 初始值是 0
         let init_frame_id = 1;
         Self {
             frame_id: Cell::new(init_frame_id),
             frame_label: Cell::new(FrameLabel::from_usize(init_frame_id)),
-            fif_count: frame_settings.fif_num,
+            fif_count: 3,
         }
     }
 }

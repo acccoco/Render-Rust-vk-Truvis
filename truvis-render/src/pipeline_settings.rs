@@ -20,7 +20,6 @@ impl DefaultRendererSettings {
 
 #[derive(Copy, Clone, Default)]
 pub struct FrameSettings {
-    pub fif_num: usize,
     pub color_format: vk::Format,
     pub depth_format: vk::Format,
     pub frame_extent: vk::Extent2D,
@@ -62,8 +61,6 @@ impl Display for FrameLabel {
     }
 }
 impl FrameLabel {
-    pub const FRAMES_IN_FLIGHT: usize = 3;
-
     const INDEX: [usize; 3] = [0, 1, 2];
 
     #[inline]
