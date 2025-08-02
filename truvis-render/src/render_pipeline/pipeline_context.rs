@@ -4,6 +4,7 @@ use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_buffers::FrameBuffers;
 use crate::renderer::frame_controller::FrameController;
 use crate::renderer::gpu_scene::GpuScene;
+use crate::renderer::cmd_allocator::CmdAllocator;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -16,7 +17,8 @@ pub struct PipelineContext<'a> {
     pub gpu_scene: &'a GpuScene,
     pub bindless_mgr: Rc<RefCell<BindlessManager>>,
     pub per_frame_data: &'a RhiStructuredBuffer<shader::PerFrameData>,
-    pub frame_ctrl: &'a mut FrameController,
+    pub frame_ctrl: &'a FrameController,
+    pub cmd_allocator: &'a mut CmdAllocator,
     pub frame_settings: &'a FrameSettings,
     pub timer: &'a Timer,
     pub frame_buffers: &'a FrameBuffers,

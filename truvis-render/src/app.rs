@@ -80,7 +80,7 @@ impl<T: OuterApp> TruvisApp<T> {
         let window_system = MainWindow::new(
             event_loop,
             self.renderer.rhi.clone(),
-            self.renderer.frame_settings().fif_num,
+            self.renderer.frame_ctrl.clone(),
             "Truvis".to_string(),
             vk::Extent2D {
                 width: 1200,
@@ -165,25 +165,14 @@ impl<T: OuterApp> TruvisApp<T> {
             }
         }
 
-        // Renderer Render ==================================
+        // Renderer: Render ================================
+        self.renderer.before_render(self.input_manager.state(), self.camera_controller.camera());
         {
-            // Renderer: Before Render
-            {
-                self.renderer.before_render(self.input_manager.state(), self.camera_controller.camera());
-            }
-
-            // >>> Renderer: Render
-            {
-                // 构建出 PipelineContext
-                let pipeline_ctx = self.renderer.collect_render_ctx();
-                self.outer_app.get_mut().unwrap().draw(pipeline_ctx);
-            }
-
-            // >>> Renderer: After Render
-            {
-                self.renderer.after_render();
-            }
+            // 构建出 PipelineContext
+            let pipeline_ctx = self.renderer.collect_render_ctx();
+            self.outer_app.get_mut().unwrap().draw(pipeline_ctx);
         }
+        self.renderer.after_render();
 
         // Window: Draw Gui ===============================
         {
@@ -193,16 +182,9 @@ impl<T: OuterApp> TruvisApp<T> {
 
         // End Frame ===================================
         {
-            // >>> Window: Present Image
-            {
-                self.window_system.get_mut().unwrap().present_image();
-            }
-
-            // >>> Renderer: End Frame
-            {
-                self.renderer.end_frame();
-            }
+            self.window_system.get_mut().unwrap().present_image();
         }
+        self.renderer.end_frame();
     }
 
     fn on_window_resized(&mut self, _width: u32, _height: u32) {

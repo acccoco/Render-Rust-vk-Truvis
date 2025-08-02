@@ -27,13 +27,14 @@ impl TrianglePipeline {
             per_frame_data: _,
             frame_settings,
             frame_buffers,
+            cmd_allocator,
         } = ctx;
         let frame_label = frame_ctrl.frame_label();
         let render_target = frame_buffers.render_target_image(frame_label);
 
         // render triangle
         {
-            let cmd = frame_ctrl.alloc_command_buffer("triangle");
+            let cmd = cmd_allocator.alloc_command_buffer("triangle");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "triangle");
 
             // 将 render target 从 general -> color attachment

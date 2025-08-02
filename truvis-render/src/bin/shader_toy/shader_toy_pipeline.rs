@@ -26,6 +26,7 @@ impl ShaderToyPipeline {
             per_frame_data: _,
             frame_settings,
             frame_buffers,
+            cmd_allocator,
         } = ctx;
         let frame_label = frame_ctrl.frame_label();
         let render_target = frame_buffers.render_target_image(frame_label);
@@ -33,7 +34,7 @@ impl ShaderToyPipeline {
 
         // render shader toy
         {
-            let cmd = frame_ctrl.alloc_command_buffer("shader-toy");
+            let cmd = cmd_allocator.alloc_command_buffer("shader-toy");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "shader-toy");
 
             // 将 render target 从 general -> color attachment

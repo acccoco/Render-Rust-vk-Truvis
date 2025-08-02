@@ -1,4 +1,5 @@
 pub mod bindless;
+pub mod cmd_allocator;
 pub mod frame_buffers;
 pub mod frame_controller;
 pub mod gpu_scene;

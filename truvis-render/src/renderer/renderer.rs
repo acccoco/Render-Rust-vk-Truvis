@@ -4,6 +4,7 @@ use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
 use crate::render_pipeline::pipeline_context::PipelineContext;
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::cmd_allocator::CmdAllocator;
 use crate::renderer::frame_buffers::FrameBuffers;
 use crate::renderer::frame_controller::FrameController;
 use crate::renderer::gpu_scene::GpuScene;
@@ -17,7 +18,7 @@ use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_queue::RhiSubmitInfo;
 use truvis_rhi::core::descriptor_pool::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo};
 use truvis_rhi::core::device::RhiDevice;
-use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
+use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier, RhiSemaphore};
 use truvis_rhi::core::texture::RhiTexture2D;
 use truvis_rhi::rhi::Rhi;
 
@@ -25,14 +26,14 @@ pub struct PresentData<'a> {
     pub render_target: &'a RhiTexture2D,
     pub render_target_bindless_key: String,
     pub render_target_barrier: RhiBarrierMask,
-    pub frame_controller: &'a mut FrameController,
+    pub cmd_allocator: &'a mut CmdAllocator,
 }
 
 /// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
 pub struct Renderer {
     pub rhi: Rc<Rhi>,
 
-    pub frame_ctrl: FrameController,
+    pub frame_ctrl: Rc<FrameController>,
     framebuffers: FrameBuffers,
 
     frame_settings: FrameSettings,
@@ -40,10 +41,14 @@ pub struct Renderer {
     pub bindless_mgr: Rc<RefCell<BindlessManager>>,
     pub scene_mgr: Rc<RefCell<SceneManager>>,
     pub gpu_scene: GpuScene,
+    cmd_allocator: CmdAllocator,
 
     // TODO 优化一下这个 buffer，不该放在这里
     pub per_frame_data_buffers: Vec<RhiStructuredBuffer<shader::PerFrameData>>,
     accum_data: AccumData,
+
+    /// 帧渲染完成的 timeline，value 就等于 frame_id
+    render_timeline_semaphore: RhiSemaphore,
 
     _descriptor_pool: RhiDescriptorPool,
 
@@ -56,7 +61,7 @@ impl Renderer {
     pub fn destroy(self) {
         // 在 Renderer 被销毁时，等待 Rhi 设备空闲
         self.wait_idle();
-        self.frame_ctrl.destroy()
+        self.render_timeline_semaphore.destroy();
     }
 }
 
@@ -96,7 +101,7 @@ impl Renderer {
                 dst_stage: vk::PipelineStageFlags2::NONE,
                 dst_access: vk::AccessFlags2::NONE,
             },
-            frame_controller: &mut self.frame_ctrl,
+            cmd_allocator: &mut self.cmd_allocator,
         }
     }
 
@@ -105,6 +110,9 @@ impl Renderer {
         &self.frame_ctrl
     }
 }
+
+// tools
+impl Renderer {}
 
 // init
 impl Renderer {
@@ -132,8 +140,11 @@ impl Renderer {
                 height: 400,
             },
         };
-        let frame_ctrl = FrameController::new(&rhi, &frame_settings);
+        let frame_ctrl = Rc::new(FrameController::new(&frame_settings));
         let framebuffers = FrameBuffers::new(&rhi, &frame_settings, &mut bindless_mgr.borrow_mut());
+
+        let render_timeline_semaphore = RhiSemaphore::new_timeline(&rhi, 0, "render-timeline");
+        let cmd_allocator = CmdAllocator::new(&rhi, &frame_settings, frame_ctrl.clone());
 
         Self {
             frame_settings,
@@ -143,11 +154,13 @@ impl Renderer {
             rhi,
             bindless_mgr,
             scene_mgr,
+            cmd_allocator,
             gpu_scene,
             per_frame_data_buffers,
             timer: Timer::default(),
             _descriptor_pool: descriptor_pool,
             fps_limit: 59.9,
+            render_timeline_semaphore,
         }
     }
 
@@ -200,12 +213,31 @@ impl Renderer {
 // phase call
 impl Renderer {
     pub fn begin_frame(&mut self) {
-        self.frame_ctrl.begin_frame();
+        // 等待 fif 的同一帧渲染完成
+        {
+            let frame_id = self.frame_ctrl.frame_id();
+            let wait_frame = if frame_id > 3 { frame_id as u64 - 3 } else { 0 };
+            let wait_timeline_value = if wait_frame == 0 { 0 } else { wait_frame };
+            let timeout_ns = 30 * 1000 * 1000 * 1000;
+            self.render_timeline_semaphore.wait_timeline(wait_timeline_value, timeout_ns);
+        }
+
+        self.cmd_allocator.free_frame_commands();
         self.timer.tic();
     }
 
     pub fn end_frame(&mut self) {
-        self.frame_ctrl.end_frame(&self.rhi);
+        // 设置当前帧结束的 semaphore，用于保护当前帧的资源
+        {
+            let submit_info = RhiSubmitInfo::new(&[]).signal(
+                &self.render_timeline_semaphore,
+                vk::PipelineStageFlags2::NONE,
+                Some(self.frame_ctrl.frame_id() as u64),
+            );
+            self.rhi.graphics_queue.submit(vec![submit_info], None);
+        }
+
+        self.frame_ctrl.end_frame();
     }
 
     pub fn time_to_render(&self) -> bool {
@@ -219,9 +251,7 @@ impl Renderer {
         self.update_gpu_scene(input_state, camera);
     }
 
-    pub fn after_render(&mut self) {
-        self.frame_ctrl.end_render(&self.rhi);
-    }
+    pub fn after_render(&mut self) {}
 
     pub fn wait_idle(&self) {
         unsafe {
@@ -237,10 +267,11 @@ impl Renderer {
             gpu_scene: &self.gpu_scene,
             bindless_mgr: self.bindless_mgr.clone(),
             per_frame_data: &self.per_frame_data_buffers[*crt_frame_label],
-            frame_ctrl: &mut self.frame_ctrl,
+            frame_ctrl: &self.frame_ctrl,
             timer: &self.timer,
             frame_settings: &self.frame_settings,
             frame_buffers: &self.framebuffers,
+            cmd_allocator: &mut self.cmd_allocator,
         }
     }
 
@@ -258,7 +289,7 @@ impl Renderer {
         let crt_frame_label = self.frame_ctrl.frame_label();
 
         // 将数据上传到 gpu buffer 中
-        let cmd = self.frame_ctrl.alloc_command_buffer("update-draw-buffer");
+        let cmd = self.cmd_allocator.alloc_command_buffer("update-draw-buffer");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
 
         let transfer_barrier_mask = RhiBarrierMask {

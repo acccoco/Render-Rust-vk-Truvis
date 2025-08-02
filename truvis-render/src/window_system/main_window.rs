@@ -2,6 +2,7 @@ use crate::gui::gui::Gui;
 use crate::gui::gui_pass::GuiPass;
 use crate::pipeline_settings::{DefaultRendererSettings, FrameLabel};
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::frame_controller::FrameController;
 use crate::renderer::renderer::PresentData;
 use crate::renderer::swapchain::RenderSwapchain;
 use ash::vk;
@@ -35,6 +36,8 @@ pub struct MainWindow {
     gui: Gui,
     gui_pass: GuiPass,
 
+    frame_ctrl: Rc<FrameController>,
+
     /// 数量和 fif num 相同
     present_complete_semaphores: Vec<RhiSemaphore>,
 
@@ -52,7 +55,7 @@ impl MainWindow {
     pub fn new(
         event_loop: &ActiveEventLoop,
         rhi: Rc<Rhi>,
-        fif_num: usize,
+        frame_ctrl: Rc<FrameController>,
         window_title: String,
         window_extent: vk::Extent2D,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
@@ -75,11 +78,12 @@ impl MainWindow {
 
         let present_settings = swapchain.present_settings();
 
-        let gui = Gui::new(&rhi, &window, fif_num, &present_settings, bindless_mgr.clone());
+        let gui = Gui::new(&rhi, &window, frame_ctrl.fif_count(), &present_settings, bindless_mgr.clone());
         let gui_pass = GuiPass::new(&rhi, bindless_mgr.clone(), present_settings.color_format);
 
-        let present_complete_semaphores =
-            (0..fif_num).map(|i| RhiSemaphore::new(&rhi, &format!("window-present-complete-{}", i))).collect_vec();
+        let present_complete_semaphores = (0..frame_ctrl.fif_count())
+            .map(|i| RhiSemaphore::new(&rhi, &format!("window-present-complete-{}", i)))
+            .collect_vec();
         let render_complete_semaphores = (0..present_settings.swapchain_image_cnt)
             .map(|i| RhiSemaphore::new(&rhi, &format!("window-render-complete-{}", i)))
             .collect_vec();
@@ -90,6 +94,7 @@ impl MainWindow {
             swapchain: Some(swapchain),
             present_complete_semaphores,
             render_complete_semaphores,
+            frame_ctrl,
             gui,
             gui_pass,
         }
@@ -103,9 +108,9 @@ impl MainWindow {
     fn draw(&mut self, renderer_data: PresentData) {
         let swapchain = self.swapchain.as_ref().unwrap();
         let canvas_idx = swapchain.current_image_index();
-        let frame_label = renderer_data.frame_controller.frame_label();
+        let frame_label = self.frame_ctrl.frame_label();
 
-        let cmd = renderer_data.frame_controller.alloc_command_buffer("window-present");
+        let cmd = renderer_data.cmd_allocator.alloc_command_buffer("window-present");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         {
             // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL

@@ -49,6 +49,7 @@ impl RtPipeline {
             per_frame_data,
             frame_settings,
             frame_buffers,
+            cmd_allocator,
         } = ctx;
         let frame_label = frame_ctrl.frame_label();
 
@@ -61,7 +62,7 @@ impl RtPipeline {
         let mut submit_cmds = Vec::new();
         // ray tracing
         {
-            let cmd = frame_ctrl.alloc_command_buffer("ray-tracing");
+            let cmd = cmd_allocator.alloc_command_buffer("ray-tracing");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
 
             // frams in flight 使用同一个 rt image，因此需要确保之前的 rt 写入已经完成
@@ -94,7 +95,7 @@ impl RtPipeline {
 
         // blit
         {
-            let cmd = frame_ctrl.alloc_command_buffer("blit");
+            let cmd = cmd_allocator.alloc_command_buffer("blit");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit");
 
             // 等待 ray-tracing 执行完成
@@ -128,7 +129,7 @@ impl RtPipeline {
 
         // hdr -> sdr
         {
-            let cmd = frame_ctrl.alloc_command_buffer("hdr2sdr");
+            let cmd = cmd_allocator.alloc_command_buffer("hdr2sdr");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "hdr2sdr");
 
             // 等待之前的 compute shader 执行完成
