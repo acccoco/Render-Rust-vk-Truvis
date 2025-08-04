@@ -9,6 +9,7 @@ struct Random
         rng_stage = tea(a, b);
     }
 
+    /// 获得下一个随机数，uniform[0, 1]
     [mutating]
     float next()
     {

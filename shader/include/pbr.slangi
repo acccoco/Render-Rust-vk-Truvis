@@ -1,0 +1,108 @@
+#pragma once
+#include "bindless.slangi"
+#include "common.slangi"
+#include "sample/random.slangi"
+#include "sample/sample.slangi"
+
+struct SpecularBrdf
+{
+    float3 f0;
+    float roughness;
+    float3 normal;
+    float3 view;
+    float3 light;
+
+    float3 h;
+    float vdoth;
+    float ndotl;
+    float ndotv;
+    float ndoth;
+
+    /// @param f0
+    /// @param roughness 
+    /// @param normal
+    /// @param view 观察方向，从物体到相机
+    /// @param light 光照方向，从物体到光源
+    __init(float3 f0, float roughness, float3 normal, float3 view, float3 light)
+    {
+        this.f0 = f0;
+        this.roughness = roughness;
+        this.normal = normal;
+        this.view = view;
+        this.light = light;
+
+        this.h = normalize(view + light);
+        this.vdoth = dot(view, h);
+        this.ndotl = dot(normal, light);
+        this.ndotv = dot(normal, view);
+        this.ndoth = dot(normal, h);
+    }
+
+    __init(int a) {
+        this.f0 = float3(1.f, 1.f, 1.f);
+        this.roughness = 0.5f;
+        this.normal = float3(0.f, 0.f, 1.f);
+        this.view = float3(0.f, 0.f, 1.f);
+        this.light = float3(0.f, 0.f, 1.f);
+
+        this.h = normalize(view + light);
+        this.vdoth = dot(view, h);
+        this.ndotl = dot(normal, light);
+        this.ndotv = dot(normal, view);
+        this.ndoth = dot(normal, h);
+    }
+
+    float3 brdf()
+    {
+        return fresnel_schlick() * ndf_ggx() * visibility_smith_ggx_correlated();
+    }
+
+    float ndf_ggx()
+    {
+        const float a = ndoth * roughness;
+        const float k = roughness / (1.f - this.ndoth * this.ndoth + a * a);
+        return k * k * (1.f / M_PI);
+    }
+
+    float3 fresnel_schlick()
+    {
+        const float f = pow(1.f - this.vdoth, 5.f);
+        return f + this.f0 * (1.f - f);
+    }
+
+    float visibility_smith_ggx_correlated()
+    {
+        const float a2 = this.roughness * this.roughness;
+        const float ggx_v = this.ndotl * sqrt(this.ndotv * this.ndotv * (1.f - a2) + a2);
+        const float ggx_l = this.ndotv * sqrt(this.ndotl * this.ndotl * (1.f - a2) + a2);
+        return 0.5f / (ggx_v + ggx_l);
+    }
+
+    /// 基于 NDF 进行采样
+    /// pdf = D * NdotH / (4 * NdotV)
+    static float3 ggx_sample(inout Random rand, float roughness, float3 normal)
+    {
+        float3 tangent, bitangent;
+        Sample::create_local_coord(normal, tangent, bitangent);
+
+        const float2 rand_val = float2(rand.next(), rand.next());
+        // GGX NDF sampling
+        const float a2 = roughness * roughness;
+        const float cos_theta_h = sqrt(max(0.0f, (1.0 - rand_val.x) / ((a2 - 1.0) * rand_val.x + 1)));
+        const float sin_theta_h = sqrt(max(0.0f, 1.0f - cos_theta_h * cos_theta_h));
+        const float phi_h = rand_val.y * M_PI * 2.0f;
+
+        // Get our GGX NDF sample (i.e., the half vector)
+        return tangent * (sin_theta_h * cos(phi_h)) +
+               bitangent * (sin_theta_h * sin(phi_h)) +
+               normal * cos_theta_h;
+    }
+};
+
+struct DiffuseBrdf {
+
+    static float3 brdf() {
+        // TODO
+        return float3(1.f, 1.f, 1.f) / M_PI;
+    }
+}

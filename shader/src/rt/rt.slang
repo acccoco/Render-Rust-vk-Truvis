@@ -1,6 +1,7 @@
 #include "pass/rt.slangi"
 #include "sample/random.slangi"
 #include "sample/sample.slangi"
+#include "pbr.slangi"
 #include "scene.slangi"
 
 const static uint max_depth = 10;
@@ -155,7 +156,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     // pdf = 1/2pi
     // {
     //     float3 tangent, bitangent;
-    //     Sample::create_loacl_coord(world_normal, tangent, bitangent);
+    //     Sample::create_local_coord(world_normal, tangent, bitangent);
     //     const float3 local_dir = Sample::sampling_hemisphere(payload.random_seed);
     //     payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
 
@@ -171,7 +172,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         const float phi = 2 * M_PI * Random::rnd(payload.random_seed);
 
         float3 tangent, bitangent;
-        Sample::create_loacl_coord(world_normal, tangent, bitangent);
+        Sample::create_local_coord(world_normal, tangent, bitangent);
 
         const float3 local_dir = float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
         payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
