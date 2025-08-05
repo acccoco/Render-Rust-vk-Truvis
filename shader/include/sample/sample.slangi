@@ -4,17 +4,19 @@
 
 struct Sample
 {
-
-    /// 半球方向上随机采样
-    static float3 sampling_hemisphere(inout uint seed)
+    /// 半球方向上，pdf = cos(theta) / pi 的随机采样
+    /// @return 返回 local 坐标系中的单位向量
+    static float3 get_cos_hemisphere_sample(inout uint seed)
     {
+        const float2 rand_val = float2(Random::rnd(seed), Random::rnd(seed));
 
-        float r1 = Random::rnd(seed);
-        float r2 = Random::rnd(seed);
-        float sq = sqrt(r1);
+        const float radius = sqrt(rand_val.x);
+        const float phi = 2.f * M_PI * rand_val.y;
 
-        // TODO 这是不是有问题啊
-        float3 direction = float3(cos(2 * M_PI * r2) * sq, sin(2 * M_PI * r2) * sq, sqrt(1. - r1));
+        float3 direction = float3(
+            radius * cos(phi),
+            radius * sin(phi),
+            sqrt(1.f - rand_val.x));
         return direction;
     }
 

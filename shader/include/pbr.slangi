@@ -10,51 +10,41 @@ struct SpecularBrdf
     float roughness;
     float3 normal;
     float3 view;
-    float3 light;
-
     float3 h;
+
+    float3 light;
     float vdoth;
     float ndotl;
     float ndotv;
     float ndoth;
+
+    float D;
 
     /// @param f0
     /// @param roughness 
     /// @param normal
     /// @param view 观察方向，从物体到相机
     /// @param light 光照方向，从物体到光源
-    __init(float3 f0, float roughness, float3 normal, float3 view, float3 light)
+    __init(float3 f0, float roughness, float3 normal, float3 view, float3 h)
     {
         this.f0 = f0;
         this.roughness = roughness;
         this.normal = normal;
         this.view = view;
-        this.light = light;
+        this.h = h;
 
-        this.h = normalize(view + light);
+        this.light = normalize(2.f * dot(view, h) * h - view);
         this.vdoth = dot(view, h);
         this.ndotl = dot(normal, light);
         this.ndotv = dot(normal, view);
         this.ndoth = dot(normal, h);
-    }
 
-    __init(int a) {
-        this.f0 = float3(1.f, 1.f, 1.f);
-        this.roughness = 0.5f;
-        this.normal = float3(0.f, 0.f, 1.f);
-        this.view = float3(0.f, 0.f, 1.f);
-        this.light = float3(0.f, 0.f, 1.f);
-
-        this.h = normalize(view + light);
-        this.vdoth = dot(view, h);
-        this.ndotl = dot(normal, light);
-        this.ndotv = dot(normal, view);
-        this.ndoth = dot(normal, h);
+        this.D = this.ndf_ggx();
     }
 
     float3 brdf()
     {
-        return fresnel_schlick() * ndf_ggx() * visibility_smith_ggx_correlated();
+        return fresnel_schlick() * D * visibility_smith_ggx_correlated();
     }
 
     float ndf_ggx()
@@ -78,14 +68,14 @@ struct SpecularBrdf
         return 0.5f / (ggx_v + ggx_l);
     }
 
-    /// 基于 NDF 进行采样
+    /// 基于 NDF 进行采样，得到的是半程向量 H
     /// pdf = D * NdotH / (4 * NdotV)
-    static float3 ggx_sample(inout Random rand, float roughness, float3 normal)
+    static float3 ggx_sample(inout uint rand_seed, float roughness, float3 normal)
     {
         float3 tangent, bitangent;
         Sample::create_local_coord(normal, tangent, bitangent);
 
-        const float2 rand_val = float2(rand.next(), rand.next());
+        const float2 rand_val = float2(Random::rnd(rand_seed), Random::rnd(rand_seed));
         // GGX NDF sampling
         const float a2 = roughness * roughness;
         const float cos_theta_h = sqrt(max(0.0f, (1.0 - rand_val.x) / ((a2 - 1.0) * rand_val.x + 1)));
@@ -97,12 +87,32 @@ struct SpecularBrdf
                bitangent * (sin_theta_h * sin(phi_h)) +
                normal * cos_theta_h;
     }
+
+    float ggx_pdf()
+    {
+        return this.D * this.ndoth / (4.f * this.vdoth);
+    }
+
+    float get_ndotl()
+    {
+        return this.ndotl;
+    }
 };
 
-struct DiffuseBrdf {
+struct DiffuseBrdf
+{
 
-    static float3 brdf() {
+    static float3 brdf()
+    {
         // TODO
         return float3(1.f, 1.f, 1.f) / M_PI;
+    }
+
+    static float3 cos_sample(inout Random rand, float3 normal)
+    {
+        const float3 local_dir = Sample::get_cos_hemisphere_sample(rand.rng_stage);
+        float3 tangent, bitangent;
+        Sample::create_local_coord(normal, tangent, bitangent);
+        return normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * normal);
     }
 }

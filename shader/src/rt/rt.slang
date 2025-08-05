@@ -1,7 +1,7 @@
 #include "pass/rt.slangi"
+#include "pbr.slangi"
 #include "sample/random.slangi"
 #include "sample/sample.slangi"
-#include "pbr.slangi"
 #include "scene.slangi"
 
 const static uint max_depth = 10;
@@ -136,50 +136,55 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     const float3 origin_world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
     const float3 world_normal = faceforward(origin_world_normal, WorldRayDirection(), origin_world_normal);
 
-    float3 tex_color = float3(0.f, 0.f, 0.f);
+    // TODO 材质参数
+    const float metallic = 0.8f;
+    const float perceptual_roughness = 0.1f;
+    const float reflectance = 0.5f; 
+    float3 base_color = float3(0.f, 0.f, 0.f);
     {
         MatPayload mat_payload = {};
         mat_payload.instance_id = instance_id;
         mat_payload.geometry_id = geometry_id;
         mat_payload.uv = interp_vertex.uv;
         diffuse_callable(mat_payload);
-        tex_color = mat_payload.out_color;
+        base_color = mat_payload.out_color;
     }
 
-    // 每个表面都有轻微的自发光：
-    // payload.radiance = tex_color * 0.01f;
+    // brdf = diffuse_brdf + specular_brdf
+    const float prob_diffuse = 0.2f;
+    const bool choose_diffuse = Random::rnd(payload.random_seed) < prob_diffuse;
+    if (choose_diffuse)
+    {
+        // 半球 cos 采样
+        // BRDF = diffuse_color / pi
+        // pdf = cos(theta) / pi
+        // weight = BRDF * cos(theta) / pdf = diffuse_color
+        {
+            const float3 local_dir = Sample::get_cos_hemisphere_sample(payload.random_seed);
+            float3 tangent, bitangent;
+            Sample::create_local_coord(world_normal, tangent, bitangent);
+            payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
+
+            const float3 diffuse_color = (1.f - metallic) * base_color;
+            payload.weight = diffuse_color;
+        }
+        payload.weight /= prob_diffuse;
+    }
+    else
+    {
+        const float3 f0 = lerp(0.16 * reflectance * reflectance, base_color, metallic);
+        const float roughness = perceptual_roughness * perceptual_roughness;
+        // 首先根据 NDF 采样半程向量 H
+        const float3 h = SpecularBrdf::ggx_sample(payload.random_seed, mat.roughness, world_normal); 
+        SpecularBrdf specular_brdf = SpecularBrdf(f0, roughness, world_normal, -WorldRayDirection(), h);
+        const float brdf_pdf = specular_brdf.ggx_pdf();
+
+        payload.weight = specular_brdf.brdf() * specular_brdf.get_ndotl() / (brdf_pdf * (1.f - prob_diffuse));
+        payload.weight = max(0.001f, payload.weight);
+    } 
 
     // 光线的起点增加一个偏移量，避免自交
     payload.ray_origin = world_pos + 0.0001 * world_normal;
-
-    // 半球均匀采样
-    // pdf = 1/2pi
-    // {
-    //     float3 tangent, bitangent;
-    //     Sample::create_local_coord(world_normal, tangent, bitangent);
-    //     const float3 local_dir = Sample::sampling_hemisphere(payload.random_seed);
-    //     payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
-
-    //     payload.weight = tex_color * 2.f * local_dir.z;
-    // }
-
-    // BRDF = tex_color / pi
-    // pdf = cos(theta)  
-    // theta = 0.5 * acos(1 - 2 * UniformRandom())
-    // phi = 2 * pi * UniformRandom()
-    {
-        const float theta = 0.5f * acos(1.f - 2.f * Random::rnd(payload.random_seed));
-        const float phi = 2 * M_PI * Random::rnd(payload.random_seed);
-
-        float3 tangent, bitangent;
-        Sample::create_local_coord(world_normal, tangent, bitangent);
-
-        const float3 local_dir = float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
-        payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
-
-        payload.weight = tex_color;
-    } 
-
     payload.done = false;
 }
 
@@ -213,8 +218,8 @@ void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttribute
     const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
 
     // 当前命中位置 diffuse 颜色
-    const float4 tex_color = mat.diffuse_map.sample(interp_vertex.uv);
-    if (tex_color.w == 0.f)
+    const float4 base_color = mat.diffuse_map.sample(interp_vertex.uv);
+    if (base_color.w == 0.f)
     {
         IgnoreHit();
     }
