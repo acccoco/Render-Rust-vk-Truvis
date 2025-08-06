@@ -19,9 +19,11 @@ struct SpecularBrdf
     float ndoth;
 
     float D;
+    float3 F;
+    float V;
 
     /// @param f0
-    /// @param roughness 
+    /// @param roughness
     /// @param normal
     /// @param view 观察方向，从物体到相机
     /// @param light 光照方向，从物体到光源
@@ -40,11 +42,13 @@ struct SpecularBrdf
         this.ndoth = dot(normal, h);
 
         this.D = this.ndf_ggx();
+        this.F = this.fresnel_schlick();
+        this.V = this.visibility_smith_ggx_correlated();
     }
 
     float3 brdf()
     {
-        return fresnel_schlick() * D * visibility_smith_ggx_correlated();
+        return this.F * this.D * this.V;
     }
 
     float ndf_ggx()
@@ -91,6 +95,11 @@ struct SpecularBrdf
     float ggx_pdf()
     {
         return this.D * this.ndoth / (4.f * this.vdoth);
+    }
+
+    float3 brdf_with_pdf()
+    {
+        return this.F * this.V * (4.f * this.vdoth) / this.ndoth;
     }
 
     float get_ndotl()

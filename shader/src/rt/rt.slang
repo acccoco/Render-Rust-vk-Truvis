@@ -101,6 +101,8 @@ void main_ray_gen()
         ray.Origin = payload.ray_origin;
         ray.Direction = payload.ray_dir;
     }
+    // TODO remove me：应该是计算出问题了，这里只是补救措施
+    color = clamp(color, float3(0.f), float3(100.f));
 
     if (accum_samples > 0)
     {
@@ -139,7 +141,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     // TODO 材质参数
     const float metallic = 0.8f;
     const float perceptual_roughness = 0.1f;
-    const float reflectance = 0.5f; 
+    const float reflectance = 0.5f;
     float3 base_color = float3(0.f, 0.f, 0.f);
     {
         MatPayload mat_payload = {};
@@ -175,13 +177,14 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         const float3 f0 = lerp(0.16 * reflectance * reflectance, base_color, metallic);
         const float roughness = perceptual_roughness * perceptual_roughness;
         // 首先根据 NDF 采样半程向量 H
-        const float3 h = SpecularBrdf::ggx_sample(payload.random_seed, mat.roughness, world_normal); 
+        const float3 h = SpecularBrdf::ggx_sample(payload.random_seed, mat.roughness, world_normal);
         SpecularBrdf specular_brdf = SpecularBrdf(f0, roughness, world_normal, -WorldRayDirection(), h);
         const float brdf_pdf = specular_brdf.ggx_pdf();
 
-        payload.weight = specular_brdf.brdf() * specular_brdf.get_ndotl() / (brdf_pdf * (1.f - prob_diffuse));
+        payload.weight = specular_brdf.brdf_with_pdf() * specular_brdf.get_ndotl() / (1.f - prob_diffuse);
+        // payload.weight = specular_brdf.brdf() * specular_brdf.get_ndotl() / (1.f * (1.f - prob_diffuse));
         payload.weight = max(0.001f, payload.weight);
-    } 
+    }
 
     // 光线的起点增加一个偏移量，避免自交
     payload.ray_origin = world_pos + 0.0001 * world_normal;
