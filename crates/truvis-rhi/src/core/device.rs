@@ -162,7 +162,7 @@ impl RhiDevice {
     }
 
     #[inline]
-    pub fn rt_pipeline_props(&self) -> &vk::PhysicalDeviceRayTracingPipelinePropertiesKHR {
+    pub fn rt_pipeline_props(&self) -> &vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'_> {
         &self.pdevice.rt_pipeline_props
     }
 

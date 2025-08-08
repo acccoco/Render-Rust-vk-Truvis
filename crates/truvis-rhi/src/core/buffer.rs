@@ -84,7 +84,7 @@ impl RhiBufferCreateInfo {
     }
 
     #[inline]
-    pub fn info(&self) -> &vk::BufferCreateInfo {
+    pub fn info(&self) -> &vk::BufferCreateInfo<'_> {
         &self.inner
     }
 

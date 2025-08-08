@@ -88,7 +88,7 @@ impl Renderer {
         .unwrap_or(vk::Format::UNDEFINED)
     }
 
-    pub fn get_renderer_data(&mut self) -> PresentData {
+    pub fn get_renderer_data(&mut self) -> PresentData<'_> {
         let crt_frame_label = self.frame_ctrl.frame_label();
 
         let (render_target, render_target_bindless_key) = self.framebuffers.render_target_texture(crt_frame_label);
@@ -257,7 +257,7 @@ impl Renderer {
         }
     }
 
-    pub fn collect_render_ctx(&mut self) -> PipelineContext {
+    pub fn collect_render_ctx(&mut self) -> PipelineContext<'_> {
         let crt_frame_label = self.frame_ctrl.frame_label();
 
         PipelineContext {

@@ -41,7 +41,7 @@ impl<V: bytemuck::Pod> DrsGeometry<V> {
     }
 }
 impl DrsGeometry3D {
-    pub fn get_blas_geometry_info(&self) -> BlasInputInfo {
+    pub fn get_blas_geometry_info(&self) -> BlasInputInfo<'_> {
         let geometry_triangle = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
             vertex_data: vk::DeviceOrHostAddressConstKHR {

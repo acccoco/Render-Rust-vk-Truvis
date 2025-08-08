@@ -163,7 +163,7 @@ impl RhiImageBarrier {
     }
 
     #[inline]
-    pub fn inner(&self) -> &vk::ImageMemoryBarrier2 {
+    pub fn inner(&self) -> &vk::ImageMemoryBarrier2<'_> {
         &self.inner
     }
 
@@ -242,7 +242,7 @@ impl Default for RhiBufferBarrier {
 }
 impl RhiBufferBarrier {
     #[inline]
-    pub fn inner(&self) -> &vk::BufferMemoryBarrier2 {
+    pub fn inner(&self) -> &vk::BufferMemoryBarrier2<'_> {
         &self.inner
     }
 

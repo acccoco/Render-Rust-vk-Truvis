@@ -12,7 +12,7 @@ pub struct RhiWriteDescriptorSet {
 }
 
 impl RhiWriteDescriptorSet {
-    pub fn to_vk_type(&self) -> vk::WriteDescriptorSet {
+    pub fn to_vk_type(&self) -> vk::WriteDescriptorSet<'_> {
         vk::WriteDescriptorSet {
             dst_set: self.dst_set,
             dst_binding: self.dst_binding,

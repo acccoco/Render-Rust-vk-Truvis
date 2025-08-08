@@ -40,7 +40,7 @@ impl RhiImageCreateInfo {
     }
 
     #[inline]
-    pub fn creat_info(&self) -> &vk::ImageCreateInfo {
+    pub fn creat_info(&self) -> &vk::ImageCreateInfo<'_> {
         &self.inner
     }
 
@@ -91,7 +91,7 @@ impl RhiImageViewCreateInfo {
     }
 
     #[inline]
-    pub fn inner(&self) -> &vk::ImageViewCreateInfo {
+    pub fn inner(&self) -> &vk::ImageViewCreateInfo<'_> {
         &self.inner
     }
 }

@@ -97,7 +97,7 @@ impl RhiSubmitInfo {
     }
 
     #[inline]
-    pub fn submit_info(&self) -> vk::SubmitInfo2 {
+    pub fn submit_info(&self) -> vk::SubmitInfo2<'_> {
         self.inner
             .command_buffer_infos(&self._command_buffers)
             .wait_semaphore_infos(&self.wait_infos)

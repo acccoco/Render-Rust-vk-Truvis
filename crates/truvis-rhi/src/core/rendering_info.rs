@@ -18,7 +18,7 @@ impl RhiRenderingInfo {
         }
     }
 
-    pub fn rendering_info(&self) -> vk::RenderingInfo {
+    pub fn rendering_info(&self) -> vk::RenderingInfo<'_> {
         let mut info = vk::RenderingInfo::default()
             .layer_count(1)
             .render_area(self.range)
