@@ -7,7 +7,7 @@
 const static uint max_depth = 10;
 
 /// 超过一定数量后，就不再重新计算了
-const static uint max_accum_samples = 1024;
+const static uint max_accum_samples = 4096;
 
 [[vk::push_constant]]
 rt::PushConstants push_const;
@@ -101,8 +101,6 @@ void main_ray_gen()
         ray.Origin = payload.ray_origin;
         ray.Direction = payload.ray_dir;
     }
-    // TODO remove me：应该是计算出问题了，这里只是补救措施
-    color = clamp(color, float3(0.f), float3(100.f));
 
     if (accum_samples > 0)
     {
@@ -136,12 +134,16 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
 
     // 双面材质：确保每次光线都命中物体的正面
     const float3 origin_world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
-    const float3 world_normal = faceforward(origin_world_normal, WorldRayDirection(), origin_world_normal);
+    float3 world_normal = faceforward(origin_world_normal, WorldRayDirection(), origin_world_normal);
+    // TODO remove me
+    if (dot(world_normal, world_normal) < 0.1f) {
+        world_normal = float3(0.0f, 0.0f, 1.0f);
+    }
 
     // TODO 材质参数
-    const float metallic = 0.8f;
-    const float perceptual_roughness = 0.1f;
-    const float reflectance = 0.5f;
+    const float metallic = 0.4f;
+    const float perceptual_roughness = 0.7f;
+    const float reflectance = 0.8f;
     float3 base_color = float3(0.f, 0.f, 0.f);
     {
         MatPayload mat_payload = {};
@@ -153,7 +155,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     }
 
     // brdf = diffuse_brdf + specular_brdf
-    const float prob_diffuse = 0.2f;
+    const float prob_diffuse = perceptual_roughness;
     const bool choose_diffuse = Random::rnd(payload.random_seed) < prob_diffuse;
     if (choose_diffuse)
     {
@@ -161,16 +163,13 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         // BRDF = diffuse_color / pi
         // pdf = cos(theta) / pi
         // weight = BRDF * cos(theta) / pdf = diffuse_color
-        {
-            const float3 local_dir = Sample::get_cos_hemisphere_sample(payload.random_seed);
-            float3 tangent, bitangent;
-            Sample::create_local_coord(world_normal, tangent, bitangent);
-            payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
+        const float3 local_dir = Sample::get_cos_hemisphere_sample(payload.random_seed);
+        float3 tangent, bitangent;
+        Sample::create_local_coord(world_normal, tangent, bitangent);
+        payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
 
-            const float3 diffuse_color = (1.f - metallic) * base_color;
-            payload.weight = diffuse_color;
-        }
-        payload.weight /= prob_diffuse;
+        const float3 diffuse_color = (1.f - metallic) * base_color;
+        payload.weight = diffuse_color / prob_diffuse;
     }
     else
     {
@@ -178,12 +177,11 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         const float roughness = perceptual_roughness * perceptual_roughness;
         // 首先根据 NDF 采样半程向量 H
         const float3 h = SpecularBrdf::ggx_sample(payload.random_seed, mat.roughness, world_normal);
-        SpecularBrdf specular_brdf = SpecularBrdf(f0, roughness, world_normal, -WorldRayDirection(), h);
+        SpecularBrdf specular_brdf = SpecularBrdf(f0, roughness, world_normal, -normalize(WorldRayDirection()), h);
         const float brdf_pdf = specular_brdf.ggx_pdf();
 
         payload.weight = specular_brdf.brdf_with_pdf() * specular_brdf.get_ndotl() / (1.f - prob_diffuse);
-        // payload.weight = specular_brdf.brdf() * specular_brdf.get_ndotl() / (1.f * (1.f - prob_diffuse));
-        payload.weight = max(0.001f, payload.weight);
+        payload.ray_dir = specular_brdf.light;
     }
 
     // 光线的起点增加一个偏移量，避免自交
@@ -251,7 +249,7 @@ void sky_miss(inout HitPayload payload)
     // phi: [-pi, pi] -> [0, 1]
     // theta: [-pi/2, pi/2] -> [1, 0]
     const float2 uv = float2(angle.x / M_PI * 0.5 + 0.5, 0.5 - angle.y / M_PI);
-    payload.radiance = float3(push_const.scene.sky.sample(uv).xyz) * 8.f;
+    payload.radiance = float3(push_const.scene.sky.sample(uv).xyz) * 10.f;
     payload.done = true;
 }
 

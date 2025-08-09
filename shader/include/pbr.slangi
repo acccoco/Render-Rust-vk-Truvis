@@ -35,11 +35,11 @@ struct SpecularBrdf
         this.view = view;
         this.h = h;
 
-        this.light = normalize(2.f * dot(view, h) * h - view);
-        this.vdoth = dot(view, h);
-        this.ndotl = dot(normal, light);
-        this.ndotv = dot(normal, view);
-        this.ndoth = dot(normal, h);
+        this.light = normalize(2.f * saturate(dot(view, h)) * h - view);
+        this.vdoth = saturate(dot(view, h));
+        this.ndotl = saturate(dot(normal, light));
+        this.ndotv = saturate(dot(normal, view));
+        this.ndoth = saturate(dot(normal, h));
 
         this.D = this.ndf_ggx();
         this.F = this.fresnel_schlick();
@@ -74,7 +74,7 @@ struct SpecularBrdf
 
     /// 基于 NDF 进行采样，得到的是半程向量 H
     /// pdf = D * NdotH / (4 * NdotV)
-    static float3 ggx_sample(inout uint rand_seed, float roughness, float3 normal)
+    static float3 ggx_sample(inout uint rand_seed, const float roughness, const float3 normal)
     {
         float3 tangent, bitangent;
         Sample::create_local_coord(normal, tangent, bitangent);
