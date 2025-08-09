@@ -100,7 +100,7 @@ impl RhiGraphicsPipelineCreateInfo {
         self.shader_stages.push(RhiShaderStageInfo {
             stage: vk::ShaderStageFlags::VERTEX,
             entry_point,
-            path,
+            path: path.to_string(),
         });
         self
     }
@@ -111,7 +111,7 @@ impl RhiGraphicsPipelineCreateInfo {
         self.shader_stages.push(RhiShaderStageInfo {
             stage: vk::ShaderStageFlags::FRAGMENT,
             entry_point,
-            path,
+            path: path.to_string(),
         });
         self
     }

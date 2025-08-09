@@ -9,6 +9,7 @@ use ash::vk;
 use itertools::Itertools;
 use std::cell::RefCell;
 use std::rc::Rc;
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::core::command_queue::RhiSubmitInfo;
 use truvis_rhi::core::synchronize::{RhiImageBarrier, RhiSemaphore};
 use truvis_rhi::rhi::Rhi;
@@ -60,7 +61,8 @@ impl MainWindow {
         window_extent: vk::Extent2D,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
     ) -> Self {
-        let icon = helper::load_icon(include_bytes!("../../resources/DruvisIII.png"));
+        let icon_data = std::fs::read(TruvisPath::resources_path("DruvisIII.png")).expect("Failed to read icon file");
+        let icon = helper::load_icon(icon_data.as_ref());
         let window_attr = Window::default_attributes()
             .with_title(window_title)
             .with_window_icon(Some(icon.clone()))

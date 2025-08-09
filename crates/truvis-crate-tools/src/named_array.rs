@@ -1,7 +1,7 @@
-/// 创建一个命名的数组和对应的枚举类型
+/// 创建一个带有索引的常量数组宏
 #[macro_export]
-macro_rules! create_named_array {
-    ($enum_name:ident, $array_name:ident, $type:ty, [$(($variant:ident, $value:expr)),* $(,)?]) => {
+macro_rules! const_map {
+    ($enum_name:ident<$vtype:ty>: { $($variant:ident: $value:expr),* $(,)? }) => {
         // 定义枚举
         #[repr(usize)]
         #[derive(Debug, Clone, Copy)]
@@ -13,13 +13,18 @@ macro_rules! create_named_array {
         impl $enum_name {
             const COUNT: usize = count_indexed_array!($($variant),*);
 
-            // 定义数组
-            const ARRAY: [$type; Self::COUNT] = [
-                $($value,)*
-            ];
+            // 获取数组的静态方法
+            fn get_array() -> &'static [$vtype; Self::COUNT] {
+                // 使用 OnceLock 实现延迟初始化的静态数组
+                static ARRAY: std::sync::OnceLock<[$vtype; { count_indexed_array!($($variant),*) }]> = std::sync::OnceLock::new();
 
-            pub fn value(self) -> &'static $type {
-                &Self::ARRAY[self as usize]
+                ARRAY.get_or_init(|| [
+                    $($value,)*
+                ])
+            }
+
+            pub fn value(self) -> &'static $vtype {
+                &Self::get_array()[self as usize]
             }
 
             pub const fn index(self) -> usize {
@@ -28,6 +33,11 @@ macro_rules! create_named_array {
 
             pub fn iter() -> impl Iterator<Item = Self> {
                 (0..Self::COUNT).map(|i| unsafe { std::mem::transmute(i) })
+            }
+
+            // 提供访问整个数组的静态方法
+            pub fn array() -> &'static [$vtype; Self::COUNT] {
+                Self::get_array()
             }
         }
     };

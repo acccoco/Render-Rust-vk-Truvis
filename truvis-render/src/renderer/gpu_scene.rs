@@ -11,6 +11,7 @@ use shader_binding::shader;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::core::acceleration::RhiAcceleration;
 use truvis_rhi::core::buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
@@ -208,8 +209,8 @@ impl GpuScene {
         frame_ctrl: Rc<FrameController>,
     ) -> Self {
         let resources = Resources {
-            sky: concat!(env!("CARGO_MANIFEST_DIR"), "/resources/sky.jpg").to_string(),
-            uv_checker: concat!(env!("CARGO_MANIFEST_DIR"), "/resources/uv_checker.png").to_string(),
+            sky: TruvisPath::resources_path("sky.jpg"),
+            uv_checker: TruvisPath::resources_path("uv_checker.png"),
         };
         bindless_mgr.borrow_mut().register_texture_by_path(rhi, resources.sky.clone());
         bindless_mgr.borrow_mut().register_texture_by_path(rhi, resources.uv_checker.clone());

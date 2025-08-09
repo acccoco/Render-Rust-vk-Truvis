@@ -6,6 +6,7 @@ use ash::vk;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::rc::Rc;
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::core::command_queue::RhiSubmitInfo;
 use truvis_rhi::core::synchronize::RhiImageBarrier;
 use truvis_rhi::rhi::Rhi;
@@ -23,13 +24,13 @@ impl RtPipeline {
             rhi,
             &bindless_mgr.borrow(),
             cstr::cstr!("main"),
-            "shader/build/imgui/blit.slang.spv",
+            TruvisPath::shader_path("imgui/blit.slang.spv").as_str(),
         );
         let sdr_pass = ComputePass::<shader::sdr::PushConstant>::new(
             rhi,
             &bindless_mgr.borrow(),
             c"main",
-            "shader/build/pass/pp/sdr.slang.spv",
+            TruvisPath::shader_path("pass/pp/sdr.slang.spv").as_str(),
         );
 
         Self {

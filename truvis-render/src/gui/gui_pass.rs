@@ -10,41 +10,32 @@ use std::cell::RefCell;
 use std::mem::offset_of;
 use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
-use truvis_crate_tools::create_named_array;
+use truvis_crate_tools::const_map;
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
 use truvis_rhi::core::shader::RhiShaderStageInfo;
 use truvis_rhi::rhi::Rhi;
 
-create_named_array!(
-    ShaderStage,
-    SHADER_STAGES,
-    RhiShaderStageInfo,
-    [
-        (
-            Vertex,
-            RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::VERTEX,
-                entry_point: cstr::cstr!("vsmain"),
-                path: "shader/build/imgui/imgui.slang.spv",
-            }
-        ),
-        (
-            Fragment,
-            RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::FRAGMENT,
-                entry_point: cstr::cstr!("psmain"),
-                path: "shader/build/imgui/imgui.slang.spv",
-            }
-        ),
-    ]
-);
+const_map!(ShaderStage<RhiShaderStageInfo>: {
+    Vertex: RhiShaderStageInfo {
+        stage: vk::ShaderStageFlags::VERTEX,
+        entry_point: cstr::cstr!("vsmain"),
+        path: TruvisPath::shader_path("imgui/imgui.slang.spv"),
+    },
+    Fragment: RhiShaderStageInfo {
+        stage: vk::ShaderStageFlags::FRAGMENT,
+        entry_point: cstr::cstr!("psmain"),
+        path: TruvisPath::shader_path("imgui/imgui.slang.spv"),
+    },
+});
 
 pub struct GuiPass {
     pipeline: RhiGraphicsPipeline,
     pipeline_layout: Rc<RhiPipelineLayout>,
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
+
 impl GuiPass {
     pub fn new(rhi: &Rhi, bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
         let pipeline_layout = Rc::new(RhiPipelineLayout::new(
@@ -75,7 +66,7 @@ impl GuiPass {
 
         let mut create_info = RhiGraphicsPipelineCreateInfo::default();
         create_info
-            .shader_stages(ShaderStage::iter().map(|stage| *stage.value()).collect_vec())
+            .shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec())
             .vertex_attribute(ImGuiVertex::vertex_input_attributes())
             .vertex_binding(ImGuiVertex::vertex_input_bindings())
             .cull_mode(vk::CullModeFlags::NONE, vk::FrontFace::CLOCKWISE)
@@ -113,6 +104,7 @@ impl GuiPass {
                 },
             })
             .store_op(vk::AttachmentStoreOp::STORE);
+
         let render_info = vk::RenderingInfo::default()
             .layer_count(1)
             .render_area(canvas_extent.into())
@@ -138,6 +130,7 @@ impl GuiPass {
         cmd.cmd_begin_rendering(&render_info);
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
         cmd.cmd_set_viewport(0, std::slice::from_ref(&viewport));
+
         let push_constant = shader::imgui::PushConstant {
             ortho: glam::Mat4::orthographic_rh(
                 0.0,
@@ -151,6 +144,7 @@ impl GuiPass {
             texture: TextureHandle { index: 0 },
             _padding_0: 0,
         };
+
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),
@@ -158,12 +152,14 @@ impl GuiPass {
             &[self.bindless_mgr.borrow().bindless_descriptor_sets[*frame_label].handle()],
             None,
         );
+
         cmd.cmd_push_constants(
             self.pipeline_layout.handle(),
             vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
             0,
             bytemuck::bytes_of(&push_constant),
         );
+
         cmd.cmd_bind_index_buffer(&mesh._index_buffer, 0, vk::IndexType::UINT16);
         cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&mesh.vertex_buffer), &[0]);
 
@@ -213,6 +209,7 @@ impl GuiPass {
                             let texture_handle = bindless_mgr
                                 .get_texture_handle(&texture_key)
                                 .unwrap_or_else(|| panic!("Texture not found: {}", texture_key));
+
                             cmd.cmd_push_constants(
                                 self.pipeline_layout.handle(),
                                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,

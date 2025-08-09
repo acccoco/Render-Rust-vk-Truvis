@@ -5,7 +5,8 @@ use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
 use model_manager::vertex::VertexLayout;
 use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
-use truvis_crate_tools::create_named_array;
+use truvis_crate_tools::const_map;
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_render::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_render::renderer::frame_buffers::FrameBuffers;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
@@ -14,29 +15,18 @@ use truvis_rhi::core::rendering_info::RhiRenderingInfo;
 use truvis_rhi::core::shader::RhiShaderStageInfo;
 use truvis_rhi::rhi::Rhi;
 
-create_named_array!(
-    ShaderStage,
-    SHADER_STAGES,
-    RhiShaderStageInfo,
-    [
-        (
-            Vertex,
-            RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::VERTEX,
-                entry_point: cstr::cstr!("vsmain"),
-                path: "shader/build/hello_triangle/triangle.slang.spv",
-            }
-        ),
-        (
-            Fragment,
-            RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::FRAGMENT,
-                entry_point: cstr::cstr!("psmain"),
-                path: "shader/build/hello_triangle/triangle.slang.spv",
-            }
-        ),
-    ]
-);
+const_map!(ShaderStage<RhiShaderStageInfo>: {
+    Vertex: RhiShaderStageInfo {
+        stage: vk::ShaderStageFlags::VERTEX,
+        entry_point: cstr::cstr!("vsmain"),
+        path: TruvisPath::shader_path("hello_triangle/triangle.slang.spv"),
+    },
+    Fragment: RhiShaderStageInfo {
+        stage: vk::ShaderStageFlags::FRAGMENT,
+        entry_point: cstr::cstr!("psmain"),
+        path: TruvisPath::shader_path("hello_triangle/triangle.slang.spv"),
+    },
+});
 
 pub struct TrianglePass {
     pipeline: RhiGraphicsPipeline,
@@ -45,7 +35,7 @@ pub struct TrianglePass {
 impl TrianglePass {
     pub fn new(rhi: &Rhi, frame_settings: &FrameSettings) -> Self {
         let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
-        pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| *stage.value()).collect_vec());
+        pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![frame_settings.color_format], None, Some(vk::Format::UNDEFINED));
         pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
         pipeline_ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());

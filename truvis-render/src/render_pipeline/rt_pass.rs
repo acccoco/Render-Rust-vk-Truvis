@@ -9,7 +9,8 @@ use shader_binding::shader::ImageHandle;
 use std::cell::RefCell;
 use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
-use truvis_crate_tools::create_named_array;
+use truvis_crate_tools::const_map;
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::core::buffer::{RhiSBTBuffer, RhiStructuredBuffer};
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::device::RhiDevice;
@@ -32,110 +33,67 @@ impl Drop for RhiRtPipeline {
     }
 }
 
-create_named_array!(
-    ShaderStage,
-    SHADER_STAGES,
-    RhiShaderStageInfo,
-    [
-        (
-            RayGen,
-            RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::RAYGEN_KHR,
-                entry_point: cstr::cstr!("main_ray_gen"),
-                path: "shader/build/rt/rt.slang.spv",
-            }
-        ),
-        (
-            SkyMiss,
-            RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::MISS_KHR,
-                entry_point: cstr::cstr!("sky_miss"),
-                path: "shader/build/rt/rt.slang.spv",
-            }
-        ),
-        (
-            ShadowMiss,
-            RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::MISS_KHR,
-                entry_point: cstr::cstr!("shadow_miss"),
-                path: "shader/build/rt/rt.slang.spv",
-            }
-        ),
-        (
-            ClosestHit,
-            RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-                entry_point: cstr::cstr!("main_closest_hit"),
-                path: "shader/build/rt/rt.slang.spv",
-            }
-        ),
-        (
-            TransAny,
-            RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::ANY_HIT_KHR,
-                entry_point: cstr::cstr!("trans_any"),
-                path: "shader/build/rt/rt.slang.spv",
-            }
-        ),
-        (
-            DiffuseCall,
-            RhiShaderStageInfo {
-                stage: vk::ShaderStageFlags::CALLABLE_KHR,
-                entry_point: cstr::cstr!("diffuse_callable"),
-                path: "shader/build/rt/rt.slang.spv",
-            }
-        ),
-    ]
-);
+const_map!(ShaderStage<RhiShaderStageInfo>: {
+    RayGen: RhiShaderStageInfo {
+        stage: vk::ShaderStageFlags::RAYGEN_KHR,
+        entry_point: cstr::cstr!("main_ray_gen"),
+        path: TruvisPath::shader_path("rt/rt.slang.spv"),
+    },
+    SkyMiss: RhiShaderStageInfo {
+        stage: vk::ShaderStageFlags::MISS_KHR,
+        entry_point: cstr::cstr!("sky_miss"),
+        path: TruvisPath::shader_path("rt/rt.slang.spv"),
+    },
+    ShadowMiss: RhiShaderStageInfo {
+        stage: vk::ShaderStageFlags::MISS_KHR,
+        entry_point: cstr::cstr!("shadow_miss"),
+        path: TruvisPath::shader_path("rt/rt.slang.spv"),
+    },
+    ClosestHit: RhiShaderStageInfo {
+        stage: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+        entry_point: cstr::cstr!("main_closest_hit"),
+        path: TruvisPath::shader_path("rt/rt.slang.spv"),
+    },
+    TransAny: RhiShaderStageInfo {
+        stage: vk::ShaderStageFlags::ANY_HIT_KHR,
+        entry_point: cstr::cstr!("trans_any"),
+        path: TruvisPath::shader_path("rt/rt.slang.spv"),
+    },
+    DiffuseCall: RhiShaderStageInfo {
+        stage: vk::ShaderStageFlags::CALLABLE_KHR,
+        entry_point: cstr::cstr!("diffuse_callable"),
+        path: TruvisPath::shader_path("rt/rt.slang.spv"),
+    },
+});
 
-create_named_array!(
-    ShaderGroups,
-    SHADER_GROUPS,
-    ShaderGroupInfo,
-    [
-        (
-            RayGen,
-            ShaderGroupInfo {
-                ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
-                general: ShaderStage::RayGen.index() as u32,
-                ..ShaderGroupInfo::unused()
-            }
-        ),
-        (
-            SkyMiss,
-            ShaderGroupInfo {
-                ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
-                general: ShaderStage::SkyMiss.index() as u32,
-                ..ShaderGroupInfo::unused()
-            }
-        ),
-        (
-            ShadowMiss,
-            ShaderGroupInfo {
-                ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
-                general: ShaderStage::ShadowMiss.index() as u32,
-                ..ShaderGroupInfo::unused()
-            }
-        ),
-        (
-            Hit,
-            ShaderGroupInfo {
-                ty: vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
-                closest_hit: ShaderStage::ClosestHit.index() as u32,
-                any_hit: ShaderStage::TransAny.index() as u32,
-                ..ShaderGroupInfo::unused()
-            }
-        ),
-        (
-            DiffuseCall,
-            ShaderGroupInfo {
-                ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
-                general: ShaderStage::DiffuseCall.index() as u32,
-                ..ShaderGroupInfo::unused()
-            }
-        ),
-    ]
-);
+const_map!(ShaderGroups<ShaderGroupInfo>: {
+    RayGen: ShaderGroupInfo {
+        ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
+        general: ShaderStage::RayGen.index() as u32,
+        ..ShaderGroupInfo::unused()
+    },
+    SkyMiss: ShaderGroupInfo {
+        ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
+        general: ShaderStage::SkyMiss.index() as u32,
+        ..ShaderGroupInfo::unused()
+    },
+    ShadowMiss: ShaderGroupInfo {
+        ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
+        general: ShaderStage::ShadowMiss.index() as u32,
+        ..ShaderGroupInfo::unused()
+    },
+    Hit: ShaderGroupInfo {
+        ty: vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
+        closest_hit: ShaderStage::ClosestHit.index() as u32,
+        any_hit: ShaderStage::TransAny.index() as u32,
+        ..ShaderGroupInfo::unused()
+    },
+    DiffuseCall: ShaderGroupInfo {
+        ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
+        general: ShaderStage::DiffuseCall.index() as u32,
+        ..ShaderGroupInfo::unused()
+    },
+});
 
 pub struct SBTRegions {
     sbt_region_raygen: vk::StridedDeviceAddressRegionKHR,

@@ -5,6 +5,7 @@ use crate::pipeline_settings::{FrameLabel, PresentSettings};
 use crate::renderer::bindless::BindlessManager;
 use ash::vk;
 use std::{cell::RefCell, rc::Rc};
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::{
@@ -92,6 +93,7 @@ impl Gui {
         let hidpi_factor = platform.hidpi_factor();
         let font_size = (13.0 * hidpi_factor) as f32;
 
+        let font_data = std::fs::read(TruvisPath::resources_path("mplus-1p-regular.ttf")).unwrap();
         imgui_ctx.fonts().add_font(&[
             imgui::FontSource::DefaultFontData {
                 config: Some(imgui::FontConfig {
@@ -100,7 +102,7 @@ impl Gui {
                 }),
             },
             imgui::FontSource::TtfData {
-                data: include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/mplus-1p-regular.ttf")),
+                data: font_data.as_ref(),
                 size_pixels: font_size,
                 config: Some(imgui::FontConfig {
                     rasterizer_multiply: 1.75,

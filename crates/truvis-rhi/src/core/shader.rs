@@ -55,16 +55,16 @@ impl RhiShaderModule {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct RhiShaderStageInfo {
     pub stage: vk::ShaderStageFlags,
     pub entry_point: &'static CStr,
-    pub path: &'static str,
+    pub path: String,
 }
 impl RhiShaderStageInfo {
     #[inline]
     pub fn path(&self) -> &std::path::Path {
-        std::path::Path::new(self.path)
+        std::path::Path::new(self.path.as_str())
     }
 }
 
