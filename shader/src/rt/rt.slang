@@ -134,15 +134,11 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
 
     // 双面材质：确保每次光线都命中物体的正面
     const float3 origin_world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
-    float3 world_normal = faceforward(origin_world_normal, WorldRayDirection(), origin_world_normal);
-    // TODO remove me
-    if (dot(world_normal, world_normal) < 0.1f) {
-        world_normal = float3(0.0f, 0.0f, 1.0f);
-    }
+    const float3 world_normal = faceforward(origin_world_normal, WorldRayDirection(), origin_world_normal);
 
     // TODO 材质参数
-    const float metallic = 0.4f;
-    const float perceptual_roughness = 0.7f;
+    const float metallic = 0.8f;
+    const float perceptual_roughness = 0.3f;
     const float reflectance = 0.8f;
     float3 base_color = float3(0.f, 0.f, 0.f);
     {
@@ -176,9 +172,9 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         const float3 f0 = lerp(0.16 * reflectance * reflectance, base_color, metallic);
         const float roughness = perceptual_roughness * perceptual_roughness;
         // 首先根据 NDF 采样半程向量 H
-        const float3 h = SpecularBrdf::ggx_sample(payload.random_seed, mat.roughness, world_normal);
-        SpecularBrdf specular_brdf = SpecularBrdf(f0, roughness, world_normal, -normalize(WorldRayDirection()), h);
-        const float brdf_pdf = specular_brdf.ggx_pdf();
+        const float3 h = SpecularBrdf::ggx_sample(payload.random_seed, roughness, world_normal);
+        // const float3 h = world_normal;
+        SpecularBrdf specular_brdf = SpecularBrdf(f0, roughness, world_normal, -WorldRayDirection(), h);
 
         payload.weight = specular_brdf.brdf_with_pdf() * specular_brdf.get_ndotl() / (1.f - prob_diffuse);
         payload.ray_dir = specular_brdf.light;
