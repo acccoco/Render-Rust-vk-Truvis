@@ -7,7 +7,7 @@ members = [
 
     "shader/shader-binding", # 将 shader 代码和 rust 代码绑定的库
 
-    "xtask/build-shader", # 构建工具
+    "shader/shader-build", # 构建工具
     # "xtask/shader-gen",   # 用于生成 shader 代码的工具，暂时不使用
 
     "crates/truvis-cxx", # 手动绑定 assmip
@@ -23,7 +23,6 @@ shader-layout-macro = { path = "crates/shader-layout-macro" }
 shader-layout-trait = { path = "crates/shader-layout-trait" }
 truvis-rhi = { path = "crates/truvis-rhi" }
 model-manager = { path = "crates/model-manager" }
-build-shader = { path = "xtask/build-shader" }
 truvis-cxx = { path = "crates/truvis-cxx" }
 truvis-render = { path = "truvis-render" }
 shader-binding = { path = "shader/shader-binding" }

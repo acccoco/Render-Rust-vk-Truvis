@@ -17,7 +17,7 @@ impl TruvisPath {
 
     pub fn shader_path(filename: &str) -> String {
         let workspace_dir = Self::workspace_path();
-        let shader_path = workspace_dir.join("shader").join("build").join(filename);
+        let shader_path = workspace_dir.join("shader").join(".build").join(filename);
         shader_path.to_str().unwrap().to_string()
     }
 

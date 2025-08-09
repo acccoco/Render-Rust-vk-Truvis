@@ -312,19 +312,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "build-shader"
-version = "0.1.0"
-dependencies = [
- "anstyle",
- "chrono",
- "env_logger",
- "log",
- "rayon",
- "truvis-crate-tools",
- "walkdir",
-]
-
-[[package]]
 name = "built"
 version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2361,6 +2348,19 @@ dependencies = [
  "bindgen",
  "bytemuck",
  "glam",
+]
+
+[[package]]
+name = "shader-build"
+version = "0.1.0"
+dependencies = [
+ "anstyle",
+ "chrono",
+ "env_logger",
+ "log",
+ "rayon",
+ "truvis-crate-tools",
+ "walkdir",
 ]
 
 [[package]]

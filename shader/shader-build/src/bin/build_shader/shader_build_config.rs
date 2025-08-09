@@ -5,7 +5,7 @@ impl EnvPath {
     pub const SHADER_SRC_DIR: &'static str = "shader/src";
 
     /// 编译 shader 的输出路径
-    pub const SHADER_BUILD_DIR: &'static str = "shader/build";
+    pub const SHADER_BUILD_DIR: &'static str = "shader/.build";
 
     /// shader 的 include 目录
     pub const SHADER_INCLUDE_DIR: &'static str = "shader/include";
