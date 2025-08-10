@@ -7,7 +7,7 @@
 const static uint max_depth = 10;
 
 /// 超过一定数量后，就不再重新计算了
-const static uint max_accum_samples = 4096;
+const static uint max_accum_samples = 512;
 
 [[vk::push_constant]]
 rt::PushConstants push_const;
