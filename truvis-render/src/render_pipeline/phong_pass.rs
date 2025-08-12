@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::mem::offset_of;
 use std::rc::Rc;
 use truvis_rhi::basic::color::LabelColor;
-use truvis_rhi::core::buffer::RhiStructuredBuffer;
+use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
 use truvis_rhi::core::rendering_info::RhiRenderingInfo;

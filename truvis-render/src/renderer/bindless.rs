@@ -10,8 +10,8 @@ use std::rc::Rc;
 use truvis_rhi::core::descriptor::{RhiDescriptorSet, RhiDescriptorSetLayout};
 use truvis_rhi::core::descriptor_pool::RhiDescriptorPool;
 use truvis_rhi::core::device::RhiDevice;
-use truvis_rhi::core::image::{Image2DViewContainer, Image2DViewUUID, RhiImage2DView};
-use truvis_rhi::core::texture::{RhiTexture2D, Texture2DContainer};
+use truvis_rhi::core::resources::image_view::{Image2DViewContainer, Image2DViewUUID, RhiImage2DView};
+use truvis_rhi::core::resources::texture::{RhiTexture2D, Texture2DContainer};
 use truvis_rhi::rhi::Rhi;
 use truvis_rhi::shader_cursor::ShaderCursor;
 

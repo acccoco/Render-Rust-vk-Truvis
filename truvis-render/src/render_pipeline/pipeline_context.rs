@@ -8,7 +8,7 @@ use crate::renderer::cmd_allocator::CmdAllocator;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::rc::Rc;
-use truvis_rhi::core::buffer::RhiStructuredBuffer;
+use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
 use truvis_rhi::rhi::Rhi;
 
 /// Rt 管线上下文，每帧重建

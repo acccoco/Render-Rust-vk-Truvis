@@ -14,12 +14,12 @@ use shader_binding::shader;
 use std::cell::RefCell;
 use std::ffi::CStr;
 use std::rc::Rc;
-use truvis_rhi::core::buffer::RhiStructuredBuffer;
+use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_queue::RhiSubmitInfo;
 use truvis_rhi::core::descriptor_pool::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo};
 use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier, RhiSemaphore};
-use truvis_rhi::core::texture::RhiTexture2D;
+use truvis_rhi::core::resources::texture::RhiTexture2D;
 use truvis_rhi::rhi::Rhi;
 
 pub struct PresentData<'a> {

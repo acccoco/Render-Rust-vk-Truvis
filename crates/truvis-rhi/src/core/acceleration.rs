@@ -7,9 +7,10 @@ use itertools::Itertools;
 
 use crate::core::debug_utils::RhiDebugType;
 use crate::{
-    core::{buffer::RhiBuffer, command_buffer::RhiCommandBuffer, device::RhiDevice, query_pool::RhiQueryPool},
+    core::{command_buffer::RhiCommandBuffer, device::RhiDevice, query_pool::RhiQueryPool},
     rhi::Rhi,
 };
+use crate::core::resources::buffer::RhiBuffer;
 
 pub struct BlasInputInfo<'a> {
     pub geometry: vk::AccelerationStructureGeometryKHR<'a>,

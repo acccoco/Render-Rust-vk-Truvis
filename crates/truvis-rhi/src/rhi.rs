@@ -176,4 +176,3 @@ impl Rhi {
             .collect()
     }
 }
-impl Rhi {}

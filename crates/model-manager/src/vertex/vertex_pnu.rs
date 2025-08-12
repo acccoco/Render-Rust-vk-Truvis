@@ -2,7 +2,8 @@ use crate::component::DrsGeometry;
 use crate::vertex::VertexLayout;
 use ash::vk;
 use std::mem::offset_of;
-use truvis_rhi::core::buffer::{RhiIndexBuffer, RhiVertexBuffer};
+use truvis_rhi::core::resources::special_buffers::vertex_buffer::RhiVertexBuffer;
+use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
 use truvis_rhi::rhi::Rhi;
 
 /// AoS: Array of structures

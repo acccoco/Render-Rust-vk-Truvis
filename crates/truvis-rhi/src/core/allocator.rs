@@ -43,4 +43,9 @@ impl RhiAllocator {
             _device: device,
         }
     }
+
+    #[inline]
+    pub fn device(&self) -> &RhiDevice {
+        &self._device
+    }
 }

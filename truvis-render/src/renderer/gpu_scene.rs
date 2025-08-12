@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::core::acceleration::RhiAcceleration;
-use truvis_rhi::core::buffer::RhiStructuredBuffer;
+use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 use truvis_rhi::rhi::Rhi;
@@ -580,7 +580,7 @@ impl GpuScene {
 
 mod helper {
     use ash::vk;
-    use truvis_rhi::core::buffer::RhiBuffer;
+    use truvis_rhi::core::resources::buffer::RhiBuffer;
     use truvis_rhi::core::command_buffer::RhiCommandBuffer;
     use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 

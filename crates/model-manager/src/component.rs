@@ -3,7 +3,8 @@ use crate::vertex::vertex_3d::Vertex3D;
 use ash::vk;
 use itertools::Itertools;
 use truvis_rhi::core::acceleration::{BlasInputInfo, RhiAcceleration};
-use truvis_rhi::core::buffer::{RhiIndexBuffer, RhiVertexBuffer};
+use truvis_rhi::core::resources::special_buffers::vertex_buffer::RhiVertexBuffer;
+use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
 use truvis_rhi::rhi::Rhi;
 
 #[derive(Default)]

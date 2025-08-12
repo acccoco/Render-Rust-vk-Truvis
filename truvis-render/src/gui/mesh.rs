@@ -1,8 +1,10 @@
 use ash::vk;
 use std::mem::offset_of;
 use truvis_rhi::basic::color::LabelColor;
-use truvis_rhi::core::buffer::{RhiBuffer, RhiIndexBuffer, RhiVertexBuffer};
+use truvis_rhi::core::resources::special_buffers::vertex_buffer::RhiVertexBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
+use truvis_rhi::core::resources::buffer::RhiBuffer;
+use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
 use truvis_rhi::core::synchronize::RhiBufferBarrier;
 use truvis_rhi::rhi::Rhi;
 

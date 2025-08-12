@@ -10,9 +10,10 @@ use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::device::RhiDevice;
 use truvis_rhi::{
     basic::color::LabelColor,
-    core::{image::RhiImage2D, texture::RhiTexture2D},
     rhi::Rhi,
 };
+use truvis_rhi::core::resources::image::RhiImage2D;
+use truvis_rhi::core::resources::texture::RhiTexture2D;
 
 pub struct Gui {
     pub imgui_ctx: imgui::Context,

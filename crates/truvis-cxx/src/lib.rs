@@ -4,7 +4,7 @@ use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
 use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
-use truvis_rhi::core::buffer::RhiIndexBuffer;
+use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
 use truvis_rhi::rhi::Rhi;
 
 pub mod _ffi_bindings;

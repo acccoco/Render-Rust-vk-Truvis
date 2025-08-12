@@ -6,9 +6,11 @@ use itertools::Itertools;
 use shader_binding::shader;
 use std::rc::Rc;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::image::{RhiImage2D, RhiImage2DView, RhiImageCreateInfo, RhiImageViewCreateInfo};
+use truvis_rhi::core::resources::image_view::RhiImageViewCreateInfo;
+use truvis_rhi::core::resources::image::{RhiImage2D, RhiImageCreateInfo};
+use truvis_rhi::core::resources::image_view::RhiImage2DView;
 use truvis_rhi::core::synchronize::RhiImageBarrier;
-use truvis_rhi::core::texture::RhiTexture2D;
+use truvis_rhi::core::resources::texture::RhiTexture2D;
 use truvis_rhi::rhi::Rhi;
 
 /// 所有帧会用到的 buffers

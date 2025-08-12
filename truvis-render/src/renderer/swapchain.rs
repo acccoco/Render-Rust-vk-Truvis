@@ -6,7 +6,8 @@ use std::rc::Rc;
 use truvis_rhi::core::command_queue::RhiQueue;
 use truvis_rhi::core::debug_utils::RhiDebugType;
 use truvis_rhi::core::device::RhiDevice;
-use truvis_rhi::core::image::{RhiImage2DView, RhiImageViewCreateInfo};
+use truvis_rhi::core::resources::image_view::RhiImageViewCreateInfo;
+use truvis_rhi::core::resources::image_view::RhiImage2DView;
 use truvis_rhi::core::synchronize::{RhiFence, RhiSemaphore};
 use truvis_rhi::rhi::Rhi;
 

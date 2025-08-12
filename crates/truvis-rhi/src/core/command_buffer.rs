@@ -9,7 +9,6 @@ use crate::core::synchronize::RhiBufferBarrier;
 use crate::{
     basic::color::LabelColor,
     core::{
-        buffer::RhiBuffer,
         command_pool::RhiCommandPool,
         command_queue::{RhiQueue, RhiSubmitInfo},
         device::RhiDevice,
@@ -18,6 +17,7 @@ use crate::{
     },
     rhi::Rhi,
 };
+use crate::core::resources::buffer::RhiBuffer;
 
 /// # destroy
 ///

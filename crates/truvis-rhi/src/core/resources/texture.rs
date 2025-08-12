@@ -1,13 +1,11 @@
-use crate::core::image::ImageContainer;
+use crate::core::resources::image::{ImageContainer, RhiImage2D};
 use crate::{
-    core::{
-        image::{RhiImage2D, RhiImage2DView, RhiImageViewCreateInfo},
-        sampler::{RhiSampler, RhiSamplerCreateInfo},
-    },
+    core::sampler::{RhiSampler, RhiSamplerCreateInfo},
     rhi::Rhi,
 };
 use ash::vk;
 use std::rc::Rc;
+use crate::core::resources::image_view::{RhiImage2DView, RhiImageViewCreateInfo};
 
 #[derive(PartialOrd, PartialEq, Hash, Copy, Clone, Ord, Eq)]
 pub struct Texture2DUUID(pub uuid::Uuid);
