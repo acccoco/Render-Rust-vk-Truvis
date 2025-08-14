@@ -1,4 +1,5 @@
 #include "pass/pp/sdr.slangi"
+#include "sample/random.slangi"
 
 [push_constant]
 sdr::PushConstant g_params;
@@ -14,7 +15,12 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     }
 
     const float4 hdr_color = g_params.src_image.load(dispatchThreadID.xy);
-    const float3 sdr_color = hdr_color.rgb / (0.5 + hdr_color.rgb);
+
+    // TODO 引入 accum frame 的参数，增加随机性
+    // 引入噪声消除色阶
+    uint random_seed = Random::tea(dispatchThreadID.y, dispatchThreadID.x);
+    const float delta = Random::rnd(random_seed);
+    const float3 sdr_color = hdr_color.rgb / (0.5 + hdr_color.rgb) + delta / 255.f;
 
     g_params.dst_image.store(
         dispatchThreadID.xy,

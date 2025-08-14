@@ -121,7 +121,7 @@ impl Renderer {
 
         let descriptor_pool = Self::init_descriptor_pool(rhi.device.clone());
         let frame_settings = FrameSettings {
-            color_format: vk::Format::R16G16B16A16_SFLOAT,
+            color_format: vk::Format::R32G32B32A32_SFLOAT,
             depth_format: Self::get_depth_format(&rhi),
             frame_extent: vk::Extent2D {
                 width: 400,
