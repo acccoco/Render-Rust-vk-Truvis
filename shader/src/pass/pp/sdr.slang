@@ -21,6 +21,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     uint random_seed = Random::tea(dispatchThreadID.y, dispatchThreadID.x);
     const float delta = Random::rnd(random_seed);
     const float3 sdr_color = hdr_color.rgb / (0.5 + hdr_color.rgb) + delta / 255.f;
+    // const float3 sdr_color = hdr_color.rgb;
 
     g_params.dst_image.store(
         dispatchThreadID.xy,

@@ -57,6 +57,12 @@ struct Scene
         return material;
     }
 
+    Instance *get_instance(uint instance_idx)
+    {
+        Instance *instance = all_instances + instance_idx;
+        return instance;
+    }
+
 #endif
 };
 

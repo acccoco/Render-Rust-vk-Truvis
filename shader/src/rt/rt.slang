@@ -4,10 +4,12 @@
 #include "sample/sample.slangi"
 #include "scene.slangi"
 
-const static uint max_depth = 10;
+const static uint max_depth = 16;
+
+const static uint channel_normal = 0;
 
 /// 超过一定数量后，就不再重新计算了
-const static uint max_accum_samples = 2048;
+const static uint max_accum_samples = 4096;
 
 [[vk::push_constant]]
 rt::PushConstants push_const;
@@ -132,14 +134,17 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
     const float3 world_pos = mul(ObjectToWorld3x4(), float4(interp_vertex.position, 1.f));
 
+     
     // 双面材质：确保每次光线都命中物体的正面
-    const float3 origin_world_normal = normalize(mul(interp_vertex.normal, ObjectToWorld3x4()).xyz);
+    float3 origin_world_normal;
+    {
+        // normal mat = obejct mat 的逆转置
+        Instance *instance = scene.get_instance(instance_id);
+        const float4x4 normal_matrix = transpose(instance.inv_model);
+        origin_world_normal = normalize(mul(normal_matrix, float4(interp_vertex.normal, 0.f)).xyz);
+    } 
     const float3 world_normal = faceforward(origin_world_normal, WorldRayDirection(), origin_world_normal);
 
-    // TODO 材质参数
-    const float metallic = 0.8f;
-    const float perceptual_roughness = 0.3f;
-    const float reflectance = 0.8f;
     float3 base_color = float3(0.f, 0.f, 0.f);
     {
         MatPayload mat_payload = {};
@@ -150,39 +155,72 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         base_color = mat_payload.out_color;
     }
 
-    // brdf = diffuse_brdf + specular_brdf
-    const float prob_diffuse = perceptual_roughness;
-    const bool choose_diffuse = Random::rnd(payload.random_seed) < prob_diffuse;
-    if (choose_diffuse)
+    // 法线着色
+    if (channel_normal == 1)
     {
-        // 半球 cos 采样
-        // BRDF = diffuse_color / pi
-        // pdf = cos(theta) / pi
-        // weight = BRDF * cos(theta) / pdf = diffuse_color
-        const float3 local_dir = Sample::get_cos_hemisphere_sample(payload.random_seed);
-        float3 tangent, bitangent;
-        Sample::create_local_coord(world_normal, tangent, bitangent);
-        payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
+        payload.radiance = world_normal * 0.5f + 0.5f;
+        payload.done = true;
+        return;
+    }
 
-        const float3 diffuse_color = (1.f - metallic) * base_color;
-        payload.weight = diffuse_color / prob_diffuse;
+    if (mat.emissive.x > 0.f) {
+        payload.radiance = mat.emissive * base_color;
+        payload.done = true;
+        return;
+    }
+
+    const bool choose_reflect = Random::rnd(payload.random_seed) < mat.opaque;
+    if (choose_reflect)
+    {
+        // brdf = diffuse_brdf + specular_brdf
+        const float prob_diffuse = mat.roughness;
+        const bool choose_diffuse = Random::rnd(payload.random_seed) < prob_diffuse;
+        if (choose_diffuse)
+        {
+            // 半球 cos 采样
+            // BRDF = diffuse_color / pi
+            // pdf = cos(theta) / pi
+            // weight = BRDF * cos(theta) / pdf = diffuse_color
+            const float3 local_dir = Sample::get_cos_hemisphere_sample(payload.random_seed);
+            float3 tangent, bitangent;
+            Sample::create_local_coord(world_normal, tangent, bitangent);
+            payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
+
+            const float3 diffuse_color = (1.f - mat.metallic) * base_color;
+            payload.weight = diffuse_color / prob_diffuse;
+        }
+        else
+        {
+            const float reflectance = 0.8f;
+            const float3 f0 = lerp(0.16 * reflectance * reflectance, base_color, mat.metallic);
+            float roughness = mat.roughness * mat.roughness;
+            // 首先根据 NDF 采样半程向量 H
+            float3 h = SpecularBrdf::ggx_sample(payload.random_seed, roughness, world_normal);
+            SpecularBrdf specular_brdf = SpecularBrdf(f0, roughness, world_normal, -WorldRayDirection(), h);
+
+            payload.weight = specular_brdf.brdf_with_pdf() * specular_brdf.get_ndotl() / (1.f - prob_diffuse);
+            payload.ray_dir = specular_brdf.light;
+        }
+
+        // 光线的起点增加一个偏移量，避免自交
+        payload.ray_origin = world_pos + 0.0001 * payload.ray_dir;
+        payload.done = false;
     }
     else
     {
-        const float3 f0 = lerp(0.16 * reflectance * reflectance, base_color, metallic);
-        const float roughness = perceptual_roughness * perceptual_roughness;
-        // 首先根据 NDF 采样半程向量 H
-        const float3 h = SpecularBrdf::ggx_sample(payload.random_seed, roughness, world_normal);
-        // const float3 h = world_normal;
-        SpecularBrdf specular_brdf = SpecularBrdf(f0, roughness, world_normal, -WorldRayDirection(), h);
-
-        payload.weight = specular_brdf.brdf_with_pdf() * specular_brdf.get_ndotl() / (1.f - prob_diffuse);
-        payload.ray_dir = specular_brdf.light;
+        payload.done = false;
+        const float mat_refractive = 1.5f;
+        const float refractive = dot(WorldRayDirection(), origin_world_normal) > 0.f ? mat_refractive : 1.f / mat_refractive;
+        payload.ray_dir = refract(WorldRayDirection(), world_normal, refractive);
+        if (length(payload.ray_dir) < 1e-6f)
+        {
+            // 折射失败，直接返回
+            payload.done = true;
+            return;
+        }
+        payload.weight = base_color;
+        payload.ray_origin = world_pos + 0.0001 * payload.ray_dir;
     }
-
-    // 光线的起点增加一个偏移量，避免自交
-    payload.ray_origin = world_pos + 0.0001 * world_normal;
-    payload.done = false;
 }
 
 [shader("callable")]
@@ -191,7 +229,7 @@ void diffuse_callable(inout MatPayload payload)
     PBRMaterial *mat = push_const.scene.get_material(payload.instance_id, payload.geometry_id);
     if (mat.diffuse_map.is_valid())
     {
-        payload.out_color = mat.diffuse_map.sample(payload.uv).xyz * mat.base_color;
+        payload.out_color = mat.diffuse_map.sample(payload.uv).xyz;
     }
     else
     {
@@ -245,7 +283,7 @@ void sky_miss(inout HitPayload payload)
     // phi: [-pi, pi] -> [0, 1]
     // theta: [-pi/2, pi/2] -> [1, 0]
     const float2 uv = float2(angle.x / M_PI * 0.5 + 0.5, 0.5 - angle.y / M_PI);
-    payload.radiance = float3(push_const.scene.sky.sample(uv).xyz) * 10.f;
+    payload.radiance = float3(push_const.scene.sky.sample(uv).xyz) * 1.f;
     payload.done = true;
 }
 

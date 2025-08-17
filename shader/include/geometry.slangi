@@ -51,9 +51,9 @@ struct Geometry
 
         Vertex vertex;
         vertex.position = A->position * a + B->position * b + C->position * c;
-        vertex.normal = A->normal * a + B->normal * b + C->normal * c;
-        vertex.tangent = A->tangent * a + B->tangent * b + C->tangent * c;
-        vertex.bitangent = A->bitangent * a + B->bitangent * b + C->bitangent * c;
+        vertex.normal = normalize(A->normal * a + B->normal * b + C->normal * c);
+        vertex.tangent = normalize(A->tangent * a + B->tangent * b + C->tangent * c);
+        vertex.bitangent = normalize(A->bitangent * a + B->bitangent * b + C->bitangent * c);
         vertex.uv = A->uv * a + B->uv * b + C->uv * c;
         return vertex;
     }

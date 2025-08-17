@@ -11,6 +11,6 @@ struct PBRMaterial
 
     TextureHandle diffuse_map;
     TextureHandle normal_map;
-    float reflection;
     float opaque;
+    float _padding_1;
 };
