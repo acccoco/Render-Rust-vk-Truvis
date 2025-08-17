@@ -28,7 +28,7 @@ struct alignas(4) CxxVec4f
 /// 4x4 矩阵结构体 (列主序)
 struct alignas(4) CxxMat4f
 {
-    float m[16]; // m[0]..m[3] 是第一列，以此类推
+    float m[16];    // m[0]..m[3] 是第一列，以此类推
 };
 
 /// 三角形面结构体
@@ -81,17 +81,18 @@ constexpr static size_t PATH_BUFFER_SIZE = 256;
 /// 材质结构体
 struct CxxMaterial
 {
-    CxxVec4f ambient;
-    CxxVec4f diffuse;
-    CxxVec4f specular;
-    CxxVec4f emission;
-    CxxVec4f reflection;
+    char name[PATH_BUFFER_SIZE];    // 材质名称，使用 C 风格字符数组，确保以 null 结尾
+
+    CxxVec4f base_color;
+    float roughness_factor;
+    float metallic_factor;
+
+    CxxVec4f emissive_color;
+
+    float opaque_factor;    // 透射率，1 表示 opaque, 0 表示 transparent
 
     /// 字符串使用 C 风格字符数组，确保以 null 结尾
     char diffuse_map[PATH_BUFFER_SIZE];
-    char ambient_map[PATH_BUFFER_SIZE];
-    char emissive_map[PATH_BUFFER_SIZE];
-    char specular_map[PATH_BUFFER_SIZE];
     char normal_map[PATH_BUFFER_SIZE];
 };
 
@@ -114,6 +115,7 @@ struct CxxInstance
 
     /// 坐标系：右手系，X-Right，Y-Up
     CxxMat4f world_transform = {};
+    char name[PATH_BUFFER_SIZE];    // 名称，使用 C 风格字符数组，确保以 null 结尾
 
 private:
     unsigned int* mat_indices_ = nullptr;

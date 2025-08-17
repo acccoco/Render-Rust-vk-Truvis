@@ -3,25 +3,19 @@ use crate::vertex::vertex_3d::Vertex3D;
 use ash::vk;
 use itertools::Itertools;
 use truvis_rhi::core::acceleration::{BlasInputInfo, RhiAcceleration};
-use truvis_rhi::core::resources::special_buffers::vertex_buffer::RhiVertexBuffer;
 use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
+use truvis_rhi::core::resources::special_buffers::vertex_buffer::RhiVertexBuffer;
 use truvis_rhi::rhi::Rhi;
 
 #[derive(Default)]
 pub struct DrsMaterial {
-    pub ambient: glam::Vec4,
-    pub diffuse: glam::Vec4,
-    pub specular: glam::Vec4,
+    pub base_color: glam::Vec4,
     pub emissive: glam::Vec4,
-
-    pub reflection: f32,
+    pub metallic: f32,
+    pub roughness: f32,
     pub opaque: f32,
 
     pub diffuse_map: String,
-    pub ambient_map: String,
-    pub emissive_map: String,
-    pub specular_map: String,
-
     pub normal_map: String,
 }
 

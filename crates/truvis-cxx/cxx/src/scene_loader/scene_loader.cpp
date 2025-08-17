@@ -96,6 +96,11 @@ bool SceneLoader::load_scene()
 
 bool SceneLoader::process_node(CxxInstance& instance, const aiNode& ai_node, const aiMatrix4x4& parent_transform) const
 {
+    // 节点名称
+    {
+        strncpy_s(instance.name, PATH_BUFFER_SIZE, ai_node.mName.C_Str(), _TRUNCATE);
+    }
+
     instance.world_transform = DataConvert::mat4(parent_transform * ai_node.mTransformation);
     instance.init(ai_node.mNumMeshes);
 
@@ -110,25 +115,42 @@ bool SceneLoader::process_node(CxxInstance& instance, const aiNode& ai_node, con
 
 bool SceneLoader::process_material(CxxMaterial& material, const aiMaterial& ai_mat) const
 {
+    // 材质名称
+    {
+        aiString out_name;
+        ai_mat.Get(AI_MATKEY_NAME, out_name);
+        strncpy_s(material.name, PATH_BUFFER_SIZE, out_name.C_Str(), _TRUNCATE);
+    }
+
     // 提取出各种颜色
     {
-        aiColor4D out_color = {};
-        ai_real out_real = {};
 
-        ai_mat.Get(AI_MATKEY_COLOR_DIFFUSE, out_color);
-        material.diffuse = DataConvert::vec4(out_color);
-
-        ai_mat.Get(AI_MATKEY_COLOR_AMBIENT, out_color);
-        material.ambient = DataConvert::vec4(out_color);
-
-        ai_mat.Get(AI_MATKEY_COLOR_SPECULAR, out_color);
-        material.specular = DataConvert::vec4(out_color);
-
-        ai_mat.Get(AI_MATKEY_COLOR_EMISSIVE, out_color);
-        material.emission = DataConvert::vec4(out_color);
-
-        ai_mat.Get(AI_MATKEY_ROUGHNESS_FACTOR, out_real);
-        material.reflection = CxxVec4f{out_real, out_real, out_real, out_real};
+        {
+            aiColor4D out_color = {};
+            ai_mat.Get(AI_MATKEY_COLOR_DIFFUSE, out_color);
+            material.base_color = DataConvert::vec4(out_color);
+        }
+        {
+            // 这个 Key 有点奇怪
+            ai_real out_real = {};
+            ai_mat.Get(AI_MATKEY_REFLECTIVITY, out_real);
+            material.metallic_factor = out_real;
+        }
+        {
+            ai_real out_real = {};
+            ai_mat.Get(AI_MATKEY_ROUGHNESS_FACTOR, out_real);
+            material.roughness_factor = out_real;
+        }
+        {
+            aiColor4D out_color = {};
+            ai_mat.Get(AI_MATKEY_COLOR_EMISSIVE, out_color);
+            material.emissive_color = DataConvert::vec4(out_color);
+        }
+        {
+            ai_real out_real = {};
+            ai_mat.Get(AI_MATKEY_OPACITY, out_real);
+            material.opaque_factor = out_real;
+        }
     }
 
     // 提取出各种纹理
@@ -152,9 +174,6 @@ bool SceneLoader::process_material(CxxMaterial& material, const aiMaterial& ai_m
 
         // 复制各种纹理路径到材质结构中
         get_texture(aiTextureType_DIFFUSE, material.diffuse_map, PATH_BUFFER_SIZE);
-        get_texture(aiTextureType_AMBIENT, material.ambient_map, PATH_BUFFER_SIZE);
-        get_texture(aiTextureType_EMISSIVE, material.emissive_map, PATH_BUFFER_SIZE);
-        get_texture(aiTextureType_SPECULAR, material.specular_map, PATH_BUFFER_SIZE);
         get_texture(aiTextureType_NORMALS, material.normal_map, PATH_BUFFER_SIZE);
     }
 

@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::core::acceleration::RhiAcceleration;
-use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
+use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
 use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 use truvis_rhi::rhi::Rhi;
 
@@ -449,18 +449,18 @@ impl GpuScene {
         for (mat_idx, mat_uuid) in self.flatten_materials.iter().enumerate() {
             let mat = scene_mgr.mat_map().get(mat_uuid).unwrap();
             material_buffer_slices[mat_idx] = shader::PBRMaterial {
-                base_color: mat.diffuse.xyz().into(),
+                base_color: mat.base_color.xyz().into(),
                 emissive: mat.emissive.xyz().into(),
-                metallic: 0.5,
-                roughness: 0.5,
+                metallic: mat.metallic,
+                roughness: mat.roughness,
                 diffuse_map: bindless_mgr.get_texture_handle(&mat.diffuse_map).unwrap_or(shader::TextureHandle {
                     index: shader::INVALID_TEX_ID,
                 }),
                 normal_map: bindless_mgr.get_texture_handle(&mat.normal_map).unwrap_or(shader::TextureHandle {
                     index: shader::INVALID_TEX_ID,
                 }),
-                reflection: mat.reflection,
                 opaque: mat.opaque,
+                _padding_1: Default::default(),
             };
         }
 
@@ -580,8 +580,8 @@ impl GpuScene {
 
 mod helper {
     use ash::vk;
-    use truvis_rhi::core::resources::buffer::RhiBuffer;
     use truvis_rhi::core::command_buffer::RhiCommandBuffer;
+    use truvis_rhi::core::resources::buffer::RhiBuffer;
     use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
 
     /// 三个操作：

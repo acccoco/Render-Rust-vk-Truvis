@@ -1,15 +1,16 @@
 use itertools::Itertools;
 use model_manager::component::{DrsGeometry, DrsInstance, DrsMaterial, DrsMesh};
+use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
-use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
 use truvis_rhi::rhi::Rhi;
 
 pub mod _ffi_bindings;
 use crate::_ffi_bindings::*;
 
+// TODO 使用 SoA 来简化，就可以移除这些代码了
 /// 确保 Vertex3D 的布局和 C++ 中的 Vertex3D 一致
 fn validate_vertex_memory_layout() {
     debug_assert!(size_of::<Vertex3D>() == size_of::<CxxVertex3D>());
@@ -130,17 +131,13 @@ impl AssimpSceneLoader {
                 let mat = &*mat;
 
                 let mat_uuid = mat_register(DrsMaterial {
-                    ambient: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.ambient),
-                    diffuse: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.diffuse),
-                    specular: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.specular),
-                    emissive: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.emission),
-                    reflection: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.reflection).x,
-                    opaque: 1.0,
+                    base_color: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.base_color),
+                    emissive: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.emissive_color),
+                    metallic: mat.metallic_factor,
+                    roughness: mat.roughness_factor,
+                    opaque: mat.opaque_factor,
 
                     diffuse_map: std::ffi::CStr::from_ptr(mat.diffuse_map.as_ptr()).to_str().unwrap().to_string(),
-                    specular_map: std::ffi::CStr::from_ptr(mat.specular_map.as_ptr()).to_str().unwrap().to_string(),
-                    emissive_map: std::ffi::CStr::from_ptr(mat.emissive_map.as_ptr()).to_str().unwrap().to_string(),
-                    ambient_map: std::ffi::CStr::from_ptr(mat.ambient_map.as_ptr()).to_str().unwrap().to_string(),
                     normal_map: std::ffi::CStr::from_ptr(mat.normal_map.as_ptr()).to_str().unwrap().to_string(),
                 });
 

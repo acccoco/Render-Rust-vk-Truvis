@@ -1,5 +1,7 @@
 ﻿#include "public/scene_loader/c_data_define.hpp"
 
+#include <string.h>
+
 CxxRasterGeometry::~CxxRasterGeometry()
 {
     delete[] vertex_array_;
@@ -17,6 +19,8 @@ CxxRasterGeometry::CxxRasterGeometry(CxxRasterGeometry&& other) noexcept
 {
     other.vertex_array_ = nullptr;
     other.face_array_ = nullptr;
+    other.vertex_cnt_ = 0;
+    other.face_cnt_ = 0;
 }
 
 
@@ -41,7 +45,10 @@ CxxInstance::CxxInstance(CxxInstance&& other) noexcept
       mat_indices_(other.mat_indices_),
       mesh_indices_(other.mesh_indices_),
       mesh_cnt_(other.mesh_cnt_)
+
 {
+    // 将 other 的 name 成员复制到当前实例
+    strncpy_s(this->name, PATH_BUFFER_SIZE, other.name, _TRUNCATE);
     other.mat_indices_ = nullptr;
     other.mesh_indices_ = nullptr;
 }
