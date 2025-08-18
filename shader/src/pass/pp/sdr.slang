@@ -20,7 +20,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     // 引入噪声消除色阶
     uint random_seed = Random::tea(dispatchThreadID.y, dispatchThreadID.x);
     const float delta = Random::rnd(random_seed);
-    const float3 sdr_color = hdr_color.rgb / (0.5 + hdr_color.rgb) + delta / 255.f;
+    const float3 sdr_color = hdr_color.rgb / (1.f + hdr_color.rgb) + delta / 255.f;
     // const float3 sdr_color = hdr_color.rgb;
 
     g_params.dst_image.store(

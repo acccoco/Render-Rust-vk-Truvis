@@ -283,7 +283,7 @@ void sky_miss(inout HitPayload payload)
     // phi: [-pi, pi] -> [0, 1]
     // theta: [-pi/2, pi/2] -> [1, 0]
     const float2 uv = float2(angle.x / M_PI * 0.5 + 0.5, 0.5 - angle.y / M_PI);
-    payload.radiance = float3(push_const.scene.sky.sample(uv).xyz) * 1.f;
+    payload.radiance = float3(push_const.scene.sky.sample(uv).xyz) * 8.f;
     payload.done = true;
 }
 
