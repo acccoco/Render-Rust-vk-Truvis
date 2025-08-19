@@ -55,7 +55,7 @@ void main_ray_gen()
 
     // 下方的 0.375 来自于 Blender 的 Cycles
     uint random_seed = Random::tea(thread_id.y * DispatchRaysDimensions().x + thread_id.x, accum_samples);
-    const float2 subpixel_jitter = accum_samples == 0
+    const float2 subpixel_jitter = (accum_samples == 0 || push_const.channel != 0)
                                        ? float2(0.5f)
                                        : float2(0.5) + 0.375 * Random::rand_gaussian(random_seed);
 
