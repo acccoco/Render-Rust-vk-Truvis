@@ -1,4 +1,4 @@
-use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings};
+use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings, PipelineSettings};
 use crate::platform::camera::DrsCamera;
 use crate::platform::input_manager::InputState;
 use crate::platform::timer::Timer;
@@ -14,12 +14,12 @@ use shader_binding::shader;
 use std::cell::RefCell;
 use std::ffi::CStr;
 use std::rc::Rc;
-use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
 use truvis_rhi::core::command_queue::RhiSubmitInfo;
 use truvis_rhi::core::descriptor_pool::{RhiDescriptorPool, RhiDescriptorPoolCreateInfo};
 use truvis_rhi::core::device::RhiDevice;
-use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier, RhiSemaphore};
+use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
 use truvis_rhi::core::resources::texture::RhiTexture2D;
+use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier, RhiSemaphore};
 use truvis_rhi::rhi::Rhi;
 
 pub struct PresentData<'a> {
@@ -37,6 +37,7 @@ pub struct Renderer {
     framebuffers: FrameBuffers,
 
     frame_settings: FrameSettings,
+    pipeline_settings: PipelineSettings,
 
     pub bindless_mgr: Rc<RefCell<BindlessManager>>,
     pub scene_mgr: Rc<RefCell<SceneManager>>,
@@ -70,6 +71,16 @@ impl Renderer {
     #[inline]
     pub fn frame_settings(&self) -> FrameSettings {
         self.frame_settings
+    }
+
+    #[inline]
+    pub fn pipeline_settings(&mut self) -> &mut PipelineSettings {
+        &mut self.pipeline_settings
+    }
+
+    #[inline]
+    pub fn accum_frames(&self) -> usize {
+        self.accum_data.accum_frames_num
     }
 
     pub fn deltatime(&self) -> std::time::Duration {
@@ -146,6 +157,7 @@ impl Renderer {
 
         Self {
             frame_settings,
+            pipeline_settings: PipelineSettings::default(),
             framebuffers,
             accum_data: Default::default(),
             frame_ctrl,
@@ -268,6 +280,7 @@ impl Renderer {
             frame_ctrl: &self.frame_ctrl,
             timer: &self.timer,
             frame_settings: &self.frame_settings,
+            pipeline_settings: &self.pipeline_settings,
             frame_buffers: &self.framebuffers,
             cmd_allocator: &mut self.cmd_allocator,
         }

@@ -25,6 +25,12 @@ pub struct FrameSettings {
     pub frame_extent: vk::Extent2D,
 }
 
+#[derive(Copy, Clone, Default)]
+pub struct PipelineSettings {
+    /// 0 表示 RT，1 表示 normal
+    pub channel: u32,
+}
+
 #[derive(Copy, Clone)]
 pub struct PresentSettings {
     pub canvas_extent: vk::Extent2D,

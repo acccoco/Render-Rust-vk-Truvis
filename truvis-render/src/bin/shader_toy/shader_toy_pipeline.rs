@@ -25,6 +25,7 @@ impl ShaderToyPipeline {
             timer,
             per_frame_data: _,
             frame_settings,
+            pipeline_settings: _,
             frame_buffers,
             cmd_allocator,
         } = ctx;

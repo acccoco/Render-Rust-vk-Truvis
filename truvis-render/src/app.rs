@@ -129,6 +129,8 @@ impl<T: OuterApp> TruvisApp<T> {
                     ));
                     ui.text(format!("CameraAspect: {:.2}", camera.asp));
                     ui.text(format!("CameraFov(Vertical): {:.2}°", camera.fov_deg_vertical));
+                    ui.slider("channel", 0, 3, &mut self.renderer.pipeline_settings().channel);
+                    ui.text(format!("Accum Frames: {}", self.renderer.accum_frames()));
                     ui.new_line();
                 }
 

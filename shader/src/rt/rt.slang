@@ -6,8 +6,6 @@
 
 const static uint max_depth = 16;
 
-const static uint channel_normal = 0;
-
 /// 超过一定数量后，就不再重新计算了
 const static uint max_accum_samples = 4096;
 
@@ -104,7 +102,7 @@ void main_ray_gen()
         ray.Direction = payload.ray_dir;
     }
 
-    if (accum_samples > 0)
+    if (accum_samples > 0 && push_const.channel == 0)
     {
         float a = 1.f / float(accum_samples + 1);
         const float3 old_color = push_const.rt_render_target.load(thread_id).xyz;
@@ -134,7 +132,6 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
     const float3 world_pos = mul(ObjectToWorld3x4(), float4(interp_vertex.position, 1.f));
 
-     
     // 双面材质：确保每次光线都命中物体的正面
     float3 origin_world_normal;
     {
@@ -142,7 +139,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         Instance *instance = scene.get_instance(instance_id);
         const float4x4 normal_matrix = transpose(instance.inv_model);
         origin_world_normal = normalize(mul(normal_matrix, float4(interp_vertex.normal, 0.f)).xyz);
-    } 
+    }
     const float3 world_normal = faceforward(origin_world_normal, WorldRayDirection(), origin_world_normal);
 
     float3 base_color = float3(0.f, 0.f, 0.f);
@@ -156,14 +153,15 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     }
 
     // 法线着色
-    if (channel_normal == 1)
+    if (push_const.channel == 1)
     {
         payload.radiance = world_normal * 0.5f + 0.5f;
         payload.done = true;
         return;
     }
 
-    if (mat.emissive.x > 0.f) {
+    if (mat.emissive.x > 0.f)
+    {
         payload.radiance = mat.emissive * base_color;
         payload.done = true;
         return;

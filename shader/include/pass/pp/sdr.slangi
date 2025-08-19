@@ -14,5 +14,7 @@ struct PushConstant
     ImageHandle dst_image;
 
     uint2 image_size;
+    uint channel;
+    uint _padding_1;
 };
 };

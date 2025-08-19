@@ -49,6 +49,7 @@ impl RtPipeline {
             timer: _,
             per_frame_data,
             frame_settings,
+            pipeline_settings,
             frame_buffers,
             cmd_allocator,
         } = ctx;
@@ -83,6 +84,7 @@ impl RtPipeline {
                 &cmd,
                 frame_ctrl,
                 frame_settings,
+                pipeline_settings,
                 color_image.handle(),
                 color_image_handle,
                 per_frame_data,
@@ -155,6 +157,8 @@ impl RtPipeline {
                     dst_image: render_target_handle,
                     image_size: glam::uvec2(frame_settings.frame_extent.width, frame_settings.frame_extent.height)
                         .into(),
+                    channel: pipeline_settings.channel,
+                    _padding_1: Default::default(),
                 },
                 glam::uvec3(
                     frame_settings.frame_extent.width.div_ceil(shader::blit::SHADER_X as u32),

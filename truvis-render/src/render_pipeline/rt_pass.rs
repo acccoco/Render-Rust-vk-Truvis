@@ -1,4 +1,4 @@
-use crate::pipeline_settings::FrameSettings;
+use crate::pipeline_settings::{FrameSettings, PipelineSettings};
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_controller::FrameController;
 use crate::renderer::gpu_scene::GpuScene;
@@ -8,12 +8,12 @@ use shader_binding::shader;
 use shader_binding::shader::ImageHandle;
 use std::cell::RefCell;
 use std::rc::Rc;
-use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::const_map;
+use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::core::resources::special_buffers::sbt_buffer::RhiSBTBuffer;
 use truvis_rhi::core::command_buffer::RhiCommandBuffer;
 use truvis_rhi::core::device::RhiDevice;
+use truvis_rhi::core::resources::special_buffers::sbt_buffer::RhiSBTBuffer;
 use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
 use truvis_rhi::core::shader::{RhiShaderModule, RhiShaderStageInfo, ShaderGroupInfo};
 use truvis_rhi::core::synchronize::RhiImageBarrier;
@@ -347,6 +347,7 @@ impl SimlpeRtPass {
         cmd: &RhiCommandBuffer,
         frame_ctrl: &FrameController,
         framse_settings: &FrameSettings,
+        pipeline_settings: &PipelineSettings,
         rt_image: vk::Image,
         rt_handle: ImageHandle,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
@@ -371,7 +372,7 @@ impl SimlpeRtPass {
             rt_render_target: rt_handle,
             spp,
             spp_idx: 0,
-            _padding_0: Default::default(),
+            channel: pipeline_settings.channel,
         };
         for spp_idx in 0..spp {
             push_constant.spp_idx = spp_idx;

@@ -1,10 +1,10 @@
-use crate::pipeline_settings::FrameSettings;
+use crate::pipeline_settings::{FrameSettings, PipelineSettings};
 use crate::platform::timer::Timer;
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::cmd_allocator::CmdAllocator;
 use crate::renderer::frame_buffers::FrameBuffers;
 use crate::renderer::frame_controller::FrameController;
 use crate::renderer::gpu_scene::GpuScene;
-use crate::renderer::cmd_allocator::CmdAllocator;
 use shader_binding::shader;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -20,6 +20,7 @@ pub struct PipelineContext<'a> {
     pub frame_ctrl: &'a FrameController,
     pub cmd_allocator: &'a mut CmdAllocator,
     pub frame_settings: &'a FrameSettings,
+    pub pipeline_settings: &'a PipelineSettings,
     pub timer: &'a Timer,
     pub frame_buffers: &'a FrameBuffers,
 }

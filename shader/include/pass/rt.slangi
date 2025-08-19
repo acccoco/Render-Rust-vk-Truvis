@@ -13,6 +13,6 @@ struct PushConstants
     ImageHandle rt_render_target;
     uint spp;
     uint spp_idx;
-    uint _padding_0;
+    uint channel;
 };
 };
