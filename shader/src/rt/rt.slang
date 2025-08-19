@@ -159,6 +159,12 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         payload.done = true;
         return;
     }
+    if (push_const.channel == 2)
+    {
+        payload.radiance = base_color;
+        payload.done = true;
+        return;
+    }
 
     if (mat.emissive.x > 0.f)
     {
