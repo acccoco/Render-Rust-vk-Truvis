@@ -12,6 +12,7 @@ tools/slang
 # IDE
 .idea
 .vscode
+.vs
 
 # Nsignt
 *.ngfx-proj
