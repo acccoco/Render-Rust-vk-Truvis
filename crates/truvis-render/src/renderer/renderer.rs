@@ -143,7 +143,11 @@ impl Renderer {
 
         let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, &descriptor_pool, frame_ctrl.clone())));
         let scene_mgr = Rc::new(RefCell::new(SceneManager::new(bindless_mgr.clone())));
-        let gpu_scene = GpuScene::new(&rhi, scene_mgr.clone(), bindless_mgr.clone(), frame_ctrl.clone());
+        let gpu_scene = GpuScene::new(&rhi, frame_ctrl.clone());
+        
+        // 注册 GPU 场景使用的默认纹理
+        gpu_scene.register_default_textures(&rhi, &mut bindless_mgr.borrow_mut());
+        
         let per_frame_data_buffers = (0..frame_ctrl.fif_count())
             .map(|idx| {
                 RhiStructuredBuffer::<shader::PerFrameData>::new_ubo(&rhi, 1, format!("per-frame-data-buffer-{idx}"))
@@ -312,8 +316,8 @@ impl Renderer {
             dst_access: vk::AccessFlags2::SHADER_READ,
         };
 
-        self.gpu_scene.prepare_render_data();
-        self.gpu_scene.upload_to_buffer(&self.rhi, &cmd, transfer_barrier_mask);
+        self.gpu_scene.prepare_render_data(&self.scene_mgr.borrow(), &mut self.bindless_mgr.borrow_mut());
+        self.gpu_scene.upload_to_buffer(&self.rhi, &cmd, transfer_barrier_mask, &self.scene_mgr.borrow(), &self.bindless_mgr.borrow());
 
         // 准备好当前帧的数据
         let per_frame_data = {

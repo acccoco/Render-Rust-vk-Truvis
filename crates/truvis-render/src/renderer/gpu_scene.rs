@@ -8,7 +8,6 @@ use itertools::Itertools;
 use model_manager::component::{DrsGeometry3D, DrsInstance};
 use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use shader_binding::shader;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
@@ -164,9 +163,6 @@ struct Resources {
 
 /// 用于构建传输到 GPU 的场景数据
 pub struct GpuScene {
-    scene_mgr: Rc<RefCell<SceneManager>>,
-    bindless_mgr: Rc<RefCell<BindlessManager>>,
-
     /// GPU 中以顺序存储的 instance
     ///
     /// CPU 执行绘制时，会使用这个顺序来绘制实例
@@ -204,21 +200,14 @@ impl GpuScene {
 impl GpuScene {
     pub fn new(
         rhi: &Rhi,
-        scene_mgr: Rc<RefCell<SceneManager>>,
-        bindless_mgr: Rc<RefCell<BindlessManager>>,
         frame_ctrl: Rc<FrameController>,
     ) -> Self {
         let resources = Resources {
             sky: TruvisPath::resources_path("sky.jpg"),
             uv_checker: TruvisPath::resources_path("uv_checker.png"),
         };
-        bindless_mgr.borrow_mut().register_texture_by_path(rhi, resources.sky.clone());
-        bindless_mgr.borrow_mut().register_texture_by_path(rhi, resources.uv_checker.clone());
 
         Self {
-            scene_mgr,
-            bindless_mgr,
-
             flatten_instances: vec![],
             flatten_materials: FlattenMap::default(),
             flatten_meshes: FlattenMap::default(),
@@ -230,37 +219,42 @@ impl GpuScene {
         }
     }
 
+    /// 注册 GpuScene 使用的默认纹理
+    pub fn register_default_textures(&self, rhi: &Rhi, bindless_mgr: &mut BindlessManager) {
+        bindless_mgr.register_texture_by_path(rhi, self.resources.sky.clone());
+        bindless_mgr.register_texture_by_path(rhi, self.resources.uv_checker.clone());
+    }
+
     /// # Phase: Before Render
     ///
     /// 在每一帧开始时调用，将场景数据转换为 GPU 可读的形式
-    pub fn prepare_render_data(&mut self) {
-        self.bindless_mgr.borrow_mut().prepare_render_data(self.frame_ctrl.frame_label());
+    pub fn prepare_render_data(&mut self, scene_mgr: &SceneManager, bindless_mgr: &mut BindlessManager) {
+        bindless_mgr.prepare_render_data(self.frame_ctrl.frame_label());
 
-        self.flatten_material_data();
-        self.flatten_mesh_data();
-        self.flatten_instance_data();
+        self.flatten_material_data(scene_mgr);
+        self.flatten_mesh_data(scene_mgr);
+        self.flatten_instance_data(scene_mgr);
     }
 
     /// # Phase: Before Render
     ///
     /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
-    pub fn upload_to_buffer(&mut self, rhi: &Rhi, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
-        self.upload_mesh_buffer(cmd, barrier_mask);
-        self.upload_instance_buffer(cmd, barrier_mask);
-        self.upload_material_buffer(cmd, barrier_mask);
-        self.upload_light_buffer(cmd, barrier_mask);
+    pub fn upload_to_buffer(&mut self, rhi: &Rhi, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
+        self.upload_mesh_buffer(cmd, barrier_mask, scene_mgr);
+        self.upload_instance_buffer(cmd, barrier_mask, scene_mgr);
+        self.upload_material_buffer(cmd, barrier_mask, scene_mgr, bindless_mgr);
+        self.upload_light_buffer(cmd, barrier_mask, scene_mgr);
 
         // 需要确保 instance 先与 tlas 构建
-        self.build_tlas(rhi);
+        self.build_tlas(rhi, scene_mgr);
 
-        self.upload_scene_buffer(cmd, barrier_mask);
+        self.upload_scene_buffer(cmd, barrier_mask, scene_mgr, bindless_mgr);
     }
 
     /// 绘制场景中的所有实例
     ///
     /// before_draw(instance_idx, submesh_idx)
-    pub fn draw(&self, cmd: &RhiCommandBuffer, mut before_draw: impl FnMut(u32, u32)) {
-        let scene_mgr = self.scene_mgr.borrow();
+    pub fn draw(&self, cmd: &RhiCommandBuffer, scene_mgr: &SceneManager, mut before_draw: impl FnMut(u32, u32)) {
         for (instance_idx, instance_uuid) in self.flatten_instances.iter().enumerate() {
             let instance = scene_mgr.get_instance(instance_uuid).unwrap();
             let mesh = scene_mgr.get_mesh(&instance.mesh).unwrap();
@@ -279,9 +273,7 @@ impl GpuScene {
     /// # 注
     ///
     /// 后续绘制时，也会使用 instance vector 中的顺序和 index
-    fn flatten_instance_data(&mut self) {
-        let scene_mgr = self.scene_mgr.borrow();
-
+    fn flatten_instance_data(&mut self, scene_mgr: &SceneManager) {
         self.flatten_instances.clear();
         self.flatten_instances.reserve(scene_mgr.instance_map().len());
 
@@ -293,9 +285,7 @@ impl GpuScene {
     /// 在每一帧绘制之前，将所有的 mesh 转换为 Vector，准备上传到 GPU
     ///
     /// 记录每个 mesh 在 geometry buffer 中的起始 idx 和长度
-    fn flatten_mesh_data(&mut self) {
-        let scene_mgr = self.scene_mgr.borrow();
-
+    fn flatten_mesh_data(&mut self, scene_mgr: &SceneManager) {
         self.mesh_geometry_map.clear();
         self.flatten_meshes.clear();
         self.flatten_meshes.reserve(scene_mgr.mesh_map().len());
@@ -309,9 +299,7 @@ impl GpuScene {
     }
 
     /// 在每一帧的绘制之前，将所有的材质转换为 Vector，准备上传到 GPU
-    fn flatten_material_data(&mut self) {
-        let scene_mgr = self.scene_mgr.borrow();
-
+    fn flatten_material_data(&mut self, scene_mgr: &SceneManager) {
         self.flatten_materials.clear();
         self.flatten_materials.reserve(scene_mgr.mat_map().len());
 
@@ -321,10 +309,8 @@ impl GpuScene {
     }
 
     /// 将整个场景的数据上传到 scene buffer 中去
-    fn upload_scene_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
-        let scene_mgr = self.scene_mgr.borrow();
+    fn upload_scene_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
         let crt_gpu_buffers = &self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
-        let bindless_mgr = self.bindless_mgr.borrow();
         let scene_data = shader::Scene {
             all_instances: crt_gpu_buffers.instance_buffer.device_address(),
             all_mats: crt_gpu_buffers.material_buffer.device_address(),
@@ -355,7 +341,7 @@ impl GpuScene {
     /// 将数据转换为 shader 中的实例数据
     ///
     /// 其中 buffer 可以是 stage buffer 的内存映射
-    fn upload_instance_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
+    fn upload_instance_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
 
         let crt_instance_stage_buffer = &mut crt_gpu_buffers.instance_stage_buffer;
@@ -373,8 +359,6 @@ impl GpuScene {
         if instance_buffer_slices.len() < self.flatten_instances.len() {
             panic!("instance cnt can not be larger than buffer");
         }
-
-        let scene_mgr = self.scene_mgr.borrow();
 
         let mut crt_geometry_indirect_idx = 0;
         let mut crt_material_indirect_idx = 0;
@@ -435,7 +419,7 @@ impl GpuScene {
     }
 
     /// 将 material 数据上传到 material buffer 中
-    fn upload_material_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
+    fn upload_material_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let crt_material_stage_buffer = &mut crt_gpu_buffers.material_stage_buffer;
         crt_material_stage_buffer.map();
@@ -444,8 +428,6 @@ impl GpuScene {
             panic!("material cnt can not be larger than buffer");
         }
 
-        let scene_mgr = self.scene_mgr.borrow();
-        let bindless_mgr = self.bindless_mgr.borrow();
         for (mat_idx, mat_uuid) in self.flatten_materials.iter().enumerate() {
             let mat = scene_mgr.mat_map().get(mat_uuid).unwrap();
             material_buffer_slices[mat_idx] = shader::PBRMaterial {
@@ -472,12 +454,11 @@ impl GpuScene {
         );
     }
 
-    fn upload_light_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
+    fn upload_light_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let crt_light_stage_buffer = &mut crt_gpu_buffers.light_stage_buffer;
         crt_light_stage_buffer.map();
         let light_buffer_slices = crt_light_stage_buffer.mapped_slice();
-        let scene_mgr = self.scene_mgr.borrow();
         if light_buffer_slices.len() < scene_mgr.point_light_map().len() {
             panic!("light cnt can not be larger than buffer");
         }
@@ -496,13 +477,12 @@ impl GpuScene {
     }
 
     /// 将 mesh 数据以 geometry 的形式上传到 GPU
-    fn upload_mesh_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask) {
+    fn upload_mesh_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         crt_geometry_stage_buffer.map();
         // let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         let geometry_buffer_slices = crt_geometry_stage_buffer.mapped_slice();
-        let scene_mgr = self.scene_mgr.borrow();
 
         let mut crt_geometry_idx = 0;
         for mesh_uuid in self.flatten_meshes.iter() {
@@ -530,8 +510,7 @@ impl GpuScene {
 // ray tracing
 impl GpuScene {
     /// 根据 instance 信息获得加速结构的 instance 信息
-    fn get_as_instance_info(&self, instance: &DrsInstance, custom_idx: u32) -> vk::AccelerationStructureInstanceKHR {
-        let scene_mgr = self.scene_mgr.borrow();
+    fn get_as_instance_info(&self, instance: &DrsInstance, custom_idx: u32, scene_mgr: &SceneManager) -> vk::AccelerationStructureInstanceKHR {
         let mesh = scene_mgr.get_mesh(&instance.mesh).expect("Mesh not found");
         vk::AccelerationStructureInstanceKHR {
             // 3x4 row-major matrix
@@ -547,7 +526,7 @@ impl GpuScene {
         }
     }
 
-    fn build_tlas(&mut self, rhi: &Rhi) {
+    fn build_tlas(&mut self, rhi: &Rhi, scene_mgr: &SceneManager) {
         if self.flatten_instances.is_empty() {
             // 没有实例数据，直接返回
             return;
@@ -558,14 +537,13 @@ impl GpuScene {
             return;
         }
 
-        let scene_mgr = self.scene_mgr.borrow();
         let instance_infos = self
             .flatten_instances
             .iter()
             .map(|ins_uuid| scene_mgr.get_instance(ins_uuid).unwrap())
             .enumerate()
             // TODO 这里暂时将 instance 的 index 作为 custom index
-            .map(|(ins_idx, ins)| self.get_as_instance_info(ins, ins_idx as u32))
+            .map(|(ins_idx, ins)| self.get_as_instance_info(ins, ins_idx as u32, scene_mgr))
             .collect_vec();
         let tlas = RhiAcceleration::build_tlas_sync(
             rhi,

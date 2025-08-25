@@ -3,6 +3,7 @@ use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_buffers::FrameBuffers;
 use crate::renderer::frame_controller::FrameController;
 use crate::renderer::gpu_scene::GpuScene;
+use crate::renderer::scene_manager::SceneManager;
 use ash::vk;
 use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
 use model_manager::vertex::VertexLayout;
@@ -103,6 +104,7 @@ impl PhongPass {
         frame_ctx: &FrameController,
         per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
+        scene_mgr: &SceneManager,
         frame_buffers: &FrameBuffers,
         frame_settings: &FrameSettings,
     ) {
@@ -134,7 +136,7 @@ impl PhongPass {
             },
             frame_label,
         );
-        gpu_scene.draw(cmd, &mut |ins_idx, submesh_idx| {
+        gpu_scene.draw(cmd, scene_mgr, &mut |ins_idx, submesh_idx| {
             // NOTE 这个数据和 PushConstant 中的内存布局是一致的
             let data = [ins_idx, submesh_idx];
             cmd.cmd_push_constants(
