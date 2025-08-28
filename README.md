@@ -23,6 +23,10 @@
 
 ![Section](./resources/Result-Section.PNG)
 
+### 支持填充面
+
+![Section-Fill](./resources/Section-Fill-Result.PNG)
+
 ## 🏗️ 项目结构
 
 ```
