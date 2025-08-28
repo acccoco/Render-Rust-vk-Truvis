@@ -27,6 +27,8 @@ struct HitPayload
     uint random_seed;
     /// 进入剖切体时 +1，离开剖切体时 -1
     int section_stack;
+    /// 在剖切体内，进入物体时 +1，离开物体时 -1
+    int object_stack;
 };
 
 struct ShadowMissPayload
@@ -79,6 +81,7 @@ void main_ray_gen()
     payload.done = false;
     payload.random_seed = random_seed;
     payload.section_stack = 0;
+    payload.object_stack = 0;
 
     Scene *scene = push_const.scene;
     RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
@@ -154,6 +157,9 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         diffuse_callable(mat_payload);
         base_color = mat_payload.out_color;
     }
+    float mat_roughness = mat.roughness;
+    float mat_metallic = mat.metallic;
+    float mat_opaque = mat.opaque;
 
     // 法线着色
     if (push_const.channel == 1)
@@ -169,20 +175,30 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         return;
     }
 
+    // FIXME 临时方案
     // 剖切体: 自发光 > 100.f 就视为剖切体
     if (mat.emissive.x > 100.f)
     {
         payload.section_stack += dot(WorldRayDirection(), origin_world_normal) < 0.f ? 1 : -1;
-        payload.radiance = 0.f;
-        payload.weight = 1.f;
-        payload.ray_origin = world_pos + 0.0001 * WorldRayDirection();
-        payload.ray_dir = WorldRayDirection();
-        return;
-    }
-    else 
-    {
-        if (payload.section_stack > 0) 
-        {
+        if (payload.section_stack == 0)
+        { // 离开剖切体，但是在物体内部，设为填充面
+            if (payload.object_stack > 0)
+            {
+                payload.done = true;
+                payload.radiance = float3(0.8f, 0.1f, 0.8f); // 紫色
+                return;
+            }
+            else
+            {
+                payload.radiance = 0.f;
+                payload.weight = 1.f;
+                payload.ray_origin = world_pos + 0.0001 * WorldRayDirection();
+                payload.ray_dir = WorldRayDirection();
+                return;
+            }
+        }
+        else
+        { // 仍然在剖切体内部
             payload.radiance = 0.f;
             payload.weight = 1.f;
             payload.ray_origin = world_pos + 0.0001 * WorldRayDirection();
@@ -190,19 +206,31 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
             return;
         }
     }
-
-    if (mat.emissive.x > 0.f)
+    else if (mat.emissive.x > 0.f) // 普通的自发光材质
     {
         payload.radiance = mat.emissive * base_color;
         payload.done = true;
         return;
     }
+    else
+    {
+        // 在剖切体内部
+        if (payload.section_stack > 0)
+        {
+            payload.radiance = 0.f;
+            payload.weight = 1.f;
+            payload.ray_origin = world_pos + 0.0001 * WorldRayDirection();
+            payload.ray_dir = WorldRayDirection();
+            payload.object_stack += dot(WorldRayDirection(), origin_world_normal) < 0.f ? 1 : -1;
+            return;
+        }
+    }
 
-    const bool choose_reflect = Random::rnd(payload.random_seed) < mat.opaque;
+    const bool choose_reflect = Random::rnd(payload.random_seed) < mat_opaque;
     if (choose_reflect)
     {
         // brdf = diffuse_brdf + specular_brdf
-        const float prob_diffuse = mat.roughness;
+        const float prob_diffuse = mat_roughness;
         const bool choose_diffuse = Random::rnd(payload.random_seed) < prob_diffuse;
         if (choose_diffuse)
         {
@@ -215,17 +243,17 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
             Sample::create_local_coord(world_normal, tangent, bitangent);
             payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
 
-            const float3 diffuse_color = (1.f - mat.metallic) * base_color;
+            const float3 diffuse_color = (1.f - mat_metallic) * base_color;
             payload.weight = diffuse_color / prob_diffuse;
         }
         else
         {
             const float reflectance = 0.8f;
-            const float3 f0 = lerp(0.16 * reflectance * reflectance, base_color, mat.metallic);
-            float roughness = mat.roughness * mat.roughness;
+            const float3 f0 = lerp(0.16 * reflectance * reflectance, base_color, mat_metallic);
+            float real_roughness = mat_roughness * mat_roughness;
             // 首先根据 NDF 采样半程向量 H
-            float3 h = SpecularBrdf::ggx_sample(payload.random_seed, roughness, world_normal);
-            SpecularBrdf specular_brdf = SpecularBrdf(f0, roughness, world_normal, -WorldRayDirection(), h);
+            float3 h = SpecularBrdf::ggx_sample(payload.random_seed, real_roughness, world_normal);
+            SpecularBrdf specular_brdf = SpecularBrdf(f0, real_roughness, world_normal, -WorldRayDirection(), h);
 
             payload.weight = specular_brdf.brdf_with_pdf() * specular_brdf.get_ndotl() / (1.f - prob_diffuse);
             payload.ray_dir = specular_brdf.light;
