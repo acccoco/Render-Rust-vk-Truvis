@@ -19,6 +19,10 @@
 - **多格式模型**: 通过 Assimp 支持 FBX、glTF、OBJ 等格式
 - **Bindless 渲染**: 现代 GPU 驱动的渲染管线
 
+### 支持剖切体
+
+![Section](./resources/Result-Section.PNG)
+
 ## 🏗️ 项目结构
 
 ```
