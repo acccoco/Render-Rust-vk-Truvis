@@ -25,6 +25,8 @@ struct HitPayload
     /// 下一次光线的方向
     float3 ray_dir;
     uint random_seed;
+    /// 进入剖切体时 +1，离开剖切体时 -1
+    int section_stack;
 };
 
 struct ShadowMissPayload
@@ -76,6 +78,7 @@ void main_ray_gen()
     payload.weight = float3(1.0f, 1.0f, 1.0f);
     payload.done = false;
     payload.random_seed = random_seed;
+    payload.section_stack = 0;
 
     Scene *scene = push_const.scene;
     RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
@@ -164,6 +167,28 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         payload.radiance = base_color;
         payload.done = true;
         return;
+    }
+
+    // 剖切体: 自发光 > 100.f 就视为剖切体
+    if (mat.emissive.x > 100.f)
+    {
+        payload.section_stack += dot(WorldRayDirection(), origin_world_normal) < 0.f ? 1 : -1;
+        payload.radiance = 0.f;
+        payload.weight = 1.f;
+        payload.ray_origin = world_pos + 0.0001 * WorldRayDirection();
+        payload.ray_dir = WorldRayDirection();
+        return;
+    }
+    else 
+    {
+        if (payload.section_stack > 0) 
+        {
+            payload.radiance = 0.f;
+            payload.weight = 1.f;
+            payload.ray_origin = world_pos + 0.0001 * WorldRayDirection();
+            payload.ray_dir = WorldRayDirection();
+            return;
+        }
     }
 
     if (mat.emissive.x > 0.f)
@@ -256,15 +281,11 @@ void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttribute
     Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
     const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
 
-    // 当前命中位置 diffuse 颜色
+    // 当前命中位置 diffuse 贴图是透的，直接忽略该命中
     const float4 base_color = mat.diffuse_map.sample(interp_vertex.uv);
     if (base_color.w == 0.f)
     {
         IgnoreHit();
-    }
-    else
-    {
-        return;
     }
 }
 
