@@ -121,7 +121,7 @@ impl GuiMesh {
 
         cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
         {
-            cmd.cmd_copy_buffer(
+            cmd.cmd_copy_buffer_1(
                 &stage_buffer,
                 &mut vertex_buffer,
                 &[vk::BufferCopy {
@@ -161,7 +161,7 @@ impl GuiMesh {
 
         cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);
         {
-            cmd.cmd_copy_buffer(
+            cmd.cmd_copy_buffer_1(
                 &stage_buffer,
                 &mut index_buffer,
                 &[vk::BufferCopy {

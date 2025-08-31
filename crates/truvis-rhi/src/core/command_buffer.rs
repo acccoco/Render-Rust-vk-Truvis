@@ -5,7 +5,9 @@ use itertools::Itertools;
 
 use crate::core::debug_utils::RhiDebugType;
 use crate::core::rendering_info::RhiRenderingInfo;
+use crate::core::resources::buffer::RhiBuffer;
 use crate::core::synchronize::RhiBufferBarrier;
+use crate::resources::managed_buffer::RhiManagedBuffer;
 use crate::{
     basic::color::LabelColor,
     core::{
@@ -17,7 +19,6 @@ use crate::{
     },
     rhi::Rhi,
 };
-use crate::core::resources::buffer::RhiBuffer;
 
 /// # destroy
 ///
@@ -127,7 +128,17 @@ impl RhiCommandBuffer {
     /// - command type: action
     /// - 支持的 queue：transfer，graphics，compute
     #[inline]
-    pub fn cmd_copy_buffer(&self, src: &RhiBuffer, dst: &mut RhiBuffer, regions: &[vk::BufferCopy]) {
+    pub fn cmd_copy_buffer_1(&self, src: &RhiBuffer, dst: &mut RhiBuffer, regions: &[vk::BufferCopy]) {
+        unsafe {
+            self.device.cmd_copy_buffer(self.handle, src.handle(), dst.handle(), regions);
+        }
+    }
+
+    // region transfer 类型的命令
+    /// - command type: action
+    /// - 支持的 queue：transfer，graphics，compute
+    #[inline]
+    pub fn cmd_copy_buffer(&self, src: &RhiManagedBuffer, dst: &mut RhiManagedBuffer, regions: &[vk::BufferCopy]) {
         unsafe {
             self.device.cmd_copy_buffer(self.handle, src.handle(), dst.handle(), regions);
         }

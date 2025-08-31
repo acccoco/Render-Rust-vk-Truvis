@@ -46,7 +46,7 @@ impl VulkanFormatUtils {
     }
 }
 
-pub struct ManagedImage2D {
+pub struct RhiManagedImage {
     handle: vk::Image,
     allocation: vk_mem::Allocation,
     width: u32,
@@ -55,7 +55,7 @@ pub struct ManagedImage2D {
     name: String,
 }
 
-impl RhiDebugType for ManagedImage2D {
+impl RhiDebugType for RhiManagedImage {
     fn debug_type_name() -> &'static str {
         "ManagedImage2D"
     }
@@ -65,7 +65,7 @@ impl RhiDebugType for ManagedImage2D {
 }
 
 // 构造方法
-impl ManagedImage2D {
+impl RhiManagedImage {
     pub(crate) fn new(
         allocator: &RhiAllocator,
         image_info: &RhiImageCreateInfo,
@@ -87,7 +87,7 @@ impl ManagedImage2D {
     }
 }
 // Getter
-impl ManagedImage2D {
+impl RhiManagedImage {
     #[inline]
     pub fn handle(&self) -> vk::Image {
         self.handle
@@ -106,7 +106,7 @@ impl ManagedImage2D {
     }
 }
 // 操作方法
-impl ManagedImage2D {
+impl RhiManagedImage {
     /// ## 实现步骤
     /// 1. 创建一个 staging buffer，用于存放待复制的数据
     /// 2. 将数据复制到 staging buffer

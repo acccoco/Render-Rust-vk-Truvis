@@ -1,14 +1,14 @@
-use crate::resources::resource_handles::ImageHandle;
+use crate::resources::resource_handles::RhiImageHandle;
 use ash::vk;
 
-pub struct ManagedImage2DView {
+pub struct RhiManagedImageView {
     handle: vk::ImageView,
     debug_name: String,
-    image_handle: ImageHandle,
+    image_handle: RhiImageHandle,
 }
-impl ManagedImage2DView {
+impl RhiManagedImageView {
     #[inline]
-    pub fn image_handle(&self) -> ImageHandle {
+    pub fn image_handle(&self) -> RhiImageHandle {
         self.image_handle
     }
 }

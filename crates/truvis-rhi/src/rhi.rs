@@ -1,120 +1,55 @@
-use std::{ffi::CStr, rc::Rc};
-
 use crate::core::command_queue::RhiQueueFamily;
+use crate::core::debug_utils::RhiDebugUtils;
 use crate::core::{
-    allocator::RhiAllocator, command_pool::RhiCommandPool, command_queue::RhiQueue, device::RhiDevice,
+    allocator::RhiAllocator, command_pool::RhiCommandPool, command_queue::RhiQueue, debug_utils, device::RhiDevice,
     instance::RhiInstance, physical_device::RhiPhysicalDevice,
 };
+use crate::resources::resource_manager::RhiResourceManager;
+use crate::vulkan_context::VulkanContext;
 use ash::vk;
+use std::cell::RefCell;
+use std::{ffi::CStr, rc::Rc};
 
-/// Rhi 只需要做到能够创建各种资源的程度就行了
-///
-/// 与 VulkanSamples 的 VulkanSamle 及 ApiVulkanSample 作用类似
 pub struct Rhi {
-    /// vk 基础函数的接口
-    ///
-    /// 在 drop 之后，会卸载 dll，因此需要确保该字段最后 drop
-    pub vk_pf: Rc<ash::Entry>,
-    instance: Rc<RhiInstance>,
-    physical_device: Rc<RhiPhysicalDevice>,
-    pub device: Rc<RhiDevice>,
-
-    pub allocator: Rc<RhiAllocator>,
-
+    vk_ctx: VulkanContext,
+    allocator: RhiAllocator,
     /// 临时的 graphics command pool，主要用于临时的命令缓冲区
-    pub temp_graphics_command_pool: Rc<RhiCommandPool>,
-
-    pub graphics_queue: Rc<RhiQueue>,
-    pub compute_queue: Rc<RhiQueue>,
-    pub transfer_queue: Rc<RhiQueue>,
+    temp_graphics_command_pool: RhiCommandPool,
+    resource_mgr: RefCell<RhiResourceManager>,
 }
 
-impl Drop for Rhi {
-    fn drop(&mut self) {
-        log::info!("destroy rhi.");
-    }
-}
-
-// init
+/// init
 impl Rhi {
     // region init 相关
     const ENGINE_NAME: &'static str = "DruvisIII";
 
     pub fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
-        let vk_pf = Rc::new(unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry"));
-
-        let instance =
-            Rc::new(RhiInstance::new(vk_pf.clone(), app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts));
-
-        let physical_device = Rc::new(RhiPhysicalDevice::new_descrete_physical_device(instance.handle()));
-
-        // graphics, compute, transfer 各创建一个
-        let queue_create_infos = [
-            vk::DeviceQueueCreateInfo::default()
-                .queue_family_index(physical_device.graphics_queue_family.queue_family_index)
-                .queue_priorities(&[1.0]),
-            vk::DeviceQueueCreateInfo::default()
-                .queue_family_index(physical_device.compute_queue_family.queue_family_index)
-                .queue_priorities(&[1.0]),
-            vk::DeviceQueueCreateInfo::default()
-                .queue_family_index(physical_device.transfer_queue_family.queue_family_index)
-                .queue_priorities(&[1.0]),
-        ];
-
-        let device =
-            Rc::new(RhiDevice::new(vk_pf.clone(), instance.clone(), physical_device.clone(), &queue_create_infos));
-
-        let graphics_queue = Rc::new(RhiQueue {
-            handle: unsafe { device.get_device_queue(physical_device.graphics_queue_family.queue_family_index, 0) },
-            queue_family: physical_device.graphics_queue_family.clone(),
-            device: device.clone(),
-        });
-        let compute_queue = Rc::new(RhiQueue {
-            handle: unsafe { device.get_device_queue(physical_device.compute_queue_family.queue_family_index, 0) },
-            queue_family: physical_device.compute_queue_family.clone(),
-            device: device.clone(),
-        });
-        let transfer_queue = Rc::new(RhiQueue {
-            handle: unsafe { device.get_device_queue(physical_device.transfer_queue_family.queue_family_index, 0) },
-            queue_family: physical_device.transfer_queue_family.clone(),
-            device: device.clone(),
-        });
-
-        log::info!("graphics queue's queue family:\n{:#?}", graphics_queue.queue_family);
-        log::info!("compute queue's queue family:\n{:#?}", compute_queue.queue_family);
-        log::info!("transfer queue's queue family:\n{:#?}", transfer_queue.queue_family);
-
-        // 在 device 以及 debug_utils 之前创建的 vk::Handle
-        {
-            device.debug_utils().set_debug_name(instance.as_ref(), "main");
-            device.debug_utils().set_debug_name(physical_device.as_ref(), "main");
-
-            device.debug_utils().set_debug_name(device.as_ref(), "main");
-            device.debug_utils().set_debug_name(graphics_queue.as_ref(), "graphics");
-            device.debug_utils().set_debug_name(compute_queue.as_ref(), "compute");
-            device.debug_utils().set_debug_name(transfer_queue.as_ref(), "transfer");
-        }
-
-        let graphics_command_pool = Rc::new(RhiCommandPool::new(
-            device.clone(),
-            physical_device.graphics_queue_family.clone(),
+        let vk_ctx = VulkanContext::new(app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts);
+        let graphics_command_pool = RhiCommandPool::new(
+            &vk_ctx.device,
+            &vk_ctx.debug_utils,
+            vk_ctx.physical_device.graphics_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),
             "rhi-graphics",
-        ));
+        );
 
-        let allocator = Rc::new(RhiAllocator::new(instance.clone(), physical_device.clone(), device.clone()));
+        let allocator =
+            RhiAllocator::new(&vk_ctx.instance.ash_instance, vk_ctx.physical_device.handle, &vk_ctx.device.ash_device);
+        let resource_mgr = RhiResourceManager::new();
 
         Self {
-            vk_pf,
-            instance,
-            physical_device,
-            device,
+            vk_ctx,
             allocator,
             temp_graphics_command_pool: graphics_command_pool,
-            graphics_queue,
-            compute_queue,
-            transfer_queue,
+            resource_mgr: RefCell::new(resource_mgr),
         }
+    }
+
+    pub fn desotry(mut self) {
+        self.resource_mgr.get_mut().desotry();
+        self.allocator.destroy();
+        self.temp_graphics_command_pool.destroy(&self.vk_ctx.device);
+        self.vk_ctx.destroy();
     }
 }
 
@@ -148,6 +83,19 @@ impl Rhi {
     #[inline]
     pub fn transfer_queue_family(&self) -> RhiQueueFamily {
         self.physical_device.transfer_queue_family.clone()
+    }
+
+    /// 当 uniform buffer 的 descriptor 在更新时，其 offset 比如是这个值的整数倍
+    ///
+    /// 注：这个值一定是 power of 2
+    #[inline]
+    pub fn min_ubo_offset_align(&self) -> vk::DeviceSize {
+        self.vk_ctx.physical_device.basic_props.limits.min_uniform_buffer_offset_alignment
+    }
+
+    #[inline]
+    pub fn rt_pipeline_props(&self) -> &vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'_> {
+        &self.vk_ctx.physical_device.rt_pipeline_props
     }
 }
 

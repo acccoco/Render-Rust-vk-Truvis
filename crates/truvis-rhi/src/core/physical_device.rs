@@ -7,35 +7,28 @@ use std::ptr::null_mut;
 
 /// 表示一张物理显卡
 pub struct RhiPhysicalDevice {
-    pub handle: vk::PhysicalDevice,
+    pub(crate) handle: vk::PhysicalDevice,
 
     /// 当前 gpu 支持的 features
-    pub features: vk::PhysicalDeviceFeatures,
+    pub(crate) features: vk::PhysicalDeviceFeatures,
 
     /// 当前 gpu 支持的 device extensions
-    pub device_extensions: Vec<vk::ExtensionProperties>,
+    pub(crate) device_extensions: Vec<vk::ExtensionProperties>,
 
     /// 当前 gpu 的基础属性
-    pub basic_props: vk::PhysicalDeviceProperties,
+    pub(crate) basic_props: vk::PhysicalDeviceProperties,
 
     /// 当前 gpu 的 ray tracing 属性
-    pub rt_pipeline_props: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>,
+    pub(crate) rt_pipeline_props: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>,
 
     /// 当前 gpu 的加速结构属性
-    pub acc_struct_props: vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'static>,
+    pub(crate) acc_struct_props: vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'static>,
 
-    pub mem_props: vk::PhysicalDeviceMemoryProperties,
+    pub(crate) mem_props: vk::PhysicalDeviceMemoryProperties,
 
-    pub graphics_queue_family: RhiQueueFamily,
-    pub compute_queue_family: RhiQueueFamily,
-    pub transfer_queue_family: RhiQueueFamily,
-}
-impl Drop for RhiPhysicalDevice {
-    fn drop(&mut self) {
-        // 物理设备不需要手动释放
-        log::info!("no need to destroy physical device manually, it will be destroyed when instance is destroyed");
-        // unsafe { self.handle.destroy_physical_device(None); }
-    }
+    pub(crate) graphics_queue_family: RhiQueueFamily,
+    pub(crate) compute_queue_family: RhiQueueFamily,
+    pub(crate) transfer_queue_family: RhiQueueFamily,
 }
 impl RhiDebugType for RhiPhysicalDevice {
     fn debug_type_name() -> &'static str {
@@ -165,6 +158,10 @@ impl RhiPhysicalDevice {
                 device_extensions,
             }
         }
+    }
+
+    pub fn destroy(self) {
+        // 无需销毁
     }
 
     #[inline]

@@ -577,7 +577,7 @@ mod helper {
             stage_buffer.flush(0, buffer_size);
             stage_buffer.unmap();
         }
-        cmd.cmd_copy_buffer(
+        cmd.cmd_copy_buffer_1(
             stage_buffer,
             dst,
             &[vk::BufferCopy {

@@ -18,16 +18,19 @@ impl RhiBufferCreateInfo {
         }
     }
 
+    /// getter
     #[inline]
     pub fn info(&self) -> &vk::BufferCreateInfo<'_> {
         &self.inner
     }
 
+    /// getter
     #[inline]
     pub fn size(&self) -> vk::DeviceSize {
         self.inner.size
     }
 
+    /// builder
     #[inline]
     pub fn queue_family_indices(mut self, indices: &[u32]) -> Self {
         self.queue_family_indices = indices.to_vec();

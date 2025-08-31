@@ -84,6 +84,13 @@ impl RhiDebugUtils {
         }
     }
 
+    pub fn desotry(self) {
+        // 触发 drop 进行销毁
+    }
+}
+
+/// 构造过程辅助函数
+impl RhiDebugUtils {
     /// 存放 msg 参数，用于初始化 debug messenger
     pub fn debug_msg_type() -> vk::DebugUtilsMessageTypeFlagsEXT {
         static mut DEBUG_MSG_TYPE: vk::DebugUtilsMessageTypeFlagsEXT = vk::DebugUtilsMessageTypeFlagsEXT::empty();
@@ -117,7 +124,10 @@ impl RhiDebugUtils {
             .message_type(Self::debug_msg_type())
             .pfn_user_callback(Some(vk_debug_callback))
     }
+}
 
+/// tools
+impl RhiDebugUtils {
     #[inline]
     pub fn set_object_debug_name<T: vk::Handle + Copy>(&self, handle: T, name: impl AsRef<str>) {
         let name = CString::new(name.as_ref()).unwrap();

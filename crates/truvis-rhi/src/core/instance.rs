@@ -9,17 +9,7 @@ use std::{
 };
 
 pub struct RhiInstance {
-    /// ash::Entry 的引用，确保在 RhiInstance 销毁之前不会被销毁
-    _vk_pf: Rc<ash::Entry>,
-    handle: ash::Instance,
-}
-impl Drop for RhiInstance {
-    fn drop(&mut self) {
-        unsafe {
-            log::info!("Destroying RhiInstance");
-            self.handle.destroy_instance(None);
-        }
-    }
+    pub(crate) ash_instance: ash::Instance,
 }
 impl RhiDebugType for RhiInstance {
     fn debug_type_name() -> &'static str {
@@ -27,7 +17,7 @@ impl RhiDebugType for RhiInstance {
     }
 
     fn vk_handle(&self) -> impl vk::Handle {
-        self.handle.handle()
+        self.ash_instance.handle()
     }
 }
 
@@ -35,14 +25,14 @@ impl Deref for RhiInstance {
     type Target = ash::Instance;
 
     fn deref(&self) -> &Self::Target {
-        &self.handle
+        &self.ash_instance
     }
 }
 
 impl RhiInstance {
     /// 设置所需的 layers 和 extensions，创建 vk instance
     pub fn new(
-        vk_entry: Rc<ash::Entry>,
+        vk_entry: &ash::Entry,
         app_name: String,
         engine_name: String,
         extra_instance_exts: Vec<&'static CStr>,
@@ -56,7 +46,7 @@ impl RhiInstance {
             .engine_name(engine_name.as_ref())
             .engine_version(vk::make_api_version(0, 1, 0, 0));
 
-        let enabled_extensions = Self::get_extensions(&vk_entry, &extra_instance_exts);
+        let enabled_extensions = Self::get_extensions(vk_entry, &extra_instance_exts);
         // 多行输出到一个字符串
         let mut enabled_extensions_str = String::new();
         for ext in &enabled_extensions {
@@ -64,7 +54,7 @@ impl RhiInstance {
         }
         log::info!("instance extensions: {}", enabled_extensions_str);
 
-        let enabled_layers = Self::get_layers(&vk_entry);
+        let enabled_layers = Self::get_layers(vk_entry);
         let mut enabled_layers_str = String::new();
         for layer in &enabled_layers {
             enabled_layers_str.push_str(&format!("\n\t{:?}", unsafe { CStr::from_ptr(*layer) }));
@@ -82,22 +72,32 @@ impl RhiInstance {
 
         let handle = unsafe { vk_entry.create_instance(&instance_ci, None).unwrap() };
 
-        Self {
-            handle,
-            _vk_pf: vk_entry,
+        Self { ash_instance: handle }
+    }
+
+    pub fn destroy(self) {
+        log::info!("Destroying RhiInstance");
+        unsafe {
+            self.ash_instance.destroy_instance(None);
         }
     }
+}
 
+/// getter
+impl RhiInstance {
     #[inline]
-    pub fn handle(&self) -> &ash::Instance {
-        &self.handle
+    pub fn ash_instance(&self) -> &ash::Instance {
+        &self.ash_instance
     }
 
     #[inline]
-    pub fn vk_handle(&self) -> vk::Instance {
-        self.handle.handle()
+    pub fn vk_instance(&self) -> vk::Instance {
+        self.ash_instance.handle()
     }
+}
 
+/// 构造过程
+impl RhiInstance {
     /// 用于在创建 instance 时设置 layer 的参数
     fn _get_layer_setting_for_single<'a, T>(
         layer_name: &'static CStr,

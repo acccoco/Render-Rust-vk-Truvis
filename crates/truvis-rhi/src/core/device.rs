@@ -8,30 +8,18 @@ use crate::core::{instance::RhiInstance, physical_device::RhiPhysicalDevice};
 use crate::shader_cursor::RhiWriteDescriptorSet;
 
 pub struct RhiDevice {
-    handle: ash::Device,
-    _vk_pf: Rc<ash::Entry>,
+    pub(crate) ash_device: ash::Device,
 
-    /// 确保 RhiDevice 在 RhiInstance 销毁之前被销毁
-    _instance: Rc<RhiInstance>,
-
-    pdevice: Rc<RhiPhysicalDevice>,
-
-    vk_dynamic_render_pf: Rc<ash::khr::dynamic_rendering::Device>,
-    vk_acceleration_struct_pf: Rc<ash::khr::acceleration_structure::Device>,
-    vk_rt_pipeline_pf: Rc<ash::khr::ray_tracing_pipeline::Device>,
-
-    /// 使用 Option 来控制 destroy 的时机
-    debug_utils: Option<RhiDebugUtils>,
+    vk_dynamic_render_pf: ash::khr::dynamic_rendering::Device,
+    vk_acceleration_struct_pf: ash::khr::acceleration_structure::Device,
+    vk_rt_pipeline_pf: ash::khr::ray_tracing_pipeline::Device,
 }
-impl RhiDevice {
-    // region ctor
 
-    /// # return
-    /// * (device, graphics queue, compute queue, transfer queue)
+/// 构造与销毁
+impl RhiDevice {
     pub fn new(
-        vk_pf: Rc<ash::Entry>,
-        instance: Rc<RhiInstance>,
-        pdevice: Rc<RhiPhysicalDevice>,
+        instance: &ash::Instance,
+        pdevice: vk::PhysicalDevice,
         queue_create_info: &[vk::DeviceQueueCreateInfo],
     ) -> Self {
         // device 所需的所有 extension
@@ -58,29 +46,31 @@ impl RhiDevice {
             .enabled_extension_names(&device_exts)
             .push_next(&mut all_features);
 
-        let device = unsafe { instance.handle().create_device(pdevice.handle, &device_create_info, None).unwrap() };
+        let device = unsafe { instance.create_device(pdevice, &device_create_info, None).unwrap() };
 
-        let debug_utils = RhiDebugUtils::new(&vk_pf, instance.handle(), &device);
-
-        let vk_dynamic_render_pf = Rc::new(ash::khr::dynamic_rendering::Device::new(instance.handle(), &device));
-        let vk_acceleration_struct_pf =
-            Rc::new(ash::khr::acceleration_structure::Device::new(instance.handle(), &device));
-        let vk_rt_pipeline_pf = Rc::new(ash::khr::ray_tracing_pipeline::Device::new(instance.handle(), &device));
+        let vk_dynamic_render_pf = ash::khr::dynamic_rendering::Device::new(instance, &device);
+        let vk_acceleration_struct_pf = ash::khr::acceleration_structure::Device::new(instance, &device);
+        let vk_rt_pipeline_pf = ash::khr::ray_tracing_pipeline::Device::new(instance, &device);
 
         Self {
-            handle: device,
-            _vk_pf: vk_pf,
-            _instance: instance,
-            pdevice: pdevice.clone(),
+            ash_device: device,
 
             vk_dynamic_render_pf,
             vk_acceleration_struct_pf,
             vk_rt_pipeline_pf,
-
-            debug_utils: Some(debug_utils),
         }
     }
 
+    pub fn destroy(self) {
+        log::info!("destroying device");
+        unsafe {
+            self.ash_device.destroy_device(None);
+        }
+    }
+}
+
+/// 构造辅助函数
+impl RhiDevice {
     /// 必要的 physical device core features
     fn physical_device_basic_features() -> vk::PhysicalDeviceFeatures {
         vk::PhysicalDeviceFeatures::default()
@@ -138,52 +128,18 @@ impl RhiDevice {
 
         exts
     }
+}
 
-    // endregion
-
-    // region getters
-
+/// getter
+impl RhiDevice {
     #[inline]
-    pub fn handle(&self) -> &ash::Device {
-        &self.handle
+    pub fn ash_handle(&self) -> &ash::Device {
+        &self.ash_device
     }
 
     #[inline]
     pub fn vk_handle(&self) -> vk::Device {
-        self.handle.handle()
-    }
-
-    /// 当 uniform buffer 的 descriptor 在更新时，其 offset 比如是这个值的整数倍
-    ///
-    /// 注：这个值一定是 power of 2
-    #[inline]
-    pub fn min_ubo_offset_align(&self) -> vk::DeviceSize {
-        self.pdevice.basic_props.limits.min_uniform_buffer_offset_alignment
-    }
-
-    #[inline]
-    pub fn rt_pipeline_props(&self) -> &vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'_> {
-        &self.pdevice.rt_pipeline_props
-    }
-
-    #[inline]
-    pub fn graphics_queue_family(&self) -> RhiQueueFamily {
-        self.pdevice.graphics_queue_family.clone()
-    }
-
-    #[inline]
-    pub fn compute_queue_family(&self) -> RhiQueueFamily {
-        self.pdevice.compute_queue_family.clone()
-    }
-
-    #[inline]
-    pub fn transfer_queue_family(&self) -> RhiQueueFamily {
-        self.pdevice.transfer_queue_family.clone()
-    }
-
-    #[inline]
-    pub fn debug_utils(&self) -> &RhiDebugUtils {
-        self.debug_utils.as_ref().unwrap()
+        self.ash_device.handle()
     }
 
     #[inline]
@@ -200,44 +156,31 @@ impl RhiDevice {
     pub fn rt_pipeline_pf(&self) -> &ash::khr::ray_tracing_pipeline::Device {
         &self.vk_rt_pipeline_pf
     }
+}
 
-    // endregion
-
-    // region tools
-
+/// tools
+impl RhiDevice {
     #[inline]
     pub fn write_descriptor_sets(&self, writes: &[RhiWriteDescriptorSet]) {
         let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();
         unsafe {
-            self.handle.update_descriptor_sets(&writes, &[]);
-        }
-    }
-
-    // endregion
-}
-impl Drop for RhiDevice {
-    fn drop(&mut self) {
-        unsafe {
-            log::info!("destroying device");
-
-            // 需要确保 debug_utils 在 handle 销毁之前被销毁
-            self.debug_utils = None;
-            self.handle.destroy_device(None);
+            self.ash_device.update_descriptor_sets(&writes, &[]);
         }
     }
 }
+
 impl RhiDebugType for RhiDevice {
     fn debug_type_name() -> &'static str {
         "RhiDevice"
     }
     fn vk_handle(&self) -> impl vk::Handle {
-        self.handle.handle()
+        self.ash_device.handle()
     }
 }
 impl Deref for RhiDevice {
     type Target = ash::Device;
 
     fn deref(&self) -> &Self::Target {
-        &self.handle
+        &self.ash_device
     }
 }

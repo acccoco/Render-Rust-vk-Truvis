@@ -1,7 +1,7 @@
-mod creator;
-mod managed_buffer;
-mod managed_image;
-mod managed_image_view;
-mod resource_creator;
-mod resource_handles;
-mod resource_manager;
+pub mod managed_buffer;
+pub mod managed_image;
+pub mod managed_image_view;
+pub mod resource_manager;
+
+pub mod buffers;
+pub mod resource_handles;

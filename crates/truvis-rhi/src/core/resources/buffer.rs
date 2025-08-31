@@ -1,13 +1,13 @@
-use std::ffi::c_void;
-use std::rc::Rc;
-use ash::vk;
-use vk_mem::Alloc;
 use crate::core::allocator::RhiAllocator;
 use crate::core::command_buffer::RhiCommandBuffer;
 use crate::core::debug_utils::RhiDebugType;
 use crate::core::device::RhiDevice;
 use crate::core::resources::buffer_creator::RhiBufferCreateInfo;
 use crate::rhi::Rhi;
+use ash::vk;
+use std::ffi::c_void;
+use std::rc::Rc;
+use vk_mem::Alloc;
 
 pub struct RhiBuffer {
     pub handle: vk::Buffer,
@@ -241,7 +241,7 @@ impl RhiBuffer {
             rhi.temp_graphics_command_pool.clone(),
             &rhi.graphics_queue,
             |cmd| {
-                cmd.cmd_copy_buffer(
+                cmd.cmd_copy_buffer_1(
                     &stage_buffer,
                     self,
                     &[vk::BufferCopy {
@@ -252,11 +252,5 @@ impl RhiBuffer {
             },
             &cmd_name,
         );
-    }
-
-    /// 默认的 descriptor buffer info
-    #[inline]
-    pub fn get_descriptor_buffer_info_ubo<T: Sized>(&self) -> vk::DescriptorBufferInfo {
-        vk::DescriptorBufferInfo::default().buffer(self.handle).offset(0).range(size_of::<T>() as vk::DeviceSize)
     }
 }
