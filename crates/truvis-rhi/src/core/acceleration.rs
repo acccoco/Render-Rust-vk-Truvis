@@ -6,11 +6,11 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::core::debug_utils::RhiDebugType;
+use crate::core::resources::buffer::RhiBuffer;
 use crate::{
     core::{command_buffer::RhiCommandBuffer, device::RhiDevice, query_pool::RhiQueryPool},
     rhi::Rhi,
 };
-use crate::core::resources::buffer::RhiBuffer;
 
 pub struct BlasInputInfo<'a> {
     pub geometry: vk::AccelerationStructureGeometryKHR<'a>,
@@ -20,8 +20,6 @@ pub struct BlasInputInfo<'a> {
 pub struct RhiAcceleration {
     acceleration_structure: vk::AccelerationStructureKHR,
     _buffer: RhiBuffer,
-
-    device: Rc<RhiDevice>,
 }
 impl RhiDebugType for RhiAcceleration {
     fn debug_type_name() -> &'static str {

@@ -43,17 +43,17 @@ impl VulkanContext {
                 .queue_priorities(&[1.0]),
         ];
 
-        let device = RhiDevice::new(&instance.ash_instance, physical_device.handle, &queue_create_infos);
+        let device = RhiDevice::new(&instance.ash_instance, physical_device.vk_handle, &queue_create_infos);
         let graphics_queue = RhiQueue {
-            handle: unsafe { device.get_device_queue(physical_device.graphics_queue_family.queue_family_index, 0) },
+            vk_queue: unsafe { device.get_device_queue(physical_device.graphics_queue_family.queue_family_index, 0) },
             queue_family: physical_device.graphics_queue_family.clone(),
         };
         let compute_queue = RhiQueue {
-            handle: unsafe { device.get_device_queue(physical_device.compute_queue_family.queue_family_index, 0) },
+            vk_queue: unsafe { device.get_device_queue(physical_device.compute_queue_family.queue_family_index, 0) },
             queue_family: physical_device.compute_queue_family.clone(),
         };
         let transfer_queue = RhiQueue {
-            handle: unsafe { device.get_device_queue(physical_device.transfer_queue_family.queue_family_index, 0) },
+            vk_queue: unsafe { device.get_device_queue(physical_device.transfer_queue_family.queue_family_index, 0) },
             queue_family: physical_device.transfer_queue_family.clone(),
         };
 
@@ -65,21 +65,29 @@ impl VulkanContext {
 
         // 在 device 以及 debug_utils 之前创建的 vk::Handle
         {
-            debug_utils.set_debug_name(&instance, "main");
-            debug_utils.set_object_debug_name(instance.)
-            debug_utils().set_debug_name(physical_device.as_ref(), "main");
+            debug_utils.set_object_debug_name(instance.vk_instance(), "RhiInstance");
+            debug_utils.set_object_debug_name(physical_device.vk_handle, "RhiPhysicalDevice");
 
-            device.debug_utils().set_debug_name(device.as_ref(), "main");
-            device.debug_utils().set_debug_name(graphics_queue.as_ref(), "graphics");
-            device.debug_utils().set_debug_name(compute_queue.as_ref(), "compute");
-            device.debug_utils().set_debug_name(transfer_queue.as_ref(), "transfer");
+            debug_utils.set_object_debug_name(device.vk_handle(), "RhiDevice");
+            debug_utils.set_object_debug_name(graphics_queue.vk_queue, "graphics_queue");
+            debug_utils.set_object_debug_name(compute_queue.vk_queue, "compute_queue");
+            debug_utils.set_object_debug_name(transfer_queue.vk_queue, "transfer_queue");
         }
 
-        Self {}
+        Self {
+            vk_pf,
+            instance,
+            physical_device,
+            device,
+            debug_utils,
+            graphics_queue,
+            compute_queue,
+            transfer_queue,
+        }
     }
 
     pub fn destroy(self) {
-        self.debug_utils.desotry();
+        self.debug_utils.destroy();
         self.device.destroy();
         self.physical_device.destroy();
         self.instance.destroy();

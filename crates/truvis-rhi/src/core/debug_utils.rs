@@ -84,7 +84,7 @@ impl RhiDebugUtils {
         }
     }
 
-    pub fn desotry(self) {
+    pub fn destroy(self) {
         // 触发 drop 进行销毁
     }
 }

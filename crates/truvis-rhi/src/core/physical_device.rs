@@ -7,7 +7,7 @@ use std::ptr::null_mut;
 
 /// 表示一张物理显卡
 pub struct RhiPhysicalDevice {
-    pub(crate) handle: vk::PhysicalDevice,
+    pub(crate) vk_handle: vk::PhysicalDevice,
 
     /// 当前 gpu 支持的 features
     pub(crate) features: vk::PhysicalDeviceFeatures,
@@ -36,7 +36,7 @@ impl RhiDebugType for RhiPhysicalDevice {
     }
 
     fn vk_handle(&self) -> impl vk::Handle {
-        self.handle
+        self.vk_handle
     }
 }
 
@@ -148,7 +148,7 @@ impl RhiPhysicalDevice {
             Self {
                 mem_props: instance.get_physical_device_memory_properties(pdevice),
                 features: instance.get_physical_device_features(pdevice),
-                handle: pdevice,
+                vk_handle: pdevice,
                 basic_props,
                 rt_pipeline_props: rt_props,
                 acc_struct_props: acc_props,

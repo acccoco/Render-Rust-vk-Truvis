@@ -19,7 +19,7 @@ pub struct RhiQueueFamily {
 ///
 /// RhiQueueFamily 在 RhiDevice 销毁时会被销毁
 pub struct RhiQueue {
-    pub(crate) handle: vk::Queue,
+    pub(crate) vk_queue: vk::Queue,
     pub(crate) queue_family: RhiQueueFamily,
 }
 impl RhiDebugType for RhiQueue {
@@ -27,7 +27,7 @@ impl RhiDebugType for RhiQueue {
         "RhiQueue"
     }
     fn vk_handle(&self) -> impl vk::Handle {
-        self.handle
+        self.vk_queue
     }
 }
 
@@ -40,7 +40,7 @@ impl RhiQueue {
 
     #[inline]
     pub fn handle(&self) -> vk::Queue {
-        self.handle
+        self.vk_queue
     }
 }
 
@@ -50,14 +50,14 @@ impl RhiQueue {
         unsafe {
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = batches.iter().map(|b| b.submit_info()).collect_vec();
-            device.queue_submit2(self.handle, &batches, fence.map_or(vk::Fence::null(), |f| f.handle())).unwrap()
+            device.queue_submit2(self.vk_queue, &batches, fence.map_or(vk::Fence::null(), |f| f.handle())).unwrap()
         }
     }
 
     /// 根据 specification，vkQueueWaitIdle 应该和 Fence 效率相同
     #[inline]
     pub fn wait_idle(&self, device: &ash::Device) {
-        unsafe { device.queue_wait_idle(self.handle).unwrap() }
+        unsafe { device.queue_wait_idle(self.vk_queue).unwrap() }
     }
 }
 
@@ -75,7 +75,7 @@ impl RhiSubmitInfo {
     pub fn new(commands: &[RhiCommandBuffer]) -> Self {
         let command_buffers = commands
             .iter()
-            .map(|cmd| vk::CommandBufferSubmitInfo::default().command_buffer(cmd.handle()))
+            .map(|cmd| vk::CommandBufferSubmitInfo::default().command_buffer(cmd.vk_handle()))
             .collect_vec();
 
         let inner = vk::SubmitInfo2 {

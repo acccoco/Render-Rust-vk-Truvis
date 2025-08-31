@@ -1,14 +1,14 @@
-use crate::core::command_queue::RhiQueueFamily;
 use crate::core::debug_utils::RhiDebugUtils;
-use crate::core::{
-    allocator::RhiAllocator, command_pool::RhiCommandPool, command_queue::RhiQueue, debug_utils, device::RhiDevice,
-    instance::RhiInstance, physical_device::RhiPhysicalDevice,
+use crate::{
+    core::{
+        allocator::RhiAllocator, command_pool::RhiCommandPool, command_queue::RhiQueueFamily, device::RhiDevice,
+        instance::RhiInstance, physical_device::RhiPhysicalDevice,
+    },
+    resources::resource_manager::RhiResourceManager,
+    vulkan_context::VulkanContext,
 };
-use crate::resources::resource_manager::RhiResourceManager;
-use crate::vulkan_context::VulkanContext;
 use ash::vk;
-use std::cell::RefCell;
-use std::{ffi::CStr, rc::Rc};
+use std::{cell::RefCell, ffi::CStr};
 
 pub struct Rhi {
     vk_ctx: VulkanContext,
@@ -18,7 +18,7 @@ pub struct Rhi {
     resource_mgr: RefCell<RhiResourceManager>,
 }
 
-/// init
+/// 创建与销毁
 impl Rhi {
     // region init 相关
     const ENGINE_NAME: &'static str = "DruvisIII";
@@ -33,8 +33,11 @@ impl Rhi {
             "rhi-graphics",
         );
 
-        let allocator =
-            RhiAllocator::new(&vk_ctx.instance.ash_instance, vk_ctx.physical_device.handle, &vk_ctx.device.ash_device);
+        let allocator = RhiAllocator::new(
+            &vk_ctx.instance.ash_instance,
+            vk_ctx.physical_device.vk_handle,
+            &vk_ctx.device.ash_device,
+        );
         let resource_mgr = RhiResourceManager::new();
 
         Self {
@@ -53,39 +56,44 @@ impl Rhi {
     }
 }
 
-// getter
+/// getter
 impl Rhi {
     #[inline]
     pub fn instance(&self) -> &RhiInstance {
-        &self.instance
+        &self.vk_ctx.instance
     }
 
     #[inline]
     pub fn device(&self) -> &RhiDevice {
-        &self.device
+        &self.vk_ctx.device
+    }
+
+    #[inline]
+    pub fn debug_utils(&self) -> &RhiDebugUtils {
+        &self.vk_ctx.debug_utils
     }
 
     #[inline]
     pub fn physical_device(&self) -> &RhiPhysicalDevice {
-        &self.physical_device
+        &self.vk_ctx.physical_device
     }
 
     #[inline]
     pub fn graphics_queue_family(&self) -> RhiQueueFamily {
-        self.physical_device.graphics_queue_family.clone()
+        self.vk_ctx.physical_device.graphics_queue_family.clone()
     }
 
     #[inline]
     pub fn compute_queue_family(&self) -> RhiQueueFamily {
-        self.physical_device.compute_queue_family.clone()
+        self.vk_ctx.physical_device.compute_queue_family.clone()
     }
 
     #[inline]
     pub fn transfer_queue_family(&self) -> RhiQueueFamily {
-        self.physical_device.transfer_queue_family.clone()
+        self.vk_ctx.physical_device.transfer_queue_family.clone()
     }
 
-    /// 当 uniform buffer 的 descriptor 在更新时，其 offset 比如是这个值的整数倍
+    /// 当 uniform buffer 的 descriptor 在更新时，其 offset 必须是这个值的整数倍
     ///
     /// 注：这个值一定是 power of 2
     #[inline]
@@ -99,7 +107,7 @@ impl Rhi {
     }
 }
 
-// tools
+/// tools
 impl Rhi {
     /// 根据给定的格式，返回支持的格式
     pub fn find_supported_format(
@@ -112,7 +120,7 @@ impl Rhi {
             .iter()
             .filter(|f| {
                 let props = unsafe {
-                    self.instance().get_physical_device_format_properties(self.physical_device().handle, **f)
+                    self.instance().get_physical_device_format_properties(self.physical_device().vk_handle, **f)
                 };
                 match tiling {
                     vk::ImageTiling::LINEAR => props.linear_tiling_features.contains(features),

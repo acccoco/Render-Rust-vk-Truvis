@@ -11,15 +11,6 @@ use std::{
 pub struct RhiInstance {
     pub(crate) ash_instance: ash::Instance,
 }
-impl RhiDebugType for RhiInstance {
-    fn debug_type_name() -> &'static str {
-        "RhiInstance"
-    }
-
-    fn vk_handle(&self) -> impl vk::Handle {
-        self.ash_instance.handle()
-    }
-}
 
 impl Deref for RhiInstance {
     type Target = ash::Instance;
