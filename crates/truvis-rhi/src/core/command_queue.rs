@@ -1,7 +1,9 @@
 use ash::vk;
 use itertools::Itertools;
+use std::rc::Rc;
 
 use crate::core::debug_utils::RhiDebugType;
+use crate::core::device::RhiDevicePfn;
 use crate::core::{
     command_buffer::RhiCommandBuffer,
     synchronize::{RhiFence, RhiSemaphore},
@@ -21,6 +23,7 @@ pub struct RhiQueueFamily {
 pub struct RhiQueue {
     pub(crate) vk_queue: vk::Queue,
     pub(crate) queue_family: RhiQueueFamily,
+    pub(crate) device_pf: Rc<RhiDevicePfn>,
 }
 impl RhiDebugType for RhiQueue {
     fn debug_type_name() -> &'static str {
@@ -46,18 +49,21 @@ impl RhiQueue {
 
 /// tools
 impl RhiQueue {
-    pub fn submit(&self, device: &ash::Device, batches: Vec<RhiSubmitInfo>, fence: Option<RhiFence>) {
+    pub fn submit(&self, batches: Vec<RhiSubmitInfo>, fence: Option<RhiFence>) {
         unsafe {
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = batches.iter().map(|b| b.submit_info()).collect_vec();
-            device.queue_submit2(self.vk_queue, &batches, fence.map_or(vk::Fence::null(), |f| f.handle())).unwrap()
+            self.device_pf
+                .vk_device_pf
+                .queue_submit2(self.vk_queue, &batches, fence.map_or(vk::Fence::null(), |f| f.handle()))
+                .unwrap()
         }
     }
 
     /// 根据 specification，vkQueueWaitIdle 应该和 Fence 效率相同
     #[inline]
-    pub fn wait_idle(&self, device: &ash::Device) {
-        unsafe { device.queue_wait_idle(self.vk_queue).unwrap() }
+    pub fn wait_idle(&self) {
+        unsafe { self.device_pf.vk_device_pf.queue_wait_idle(self.vk_queue).unwrap() }
     }
 }
 

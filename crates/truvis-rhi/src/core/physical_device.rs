@@ -30,15 +30,6 @@ pub struct RhiPhysicalDevice {
     pub(crate) compute_queue_family: RhiQueueFamily,
     pub(crate) transfer_queue_family: RhiQueueFamily,
 }
-impl RhiDebugType for RhiPhysicalDevice {
-    fn debug_type_name() -> &'static str {
-        "RhiPhysicalDevice"
-    }
-
-    fn vk_handle(&self) -> impl vk::Handle {
-        self.vk_handle
-    }
-}
 
 impl RhiPhysicalDevice {
     /// 创建一个新的物理显卡实例
@@ -168,5 +159,15 @@ impl RhiPhysicalDevice {
     /// 当前 gpu 是否是独立显卡
     pub fn is_descrete_gpu(&self) -> bool {
         self.basic_props.device_type == vk::PhysicalDeviceType::DISCRETE_GPU
+    }
+}
+
+impl RhiDebugType for RhiPhysicalDevice {
+    fn debug_type_name() -> &'static str {
+        "RhiPhysicalDevice"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.vk_handle
     }
 }

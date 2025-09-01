@@ -7,6 +7,28 @@ pub struct RhiDebugUtils {
     pub vk_debug_utils_device: ash::ext::debug_utils::Device,
     pub vk_debug_utils_messenger: vk::DebugUtilsMessengerEXT,
 }
+
+impl RhiDebugUtils {
+    pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, device: &ash::Device) -> Self {
+        let loader = ash::ext::debug_utils::Instance::new(vk_pf, instance);
+
+        let create_info = Self::debug_utils_messenger_ci();
+        let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None).unwrap() };
+
+        let vk_debug_utils_device = ash::ext::debug_utils::Device::new(instance, device);
+
+        Self {
+            vk_debug_utils_instance: loader,
+            vk_debug_utils_messenger: debug_messenger,
+            vk_debug_utils_device,
+        }
+    }
+
+    pub fn destroy(self) {
+        // 触发 drop 进行销毁
+    }
+}
+
 impl Drop for RhiDebugUtils {
     fn drop(&mut self) {
         unsafe {
@@ -63,32 +85,6 @@ unsafe extern "system" fn vk_debug_callback(
     vk::FALSE
 }
 
-pub trait RhiDebugType {
-    fn debug_type_name() -> &'static str;
-    fn vk_handle(&self) -> impl vk::Handle;
-}
-
-impl RhiDebugUtils {
-    pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance, device: &ash::Device) -> Self {
-        let loader = ash::ext::debug_utils::Instance::new(vk_pf, instance);
-
-        let create_info = Self::debug_utils_messenger_ci();
-        let debug_messenger = unsafe { loader.create_debug_utils_messenger(&create_info, None).unwrap() };
-
-        let vk_debug_utils_device = ash::ext::debug_utils::Device::new(instance, device);
-
-        Self {
-            vk_debug_utils_instance: loader,
-            vk_debug_utils_messenger: debug_messenger,
-            vk_debug_utils_device,
-        }
-    }
-
-    pub fn destroy(self) {
-        // 触发 drop 进行销毁
-    }
-}
-
 /// 构造过程辅助函数
 impl RhiDebugUtils {
     /// 存放 msg 参数，用于初始化 debug messenger
@@ -124,6 +120,11 @@ impl RhiDebugUtils {
             .message_type(Self::debug_msg_type())
             .pfn_user_callback(Some(vk_debug_callback))
     }
+}
+
+pub trait RhiDebugType {
+    fn debug_type_name() -> &'static str;
+    fn vk_handle(&self) -> impl vk::Handle;
 }
 
 /// tools

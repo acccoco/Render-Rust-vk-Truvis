@@ -1,7 +1,6 @@
-use crate::core::debug_utils::{RhiDebugType, RhiDebugUtils};
+use crate::core::debug_utils::RhiDebugUtils;
 use ash::vk;
 use itertools::Itertools;
-use std::ops::Deref;
 use std::rc::Rc;
 use std::{
     collections::HashSet,
@@ -9,15 +8,10 @@ use std::{
 };
 
 pub struct RhiInstance {
-    pub(crate) ash_instance: ash::Instance,
-}
-
-impl Deref for RhiInstance {
-    type Target = ash::Instance;
-
-    fn deref(&self) -> &Self::Target {
-        &self.ash_instance
-    }
+    /// 仅仅是函数指针，以及一个裸的 handle，可以随意 clone
+    ///
+    /// 不需要考虑生命周期的问题，生命周期现在是由手动控制的
+    pub(crate) ash_instance: Rc<ash::Instance>,
 }
 
 impl RhiInstance {
@@ -63,7 +57,9 @@ impl RhiInstance {
 
         let handle = unsafe { vk_entry.create_instance(&instance_ci, None).unwrap() };
 
-        Self { ash_instance: handle }
+        Self {
+            ash_instance: Rc::new(handle),
+        }
     }
 
     pub fn destroy(self) {

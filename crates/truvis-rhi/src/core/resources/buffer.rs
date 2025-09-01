@@ -1,4 +1,4 @@
-use crate::core::allocator::RhiAllocator;
+use crate::core::mem_allocator::RhiMemAllocator;
 use crate::core::command_buffer::RhiCommandBuffer;
 use crate::core::debug_utils::RhiDebugType;
 use crate::core::device::RhiDevice;
@@ -18,7 +18,7 @@ pub struct RhiBuffer {
 
     pub debug_name: String,
 
-    pub allocator: Rc<RhiAllocator>,
+    pub allocator: Rc<RhiMemAllocator>,
     pub device: Rc<RhiDevice>,
 
     pub device_addr: Option<vk::DeviceAddress>,

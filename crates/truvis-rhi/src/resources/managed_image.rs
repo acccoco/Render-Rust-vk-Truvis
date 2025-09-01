@@ -1,4 +1,4 @@
-use crate::core::allocator::RhiAllocator;
+use crate::core::mem_allocator::RhiMemAllocator;
 use crate::core::command_buffer::RhiCommandBuffer;
 use crate::core::debug_utils::RhiDebugType;
 use crate::core::resources::buffer::RhiBuffer;
@@ -67,7 +67,7 @@ impl RhiDebugType for RhiManagedImage {
 // 构造方法
 impl RhiManagedImage {
     pub(crate) fn new(
-        allocator: &RhiAllocator,
+        allocator: &RhiMemAllocator,
         image_info: &RhiImageCreateInfo,
         alloc_info: &vk_mem::AllocationCreateInfo,
         name: &str,

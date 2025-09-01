@@ -1,18 +1,28 @@
+use crate::core::debug_utils::RhiDebugType;
+use crate::shader_cursor::RhiWriteDescriptorSet;
 use ash::vk;
 use itertools::Itertools;
-use std::{ffi::CStr, ops::Deref, rc::Rc};
+use std::ops::Deref;
+use std::{ffi::CStr, rc::Rc};
 
-use crate::core::command_queue::RhiQueueFamily;
-use crate::core::debug_utils::{RhiDebugType, RhiDebugUtils};
-use crate::core::{instance::RhiInstance, physical_device::RhiPhysicalDevice};
-use crate::shader_cursor::RhiWriteDescriptorSet;
+pub struct RhiDevicePfn {
+    pub(crate) vk_device_pf: ash::Device,
+    pub(crate) vk_dynamic_render_pf: ash::khr::dynamic_rendering::Device,
+    pub(crate) vk_acceleration_struct_pf: ash::khr::acceleration_structure::Device,
+    pub(crate) vk_rt_pipeline_pf: ash::khr::ray_tracing_pipeline::Device,
+}
+impl Deref for RhiDevicePfn {
+    type Target = ash::Device;
+    fn deref(&self) -> &Self::Target {
+        &self.vk_device_pf
+    }
+}
 
 pub struct RhiDevice {
-    pub(crate) ash_device: ash::Device,
-
-    vk_dynamic_render_pf: ash::khr::dynamic_rendering::Device,
-    vk_acceleration_struct_pf: ash::khr::acceleration_structure::Device,
-    vk_rt_pipeline_pf: ash::khr::ray_tracing_pipeline::Device,
+    /// 仅仅是函数指针，以及一个裸的 handle，可以随意 clone
+    ///
+    /// 不需要考虑生命周期的问题，生命周期现在是由手动控制的
+    pub(crate) device_pfn: Rc<RhiDevicePfn>,
 }
 
 /// 构造与销毁
@@ -53,23 +63,24 @@ impl RhiDevice {
         let vk_rt_pipeline_pf = ash::khr::ray_tracing_pipeline::Device::new(instance, &device);
 
         Self {
-            ash_device: device,
-
-            vk_dynamic_render_pf,
-            vk_acceleration_struct_pf,
-            vk_rt_pipeline_pf,
+            device_pfn: Rc::new(RhiDevicePfn {
+                vk_device_pf: device.clone(),
+                vk_dynamic_render_pf,
+                vk_acceleration_struct_pf,
+                vk_rt_pipeline_pf,
+            }),
         }
     }
 
     pub fn destroy(self) {
         log::info!("destroying device");
         unsafe {
-            self.ash_device.destroy_device(None);
+            self.device_pfn.vk_device_pf.destroy_device(None);
         }
     }
 }
 
-/// 构造辅助函数
+/// 创建过程的辅助函数
 impl RhiDevice {
     /// 必要的 physical device core features
     fn physical_device_basic_features() -> vk::PhysicalDeviceFeatures {
@@ -134,27 +145,27 @@ impl RhiDevice {
 impl RhiDevice {
     #[inline]
     pub fn ash_handle(&self) -> &ash::Device {
-        &self.ash_device
+        &self.device_pfn.vk_device_pf
     }
 
     #[inline]
     pub fn vk_handle(&self) -> vk::Device {
-        self.ash_device.handle()
+        self.device_pfn.vk_device_pf.handle()
     }
 
     #[inline]
     pub fn dynamic_rendering_pf(&self) -> &ash::khr::dynamic_rendering::Device {
-        &self.vk_dynamic_render_pf
+        &self.device_pfn.vk_dynamic_render_pf
     }
 
     #[inline]
     pub fn acceleration_structure_pf(&self) -> &ash::khr::acceleration_structure::Device {
-        &self.vk_acceleration_struct_pf
+        &self.device_pfn.vk_acceleration_struct_pf
     }
 
     #[inline]
     pub fn rt_pipeline_pf(&self) -> &ash::khr::ray_tracing_pipeline::Device {
-        &self.vk_rt_pipeline_pf
+        &self.device_pfn.vk_rt_pipeline_pf
     }
 }
 
@@ -164,7 +175,7 @@ impl RhiDevice {
     pub fn write_descriptor_sets(&self, writes: &[RhiWriteDescriptorSet]) {
         let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();
         unsafe {
-            self.ash_device.update_descriptor_sets(&writes, &[]);
+            self.device_pfn.vk_device_pf.update_descriptor_sets(&writes, &[]);
         }
     }
 }
@@ -174,13 +185,6 @@ impl RhiDebugType for RhiDevice {
         "RhiDevice"
     }
     fn vk_handle(&self) -> impl vk::Handle {
-        self.ash_device.handle()
-    }
-}
-impl Deref for RhiDevice {
-    type Target = ash::Device;
-
-    fn deref(&self) -> &Self::Target {
-        &self.ash_device
+        self.device_pfn.vk_device_pf.handle()
     }
 }

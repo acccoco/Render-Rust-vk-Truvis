@@ -1,7 +1,7 @@
 [package]
 name = "shader-binding"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "通过 bindgen 生成 shader 对应的 rust 数据结构"
 
 

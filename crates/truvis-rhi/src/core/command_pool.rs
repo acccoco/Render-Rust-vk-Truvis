@@ -1,8 +1,9 @@
 use ash::vk;
+use std::rc::Rc;
 
 use crate::core::command_queue::RhiQueueFamily;
 use crate::core::debug_utils::{RhiDebugType, RhiDebugUtils};
-use crate::core::device::RhiDevice;
+use crate::core::device::{RhiDevice, RhiDevicePfn};
 
 /// command pool 是和 queue family 绑定的，而不是和 queue 绑定的
 pub struct RhiCommandPool {
@@ -10,6 +11,8 @@ pub struct RhiCommandPool {
     _queue_family: RhiQueueFamily,
 
     _debug_name: String,
+
+    pub(crate) device_pf: Rc<RhiDevicePfn>,
 }
 /// 构造函数
 impl RhiCommandPool {
@@ -21,8 +24,9 @@ impl RhiCommandPool {
         flags: vk::CommandPoolCreateFlags,
         debug_name: &str,
     ) -> Self {
+        let device_pf = device.device_pfn.clone();
         let pool = unsafe {
-            device
+            device_pf
                 .create_command_pool(
                     &vk::CommandPoolCreateInfo::default()
                         .queue_family_index(queue_family.queue_family_index)
@@ -36,14 +40,15 @@ impl RhiCommandPool {
             handle: pool,
             _queue_family: queue_family,
             _debug_name: debug_name.to_string(),
+            device_pf,
         };
         debug_utils.set_debug_name(&command_pool, debug_name);
         command_pool
     }
 
-    pub fn destroy(self, device: &RhiDevice) {
+    pub fn destroy(self) {
         unsafe {
-            device.destroy_command_pool(self.handle, None);
+            self.device_pf.vk_device_pf.destroy_command_pool(self.handle, None);
         }
     }
 }
@@ -61,9 +66,12 @@ impl RhiCommandPool {
     /// 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
     ///
     /// reset 之后，pool 内的 command buffer 又可以重新录制命令
-    pub fn reset_all_buffers(&self, device: &RhiDevice) {
+    pub fn reset_all_buffers(&self) {
         unsafe {
-            device.reset_command_pool(self.handle, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();
+            self.device_pf
+                .vk_device_pf
+                .reset_command_pool(self.handle, vk::CommandPoolResetFlags::RELEASE_RESOURCES)
+                .unwrap();
         }
     }
 }

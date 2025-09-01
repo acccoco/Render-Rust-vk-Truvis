@@ -1,4 +1,4 @@
-use crate::core::allocator::RhiAllocator;
+use crate::core::mem_allocator::RhiMemAllocator;
 use crate::core::command_buffer::RhiCommandBuffer;
 use crate::core::device::RhiDevice;
 use crate::rhi::Rhi;
@@ -54,7 +54,7 @@ impl RhiManagedBuffer {
         Self::new(rhi, buffer_size, vk::BufferUsageFlags::TRANSFER_SRC, true, name)
     }
 
-    pub fn destroy(mut self, allocator: &RhiAllocator) {
+    pub fn destroy(mut self, allocator: &RhiMemAllocator) {
         unsafe {
             allocator.destroy_buffer(self.vk_handle, &mut self.allocation);
         }
@@ -125,7 +125,7 @@ impl RhiManagedBuffer {
     /// 确保 `[T]` 的内存布局在 CPU 和 GPU 是一致的
     ///
     /// 如果需要处理内存对齐的问题，考虑使用 `ash::util::Align`
-    pub fn transfer_data_by_mem_map<T>(&mut self, data: &[T], allocator: &RhiAllocator)
+    pub fn transfer_data_by_mem_map<T>(&mut self, data: &[T], allocator: &RhiMemAllocator)
     where
         T: Sized + Copy,
     {
@@ -143,7 +143,7 @@ impl RhiManagedBuffer {
 
     /// map 和 unmap 需要匹配
     #[inline]
-    pub fn map(&mut self, allocator: &RhiAllocator) {
+    pub fn map(&mut self, allocator: &RhiMemAllocator) {
         if self.map_ptr.is_some() {
             return;
         }
@@ -153,12 +153,12 @@ impl RhiManagedBuffer {
     }
 
     #[inline]
-    pub fn flush(&mut self, allocator: &RhiAllocator, offset: vk::DeviceSize, size: vk::DeviceSize) {
+    pub fn flush(&mut self, allocator: &RhiMemAllocator, offset: vk::DeviceSize, size: vk::DeviceSize) {
         allocator.flush_allocation(&self.allocation, offset, size).unwrap();
     }
 
     #[inline]
-    pub fn unmap(&mut self, allocator: &RhiAllocator) {
+    pub fn unmap(&mut self, allocator: &RhiMemAllocator) {
         if self.map_ptr.is_none() {
             return;
         }

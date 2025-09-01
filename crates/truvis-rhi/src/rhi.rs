@@ -1,7 +1,7 @@
 use crate::core::debug_utils::RhiDebugUtils;
 use crate::{
     core::{
-        allocator::RhiAllocator, command_pool::RhiCommandPool, command_queue::RhiQueueFamily, device::RhiDevice,
+        mem_allocator::RhiMemAllocator, command_pool::RhiCommandPool, command_queue::RhiQueueFamily, device::RhiDevice,
         instance::RhiInstance, physical_device::RhiPhysicalDevice,
     },
     resources::resource_manager::RhiResourceManager,
@@ -12,7 +12,7 @@ use std::{cell::RefCell, ffi::CStr};
 
 pub struct Rhi {
     vk_ctx: VulkanContext,
-    allocator: RhiAllocator,
+    allocator: RhiMemAllocator,
     /// 临时的 graphics command pool，主要用于临时的命令缓冲区
     temp_graphics_command_pool: RhiCommandPool,
     resource_mgr: RefCell<RhiResourceManager>,
@@ -33,7 +33,7 @@ impl Rhi {
             "rhi-graphics",
         );
 
-        let allocator = RhiAllocator::new(
+        let allocator = RhiMemAllocator::new(
             &vk_ctx.instance.ash_instance,
             vk_ctx.physical_device.vk_handle,
             &vk_ctx.device.ash_device,

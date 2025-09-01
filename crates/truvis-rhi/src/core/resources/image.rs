@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use ash::vk;
 use vk_mem::Alloc;
-use crate::core::allocator::RhiAllocator;
+use crate::core::mem_allocator::RhiMemAllocator;
 use crate::core::command_buffer::RhiCommandBuffer;
 use crate::core::debug_utils::RhiDebugType;
 use crate::core::resources::buffer::RhiBuffer;
@@ -71,7 +71,7 @@ pub struct RhiImage2D {
     _name: String,
     image_info: Rc<RhiImageCreateInfo>,
 
-    allocator: Rc<RhiAllocator>,
+    allocator: Rc<RhiMemAllocator>,
 }
 
 impl RhiDebugType for RhiImage2D {

@@ -1,5 +1,5 @@
 pub mod acceleration;
-pub mod allocator;
+pub mod mem_allocator;
 pub mod command_buffer;
 pub mod command_pool;
 pub mod command_queue;
