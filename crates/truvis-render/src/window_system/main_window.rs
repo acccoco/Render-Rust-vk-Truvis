@@ -10,12 +10,13 @@ use itertools::Itertools;
 use std::cell::RefCell;
 use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::core::command_queue::RhiSubmitInfo;
-use truvis_rhi::core::synchronize::{RhiImageBarrier, RhiSemaphore};
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::commands::submit_info::SubmitInfo;
+use truvis_rhi::commands::barrier::ImageBarrier;
+use truvis_rhi::render_context::RenderContext;
 use winit::event_loop::ActiveEventLoop;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::window::Window;
+use truvis_rhi::commands::semaphore::Semaphore;
 
 mod helper {
     pub fn load_icon(bytes: &[u8]) -> winit::window::Icon {
@@ -30,7 +31,7 @@ mod helper {
 }
 
 pub struct MainWindow {
-    rhi: Rc<Rhi>,
+    rhi: Rc<RenderContext>,
     winit_window: Window,
 
     swapchain: Option<RenderSwapchain>,
@@ -40,7 +41,7 @@ pub struct MainWindow {
     frame_ctrl: Rc<FrameController>,
 
     /// 数量和 fif num 相同
-    present_complete_semaphores: Vec<RhiSemaphore>,
+    present_complete_semaphores: Vec<Semaphore>,
 
     /// 表示 gui 的绘制已经完成；
     ///
@@ -48,14 +49,14 @@ pub struct MainWindow {
     /// 因为每个 image 都需要一个对应的 semaphore 来等待 gui 绘制完成后再进行呈现
     ///
     /// renderer 的 wait timeline 可以确保 signal 操作已经完成，但是无法 wait 操作已经完成
-    render_complete_semaphores: Vec<RhiSemaphore>,
+    render_complete_semaphores: Vec<Semaphore>,
 }
 
 // ctor
 impl MainWindow {
     pub fn new(
         event_loop: &ActiveEventLoop,
-        rhi: Rc<Rhi>,
+        rhi: Rc<RenderContext>,
         frame_ctrl: Rc<FrameController>,
         window_title: String,
         window_extent: vk::Extent2D,
@@ -84,10 +85,10 @@ impl MainWindow {
         let gui_pass = GuiPass::new(&rhi, bindless_mgr.clone(), present_settings.color_format);
 
         let present_complete_semaphores = (0..frame_ctrl.fif_count())
-            .map(|i| RhiSemaphore::new(&rhi, &format!("window-present-complete-{}", i)))
+            .map(|i| Semaphore::new(&rhi, &format!("window-present-complete-{}", i)))
             .collect_vec();
         let render_complete_semaphores = (0..present_settings.swapchain_image_cnt)
-            .map(|i| RhiSemaphore::new(&rhi, &format!("window-render-complete-{}", i)))
+            .map(|i| Semaphore::new(&rhi, &format!("window-render-complete-{}", i)))
             .collect_vec();
 
         Self {
@@ -118,7 +119,7 @@ impl MainWindow {
             // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
             // 注1: 可能有 blend 操作，因此需要 COLOR_ATTACHMENT_READ
             // 注2: 这里的 bottom 表示 layout transfer 等待 present 完成
-            let swapchain_image_layout_transfer_barrier = RhiImageBarrier::new()
+            let swapchain_image_layout_transfer_barrier = ImageBarrier::new()
                 .image(swapchain.current_image())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
@@ -128,7 +129,7 @@ impl MainWindow {
                     vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
                 );
 
-            let render_target_barrier = RhiImageBarrier::new()
+            let render_target_barrier = ImageBarrier::new()
                 .image(renderer_data.render_target.image())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(renderer_data.render_target_barrier.src_stage, renderer_data.render_target_barrier.src_access)
@@ -152,7 +153,7 @@ impl MainWindow {
             // 注1: 这里的 top 表示 present 需要等待 layout transfer 完成
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[RhiImageBarrier::new()
+                &[ImageBarrier::new()
                     .image(swapchain.current_image())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
@@ -166,7 +167,7 @@ impl MainWindow {
         cmd.end();
 
         // 等待 swapchain 的 image 准备好；通知 swapchain 的 image 已经绘制完成
-        let submit_info = RhiSubmitInfo::new(std::slice::from_ref(&cmd))
+        let submit_info = SubmitInfo::new(std::slice::from_ref(&cmd))
             .wait(
                 &self.present_complete_semaphores[*frame_label],
                 vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,

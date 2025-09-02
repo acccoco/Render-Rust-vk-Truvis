@@ -12,18 +12,18 @@ use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::const_map;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
-use truvis_rhi::core::shader::RhiShaderStageInfo;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::commands::command_buffer::CommandBuffer;
+use truvis_rhi::pipelines::graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout};
+use truvis_rhi::pipelines::shader::ShaderStageInfo;
+use truvis_rhi::render_context::RenderContext;
 
-const_map!(ShaderStage<RhiShaderStageInfo>: {
-    Vertex: RhiShaderStageInfo {
+const_map!(ShaderStage<ShaderStageInfo>: {
+    Vertex: ShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: cstr::cstr!("vsmain"),
         path: TruvisPath::shader_path("imgui/imgui.slang.spv"),
     },
-    Fragment: RhiShaderStageInfo {
+    Fragment: ShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: cstr::cstr!("psmain"),
         path: TruvisPath::shader_path("imgui/imgui.slang.spv"),
@@ -31,14 +31,14 @@ const_map!(ShaderStage<RhiShaderStageInfo>: {
 });
 
 pub struct GuiPass {
-    pipeline: RhiGraphicsPipeline,
-    pipeline_layout: Rc<RhiPipelineLayout>,
+    pipeline: GraphicsPipeline,
+    pipeline_layout: Rc<PipelineLayout>,
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
 
 impl GuiPass {
-    pub fn new(rhi: &Rhi, bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
-        let pipeline_layout = Rc::new(RhiPipelineLayout::new(
+    pub fn new(rhi: &RenderContext, bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
+        let pipeline_layout = Rc::new(PipelineLayout::new(
             rhi.device.clone(),
             &[bindless_mgr.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange {
@@ -64,7 +64,7 @@ impl GuiPass {
             .dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
             .alpha_blend_op(vk::BlendOp::ADD)];
 
-        let mut create_info = RhiGraphicsPipelineCreateInfo::default();
+        let mut create_info = GraphicsPipelineCreateInfo::default();
         create_info
             .shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec())
             .vertex_attribute(ImGuiVertex::vertex_input_attributes())
@@ -75,7 +75,7 @@ impl GuiPass {
             // TODO 这里不应该由 depth
             .attach_info(vec![color_format], None, None);
 
-        let pipeline = RhiGraphicsPipeline::new(rhi.device.clone(), &create_info, pipeline_layout.clone(), "uipass");
+        let pipeline = GraphicsPipeline::new(rhi.device.clone(), &create_info, pipeline_layout.clone(), "uipass");
 
         Self {
             pipeline,
@@ -86,10 +86,10 @@ impl GuiPass {
 
     pub fn draw(
         &self,
-        rhi: &Rhi,
+        rhi: &RenderContext,
         canvas_color_view: vk::ImageView,
         canvas_extent: vk::Extent2D,
-        cmd: &RhiCommandBuffer,
+        cmd: &CommandBuffer,
         gui: &mut Gui,
         frame_label: FrameLabel,
     ) {

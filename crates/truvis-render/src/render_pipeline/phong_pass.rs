@@ -12,24 +12,24 @@ use std::cell::RefCell;
 use std::mem::offset_of;
 use std::rc::Rc;
 use truvis_rhi::basic::color::LabelColor;
-use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
-use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
-use truvis_rhi::core::rendering_info::RhiRenderingInfo;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::resources::special_buffers::structured_buffer::StructuredBuffer;
+use truvis_rhi::commands::command_buffer::CommandBuffer;
+use truvis_rhi::pipelines::graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout};
+use truvis_rhi::pipelines::rendering_info::RenderingInfo;
+use truvis_rhi::render_context::RenderContext;
 
 pub struct PhongPass {
-    pipeline: RhiGraphicsPipeline,
+    pipeline: GraphicsPipeline,
     bindless_manager: Rc<RefCell<BindlessManager>>,
 }
 impl PhongPass {
     pub fn new(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         color_format: vk::Format,
         depth_format: vk::Format,
         bindless_manager: Rc<RefCell<BindlessManager>>,
     ) -> Self {
-        let mut ci = RhiGraphicsPipelineCreateInfo::default();
+        let mut ci = GraphicsPipelineCreateInfo::default();
         ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv", cstr::cstr!("main"));
         ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv", cstr::cstr!("main"));
 
@@ -44,7 +44,7 @@ impl PhongPass {
             [0.0; 4],
         );
 
-        let pipeline_layout = Rc::new(RhiPipelineLayout::new(
+        let pipeline_layout = Rc::new(PipelineLayout::new(
             rhi.device.clone(),
             &[bindless_manager.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange::default()
@@ -54,7 +54,7 @@ impl PhongPass {
             "phong-pass",
         ));
 
-        let d3_pipe = RhiGraphicsPipeline::new(rhi.device.clone(), &ci, pipeline_layout, "phong-d3-pipe");
+        let d3_pipe = GraphicsPipeline::new(rhi.device.clone(), &ci, pipeline_layout, "phong-d3-pipe");
 
         Self {
             pipeline: d3_pipe,
@@ -64,7 +64,7 @@ impl PhongPass {
 
     fn bind(
         &self,
-        cmd: &RhiCommandBuffer,
+        cmd: &CommandBuffer,
         viewport: &vk::Rect2D,
         push_constant: &shader::raster::PushConstants,
         frame_idx: FrameLabel,
@@ -100,16 +100,16 @@ impl PhongPass {
 
     pub fn draw(
         &self,
-        cmd: &RhiCommandBuffer,
+        cmd: &CommandBuffer,
         frame_ctx: &FrameController,
-        per_frame_data: &RhiStructuredBuffer<shader::PerFrameData>,
+        per_frame_data: &StructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
         scene_mgr: &SceneManager,
         frame_buffers: &FrameBuffers,
         frame_settings: &FrameSettings,
     ) {
         let frame_label = frame_ctx.frame_label();
-        let rendering_info = RhiRenderingInfo::new(
+        let rendering_info = RenderingInfo::new(
             vec![frame_buffers.render_target_image_view(frame_label).handle()],
             Some(frame_buffers.depth_image_view().handle()),
             vk::Rect2D {

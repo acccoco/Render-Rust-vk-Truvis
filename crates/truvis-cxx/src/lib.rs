@@ -4,8 +4,8 @@ use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
 use std::ffi::c_void;
 use std::mem::offset_of;
-use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_rhi::render_context::RenderContext;
 
 pub mod _ffi_bindings;
 use crate::_ffi_bindings::*;
@@ -37,7 +37,7 @@ impl AssimpSceneLoader {
     /// # return
     /// 返回整个场景的所有 instance id
     pub fn load_scene(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         model_file: &std::path::Path,
         instance_register: impl FnMut(DrsInstance) -> InsGuid,
         mesh_register: impl FnMut(DrsMesh) -> MeshGuid,
@@ -71,7 +71,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中基础的几何体
-    fn load_mesh(&mut self, rhi: &Rhi, mut mesh_register: impl FnMut(DrsMesh) -> MeshGuid) {
+    fn load_mesh(&mut self, rhi: &RenderContext, mut mesh_register: impl FnMut(DrsMesh) -> MeshGuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -96,7 +96,7 @@ impl AssimpSceneLoader {
                 }
                 let index_data =
                     std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
-                let mut index_buffer = RhiIndexBuffer::new(
+                let mut index_buffer = IndexBuffer::new(
                     rhi,
                     index_data.len(),
                     format!("{}-mesh-{}-indices", self.model_name, mesh_idx),
@@ -122,7 +122,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中的所有材质
-    fn load_mats(&mut self, _rhi: &Rhi, mut mat_register: impl FnMut(DrsMaterial) -> MatGuid) {
+    fn load_mats(&mut self, _rhi: &RenderContext, mut mat_register: impl FnMut(DrsMaterial) -> MatGuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)

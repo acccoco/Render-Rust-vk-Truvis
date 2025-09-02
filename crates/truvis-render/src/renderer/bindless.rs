@@ -1,22 +1,28 @@
-use crate::pipeline_settings::FrameLabel;
-use crate::render_resource::ImageLoader;
-use crate::renderer::frame_controller::FrameController;
+use std::{collections::HashMap, rc::Rc};
+
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
 use shader_layout_macro::ShaderLayout;
-use std::collections::HashMap;
-use std::rc::Rc;
-use truvis_rhi::core::descriptor::{RhiDescriptorSet, RhiDescriptorSetLayout};
-use truvis_rhi::core::descriptor_pool::RhiDescriptorPool;
-use truvis_rhi::core::device::RhiDevice;
-use truvis_rhi::core::resources::image_view::{Image2DViewContainer, Image2DViewUUID, RhiImage2DView};
-use truvis_rhi::core::resources::texture::{RhiTexture2D, Texture2DContainer};
-use truvis_rhi::rhi::Rhi;
-use truvis_rhi::shader_cursor::ShaderCursor;
+use truvis_rhi::{
+    descriptors::{
+        descriptor::{DescriptorSet, DescriptorSetLayout},
+        descriptor_pool::DescriptorPool,
+    },
+    foundation::device::{Device, DeviceFunctions},
+    resources::{
+        image_view::{Image2DViewContainer, Image2DViewUUID, Image2DView},
+        texture::{Texture2D, Texture2DContainer},
+    },
+    render_context::RenderContext,
+    utilities::shader_cursor::ShaderCursor,
+};
+
+use crate::{pipeline_settings::FrameLabel, render_resource::ImageLoader, renderer::frame_controller::FrameController};
 
 #[derive(ShaderLayout)]
-pub struct BindlessDescriptorBinding {
+pub struct BindlessDescriptorBinding
+{
     #[binding = 0]
     #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
     #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR | COMPUTE"]
@@ -32,11 +38,12 @@ pub struct BindlessDescriptorBinding {
     _images: (),
 }
 
-pub struct BindlessManager {
-    pub bindless_descriptor_layout: RhiDescriptorSetLayout<BindlessDescriptorBinding>,
+pub struct BindlessManager
+{
+    pub bindless_descriptor_layout: DescriptorSetLayout<BindlessDescriptorBinding>,
 
     /// 每一个 frame in flights 都有一个 descriptor set
-    pub bindless_descriptor_sets: Vec<RhiDescriptorSet<BindlessDescriptorBinding>>,
+    pub bindless_descriptor_sets: Vec<DescriptorSet<BindlessDescriptorBinding>>,
 
     /// 每一帧都需要重新构建的映射
     ///
@@ -50,21 +57,23 @@ pub struct BindlessManager {
     bindless_images: HashMap<Image2DViewUUID, u32>,
     images: HashMap<Image2DViewUUID, Image2DViewContainer>,
 
-    device: Rc<RhiDevice>,
+    device_functions: Rc<DeviceFunctions>,
 
     /// 当前 frame in flight 的标签，每帧更新
     frame_label: FrameLabel,
 }
-impl BindlessManager {
-    pub fn new(rhi: &Rhi, descriptor_pool: &RhiDescriptorPool, frame_ctrl: Rc<FrameController>) -> Self {
-        let bindless_layout = RhiDescriptorSetLayout::<BindlessDescriptorBinding>::new(
+impl BindlessManager
+{
+    pub fn new(rhi: &RenderContext, descriptor_pool: &DescriptorPool, frame_ctrl: Rc<FrameController>) -> Self
+    {
+        let bindless_layout = DescriptorSetLayout::<BindlessDescriptorBinding>::new(
             rhi,
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
             "bindless-layout",
         );
         let bindless_descriptor_sets = (0..frame_ctrl.fif_count())
             .map(|idx| {
-                RhiDescriptorSet::<BindlessDescriptorBinding>::new(
+                DescriptorSet::<BindlessDescriptorBinding>::new(
                     rhi,
                     descriptor_pool,
                     &bindless_layout,
@@ -83,7 +92,7 @@ impl BindlessManager {
             bindless_images: HashMap::new(),
             images: HashMap::new(),
 
-            device: rhi.device.clone(),
+            device_functions: rhi.device_functions().clone(),
 
             frame_label: FrameLabel::A,
         }
@@ -91,14 +100,16 @@ impl BindlessManager {
 
     /// getter
     #[inline]
-    pub fn current_descriptor_set(&self) -> &RhiDescriptorSet<BindlessDescriptorBinding> {
+    pub fn current_descriptor_set(&self) -> &DescriptorSet<BindlessDescriptorBinding>
+    {
         &self.bindless_descriptor_sets[*self.frame_label]
     }
 
     /// # Phase: Before Render
     ///
     /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
-    pub fn prepare_render_data(&mut self, frame_label: FrameLabel) {
+    pub fn prepare_render_data(&mut self, frame_label: FrameLabel)
+    {
         self.frame_label = frame_label;
 
         let mut texture_infos = Vec::with_capacity(self.textures.iter().len());
@@ -131,37 +142,44 @@ impl BindlessManager {
                 image_infos,
             ),
         ];
-        self.device.write_descriptor_sets(&writes);
+        self.device_functions.write_descriptor_sets(&writes);
     }
 
     /// 获得纹理在当前帧的 bindless 索引
-    pub fn get_texture_handle(&self, texture_path: &str) -> Option<shader::TextureHandle> {
+    pub fn get_texture_handle(&self, texture_path: &str) -> Option<shader::TextureHandle>
+    {
         self.bindless_textures.get(texture_path).copied().map(|idx| shader::TextureHandle { index: idx as _ })
     }
 
     /// 获得图像在当前帧的 bindless 索引
-    pub fn get_image_handle(&self, image_uuid: &Image2DViewUUID) -> Option<shader::ImageHandle> {
+    pub fn get_image_handle(&self, image_uuid: &Image2DViewUUID) -> Option<shader::ImageHandle>
+    {
         self.bindless_images.get(image_uuid).copied().map(|idx| shader::ImageHandle { index: idx as _ })
     }
 }
 
 // register & unregister
-impl BindlessManager {
-    pub fn register_texture_by_path(&mut self, rhi: &Rhi, texture_path: String) {
+impl BindlessManager
+{
+    pub fn register_texture_by_path(&mut self, rhi: &RenderContext, texture_path: String)
+    {
         let texture = ImageLoader::load_image(rhi, std::path::Path::new(&texture_path));
         self.register_texture(texture_path, Texture2DContainer::Owned(Box::new(texture)));
     }
 
-    pub fn register_texture_owned(&mut self, key: String, texture: RhiTexture2D) {
+    pub fn register_texture_owned(&mut self, key: String, texture: Texture2D)
+    {
         self.register_texture(key, Texture2DContainer::Owned(Box::new(texture)));
     }
 
-    pub fn register_texture_shared(&mut self, key: String, texture: Rc<RhiTexture2D>) {
+    pub fn register_texture_shared(&mut self, key: String, texture: Rc<Texture2D>)
+    {
         self.register_texture(key, Texture2DContainer::Shared(texture));
     }
 
     #[inline]
-    fn register_texture(&mut self, key: String, texture: Texture2DContainer) {
+    fn register_texture(&mut self, key: String, texture: Texture2DContainer)
+    {
         if self.textures.contains_key(&key) {
             log::error!("Texture {} is already registered", key);
             return;
@@ -169,20 +187,24 @@ impl BindlessManager {
         self.textures.insert(key, texture);
     }
 
-    pub fn unregister_texture(&mut self, key: &str) {
+    pub fn unregister_texture(&mut self, key: &str)
+    {
         self.textures.remove(key);
     }
 
-    pub fn register_image_shared(&mut self, image: Rc<RhiImage2DView>) {
+    pub fn register_image_shared(&mut self, image: Rc<Image2DView>)
+    {
         self.register_image(image.uuid(), Image2DViewContainer::Shared(image));
     }
 
-    pub fn register_image_raw(&mut self, image: &RhiImage2DView) {
+    pub fn register_image_raw(&mut self, image: &Image2DView)
+    {
         self.register_image(image.uuid(), Image2DViewContainer::Raw(image.handle()));
     }
 
     #[inline]
-    fn register_image(&mut self, key: Image2DViewUUID, image: Image2DViewContainer) {
+    fn register_image(&mut self, key: Image2DViewUUID, image: Image2DViewContainer)
+    {
         if self.images.contains_key(&key) {
             log::error!("Image with UUID {} is already registered", key);
             return;
@@ -190,7 +212,8 @@ impl BindlessManager {
         self.images.insert(key, image);
     }
 
-    pub fn unregister_image(&mut self, key: &Image2DViewUUID) {
+    pub fn unregister_image(&mut self, key: &Image2DViewUUID)
+    {
         self.images.remove(key);
     }
 }

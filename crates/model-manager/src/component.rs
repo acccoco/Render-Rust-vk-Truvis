@@ -2,10 +2,10 @@ use crate::guid_new_type::{MatGuid, MeshGuid};
 use crate::vertex::vertex_3d::Vertex3D;
 use ash::vk;
 use itertools::Itertools;
-use truvis_rhi::core::acceleration::{BlasInputInfo, RhiAcceleration};
-use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
-use truvis_rhi::core::resources::special_buffers::vertex_buffer::RhiVertexBuffer;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::raytracing::acceleration::{BlasInputInfo, Acceleration};
+use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
+use truvis_rhi::render_context::RenderContext;
 
 #[derive(Default)]
 pub struct DrsMaterial {
@@ -20,8 +20,8 @@ pub struct DrsMaterial {
 }
 
 pub struct DrsGeometry<V: bytemuck::Pod> {
-    pub vertex_buffer: RhiVertexBuffer<V>,
-    pub index_buffer: RhiIndexBuffer,
+    pub vertex_buffer: VertexBuffer<V>,
+    pub index_buffer: IndexBuffer,
 }
 pub type DrsGeometry3D = DrsGeometry<Vertex3D>;
 impl<V: bytemuck::Pod> DrsGeometry<V> {
@@ -79,19 +79,19 @@ impl DrsGeometry3D {
 pub struct DrsMesh {
     pub geometries: Vec<DrsGeometry<Vertex3D>>,
 
-    pub blas: Option<RhiAcceleration>,
+    pub blas: Option<Acceleration>,
     pub name: String,
     pub blas_device_address: Option<vk::DeviceAddress>,
 }
 
 impl DrsMesh {
-    pub fn build_blas(&mut self, rhi: &Rhi) {
+    pub fn build_blas(&mut self, rhi: &RenderContext) {
         if self.blas.is_some() {
             return; // 已经构建过了
         }
 
         let blas_infos = self.geometries.iter().map(|g| g.get_blas_geometry_info()).collect_vec();
-        let blas = RhiAcceleration::build_blas_sync(
+        let blas = Acceleration::build_blas_sync(
             rhi,
             &blas_infos,
             vk::BuildAccelerationStructureFlagsKHR::empty(),

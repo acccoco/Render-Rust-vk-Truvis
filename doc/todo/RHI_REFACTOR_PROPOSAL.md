@@ -16,7 +16,7 @@
 ### 当前架构的问题
 
 1. **循环引用风险**
-   - `RhiBuffer` 和 `RhiImage2D` 直接持有 `Rc<RhiDevice>` 强引用
+   - `RhiBuffer` 和 `RhiImage2D` 直接持有 `Rc<RhiDeviceFunctions>` 强引用
    - 可能导致设备无法正确销毁，造成内存泄漏
 
 2. **资源管理分散**
@@ -290,7 +290,7 @@ impl RhiResourceManager {
 pub struct Rhi {
     // 保持原有的核心组件
     pub instance: Rc<RhiInstance>,
-    pub device: Rc<RhiDevice>,
+    pub device: Rc<RhiDeviceFunctions>,
     pub allocator: Rc<RhiAllocator>,
     pub graphics_queue: RhiQueue,
     pub temp_graphics_command_pool: Rc<RhiCommandPool>,
@@ -554,7 +554,7 @@ pub fn create_image_2d_direct(&self, ...) -> RhiImage2D {
 
 ### 优势
 
-1. **减少引用计数开销**：不再使用 `Rc<RhiDevice>`
+1. **减少引用计数开销**：不再使用 `Rc<RhiDeviceFunctions>`
 2. **批量操作**：可以实现批量资源创建和销毁
 3. **内存局部性**：资源集中存储，提高缓存命中率
 4. **资源池化**：容易实现资源重用机制

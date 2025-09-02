@@ -2,9 +2,9 @@ use crate::component::DrsGeometry;
 use crate::vertex::VertexLayout;
 use ash::vk;
 use std::mem::offset_of;
-use truvis_rhi::core::resources::special_buffers::vertex_buffer::RhiVertexBuffer;
-use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
+use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_rhi::render_context::RenderContext;
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -43,21 +43,21 @@ impl VertexLayout for VertexAosLayoutPosColor {
 
 impl VertexAosLayoutPosColor {
     pub fn create_vertex_buffer(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         data: &[VertexPosColor],
         name: impl AsRef<str>,
-    ) -> RhiVertexBuffer<VertexPosColor> {
-        let mut vertex_buffer = RhiVertexBuffer::new(rhi, data.len(), name.as_ref());
+    ) -> VertexBuffer<VertexPosColor> {
+        let mut vertex_buffer = VertexBuffer::new(rhi, data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(rhi, data);
 
         vertex_buffer
     }
 
     /// return: (vertex_buffer, index_buffer)
-    pub fn triangle(rhi: &Rhi) -> DrsGeometry<VertexPosColor> {
+    pub fn triangle(rhi: &RenderContext) -> DrsGeometry<VertexPosColor> {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::TRIANGLE_VERTEX_DATA, "triangle-vertex-buffer");
 
-        let mut index_buffer = RhiIndexBuffer::new(rhi, shape::TRIANGLE_INDEX_DATA.len(), "triangle-index-buffer");
+        let mut index_buffer = IndexBuffer::new(rhi, shape::TRIANGLE_INDEX_DATA.len(), "triangle-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::TRIANGLE_INDEX_DATA);
 
         DrsGeometry {
@@ -66,10 +66,10 @@ impl VertexAosLayoutPosColor {
         }
     }
 
-    pub fn rectangle(rhi: &Rhi) -> DrsGeometry<VertexPosColor> {
+    pub fn rectangle(rhi: &RenderContext) -> DrsGeometry<VertexPosColor> {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::RECTANGLE_VERTEX_DATA, "rectangle-vertex-buffer");
 
-        let mut index_buffer = RhiIndexBuffer::new(rhi, shape::RECTANGLE_INDEX_DATA.len(), "rectangle-index-buffer");
+        let mut index_buffer = IndexBuffer::new(rhi, shape::RECTANGLE_INDEX_DATA.len(), "rectangle-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::RECTANGLE_INDEX_DATA);
 
         DrsGeometry {

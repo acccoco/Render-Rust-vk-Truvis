@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_cxx::AssimpSceneLoader;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::render_context::RenderContext;
 
 pub struct SceneManager {
     mat_map: HashMap<MatGuid, DrsMaterial>,
@@ -64,7 +64,7 @@ impl SceneManager {
     }
 
     /// 向世界中添加一个外部场景
-    pub fn load_scene(&mut self, rhi: &Rhi, model_path: &std::path::Path, transform: &glam::Mat4) -> Vec<InsGuid> {
+    pub fn load_scene(&mut self, rhi: &RenderContext, model_path: &std::path::Path, transform: &glam::Mat4) -> Vec<InsGuid> {
         let mut ins_guids = vec![];
 
         AssimpSceneLoader::load_scene(

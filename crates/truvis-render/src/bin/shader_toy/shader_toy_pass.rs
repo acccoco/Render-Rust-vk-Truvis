@@ -11,19 +11,19 @@ use truvis_crate_tools::resource::TruvisPath;
 use truvis_render::pipeline_settings::FrameSettings;
 use truvis_render::platform::timer::Timer;
 use truvis_render::renderer::frame_controller::FrameController;
-use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
-use truvis_rhi::core::rendering_info::RhiRenderingInfo;
-use truvis_rhi::core::shader::RhiShaderStageInfo;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::commands::command_buffer::CommandBuffer;
+use truvis_rhi::pipelines::graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout};
+use truvis_rhi::pipelines::rendering_info::RenderingInfo;
+use truvis_rhi::pipelines::shader::ShaderStageInfo;
+use truvis_rhi::render_context::RenderContext;
 
-const_map!(ShaderStage<RhiShaderStageInfo>:{
-    Vertex: RhiShaderStageInfo {
+const_map!(ShaderStage<ShaderStageInfo>:{
+    Vertex: ShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: cstr::cstr!("main"),
         path: TruvisPath::shader_path("shadertoy-glsl/shadertoy.vert.spv"),
     },
-    Fragment: RhiShaderStageInfo {
+    Fragment: ShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: cstr::cstr!("main"),
         path: TruvisPath::shader_path("shadertoy-glsl/shadertoy.frag.spv"),
@@ -50,12 +50,12 @@ pub struct PushConstants {
 }
 
 pub struct ShaderToyPass {
-    pipeline: RhiGraphicsPipeline,
-    _pipeline_layout: Rc<RhiPipelineLayout>,
+    pipeline: GraphicsPipeline,
+    _pipeline_layout: Rc<PipelineLayout>,
 }
 impl ShaderToyPass {
-    pub fn new(rhi: &Rhi, color_format: vk::Format) -> Self {
-        let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
+    pub fn new(rhi: &RenderContext, color_format: vk::Format) -> Self {
+        let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![color_format], None, Some(vk::Format::UNDEFINED));
         pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
@@ -67,7 +67,7 @@ impl ShaderToyPass {
             [0.0; 4],
         );
 
-        let pipeline_layout = Rc::new(RhiPipelineLayout::new(
+        let pipeline_layout = Rc::new(PipelineLayout::new(
             rhi.device.clone(),
             &[],
             &[vk::PushConstantRange {
@@ -78,7 +78,7 @@ impl ShaderToyPass {
             "shader-toy",
         ));
         let pipeline =
-            RhiGraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, pipeline_layout.clone(), "shader-toy");
+            GraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, pipeline_layout.clone(), "shader-toy");
 
         Self {
             _pipeline_layout: pipeline_layout,
@@ -88,7 +88,7 @@ impl ShaderToyPass {
 
     pub fn draw(
         &self,
-        cmd: &RhiCommandBuffer,
+        cmd: &CommandBuffer,
         frame_ctrl: &FrameController,
         frame_settings: &FrameSettings,
         render_target: vk::ImageView,
@@ -112,7 +112,7 @@ impl ShaderToyPass {
             __padding__: [0.0, 0.0],
         };
 
-        let rendering_info = RhiRenderingInfo::new(
+        let rendering_info = RenderingInfo::new(
             vec![render_target],
             None,
             vk::Rect2D {

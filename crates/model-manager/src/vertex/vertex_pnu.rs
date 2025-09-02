@@ -2,9 +2,9 @@ use crate::component::DrsGeometry;
 use crate::vertex::VertexLayout;
 use ash::vk;
 use std::mem::offset_of;
-use truvis_rhi::core::resources::special_buffers::vertex_buffer::RhiVertexBuffer;
-use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
+use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_rhi::render_context::RenderContext;
 
 /// AoS: Array of structures
 #[repr(C)]
@@ -56,20 +56,20 @@ impl VertexLayout for VertexLayoutAosPosNormalUv {
 
 impl VertexLayoutAosPosNormalUv {
     pub fn create_vertex_buffer(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         data: &[VertexPosNormalUv],
         name: impl AsRef<str>,
-    ) -> RhiVertexBuffer<VertexPosNormalUv> {
-        let mut vertex_buffer = RhiVertexBuffer::new(rhi, data.len(), name.as_ref());
+    ) -> VertexBuffer<VertexPosNormalUv> {
+        let mut vertex_buffer = VertexBuffer::new(rhi, data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(rhi, data);
 
         vertex_buffer
     }
 
-    pub fn cube(rhi: &Rhi) -> DrsGeometry<VertexPosNormalUv> {
+    pub fn cube(rhi: &RenderContext) -> DrsGeometry<VertexPosNormalUv> {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::Cube::VERTICES, "cube-vertex-buffer");
 
-        let mut index_buffer = RhiIndexBuffer::new(rhi, shape::Cube::INDICES.len(), "cube-index-buffer");
+        let mut index_buffer = IndexBuffer::new(rhi, shape::Cube::INDICES.len(), "cube-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::Cube::INDICES);
 
         DrsGeometry {
@@ -78,10 +78,10 @@ impl VertexLayoutAosPosNormalUv {
         }
     }
 
-    pub fn floor(rhi: &Rhi) -> DrsGeometry<VertexPosNormalUv> {
+    pub fn floor(rhi: &RenderContext) -> DrsGeometry<VertexPosNormalUv> {
         let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::Floor::VERTICES, "floor-vertex-buffer");
 
-        let mut index_buffer = RhiIndexBuffer::new(rhi, shape::Floor::INDICES.len(), "floor-index-buffer");
+        let mut index_buffer = IndexBuffer::new(rhi, shape::Floor::INDICES.len(), "floor-index-buffer");
         index_buffer.transfer_data_sync(rhi, &shape::Floor::INDICES);
 
         DrsGeometry {

@@ -7,9 +7,9 @@ use shader_binding::shader;
 use std::cell::RefCell;
 use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::core::command_queue::RhiSubmitInfo;
-use truvis_rhi::core::synchronize::RhiImageBarrier;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::commands::submit_info::SubmitInfo;
+use truvis_rhi::commands::barrier::ImageBarrier;
+use truvis_rhi::render_context::RenderContext;
 
 /// 整个 RT 管线
 pub struct RtPipeline {
@@ -18,7 +18,7 @@ pub struct RtPipeline {
     sdr_pass: ComputePass<shader::sdr::PushConstant>,
 }
 impl RtPipeline {
-    pub fn new(rhi: &Rhi, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new(rhi: &RenderContext, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         let rt_pass = SimlpeRtPass::new(rhi, bindless_mgr.clone());
         let blit_pass = ComputePass::<shader::blit::PushConstant>::new(
             rhi,
@@ -70,7 +70,7 @@ impl RtPipeline {
             // frams in flight 使用同一个 rt image，因此需要确保之前的 rt 写入已经完成
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[RhiImageBarrier::new()
+                &[ImageBarrier::new()
                     .image(color_image.handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .src_mask(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, vk::AccessFlags2::SHADER_STORAGE_WRITE)
@@ -102,7 +102,7 @@ impl RtPipeline {
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit");
 
             // 等待 ray-tracing 执行完成
-            let rt_barrier = RhiImageBarrier::new()
+            let rt_barrier = ImageBarrier::new()
                 .image(color_image.handle())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, vk::AccessFlags2::SHADER_STORAGE_WRITE)
@@ -136,7 +136,7 @@ impl RtPipeline {
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "hdr2sdr");
 
             // 等待之前的 compute shader 执行完成
-            let rt_barrier = RhiImageBarrier::new()
+            let rt_barrier = ImageBarrier::new()
                 .image(render_target)
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(
@@ -171,6 +171,6 @@ impl RtPipeline {
             submit_cmds.push(cmd);
         }
 
-        rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&submit_cmds)], None);
+        rhi.graphics_queue.submit(vec![SubmitInfo::new(&submit_cmds)], None);
     }
 }

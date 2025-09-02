@@ -58,7 +58,7 @@ Truvis 的 RHI (Render Hardware Interface) 层，提供 Vulkan 的现代化封�
 ```rust
 pub struct Rhi {
     pub vk_pf: Rc<ash::Entry>,                    // Vulkan 动态库入口
-    pub device: Rc<RhiDevice>,                    // 逻辑设备
+    pub device: Rc<RhiDeviceFunctions>,                    // 逻辑设备
     pub allocator: Rc<RhiAllocator>,              // VMA 内存分配器
     
     // 专用队列

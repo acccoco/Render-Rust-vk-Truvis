@@ -1,12 +1,12 @@
 use ash::vk;
 use std::mem::offset_of;
 use truvis_rhi::basic::color::LabelColor;
-use truvis_rhi::core::resources::special_buffers::vertex_buffer::RhiVertexBuffer;
-use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::resources::buffer::RhiBuffer;
-use truvis_rhi::core::resources::special_buffers::index_buffer::RhiIndexBuffer;
-use truvis_rhi::core::synchronize::RhiBufferBarrier;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
+use truvis_rhi::commands::command_buffer::CommandBuffer;
+use truvis_rhi::resources::buffer::Buffer;
+use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_rhi::commands::barrier::BufferBarrier;
+use truvis_rhi::render_context::RenderContext;
 
 /// AoS: Array of Structs
 pub struct ImGuiVertex {
@@ -50,17 +50,17 @@ impl ImGuiVertex {
 
 /// imgui 绘制所需的 vertex buffer 和 index buffer
 pub struct GuiMesh {
-    pub vertex_buffer: RhiVertexBuffer<imgui::DrawVert>,
+    pub vertex_buffer: VertexBuffer<imgui::DrawVert>,
     _vertex_count: usize,
-    _vertex_stage_buffer: RhiBuffer,
+    _vertex_stage_buffer: Buffer,
 
-    pub _index_buffer: RhiIndexBuffer,
+    pub _index_buffer: IndexBuffer,
     _index_count: usize,
-    _index_stage_buffer: RhiBuffer,
+    _index_stage_buffer: Buffer,
 }
 
 impl GuiMesh {
-    pub fn new(rhi: &Rhi, cmd: &RhiCommandBuffer, frame_name: &str, draw_data: &imgui::DrawData) -> Self {
+    pub fn new(rhi: &RenderContext, cmd: &CommandBuffer, frame_name: &str, draw_data: &imgui::DrawData) -> Self {
         let (vertex_buffer, vertex_cnt, vertex_stage_buffer) =
             Self::create_vertex_buffer(rhi, frame_name, cmd, draw_data);
         let (index_buffer, index_cnt, index_stage_buffer) = Self::create_index_buffer(rhi, frame_name, cmd, draw_data);
@@ -70,11 +70,11 @@ impl GuiMesh {
             cmd.buffer_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[
-                    RhiBufferBarrier::default()
+                    BufferBarrier::default()
                         .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
                         .dst_mask(vk::PipelineStageFlags2::INDEX_INPUT, vk::AccessFlags2::INDEX_READ)
                         .buffer(index_buffer.handle(), 0, vk::WHOLE_SIZE),
-                    RhiBufferBarrier::default()
+                    BufferBarrier::default()
                         .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
                         .dst_mask(vk::PipelineStageFlags2::VERTEX_INPUT, vk::AccessFlags2::VERTEX_ATTRIBUTE_READ)
                         .buffer(vertex_buffer.handle(), 0, vk::WHOLE_SIZE),
@@ -98,11 +98,11 @@ impl GuiMesh {
     ///
     /// @return (vertex buffer, vertex count, stage buffer)
     fn create_vertex_buffer(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         frame_name: &str,
-        cmd: &RhiCommandBuffer,
+        cmd: &CommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (RhiVertexBuffer<imgui::DrawVert>, usize, RhiBuffer) {
+    ) -> (VertexBuffer<imgui::DrawVert>, usize, Buffer) {
         let vertex_count = draw_data.total_vtx_count as usize;
         let mut vertices = Vec::with_capacity(vertex_count);
         for draw_list in draw_data.draw_lists() {
@@ -111,8 +111,8 @@ impl GuiMesh {
 
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
         let mut vertex_buffer =
-            RhiVertexBuffer::<imgui::DrawVert>::new(rhi, vertex_count, format!("{}-imgui-vertex", frame_name));
-        let mut stage_buffer = RhiBuffer::new_stage_buffer(
+            VertexBuffer::<imgui::DrawVert>::new(rhi, vertex_count, format!("{}-imgui-vertex", frame_name));
+        let mut stage_buffer = Buffer::new_stage_buffer(
             rhi,
             vertices_size as vk::DeviceSize,
             format!("{}-imgui-vertex-stage", frame_name),
@@ -139,11 +139,11 @@ impl GuiMesh {
     ///
     /// @return (index buffer, index count, stage buffer)
     fn create_index_buffer(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         frame_name: &str,
-        cmd: &RhiCommandBuffer,
+        cmd: &CommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (RhiIndexBuffer, usize, RhiBuffer) {
+    ) -> (IndexBuffer, usize, Buffer) {
         let index_count = draw_data.total_idx_count as usize;
         let mut indices = Vec::with_capacity(index_count);
         for draw_list in draw_data.draw_lists() {
@@ -151,8 +151,8 @@ impl GuiMesh {
         }
 
         let indices_size = index_count * size_of::<imgui::DrawIdx>();
-        let mut index_buffer = RhiIndexBuffer::new(rhi, indices_size, format!("{}-imgui-index", frame_name));
-        let mut stage_buffer = RhiBuffer::new_stage_buffer(
+        let mut index_buffer = IndexBuffer::new(rhi, indices_size, format!("{}-imgui-index", frame_name));
+        let mut stage_buffer = Buffer::new_stage_buffer(
             rhi,
             indices_size as vk::DeviceSize,
             format!("{}-imgui-index-stage", frame_name),

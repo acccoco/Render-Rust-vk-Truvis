@@ -9,19 +9,19 @@ use truvis_crate_tools::const_map;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_render::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_render::renderer::frame_buffers::FrameBuffers;
-use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::graphics_pipeline::{RhiGraphicsPipeline, RhiGraphicsPipelineCreateInfo, RhiPipelineLayout};
-use truvis_rhi::core::rendering_info::RhiRenderingInfo;
-use truvis_rhi::core::shader::RhiShaderStageInfo;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::commands::command_buffer::CommandBuffer;
+use truvis_rhi::pipelines::graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout};
+use truvis_rhi::pipelines::rendering_info::RenderingInfo;
+use truvis_rhi::pipelines::shader::ShaderStageInfo;
+use truvis_rhi::render_context::RenderContext;
 
-const_map!(ShaderStage<RhiShaderStageInfo>: {
-    Vertex: RhiShaderStageInfo {
+const_map!(ShaderStage<ShaderStageInfo>: {
+    Vertex: ShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: cstr::cstr!("vsmain"),
         path: TruvisPath::shader_path("hello_triangle/triangle.slang.spv"),
     },
-    Fragment: RhiShaderStageInfo {
+    Fragment: ShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: cstr::cstr!("psmain"),
         path: TruvisPath::shader_path("hello_triangle/triangle.slang.spv"),
@@ -29,12 +29,12 @@ const_map!(ShaderStage<RhiShaderStageInfo>: {
 });
 
 pub struct TrianglePass {
-    pipeline: RhiGraphicsPipeline,
-    _pipeline_layout: Rc<RhiPipelineLayout>,
+    pipeline: GraphicsPipeline,
+    _pipeline_layout: Rc<PipelineLayout>,
 }
 impl TrianglePass {
-    pub fn new(rhi: &Rhi, frame_settings: &FrameSettings) -> Self {
-        let mut pipeline_ci = RhiGraphicsPipelineCreateInfo::default();
+    pub fn new(rhi: &RenderContext, frame_settings: &FrameSettings) -> Self {
+        let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![frame_settings.color_format], None, Some(vk::Format::UNDEFINED));
         pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
@@ -46,8 +46,8 @@ impl TrianglePass {
             [0.0; 4],
         );
 
-        let pipeline_layout = Rc::new(RhiPipelineLayout::new(rhi.device.clone(), &[], &[], "hello-triangle"));
-        let pipeline = RhiGraphicsPipeline::new(
+        let pipeline_layout = Rc::new(PipelineLayout::new(rhi.device.clone(), &[], &[], "hello-triangle"));
+        let pipeline = GraphicsPipeline::new(
             rhi.device.clone(),
             &pipeline_ci,
             pipeline_layout.clone(),
@@ -62,14 +62,14 @@ impl TrianglePass {
 
     pub fn draw(
         &self,
-        cmd: &RhiCommandBuffer,
+        cmd: &CommandBuffer,
         frame_label: FrameLabel,
         framebuffers: &FrameBuffers,
         frame_settings: &FrameSettings,
         shape: &DrsGeometry<VertexPosColor>,
     ) {
         let viewport_extent = frame_settings.frame_extent;
-        let rendering_info = RhiRenderingInfo::new(
+        let rendering_info = RenderingInfo::new(
             vec![framebuffers.render_target_image_view(frame_label).handle()],
             None,
             vk::Rect2D {

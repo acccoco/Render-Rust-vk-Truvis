@@ -11,11 +11,11 @@ use shader_binding::shader;
 use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::core::acceleration::RhiAcceleration;
-use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::resources::special_buffers::structured_buffer::RhiStructuredBuffer;
-use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::commands::barrier::{BarrierMask, BufferBarrier};
+use truvis_rhi::raytracing::acceleration::Acceleration;
+use truvis_rhi::commands::command_buffer::CommandBuffer;
+use truvis_rhi::resources::special_buffers::structured_buffer::StructuredBuffer;
+use truvis_rhi::render_context::RenderContext;
 
 /// 数据以顺序的方式存储，同时查找时间为 O(1)
 #[derive(Default)]
@@ -71,82 +71,82 @@ impl<T: std::hash::Hash + Eq + Copy> FlattenMap<T> {
 
 /// 构建 Gpu Scene 所需的所有 buffer
 struct GpuSceneBuffers {
-    scene_buffer: RhiStructuredBuffer<shader::Scene>,
-    light_buffer: RhiStructuredBuffer<shader::PointLight>,
-    light_stage_buffer: RhiStructuredBuffer<shader::PointLight>,
-    material_buffer: RhiStructuredBuffer<shader::PBRMaterial>,
-    material_stage_buffer: RhiStructuredBuffer<shader::PBRMaterial>,
-    geometry_buffer: RhiStructuredBuffer<shader::Geometry>,
-    geometry_stage_buffer: RhiStructuredBuffer<shader::Geometry>,
-    instance_buffer: RhiStructuredBuffer<shader::Instance>,
-    instance_stage_buffer: RhiStructuredBuffer<shader::Instance>,
-    material_indirect_buffer: RhiStructuredBuffer<u32>,
-    material_indirect_stage_buffer: RhiStructuredBuffer<u32>,
-    geometry_indirect_buffer: RhiStructuredBuffer<u32>,
-    geometry_indirect_stage_buffer: RhiStructuredBuffer<u32>,
-    tlas: Option<RhiAcceleration>,
+    scene_buffer: StructuredBuffer<shader::Scene>,
+    light_buffer: StructuredBuffer<shader::PointLight>,
+    light_stage_buffer: StructuredBuffer<shader::PointLight>,
+    material_buffer: StructuredBuffer<shader::PBRMaterial>,
+    material_stage_buffer: StructuredBuffer<shader::PBRMaterial>,
+    geometry_buffer: StructuredBuffer<shader::Geometry>,
+    geometry_stage_buffer: StructuredBuffer<shader::Geometry>,
+    instance_buffer: StructuredBuffer<shader::Instance>,
+    instance_stage_buffer: StructuredBuffer<shader::Instance>,
+    material_indirect_buffer: StructuredBuffer<u32>,
+    material_indirect_stage_buffer: StructuredBuffer<u32>,
+    geometry_indirect_buffer: StructuredBuffer<u32>,
+    geometry_indirect_stage_buffer: StructuredBuffer<u32>,
+    tlas: Option<Acceleration>,
 }
 impl GpuSceneBuffers {
-    fn new(rhi: &Rhi, frame_label: usize) -> Self {
+    fn new(rhi: &RenderContext, frame_label: usize) -> Self {
         let max_light_cnt = 512;
         let max_material_cnt = 1024;
         let max_geometry_cnt = 1024 * 8;
         let max_instance_cnt = 1024;
 
         GpuSceneBuffers {
-            scene_buffer: RhiStructuredBuffer::new_ubo(rhi, 1, format!("scene buffer-{}", frame_label)),
-            light_buffer: RhiStructuredBuffer::new_ubo(rhi, max_light_cnt, format!("light buffer-{}", frame_label)),
-            light_stage_buffer: RhiStructuredBuffer::new_stage_buffer(
+            scene_buffer: StructuredBuffer::new_ubo(rhi, 1, format!("scene buffer-{}", frame_label)),
+            light_buffer: StructuredBuffer::new_ubo(rhi, max_light_cnt, format!("light buffer-{}", frame_label)),
+            light_stage_buffer: StructuredBuffer::new_stage_buffer(
                 rhi,
                 max_light_cnt,
                 format!("light stage buffer-{}", frame_label),
             ),
-            material_buffer: RhiStructuredBuffer::new_ubo(
+            material_buffer: StructuredBuffer::new_ubo(
                 rhi,
                 max_material_cnt,
                 format!("material buffer-{}", frame_label),
             ),
-            material_stage_buffer: RhiStructuredBuffer::new_stage_buffer(
+            material_stage_buffer: StructuredBuffer::new_stage_buffer(
                 rhi,
                 max_material_cnt,
                 format!("material stage buffer-{}", frame_label),
             ),
-            geometry_buffer: RhiStructuredBuffer::new_ubo(
+            geometry_buffer: StructuredBuffer::new_ubo(
                 rhi,
                 max_geometry_cnt,
                 format!("geometry buffer-{}", frame_label),
             ),
-            geometry_stage_buffer: RhiStructuredBuffer::new_stage_buffer(
+            geometry_stage_buffer: StructuredBuffer::new_stage_buffer(
                 rhi,
                 max_geometry_cnt,
                 format!("geometry stage buffer-{}", frame_label),
             ),
-            instance_buffer: RhiStructuredBuffer::new_ubo(
+            instance_buffer: StructuredBuffer::new_ubo(
                 rhi,
                 max_instance_cnt,
                 format!("instance buffer-{}", frame_label),
             ),
-            instance_stage_buffer: RhiStructuredBuffer::new_stage_buffer(
+            instance_stage_buffer: StructuredBuffer::new_stage_buffer(
                 rhi,
                 max_instance_cnt,
                 format!("instance stage buffer-{}", frame_label),
             ),
-            material_indirect_buffer: RhiStructuredBuffer::new_ubo(
+            material_indirect_buffer: StructuredBuffer::new_ubo(
                 rhi,
                 max_instance_cnt * 8,
                 format!("instance material buffer-{}", frame_label),
             ),
-            material_indirect_stage_buffer: RhiStructuredBuffer::new_stage_buffer(
+            material_indirect_stage_buffer: StructuredBuffer::new_stage_buffer(
                 rhi,
                 max_instance_cnt * 8,
                 format!("instance material stage buffer-{}", frame_label),
             ),
-            geometry_indirect_buffer: RhiStructuredBuffer::new_ubo(
+            geometry_indirect_buffer: StructuredBuffer::new_ubo(
                 rhi,
                 max_instance_cnt * 8,
                 format!("instance geometry buffer-{}", frame_label),
             ),
-            geometry_indirect_stage_buffer: RhiStructuredBuffer::new_stage_buffer(
+            geometry_indirect_stage_buffer: StructuredBuffer::new_stage_buffer(
                 rhi,
                 max_instance_cnt * 8,
                 format!("instance geometry stage buffer-{}", frame_label),
@@ -188,7 +188,7 @@ pub struct GpuScene {
 // getter
 impl GpuScene {
     #[inline]
-    pub fn tlas(&self, frame_label: usize) -> Option<&RhiAcceleration> {
+    pub fn tlas(&self, frame_label: usize) -> Option<&Acceleration> {
         self.gpu_scene_buffers[frame_label].tlas.as_ref()
     }
 
@@ -199,7 +199,7 @@ impl GpuScene {
 }
 impl GpuScene {
     pub fn new(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         frame_ctrl: Rc<FrameController>,
     ) -> Self {
         let resources = Resources {
@@ -220,7 +220,7 @@ impl GpuScene {
     }
 
     /// 注册 GpuScene 使用的默认纹理
-    pub fn register_default_textures(&self, rhi: &Rhi, bindless_mgr: &mut BindlessManager) {
+    pub fn register_default_textures(&self, rhi: &RenderContext, bindless_mgr: &mut BindlessManager) {
         bindless_mgr.register_texture_by_path(rhi, self.resources.sky.clone());
         bindless_mgr.register_texture_by_path(rhi, self.resources.uv_checker.clone());
     }
@@ -239,7 +239,7 @@ impl GpuScene {
     /// # Phase: Before Render
     ///
     /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
-    pub fn upload_to_buffer(&mut self, rhi: &Rhi, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
+    pub fn upload_to_buffer(&mut self, rhi: &RenderContext, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
         self.upload_mesh_buffer(cmd, barrier_mask, scene_mgr);
         self.upload_instance_buffer(cmd, barrier_mask, scene_mgr);
         self.upload_material_buffer(cmd, barrier_mask, scene_mgr, bindless_mgr);
@@ -254,7 +254,7 @@ impl GpuScene {
     /// 绘制场景中的所有实例
     ///
     /// before_draw(instance_idx, submesh_idx)
-    pub fn draw(&self, cmd: &RhiCommandBuffer, scene_mgr: &SceneManager, mut before_draw: impl FnMut(u32, u32)) {
+    pub fn draw(&self, cmd: &CommandBuffer, scene_mgr: &SceneManager, mut before_draw: impl FnMut(u32, u32)) {
         for (instance_idx, instance_uuid) in self.flatten_instances.iter().enumerate() {
             let instance = scene_mgr.get_instance(instance_uuid).unwrap();
             let mesh = scene_mgr.get_mesh(&instance.mesh).unwrap();
@@ -309,7 +309,7 @@ impl GpuScene {
     }
 
     /// 将整个场景的数据上传到 scene buffer 中去
-    fn upload_scene_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
+    fn upload_scene_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
         let crt_gpu_buffers = &self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let scene_data = shader::Scene {
             all_instances: crt_gpu_buffers.instance_buffer.device_address(),
@@ -330,7 +330,7 @@ impl GpuScene {
         cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.handle(), 0, bytemuck::bytes_of(&scene_data));
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
-            &[RhiBufferBarrier::default().mask(barrier_mask).buffer(
+            &[BufferBarrier::default().mask(barrier_mask).buffer(
                 crt_gpu_buffers.scene_buffer.handle(),
                 0,
                 vk::WHOLE_SIZE,
@@ -341,7 +341,7 @@ impl GpuScene {
     /// 将数据转换为 shader 中的实例数据
     ///
     /// 其中 buffer 可以是 stage buffer 的内存映射
-    fn upload_instance_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager) {
+    fn upload_instance_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
 
         let crt_instance_stage_buffer = &mut crt_gpu_buffers.instance_stage_buffer;
@@ -419,7 +419,7 @@ impl GpuScene {
     }
 
     /// 将 material 数据上传到 material buffer 中
-    fn upload_material_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
+    fn upload_material_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let crt_material_stage_buffer = &mut crt_gpu_buffers.material_stage_buffer;
         crt_material_stage_buffer.map();
@@ -454,7 +454,7 @@ impl GpuScene {
         );
     }
 
-    fn upload_light_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager) {
+    fn upload_light_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let crt_light_stage_buffer = &mut crt_gpu_buffers.light_stage_buffer;
         crt_light_stage_buffer.map();
@@ -477,7 +477,7 @@ impl GpuScene {
     }
 
     /// 将 mesh 数据以 geometry 的形式上传到 GPU
-    fn upload_mesh_buffer(&mut self, cmd: &RhiCommandBuffer, barrier_mask: RhiBarrierMask, scene_mgr: &SceneManager) {
+    fn upload_mesh_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         crt_geometry_stage_buffer.map();
@@ -526,7 +526,7 @@ impl GpuScene {
         }
     }
 
-    fn build_tlas(&mut self, rhi: &Rhi, scene_mgr: &SceneManager) {
+    fn build_tlas(&mut self, rhi: &RenderContext, scene_mgr: &SceneManager) {
         if self.flatten_instances.is_empty() {
             // 没有实例数据，直接返回
             return;
@@ -545,7 +545,7 @@ impl GpuScene {
             // TODO 这里暂时将 instance 的 index 作为 custom index
             .map(|(ins_idx, ins)| self.get_as_instance_info(ins, ins_idx as u32, scene_mgr))
             .collect_vec();
-        let tlas = RhiAcceleration::build_tlas_sync(
+        let tlas = Acceleration::build_tlas_sync(
             rhi,
             &instance_infos,
             vk::BuildAccelerationStructureFlagsKHR::empty(),
@@ -558,19 +558,18 @@ impl GpuScene {
 
 mod helper {
     use ash::vk;
-    use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-    use truvis_rhi::core::resources::buffer::RhiBuffer;
-    use truvis_rhi::core::synchronize::{RhiBarrierMask, RhiBufferBarrier};
-
+    use truvis_rhi::commands::barrier::{BarrierMask, BufferBarrier};
+    use truvis_rhi::commands::command_buffer::CommandBuffer;
+    use truvis_rhi::resources::buffer::Buffer;
     /// 三个操作：
     /// 1. 将 stage buffer 的数据 *全部* flush 到 buffer 中
     /// 2. 从 stage buffer 中将 *所有* 数据复制到目标 buffer 中
     /// 3. 添加 barrier，确保后续访问时 copy 已经完成且数据可用
     pub fn flush_copy_and_barrier(
-        cmd: &RhiCommandBuffer,
-        stage_buffer: &mut RhiBuffer,
-        dst: &mut RhiBuffer,
-        barrier_mask: RhiBarrierMask,
+        cmd: &CommandBuffer,
+        stage_buffer: &mut Buffer,
+        dst: &mut Buffer,
+        barrier_mask: BarrierMask,
     ) {
         let buffer_size = stage_buffer.size();
         {
@@ -587,7 +586,7 @@ mod helper {
         );
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
-            &[RhiBufferBarrier::default().mask(barrier_mask).buffer(dst.handle(), 0, vk::WHOLE_SIZE)],
+            &[BufferBarrier::default().mask(barrier_mask).buffer(dst.handle(), 0, vk::WHOLE_SIZE)],
         );
     }
 

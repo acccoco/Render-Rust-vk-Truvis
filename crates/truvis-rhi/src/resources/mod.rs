@@ -1,7 +1,6 @@
-pub mod managed_buffer;
-pub mod managed_image;
-pub mod managed_image_view;
-pub mod resource_manager;
-
-pub mod buffers;
-pub mod resource_handles;
+pub mod buffer;
+pub mod buffer_creator;
+pub mod image;
+pub mod image_view;
+pub mod special_buffers;
+pub mod texture;

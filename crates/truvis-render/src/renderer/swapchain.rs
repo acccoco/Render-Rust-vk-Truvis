@@ -3,13 +3,14 @@ use ash::vk;
 use itertools::Itertools;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::rc::Rc;
-use truvis_rhi::core::command_queue::RhiQueue;
-use truvis_rhi::core::debug_utils::RhiDebugType;
-use truvis_rhi::core::device::RhiDevice;
-use truvis_rhi::core::resources::image_view::RhiImageViewCreateInfo;
-use truvis_rhi::core::resources::image_view::RhiImage2DView;
-use truvis_rhi::core::synchronize::{RhiFence, RhiSemaphore};
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::commands::command_queue::CommandQueue;
+use truvis_rhi::commands::fence::Fence;
+use truvis_rhi::foundation::debug_messenger::DebugType;
+use truvis_rhi::foundation::device::Device;
+use truvis_rhi::resources::image_view::ImageViewCreateInfo;
+use truvis_rhi::resources::image_view::Image2DView;
+use truvis_rhi::commands::semaphore::Semaphore;
+use truvis_rhi::render_context::RenderContext;
 
 struct RhiSurface {
     handle: vk::SurfaceKHR,
@@ -18,7 +19,7 @@ struct RhiSurface {
     capabilities: vk::SurfaceCapabilitiesKHR,
 }
 impl RhiSurface {
-    fn new(rhi: &Rhi, window: &winit::window::Window) -> Self {
+    fn new(rhi: &RenderContext, window: &winit::window::Window) -> Self {
         let surface_pf = ash::khr::surface::Instance::new(&rhi.vk_pf, rhi.instance());
 
         let surface = unsafe {
@@ -51,7 +52,7 @@ impl Drop for RhiSurface {
         unsafe { self.pf.destroy_surface(self.handle, None) }
     }
 }
-impl RhiDebugType for RhiSurface {
+impl DebugType for RhiSurface {
     fn debug_type_name() -> &'static str {
         "RhiSurface"
     }
@@ -61,14 +62,14 @@ impl RhiDebugType for RhiSurface {
 }
 
 pub struct RenderSwapchain {
-    _device: Rc<RhiDevice>,
+    _device: Rc<RhiDeviceFunctions>,
     _surface: RhiSurface,
     swapchain_pf: ash::khr::swapchain::Device,
     swapchain_handle: vk::SwapchainKHR,
 
     /// 这里的 image 并非手动创建的，因此无法使用 RhiImage 类型
     images: Vec<vk::Image>,
-    image_views: Vec<RhiImage2DView>,
+    image_views: Vec<Image2DView>,
     swapchain_image_index: usize,
 
     color_format: vk::Format,
@@ -78,7 +79,7 @@ impl RenderSwapchain {
     // region ============== constructor ============
 
     pub fn new(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         window: &winit::window::Window,
         present_mode: vk::PresentModeKHR,
         surface_format: vk::SurfaceFormatKHR,
@@ -106,10 +107,10 @@ impl RenderSwapchain {
             .iter()
             .enumerate()
             .map(|(idx, img)| {
-                RhiImage2DView::new(
+                Image2DView::new(
                     rhi,
                     *img,
-                    RhiImageViewCreateInfo::new_image_view_2d_info(surface_format.format, vk::ImageAspectFlags::COLOR),
+                    ImageViewCreateInfo::new_image_view_2d_info(surface_format.format, vk::ImageAspectFlags::COLOR),
                     format!("swapchain-{}", idx),
                 )
             })
@@ -129,7 +130,7 @@ impl RenderSwapchain {
     }
 
     fn create_swapchain(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         swapchain_pf: &ash::khr::swapchain::Device,
         surface: &RhiSurface,
         format: vk::Format,
@@ -197,7 +198,7 @@ impl RenderSwapchain {
     }
 
     #[inline]
-    pub fn current_image_view(&self) -> &RhiImage2DView {
+    pub fn current_image_view(&self) -> &Image2DView {
         &self.image_views[self.swapchain_image_index]
     }
 
@@ -214,7 +215,7 @@ impl RenderSwapchain {
 
     /// timeout: nano seconds
     #[inline]
-    pub fn acquire_next_image(&mut self, semaphore: Option<&RhiSemaphore>, fence: Option<&RhiFence>, timeout: u64) {
+    pub fn acquire_next_image(&mut self, semaphore: Option<&Semaphore>, fence: Option<&Fence>, timeout: u64) {
         let (image_index, is_optimal) = unsafe {
             self.swapchain_pf
                 .acquire_next_image(
@@ -235,7 +236,7 @@ impl RenderSwapchain {
     }
 
     #[inline]
-    pub fn present_image(&self, queue: &RhiQueue, wait_semaphores: &[RhiSemaphore]) {
+    pub fn present_image(&self, queue: &CommandQueue, wait_semaphores: &[Semaphore]) {
         let wait_semaphores = wait_semaphores.iter().map(|s| s.handle()).collect_vec();
         let image_indices = [self.swapchain_image_index as u32];
         let present_info = vk::PresentInfoKHR::default()

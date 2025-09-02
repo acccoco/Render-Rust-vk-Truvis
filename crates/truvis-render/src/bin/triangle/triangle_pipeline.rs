@@ -4,15 +4,15 @@ use model_manager::component::DrsGeometry;
 use model_manager::vertex::vertex_pc::VertexPosColor;
 use truvis_render::pipeline_settings::FrameSettings;
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
-use truvis_rhi::core::command_queue::RhiSubmitInfo;
-use truvis_rhi::core::synchronize::RhiImageBarrier;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::commands::submit_info::SubmitInfo;
+use truvis_rhi::commands::barrier::ImageBarrier;
+use truvis_rhi::render_context::RenderContext;
 
 pub struct TrianglePipeline {
     triangle_pass: TrianglePass,
 }
 impl TrianglePipeline {
-    pub fn new(rhi: &Rhi, frame_settings: &FrameSettings) -> Self {
+    pub fn new(rhi: &RenderContext, frame_settings: &FrameSettings) -> Self {
         let triangle_pass = TrianglePass::new(rhi, frame_settings);
         Self { triangle_pass }
     }
@@ -41,7 +41,7 @@ impl TrianglePipeline {
             // 将 render target 从 general -> color attachment
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[RhiImageBarrier::new()
+                &[ImageBarrier::new()
                     .image(render_target)
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
@@ -60,7 +60,7 @@ impl TrianglePipeline {
             // 将 render target 从 color attachment -> general
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[RhiImageBarrier::new()
+                &[ImageBarrier::new()
                     .image(render_target)
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
@@ -72,7 +72,7 @@ impl TrianglePipeline {
             );
 
             cmd.end();
-            rhi.graphics_queue.submit(vec![RhiSubmitInfo::new(&[cmd])], None);
+            rhi.graphics_queue.submit(vec![SubmitInfo::new(&[cmd])], None);
         }
     }
 }

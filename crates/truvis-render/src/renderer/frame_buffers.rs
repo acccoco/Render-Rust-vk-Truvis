@@ -1,40 +1,48 @@
-use crate::pipeline_settings::{FrameLabel, FrameSettings};
-use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_controller::FrameController;
+use std::rc::Rc;
+
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
-use std::rc::Rc;
-use truvis_rhi::core::command_buffer::RhiCommandBuffer;
-use truvis_rhi::core::resources::image_view::RhiImageViewCreateInfo;
-use truvis_rhi::core::resources::image::{RhiImage2D, RhiImageCreateInfo};
-use truvis_rhi::core::resources::image_view::RhiImage2DView;
-use truvis_rhi::core::synchronize::RhiImageBarrier;
-use truvis_rhi::core::resources::texture::RhiTexture2D;
-use truvis_rhi::rhi::Rhi;
+use truvis_rhi::{
+    commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
+    resources::{
+        image::{Image2D, ImageCreateInfo},
+        image_view::{Image2DView, ImageViewCreateInfo},
+        texture::Texture2D,
+    },
+    render_context::RenderContext,
+};
+
+use crate::{
+    pipeline_settings::{FrameLabel, FrameSettings},
+    renderer::{bindless::BindlessManager, frame_controller::FrameController},
+};
 
 /// 所有帧会用到的 buffers
-pub struct FrameBuffers {
-    color_image: Rc<RhiImage2D>,
-    color_image_view: Rc<RhiImage2DView>,
+pub struct FrameBuffers
+{
+    color_image: Rc<Image2D>,
+    color_image_view: Rc<Image2DView>,
 
-    _depth_image: Rc<RhiImage2D>,
-    depth_image_view: Rc<RhiImage2DView>,
+    _depth_image: Rc<Image2D>,
+    depth_image_view: Rc<Image2DView>,
 
     /// fif 每一帧的渲染结果
-    render_targets: Vec<Rc<RhiTexture2D>>,
+    render_targets: Vec<Rc<Texture2D>>,
     render_target_bindless_keys: Vec<String>,
 
     frame_ctrl: Rc<FrameController>,
 }
 
-impl FrameBuffers {
+impl FrameBuffers
+{
     pub fn new(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         frame_settigns: &FrameSettings,
         frame_ctrl: Rc<FrameController>,
         bindless_mgr: &mut BindlessManager,
-    ) -> Self {
+    ) -> Self
+    {
         let (color_image, color_image_view) = Self::create_color_image(rhi, frame_settigns);
         let (depth_image, depth_image_view) = Self::create_depth_image(rhi, frame_settigns);
         let render_targets = Self::create_render_targets(rhi, frame_settigns, &frame_ctrl);
@@ -57,12 +65,14 @@ impl FrameBuffers {
         framebuffers
     }
 
-    pub fn rebuild(&mut self, rhi: &Rhi, frame_settings: &FrameSettings, bindless_mgr: &mut BindlessManager) {
+    pub fn rebuild(&mut self, rhi: &RenderContext, frame_settings: &FrameSettings, bindless_mgr: &mut BindlessManager)
+    {
         self.unregister_bindless(bindless_mgr);
         *self = Self::new(rhi, frame_settings, self.frame_ctrl.clone(), bindless_mgr);
     }
 
-    fn register_bindless(&self, bindless_mgr: &mut BindlessManager) {
+    fn register_bindless(&self, bindless_mgr: &mut BindlessManager)
+    {
         bindless_mgr.register_image_shared(self.color_image_view.clone());
 
         for (render_target, key) in self.render_targets.iter().zip(self.render_target_bindless_keys.iter()) {
@@ -71,7 +81,8 @@ impl FrameBuffers {
         }
     }
 
-    fn unregister_bindless(&self, bindless_mgr: &mut BindlessManager) {
+    fn unregister_bindless(&self, bindless_mgr: &mut BindlessManager)
+    {
         bindless_mgr.unregister_image(&self.color_image_view.uuid());
 
         for (render_target, key) in self.render_targets.iter().zip(self.render_target_bindless_keys.iter()) {
@@ -81,10 +92,11 @@ impl FrameBuffers {
     }
 
     /// 创建 RayTracing 需要的 image
-    fn create_color_image(rhi: &Rhi, frame_settings: &FrameSettings) -> (Rc<RhiImage2D>, Rc<RhiImage2DView>) {
-        let color_image = Rc::new(RhiImage2D::new(
+    fn create_color_image(rhi: &RenderContext, frame_settings: &FrameSettings) -> (Rc<Image2D>, Rc<Image2DView>)
+    {
+        let color_image = Rc::new(Image2D::new(
             rhi,
-            Rc::new(RhiImageCreateInfo::new_image_2d_info(
+            Rc::new(ImageCreateInfo::new_image_2d_info(
                 frame_settings.frame_extent,
                 frame_settings.color_format,
                 vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED,
@@ -96,22 +108,19 @@ impl FrameBuffers {
             "framebuffer-color",
         ));
 
-        let color_image_view = Rc::new(RhiImage2DView::new(
+        let color_image_view = Rc::new(Image2DView::new(
             rhi,
             color_image.handle(),
-            RhiImageViewCreateInfo::new_image_view_2d_info(frame_settings.color_format, vk::ImageAspectFlags::COLOR),
+            ImageViewCreateInfo::new_image_view_2d_info(frame_settings.color_format, vk::ImageAspectFlags::COLOR),
             "framebuffer-color",
         ));
 
         // layout transfer
-        RhiCommandBuffer::one_time_exec(
-            rhi,
-            rhi.temp_graphics_command_pool.clone(),
-            &rhi.graphics_queue,
+        rhi.one_time_exec(
             |cmd| {
                 cmd.image_memory_barrier(
                     vk::DependencyFlags::empty(),
-                    &[RhiImageBarrier::new()
+                    &[ImageBarrier::new()
                         .image(color_image.handle())
                         .src_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())
                         .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
@@ -125,10 +134,11 @@ impl FrameBuffers {
         (color_image, color_image_view)
     }
 
-    fn create_depth_image(rhi: &Rhi, frame_settings: &FrameSettings) -> (Rc<RhiImage2D>, Rc<RhiImage2DView>) {
-        let depth_image = Rc::new(RhiImage2D::new(
+    fn create_depth_image(rhi: &RenderContext, frame_settings: &FrameSettings) -> (Rc<Image2D>, Rc<Image2DView>)
+    {
+        let depth_image = Rc::new(Image2D::new(
             rhi,
-            Rc::new(RhiImageCreateInfo::new_image_2d_info(
+            Rc::new(ImageCreateInfo::new_image_2d_info(
                 frame_settings.frame_extent,
                 frame_settings.depth_format,
                 vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
@@ -140,10 +150,10 @@ impl FrameBuffers {
             "framebuffer-depth",
         ));
 
-        let depth_image_view = RhiImage2DView::new(
+        let depth_image_view = Image2DView::new(
             rhi,
             depth_image.handle(),
-            RhiImageViewCreateInfo::new_image_view_2d_info(frame_settings.depth_format, vk::ImageAspectFlags::DEPTH),
+            ImageViewCreateInfo::new_image_view_2d_info(frame_settings.depth_format, vk::ImageAspectFlags::DEPTH),
             "framebuffer-depth",
         );
 
@@ -151,21 +161,22 @@ impl FrameBuffers {
     }
 
     fn create_render_targets(
-        rhi: &Rhi,
+        rhi: &RenderContext,
         frame_settings: &FrameSettings,
         frame_ctrl: &FrameController,
-    ) -> Vec<Rc<RhiTexture2D>> {
+    ) -> Vec<Rc<Texture2D>>
+    {
         let create_texture = |fif_labe: FrameLabel| {
             let name = format!("render-target-{}", fif_labe);
-            let color_image = Rc::new(RhiImage2D::new(
+            let color_image = Rc::new(Image2D::new(
                 rhi,
-                Rc::new(RhiImageCreateInfo::new_image_2d_info(
+                Rc::new(ImageCreateInfo::new_image_2d_info(
                     frame_settings.frame_extent,
                     frame_settings.color_format,
-                    vk::ImageUsageFlags::STORAGE
-                        | vk::ImageUsageFlags::TRANSFER_SRC
-                        | vk::ImageUsageFlags::SAMPLED
-                        | vk::ImageUsageFlags::COLOR_ATTACHMENT,
+                    vk::ImageUsageFlags::STORAGE |
+                        vk::ImageUsageFlags::TRANSFER_SRC |
+                        vk::ImageUsageFlags::SAMPLED |
+                        vk::ImageUsageFlags::COLOR_ATTACHMENT,
                 )),
                 &vk_mem::AllocationCreateInfo {
                     usage: vk_mem::MemoryUsage::AutoPreferDevice,
@@ -173,7 +184,7 @@ impl FrameBuffers {
                 },
                 &name,
             ));
-            RhiTexture2D::new(rhi, color_image, &name)
+            Texture2D::new(rhi, color_image, &name)
         };
 
         (0..frame_ctrl.fif_count())
@@ -186,14 +197,17 @@ impl FrameBuffers {
 }
 
 // getter
-impl FrameBuffers {
+impl FrameBuffers
+{
     #[inline]
-    pub fn depth_image_view(&self) -> &RhiImage2DView {
+    pub fn depth_image_view(&self) -> &Image2DView
+    {
         &self.depth_image_view
     }
 
     #[inline]
-    pub fn render_target_texture(&self, frame_label: FrameLabel) -> (&RhiTexture2D, String) {
+    pub fn render_target_texture(&self, frame_label: FrameLabel) -> (&Texture2D, String)
+    {
         (
             &self.render_targets[frame_label as usize], //
             self.render_target_bindless_keys[frame_label as usize].clone(),
@@ -201,26 +215,31 @@ impl FrameBuffers {
     }
 
     #[inline]
-    pub fn render_target_image(&self, frame_label: FrameLabel) -> vk::Image {
+    pub fn render_target_image(&self, frame_label: FrameLabel) -> vk::Image
+    {
         self.render_targets[frame_label as usize].image()
     }
 
     #[inline]
-    pub fn render_target_image_view(&self, frame_label: FrameLabel) -> &RhiImage2DView {
+    pub fn render_target_image_view(&self, frame_label: FrameLabel) -> &Image2DView
+    {
         self.render_targets[frame_label as usize].image_view()
     }
 
-    pub fn color_image_bindless_handle(&self, bindless_mgr: &BindlessManager) -> shader::ImageHandle {
+    pub fn color_image_bindless_handle(&self, bindless_mgr: &BindlessManager) -> shader::ImageHandle
+    {
         bindless_mgr.get_image_handle(&self.color_image_view.uuid()).unwrap()
     }
 
     #[inline]
-    pub fn color_image(&self) -> &RhiImage2D {
+    pub fn color_image(&self) -> &Image2D
+    {
         &self.color_image
     }
 
     #[inline]
-    pub fn color_image_view(&self) -> &RhiImage2DView {
+    pub fn color_image_view(&self) -> &Image2DView
+    {
         &self.color_image_view
     }
 
@@ -228,7 +247,8 @@ impl FrameBuffers {
         &self,
         bindless_mgr: &BindlessManager,
         frame_label: FrameLabel,
-    ) -> shader::ImageHandle {
+    ) -> shader::ImageHandle
+    {
         bindless_mgr.get_image_handle(&self.render_targets[frame_label as usize].image_view().uuid()).unwrap()
     }
 
@@ -236,7 +256,8 @@ impl FrameBuffers {
         &self,
         bindless_mgr: &BindlessManager,
         frame_label: FrameLabel,
-    ) -> shader::TextureHandle {
+    ) -> shader::TextureHandle
+    {
         bindless_mgr.get_texture_handle(&self.render_target_bindless_keys[frame_label as usize]).unwrap()
     }
 }
