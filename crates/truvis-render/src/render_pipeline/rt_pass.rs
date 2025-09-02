@@ -7,9 +7,9 @@ use truvis_crate_tools::{const_map, count_indexed_array, resource::TruvisPath};
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
     foundation::device::DeviceFunctions,
-    pipelines::shader::{ShaderModule, ShaderStageInfo, ShaderGroupInfo},
-    resources::special_buffers::{sbt_buffer::SBTBuffer, structured_buffer::StructuredBuffer},
+    pipelines::shader::{ShaderGroupInfo, ShaderModule, ShaderStageInfo},
     render_context::RenderContext,
+    resources::special_buffers::{sbt_buffer::SBTBuffer, structured_buffer::StructuredBuffer},
 };
 
 use crate::{
@@ -17,17 +17,14 @@ use crate::{
     renderer::{bindless::BindlessManager, frame_controller::FrameController, gpu_scene::GpuScene},
 };
 
-pub struct RhiRtPipeline
-{
+pub struct RhiRtPipeline {
     pub pipeline: vk::Pipeline,
     pub pipeline_layout: vk::PipelineLayout,
 
     pub device_functions: Rc<DeviceFunctions>,
 }
-impl Drop for RhiRtPipeline
-{
-    fn drop(&mut self)
-    {
+impl Drop for RhiRtPipeline {
+    fn drop(&mut self) {
         unsafe {
             self.device_functions.destroy_pipeline(self.pipeline, None);
             self.device_functions.destroy_pipeline_layout(self.pipeline_layout, None);
@@ -97,8 +94,7 @@ const_map!(ShaderGroups<ShaderGroupInfo>: {
     },
 });
 
-pub struct SBTRegions
-{
+pub struct SBTRegions {
     sbt_region_raygen: vk::StridedDeviceAddressRegionKHR,
     sbt_region_miss: vk::StridedDeviceAddressRegionKHR,
     sbt_region_hit: vk::StridedDeviceAddressRegionKHR,
@@ -108,15 +104,13 @@ pub struct SBTRegions
 
     device_functions: Rc<DeviceFunctions>,
 }
-impl SBTRegions
-{
+impl SBTRegions {
     const RAYGEN_SBT_REGION: usize = ShaderGroups::RayGen.index();
     const MISS_SBT_REGION: &'static [usize] = &[ShaderGroups::SkyMiss.index(), ShaderGroups::ShadowMiss.index()];
     const HIT_SBT_REGION: &'static [usize] = &[ShaderGroups::Hit.index()];
     const CALLABLE_SBT_REGION: &'static [usize] = &[ShaderGroups::DiffuseCall.index()];
 
-    pub fn create_sbt(rhi: &RenderContext, pipeline: &RhiRtPipeline) -> Self
-    {
+    pub fn create_sbt(rhi: &RenderContext, pipeline: &RhiRtPipeline) -> Self {
         let rt_pipeline_props = rhi.rt_pipeline_props();
 
         // 因为不需要 user data，所以可以直接使用 shader group handle size
@@ -143,10 +137,10 @@ impl SBTRegions
 
         let mut sbt_buffer = SBTBuffer::new(
             rhi,
-            (raygen_shader_group_region_size +
-                miss_shader_group_region_size +
-                hit_shader_group_region_size +
-                callable_shader_group_region_size) as vk::DeviceSize,
+            (raygen_shader_group_region_size
+                + miss_shader_group_region_size
+                + hit_shader_group_region_size
+                + callable_shader_group_region_size) as vk::DeviceSize,
             rt_pipeline_props.shader_group_base_alignment as vk::DeviceSize,
             "simple-rt-sbt",
         );
@@ -166,21 +160,22 @@ impl SBTRegions
             .stride(aligned_shader_group_handle_size as vk::DeviceSize)
             .size(hit_shader_group_region_size as vk::DeviceSize)
             .device_address(
-                sbt_address +
-                    raygen_shader_group_region_size as vk::DeviceSize +
-                    miss_shader_group_region_size as vk::DeviceSize,
+                sbt_address
+                    + raygen_shader_group_region_size as vk::DeviceSize
+                    + miss_shader_group_region_size as vk::DeviceSize,
             );
         let sbt_region_callable = vk::StridedDeviceAddressRegionKHR::default()
             .stride(aligned_shader_group_handle_size as vk::DeviceSize)
             .size(callable_shader_group_region_size as vk::DeviceSize)
             .device_address(
-                sbt_address +
-                    raygen_shader_group_region_size as vk::DeviceSize +
-                    miss_shader_group_region_size as vk::DeviceSize +
-                    hit_shader_group_region_size as vk::DeviceSize,
+                sbt_address
+                    + raygen_shader_group_region_size as vk::DeviceSize
+                    + miss_shader_group_region_size as vk::DeviceSize
+                    + hit_shader_group_region_size as vk::DeviceSize,
             );
 
-        // 从 pipeline 中获取 shader 的 handle，并且将 shader handle 写入到 shader binding table 中
+        // 从 pipeline 中获取 shader 的 handle，并且将 shader handle 写入到 shader
+        // binding table 中
         {
             let shader_group_handle_data = unsafe {
                 rhi.device_functions()
@@ -252,8 +247,7 @@ impl SBTRegions
     }
 }
 
-pub struct SimlpeRtPass
-{
+pub struct SimlpeRtPass {
     pipeline: RhiRtPipeline,
     _bindless_mgr: Rc<RefCell<BindlessManager>>,
 
@@ -261,10 +255,8 @@ pub struct SimlpeRtPass
 
     device_functions: Rc<DeviceFunctions>,
 }
-impl SimlpeRtPass
-{
-    pub fn new(rhi: &RenderContext, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self
-    {
+impl SimlpeRtPass {
+    pub fn new(rhi: &RenderContext, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         let shader_modules = ShaderStage::iter()
             .map(|stage| stage.value())
             .map(|stage| ShaderModule::new(rhi, stage.path()))
@@ -294,11 +286,11 @@ impl SimlpeRtPass
 
         let push_constant_range = vk::PushConstantRange::default()
             .stage_flags(
-                vk::ShaderStageFlags::RAYGEN_KHR |
-                    vk::ShaderStageFlags::MISS_KHR |
-                    vk::ShaderStageFlags::ANY_HIT_KHR |
-                    vk::ShaderStageFlags::CALLABLE_KHR |
-                    vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+                vk::ShaderStageFlags::RAYGEN_KHR
+                    | vk::ShaderStageFlags::MISS_KHR
+                    | vk::ShaderStageFlags::ANY_HIT_KHR
+                    | vk::ShaderStageFlags::CALLABLE_KHR
+                    | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
             )
             .offset(0)
             .size(size_of::<shader::rt::PushConstants>() as u32);
@@ -359,8 +351,7 @@ impl SimlpeRtPass
         rt_handle: ImageHandle,
         per_frame_data: &StructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
-    )
-    {
+    ) {
         let frame_label = frame_ctrl.frame_label();
 
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
@@ -404,11 +395,11 @@ impl SimlpeRtPass
 
             cmd.cmd_push_constants(
                 self.pipeline.pipeline_layout,
-                vk::ShaderStageFlags::RAYGEN_KHR |
-                    vk::ShaderStageFlags::MISS_KHR |
-                    vk::ShaderStageFlags::ANY_HIT_KHR |
-                    vk::ShaderStageFlags::CALLABLE_KHR |
-                    vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+                vk::ShaderStageFlags::RAYGEN_KHR
+                    | vk::ShaderStageFlags::MISS_KHR
+                    | vk::ShaderStageFlags::ANY_HIT_KHR
+                    | vk::ShaderStageFlags::CALLABLE_KHR
+                    | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
                 0,
                 bytemuck::bytes_of(&push_constant),
             );
@@ -430,13 +421,11 @@ impl SimlpeRtPass
     }
 }
 
-mod helper
-{
+mod helper {
     /// round x up to a multiple of align
     ///
     /// * align must be a power of 2
-    pub fn align_up(x: u32, align: u32) -> u32
-    {
+    pub fn align_up(x: u32, align: u32) -> u32 {
         (x + (align - 1)) & !(align - 1)
     }
 }

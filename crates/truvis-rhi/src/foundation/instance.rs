@@ -9,24 +9,21 @@ use itertools::Itertools;
 
 use crate::foundation::debug_messenger::DebugMsger;
 
-pub struct Instance
-{
+pub struct Instance {
     /// 仅仅是函数指针，以及一个裸的 handle，可以随意 clone
     ///
     /// 不需要考虑生命周期的问题，生命周期现在是由手动控制的
     pub(crate) ash_instance: Rc<ash::Instance>,
 }
 
-impl Instance
-{
+impl Instance {
     /// 设置所需的 layers 和 extensions，创建 vk instance
     pub fn new(
         vk_entry: &ash::Entry,
         app_name: String,
         engine_name: String,
         extra_instance_exts: Vec<&'static CStr>,
-    ) -> Self
-    {
+    ) -> Self {
         let app_name = CString::new(app_name.as_str()).unwrap();
         let engine_name = CString::new(engine_name.as_str()).unwrap();
         let app_info = vk::ApplicationInfo::default()
@@ -67,8 +64,7 @@ impl Instance
         }
     }
 
-    pub fn destroy(self)
-    {
+    pub fn destroy(self) {
         log::info!("Destroying RhiInstance");
         unsafe {
             self.ash_instance.destroy_instance(None);
@@ -77,32 +73,27 @@ impl Instance
 }
 
 /// getter
-impl Instance
-{
+impl Instance {
     #[inline]
-    pub fn ash_instance(&self) -> &ash::Instance
-    {
+    pub fn ash_instance(&self) -> &ash::Instance {
         &self.ash_instance
     }
 
     #[inline]
-    pub fn vk_instance(&self) -> vk::Instance
-    {
+    pub fn vk_instance(&self) -> vk::Instance {
         self.ash_instance.handle()
     }
 }
 
 /// 构造过程
-impl Instance
-{
+impl Instance {
     /// 用于在创建 instance 时设置 layer 的参数
     fn _get_layer_setting_for_single<'a, T>(
         layer_name: &'static CStr,
         setting_name: &'static CStr,
         ty: vk::LayerSettingTypeEXT,
         value: &'a T,
-    ) -> vk::LayerSettingEXT<'a>
-    {
+    ) -> vk::LayerSettingEXT<'a> {
         vk::LayerSettingEXT {
             p_layer_name: layer_name.as_ptr(),
             p_setting_name: setting_name.as_ptr(),
@@ -119,8 +110,7 @@ impl Instance
         setting_name: &'static CStr,
         ty: vk::LayerSettingTypeEXT,
         value: &'a [T],
-    ) -> vk::LayerSettingEXT<'a>
-    {
+    ) -> vk::LayerSettingEXT<'a> {
         vk::LayerSettingEXT {
             p_layer_name: layer_name.as_ptr(),
             p_setting_name: setting_name.as_ptr(),
@@ -135,8 +125,7 @@ impl Instance
     ///
     /// # return
     /// instance 所需的，且受支持的 extension
-    fn get_extensions(vk_entry: &ash::Entry, extra_instance_exts: &[&'static CStr]) -> Vec<*const c_char>
-    {
+    fn get_extensions(vk_entry: &ash::Entry, extra_instance_exts: &[&'static CStr]) -> Vec<*const c_char> {
         let all_ext_props = unsafe { vk_entry.enumerate_instance_extension_properties(None).unwrap() };
         let mut enabled_extensions: HashSet<&'static CStr> = HashSet::new();
 
@@ -165,8 +154,7 @@ impl Instance
     }
 
     /// instance 所需的所有 layers
-    fn get_layers(vk_entry: &ash::Entry) -> Vec<*const c_char>
-    {
+    fn get_layers(vk_entry: &ash::Entry) -> Vec<*const c_char> {
         let all_layer_props = unsafe { vk_entry.enumerate_instance_layer_properties().unwrap() };
 
         // 存储所有支持的 layers
@@ -192,17 +180,15 @@ impl Instance
     }
 
     /// 必须要开启的 instance layers
-    fn basic_instance_layers() -> Vec<&'static CStr>
-    {
-        // 无需开启 validation layer，使用 vulkan configurator 控制 validation layer 的开启
-        // layers.push(cstr::cstr!("VK_LAYER_KHRONOS_validation"))
+    fn basic_instance_layers() -> Vec<&'static CStr> {
+        // 无需开启 validation layer，使用 vulkan configurator 控制 validation layer
+        // 的开启 layers.push(cstr::cstr!("VK_LAYER_KHRONOS_validation"))
 
         Vec::new()
     }
 
     /// 必须要开启的 instance extensions
-    fn basic_instance_exts() -> Vec<&'static CStr>
-    {
+    fn basic_instance_exts() -> Vec<&'static CStr> {
         let exts = vec![
             // 这个 extension 可以单独使用，提供以下功能：
             // 1. debug messenger

@@ -1,11 +1,12 @@
 use imgui::Ui;
 use shader_binding::shader;
-use truvis_render::app::TruvisApp;
-use truvis_render::outer_app::OuterApp;
-use truvis_render::platform::camera::DrsCamera;
-use truvis_render::render_pipeline::pipeline_context::PipelineContext;
-use truvis_render::render_pipeline::rt_pipeline::RtPipeline;
-use truvis_render::renderer::renderer::Renderer;
+use truvis_render::{
+    app::TruvisApp,
+    outer_app::OuterApp,
+    platform::camera::DrsCamera,
+    render_pipeline::{pipeline_context::PipelineContext, rt_pipeline::RtPipeline},
+    renderer::renderer::Renderer,
+};
 
 struct RtApp {
     rt_pipeline: RtPipeline,

@@ -53,7 +53,8 @@ impl CMakeDirs {
         std::path::PathBuf::from(format!("{}/build", Self::cmake_custom_output_dir().display()))
     }
 
-    /// cmake build 文件夹下的 Debug 或 Release 目录，里面存放在 lib 以及 dll, pdb
+    /// cmake build 文件夹下的 Debug 或 Release 目录，里面存放在 lib 以及 dll,
+    /// pdb
     fn cmake_custom_output_lib_dir() -> std::path::PathBuf {
         std::path::PathBuf::from(format!(
             "{}/{}",
@@ -84,7 +85,8 @@ fn build_cmake_project() {
 /// 复制 DLL 文件到目标目录
 fn copy_dll_files() {
     // 使用 cargo:warning= 前缀让消息显示在构建输出中
-    // println!("cargo:warning=src dir: {}", Dirs::cmake_custom_install_bin_dir().display());
+    // println!("cargo:warning=src dir: {}",
+    // Dirs::cmake_custom_install_bin_dir().display());
 
     // 只需要复制 dll 文件到 target/debug 目录下
     for entry in std::fs::read_dir(CMakeDirs::cmake_custom_output_lib_dir()).unwrap() {

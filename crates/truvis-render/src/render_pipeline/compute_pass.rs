@@ -2,15 +2,14 @@ use std::{ffi::CStr, rc::Rc};
 
 use ash::vk;
 use truvis_rhi::{
-    commands::command_buffer::CommandBuffer, foundation::device::DeviceFunctions,
-    pipelines::shader::ShaderModule, render_context::RenderContext,
+    commands::command_buffer::CommandBuffer, foundation::device::DeviceFunctions, pipelines::shader::ShaderModule,
+    render_context::RenderContext,
 };
 
 use crate::renderer::bindless::BindlessManager;
 
 /// 泛型参数 P 表示 compute shader 的参数，以 push constant 的形式传入 shader
-pub struct ComputePass<P: bytemuck::Pod>
-{
+pub struct ComputePass<P: bytemuck::Pod> {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
 
@@ -18,10 +17,8 @@ pub struct ComputePass<P: bytemuck::Pod>
 
     device_functions: Rc<DeviceFunctions>,
 }
-impl<P: bytemuck::Pod> ComputePass<P>
-{
-    pub fn new(rhi: &RenderContext, bindless_mgr: &BindlessManager, entry_point: &CStr, shader_path: &str) -> Self
-    {
+impl<P: bytemuck::Pod> ComputePass<P> {
+    pub fn new(rhi: &RenderContext, bindless_mgr: &BindlessManager, entry_point: &CStr, shader_path: &str) -> Self {
         let shader_module = ShaderModule::new(rhi, std::path::Path::new(shader_path));
         let stage_info = vk::PipelineShaderStageCreateInfo::default()
             .module(shader_module.handle())
@@ -60,8 +57,7 @@ impl<P: bytemuck::Pod> ComputePass<P>
         }
     }
 
-    pub fn exec(&self, cmd: &CommandBuffer, bindless_mgr: &BindlessManager, params: &P, group_cnt: glam::UVec3)
-    {
+    pub fn exec(&self, cmd: &CommandBuffer, bindless_mgr: &BindlessManager, params: &P, group_cnt: glam::UVec3) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::COMPUTE, self.pipeline);
 
         cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::COMPUTE, 0, bytemuck::bytes_of(params));
@@ -77,10 +73,8 @@ impl<P: bytemuck::Pod> ComputePass<P>
         cmd.cmd_dispatch(group_cnt);
     }
 }
-impl<P: bytemuck::Pod> Drop for ComputePass<P>
-{
-    fn drop(&mut self)
-    {
+impl<P: bytemuck::Pod> Drop for ComputePass<P> {
+    fn drop(&mut self) {
         unsafe {
             self.device_functions.destroy_pipeline(self.pipeline, None);
             self.device_functions.destroy_pipeline_layout(self.pipeline_layout, None);

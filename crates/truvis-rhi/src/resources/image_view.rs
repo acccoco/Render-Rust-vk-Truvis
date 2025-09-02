@@ -2,13 +2,11 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::foundation::{debug_messenger::DebugType, device::DeviceFunctions, mem_allocator::MemAllocator};
+use crate::foundation::{debug_messenger::DebugType, device::DeviceFunctions};
 
-impl ImageViewCreateInfo
-{
+impl ImageViewCreateInfo {
     #[inline]
-    pub fn new_image_view_2d_info(format: vk::Format, aspect: vk::ImageAspectFlags) -> Self
-    {
+    pub fn new_image_view_2d_info(format: vk::Format, aspect: vk::ImageAspectFlags) -> Self {
         Self {
             inner: vk::ImageViewCreateInfo {
                 format,
@@ -25,8 +23,7 @@ impl ImageViewCreateInfo
     }
 
     #[inline]
-    pub fn inner(&self) -> &vk::ImageViewCreateInfo<'_>
-    {
+    pub fn inner(&self) -> &vk::ImageViewCreateInfo<'_> {
         &self.inner
     }
 }
@@ -34,16 +31,13 @@ impl ImageViewCreateInfo
 #[derive(PartialOrd, PartialEq, Hash, Copy, Clone, Ord, Eq, Debug)]
 pub struct Image2DViewUUID(pub uuid::Uuid);
 
-impl std::fmt::Display for Image2DViewUUID
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
-    {
+impl std::fmt::Display for Image2DViewUUID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "image2d-view-uuid-{}", self.0)
     }
 }
 
-pub struct Image2DView
-{
+pub struct Image2DView {
     handle: vk::ImageView,
     uuid: Image2DViewUUID,
 
@@ -53,38 +47,31 @@ pub struct Image2DView
     device_functions: Rc<DeviceFunctions>,
 }
 
-impl Drop for Image2DView
-{
-    fn drop(&mut self)
-    {
+impl Drop for Image2DView {
+    fn drop(&mut self) {
         unsafe {
             self.device_functions.destroy_image_view(self.handle, None);
         }
     }
 }
 
-impl DebugType for Image2DView
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for Image2DView {
+    fn debug_type_name() -> &'static str {
         "RhiImage2DView"
     }
 
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.handle
     }
 }
 
-impl Image2DView
-{
+impl Image2DView {
     pub fn new(
         device_functions: Rc<DeviceFunctions>,
         image: vk::Image,
         mut info: ImageViewCreateInfo,
         name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         info.inner.image = image;
         let handle = unsafe { device_functions.create_image_view(&info.inner, None).unwrap() };
         let image_view = Self {
@@ -100,30 +87,25 @@ impl Image2DView
 
     /// getter
     #[inline]
-    pub fn handle(&self) -> vk::ImageView
-    {
+    pub fn handle(&self) -> vk::ImageView {
         self.handle
     }
 
     #[inline]
-    pub fn uuid(&self) -> Image2DViewUUID
-    {
+    pub fn uuid(&self) -> Image2DViewUUID {
         self.uuid
     }
 }
 
-pub enum Image2DViewContainer
-{
+pub enum Image2DViewContainer {
     Own(Box<Image2DView>),
     Shared(Rc<Image2DView>),
     Raw(vk::ImageView),
 }
 
-impl Image2DViewContainer
-{
+impl Image2DViewContainer {
     #[inline]
-    pub fn vk_image_view(&self) -> vk::ImageView
-    {
+    pub fn vk_image_view(&self) -> vk::ImageView {
         match self {
             Image2DViewContainer::Own(view) => view.handle(),
             Image2DViewContainer::Shared(view) => view.handle(),
@@ -132,7 +114,6 @@ impl Image2DViewContainer
     }
 }
 
-pub struct ImageViewCreateInfo
-{
+pub struct ImageViewCreateInfo {
     inner: vk::ImageViewCreateInfo<'static>,
 }

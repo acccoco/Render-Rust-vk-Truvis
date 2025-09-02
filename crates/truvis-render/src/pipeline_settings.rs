@@ -1,6 +1,6 @@
+use std::{fmt::Display, ops::Deref};
+
 use ash::vk;
-use std::fmt::Display;
-use std::ops::Deref;
 
 pub struct DefaultRendererSettings;
 impl DefaultRendererSettings {

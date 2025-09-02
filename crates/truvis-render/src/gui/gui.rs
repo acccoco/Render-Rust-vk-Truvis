@@ -8,8 +8,8 @@ use truvis_rhi::{
     basic::color::LabelColor,
     commands::command_buffer::CommandBuffer,
     foundation::device::{Device, DeviceFunctions},
-    resources::{image::Image2D, texture::Texture2D},
     render_context::RenderContext,
+    resources::{image::Image2D, texture::Texture2D},
 };
 
 use crate::{
@@ -18,8 +18,7 @@ use crate::{
     renderer::bindless::BindlessManager,
 };
 
-pub struct Gui
-{
+pub struct Gui {
     pub imgui_ctx: imgui::Context,
     pub platform: imgui_winit_support::WinitPlatform,
 
@@ -32,15 +31,12 @@ pub struct Gui
 
     device_functions: Rc<DeviceFunctions>,
 }
-impl Drop for Gui
-{
+impl Drop for Gui {
     fn drop(&mut self) {}
 }
 
-
 /// 创建过程
-impl Gui
-{
+impl Gui {
     const FONT_TEXTURE_ID: usize = 0;
     const FONT_TEXTURE_KEY: &'static str = "imgui-fonts";
     const RENDER_IMAGE_ID: usize = 1;
@@ -51,8 +47,7 @@ impl Gui
         fif_num: usize,
         present_settings: &PresentSettings,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
-    ) -> Self
-    {
+    ) -> Self {
         let mut imgui_ctx = imgui::Context::create();
         // disable automatic saving .ini file
         imgui_ctx.set_ini_filename(None);
@@ -99,8 +94,7 @@ impl Gui
         imgui_ctx: &mut imgui::Context,
         platform: &imgui_winit_support::WinitPlatform,
         bindless_mgr: &mut BindlessManager,
-    )
-    {
+    ) {
         let hidpi_factor = platform.hidpi_factor();
         let font_size = (13.0 * hidpi_factor) as f32;
 
@@ -146,21 +140,17 @@ impl Gui
     }
 }
 
-
 /// tools
-impl Gui
-{
+impl Gui {
     /// 接受 window 的事件
-    pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>)
-    {
+    pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>) {
         self.platform.handle_event(self.imgui_ctx.io_mut(), window, event);
     }
 
     /// # Phase: IO
     /// 1. 可能会修改鼠标位置
     /// 1. 更新 imgui 的 delta time
-    pub fn prepare_frame(&mut self, window: &winit::window::Window, duration: std::time::Duration)
-    {
+    pub fn prepare_frame(&mut self, window: &winit::window::Window, duration: std::time::Duration) {
         // 看源码可知：imgui 可能会设定鼠标位置
         self.platform.prepare_frame(self.imgui_ctx.io_mut(), window).unwrap();
 
@@ -173,8 +163,7 @@ impl Gui
         window: &winit::window::Window,
         ui_func_main: impl FnOnce(&imgui::Ui, [f32; 2]),
         ui_func_right: impl FnOnce(&imgui::Ui),
-    )
-    {
+    ) {
         let ui = self.imgui_ctx.new_frame();
 
         unsafe {
@@ -305,8 +294,7 @@ impl Gui
         self.platform.prepare_render(ui, window);
     }
 
-    pub fn register_render_image_key(&mut self, key: String)
-    {
+    pub fn register_render_image_key(&mut self, key: String) {
         self.render_image_key = Some(key);
     }
 
@@ -318,8 +306,7 @@ impl Gui
         rhi: &RenderContext,
         cmd: &CommandBuffer,
         frame_label: FrameLabel,
-    ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> String + use<'_>)>
-    {
+    ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> String + use<'_>)> {
         let draw_data = self.imgui_ctx.render();
         if draw_data.total_vtx_count == 0 {
             return None;
@@ -341,8 +328,7 @@ impl Gui
     }
 
     #[inline]
-    pub fn get_render_region(&self) -> vk::Rect2D
-    {
+    pub fn get_render_region(&self) -> vk::Rect2D {
         self.render_region
     }
 }

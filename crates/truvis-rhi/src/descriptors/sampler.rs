@@ -4,15 +4,12 @@ use ash::vk;
 
 use crate::foundation::{debug_messenger::DebugType, device::DeviceFunctions};
 
-pub struct SamplerCreateInfo
-{
+pub struct SamplerCreateInfo {
     inner: vk::SamplerCreateInfo<'static>,
 }
 
-impl Default for SamplerCreateInfo
-{
-    fn default() -> Self
-    {
+impl Default for SamplerCreateInfo {
+    fn default() -> Self {
         let sampler_info = vk::SamplerCreateInfo::default()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)
@@ -34,50 +31,40 @@ impl Default for SamplerCreateInfo
     }
 }
 
-impl SamplerCreateInfo
-{
+impl SamplerCreateInfo {
     /// 默认配置：linear，repeat
     #[inline]
-    pub fn new() -> Self
-    {
+    pub fn new() -> Self {
         Self::default()
     }
 }
 
-pub struct Sampler
-{
+pub struct Sampler {
     handle: vk::Sampler,
 
     _info: Rc<SamplerCreateInfo>,
     device_functions: Rc<DeviceFunctions>,
 }
-impl DebugType for Sampler
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for Sampler {
+    fn debug_type_name() -> &'static str {
         "RhiSampler"
     }
 
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.handle
     }
 }
-impl Drop for Sampler
-{
-    fn drop(&mut self)
-    {
+impl Drop for Sampler {
+    fn drop(&mut self) {
         unsafe {
             self.device_functions.destroy_sampler(self.handle, None);
         }
     }
 }
 
-impl Sampler
-{
+impl Sampler {
     #[inline]
-    pub fn new(device_functions: Rc<DeviceFunctions>, info: Rc<SamplerCreateInfo>, debug_name: &str) -> Self
-    {
+    pub fn new(device_functions: Rc<DeviceFunctions>, info: Rc<SamplerCreateInfo>, debug_name: &str) -> Self {
         let handle = unsafe { device_functions.create_sampler(&info.inner, None).unwrap() };
         let sampler = Self {
             handle,
@@ -90,8 +77,7 @@ impl Sampler
 
     /// getter
     #[inline]
-    pub fn handle(&self) -> vk::Sampler
-    {
+    pub fn handle(&self) -> vk::Sampler {
         self.handle
     }
 }

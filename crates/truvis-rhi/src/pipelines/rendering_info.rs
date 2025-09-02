@@ -1,19 +1,16 @@
 use ash::vk;
 
-pub struct RenderingInfo
-{
+pub struct RenderingInfo {
     color_attach_info: Vec<vk::RenderingAttachmentInfo<'static>>,
     depth_attach_info: Option<vk::RenderingAttachmentInfo<'static>>,
     range: vk::Rect2D,
 }
-impl RenderingInfo
-{
+impl RenderingInfo {
     pub fn new(
         color_attach_image: Vec<vk::ImageView>,
         depth_attach_image: Option<vk::ImageView>,
         range: vk::Rect2D,
-    ) -> Self
-    {
+    ) -> Self {
         Self {
             color_attach_info: color_attach_image.iter().map(|view| Self::get_color_attachment(*view)).collect(),
             depth_attach_info: depth_attach_image.map(Self::get_depth_attachment),
@@ -21,8 +18,7 @@ impl RenderingInfo
         }
     }
 
-    pub fn rendering_info(&self) -> vk::RenderingInfo<'_>
-    {
+    pub fn rendering_info(&self) -> vk::RenderingInfo<'_> {
         let mut info = vk::RenderingInfo::default()
             .layer_count(1)
             .render_area(self.range)
@@ -33,8 +29,7 @@ impl RenderingInfo
         info
     }
 
-    fn get_color_attachment(image_view: vk::ImageView) -> vk::RenderingAttachmentInfo<'static>
-    {
+    fn get_color_attachment(image_view: vk::ImageView) -> vk::RenderingAttachmentInfo<'static> {
         vk::RenderingAttachmentInfo::default()
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
             .image_view(image_view)
@@ -47,8 +42,7 @@ impl RenderingInfo
             })
     }
 
-    fn get_depth_attachment(depth_image_view: vk::ImageView) -> vk::RenderingAttachmentInfo<'static>
-    {
+    fn get_depth_attachment(depth_image_view: vk::ImageView) -> vk::RenderingAttachmentInfo<'static> {
         vk::RenderingAttachmentInfo::default()
             .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
             .image_view(depth_image_view)

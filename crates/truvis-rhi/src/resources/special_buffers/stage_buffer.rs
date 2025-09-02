@@ -12,18 +12,18 @@ use crate::{
     resources::{buffer::Buffer, buffer_creator::BufferCreateInfo},
 };
 
-pub struct StageBuffer<T: bytemuck::Pod>
-{
+pub struct StageBuffer<T: bytemuck::Pod> {
     inner: Buffer,
     _phantom: PhantomData<T>,
 }
 
 impl_derive_buffer!(StageBuffer<T: bytemuck::Pod>, Buffer, inner);
-impl<T: bytemuck::Pod> StageBuffer<T>
-{
-    pub fn new(device_functions: Rc<DeviceFunctions>, allocator: Rc<MemAllocator>, debug_name: impl AsRef<str>)
-    -> Self
-    {
+impl<T: bytemuck::Pod> StageBuffer<T> {
+    pub fn new(
+        device_functions: Rc<DeviceFunctions>,
+        allocator: Rc<MemAllocator>,
+        debug_name: impl AsRef<str>,
+    ) -> Self {
         let buffer = Self {
             inner: Buffer::new(
                 device_functions.clone(),
@@ -44,8 +44,7 @@ impl<T: bytemuck::Pod> StageBuffer<T>
     }
 
     // BUG 可能需要考虑内存对齐
-    pub fn transfer(&mut self, trans_func: &dyn Fn(&mut T))
-    {
+    pub fn transfer(&mut self, trans_func: &dyn Fn(&mut T)) {
         self.inner.map();
         unsafe {
             let ptr = self.inner.map_ptr.unwrap() as *mut T;
@@ -57,15 +56,12 @@ impl<T: bytemuck::Pod> StageBuffer<T>
     }
 }
 
-impl<T: bytemuck::Pod> DebugType for StageBuffer<T>
-{
-    fn debug_type_name() -> &'static str
-    {
+impl<T: bytemuck::Pod> DebugType for StageBuffer<T> {
+    fn debug_type_name() -> &'static str {
         "StageBuffer"
     }
 
-    fn vk_handle(&self) -> impl Handle
-    {
+    fn vk_handle(&self) -> impl Handle {
         self.inner.handle
     }
 }

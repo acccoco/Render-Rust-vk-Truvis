@@ -1,12 +1,12 @@
-use crate::triangle_pass::TrianglePass;
 use ash::vk;
-use model_manager::component::DrsGeometry;
-use model_manager::vertex::vertex_pc::VertexPosColor;
-use truvis_render::pipeline_settings::FrameSettings;
-use truvis_render::render_pipeline::pipeline_context::PipelineContext;
-use truvis_rhi::commands::submit_info::SubmitInfo;
-use truvis_rhi::commands::barrier::ImageBarrier;
-use truvis_rhi::render_context::RenderContext;
+use model_manager::{component::DrsGeometry, vertex::vertex_pc::VertexPosColor};
+use truvis_render::{pipeline_settings::FrameSettings, render_pipeline::pipeline_context::PipelineContext};
+use truvis_rhi::{
+    commands::{barrier::ImageBarrier, submit_info::SubmitInfo},
+    render_context::RenderContext,
+};
+
+use crate::triangle_pass::TrianglePass;
 
 pub struct TrianglePipeline {
     triangle_pass: TrianglePass,

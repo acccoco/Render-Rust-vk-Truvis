@@ -1,21 +1,28 @@
+use std::rc::Rc;
+
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
-use model_manager::component::DrsGeometry;
-use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
-use model_manager::vertex::VertexLayout;
-use std::rc::Rc;
-use truvis_crate_tools::count_indexed_array;
-use truvis_crate_tools::const_map;
-use truvis_crate_tools::resource::TruvisPath;
-use truvis_render::pipeline_settings::FrameSettings;
-use truvis_render::platform::timer::Timer;
-use truvis_render::renderer::frame_controller::FrameController;
-use truvis_rhi::commands::command_buffer::CommandBuffer;
-use truvis_rhi::pipelines::graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout};
-use truvis_rhi::pipelines::rendering_info::RenderingInfo;
-use truvis_rhi::pipelines::shader::ShaderStageInfo;
-use truvis_rhi::render_context::RenderContext;
+use model_manager::{
+    component::DrsGeometry,
+    vertex::{
+        VertexLayout,
+        vertex_pc::{VertexAosLayoutPosColor, VertexPosColor},
+    },
+};
+use truvis_crate_tools::{const_map, count_indexed_array, resource::TruvisPath};
+use truvis_render::{
+    pipeline_settings::FrameSettings, platform::timer::Timer, renderer::frame_controller::FrameController,
+};
+use truvis_rhi::{
+    commands::command_buffer::CommandBuffer,
+    pipelines::{
+        graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},
+        rendering_info::RenderingInfo,
+        shader::ShaderStageInfo,
+    },
+    render_context::RenderContext,
+};
 
 const_map!(ShaderStage<ShaderStageInfo>:{
     Vertex: ShaderStageInfo {
@@ -61,9 +68,11 @@ impl ShaderToyPass {
         pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
         pipeline_ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
         pipeline_ci.color_blend(
-            vec![vk::PipelineColorBlendAttachmentState::default()
-                .blend_enable(false)
-                .color_write_mask(vk::ColorComponentFlags::RGBA)],
+            vec![
+                vk::PipelineColorBlendAttachmentState::default()
+                    .blend_enable(false)
+                    .color_write_mask(vk::ColorComponentFlags::RGBA),
+            ],
             [0.0; 4],
         );
 
@@ -77,8 +86,7 @@ impl ShaderToyPass {
             }],
             "shader-toy",
         ));
-        let pipeline =
-            GraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, pipeline_layout.clone(), "shader-toy");
+        let pipeline = GraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, pipeline_layout.clone(), "shader-toy");
 
         Self {
             _pipeline_layout: pipeline_layout,

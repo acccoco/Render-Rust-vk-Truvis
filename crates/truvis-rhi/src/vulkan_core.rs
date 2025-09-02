@@ -7,8 +7,7 @@ use crate::{
     foundation::{debug_messenger::DebugMsger, device::Device, instance::Instance, physical_device::PhysicalDevice},
 };
 
-pub struct VulkanCore
-{
+pub struct VulkanCore {
     /// vk 基础函数的接口
     ///
     /// 在 drop 之后，会卸载 dll，因此需要确保该字段最后 drop
@@ -26,10 +25,8 @@ pub struct VulkanCore
 }
 
 /// 创建与销毁
-impl VulkanCore
-{
-    pub fn new(app_name: String, engine_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self
-    {
+impl VulkanCore {
+    pub fn new(app_name: String, engine_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
         let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");
         let instance = Instance::new(&vk_pf, app_name, engine_name, instance_extra_exts);
         let physical_device = PhysicalDevice::new_descrete_physical_device(instance.ash_instance());
@@ -99,8 +96,7 @@ impl VulkanCore
         }
     }
 
-    pub fn destroy(self)
-    {
+    pub fn destroy(self) {
         self.debug_utils.destroy();
         self.device.destroy();
         self.physical_device.destroy();

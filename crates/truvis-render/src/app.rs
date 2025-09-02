@@ -1,18 +1,21 @@
-use crate::outer_app::OuterApp;
-use crate::platform::camera_controller::CameraController;
-use crate::platform::input_manager::InputManager;
-use crate::renderer::renderer::Renderer;
-use crate::window_system::main_window::MainWindow;
+use std::{cell::OnceCell, ffi::CStr, sync::OnceLock};
+
 use ash::vk;
 use raw_window_handle::HasDisplayHandle;
-use std::cell::OnceCell;
-use std::ffi::CStr;
-use std::sync::OnceLock;
 use truvis_crate_tools::init_log::init_log;
-use winit::application::ApplicationHandler;
-use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
-use winit::event_loop::ActiveEventLoop;
-use winit::window::WindowId;
+use winit::{
+    application::ApplicationHandler,
+    event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
+    event_loop::ActiveEventLoop,
+    window::WindowId,
+};
+
+use crate::{
+    outer_app::OuterApp,
+    platform::{camera_controller::CameraController, input_manager::InputManager},
+    renderer::renderer::Renderer,
+    window_system::main_window::MainWindow,
+};
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     log::error!("{}", info);
@@ -243,7 +246,8 @@ impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
                 event_loop.exit();
             }
             WindowEvent::Resized(new_size) => {
-                // log::info!("window was resized, new size is : {}x{}", new_size.width, new_size.height);
+                // log::info!("window was resized, new size is : {}x{}", new_size.width,
+                // new_size.height);
                 self.on_window_resized(new_size.width, new_size.height);
             }
             WindowEvent::RedrawRequested => {

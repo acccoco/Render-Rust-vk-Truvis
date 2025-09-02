@@ -5,8 +5,7 @@ use crate::commands::{command_buffer::CommandBuffer, semaphore::Semaphore};
 
 /// Rhi 关于 submitInfo 的封装，更易用
 #[derive(Default)]
-pub struct SubmitInfo
-{
+pub struct SubmitInfo {
     inner: vk::SubmitInfo2<'static>,
 
     _command_buffers: Vec<vk::CommandBufferSubmitInfo<'static>>,
@@ -14,10 +13,8 @@ pub struct SubmitInfo
     signal_infos: Vec<vk::SemaphoreSubmitInfo<'static>>,
 }
 
-impl SubmitInfo
-{
-    pub fn new(commands: &[CommandBuffer]) -> Self
-    {
+impl SubmitInfo {
+    pub fn new(commands: &[CommandBuffer]) -> Self {
         let command_buffers = commands
             .iter()
             .map(|cmd| vk::CommandBufferSubmitInfo::default().command_buffer(cmd.vk_handle()))
@@ -41,8 +38,7 @@ impl SubmitInfo
     }
 
     #[inline]
-    pub fn submit_info(&self) -> vk::SubmitInfo2<'_>
-    {
+    pub fn submit_info(&self) -> vk::SubmitInfo2<'_> {
         self.inner
             .command_buffer_infos(&self._command_buffers)
             .wait_semaphore_infos(&self.wait_infos)
@@ -50,8 +46,7 @@ impl SubmitInfo
     }
 
     #[inline]
-    pub fn wait(mut self, semaphore: &Semaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self
-    {
+    pub fn wait(mut self, semaphore: &Semaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
         self.wait_infos.push(
             vk::SemaphoreSubmitInfo::default()
                 .semaphore(semaphore.handle())
@@ -62,8 +57,7 @@ impl SubmitInfo
     }
 
     #[inline]
-    pub fn signal(mut self, semaphore: &Semaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self
-    {
+    pub fn signal(mut self, semaphore: &Semaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
         self.signal_infos.push(
             vk::SemaphoreSubmitInfo::default()
                 .semaphore(semaphore.handle())

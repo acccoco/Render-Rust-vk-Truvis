@@ -1,5 +1,6 @@
-use crate::pipeline_settings::FrameLabel;
 use std::cell::Cell;
+
+use crate::pipeline_settings::FrameLabel;
 
 pub struct FrameController {
     /// 当前处在 in-flight 的第几帧：A, B, C

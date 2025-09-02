@@ -12,36 +12,30 @@ use crate::{
     resources::buffer::Buffer,
 };
 
-pub struct BlasInputInfo<'a>
-{
+pub struct BlasInputInfo<'a> {
     pub geometry: vk::AccelerationStructureGeometryKHR<'a>,
     pub range: vk::AccelerationStructureBuildRangeInfoKHR,
 }
 
-pub struct Acceleration
-{
+pub struct Acceleration {
     acceleration_structure: vk::AccelerationStructureKHR,
     _buffer: Buffer,
     device_functions: Rc<DeviceFunctions>,
 }
-impl DebugType for Acceleration
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for Acceleration {
+    fn debug_type_name() -> &'static str {
         "RhiAcceleration"
     }
 
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.acceleration_structure
     }
 }
-impl Acceleration
-{
+impl Acceleration {
     /// 同步构建 blas
     ///
-    /// 需要指定每个 geometry 的信息，以及每个 geometry 拥有的 max primitives 数量
-    /// 会自动添加 compact 和 trace 的 flag
+    /// 需要指定每个 geometry 的信息，以及每个 geometry 拥有的 max primitives
+    /// 数量 会自动添加 compact 和 trace 的 flag
     ///
     /// # 构建过程
     ///
@@ -57,8 +51,7 @@ impl Acceleration
         blas_inputs: &[BlasInputInfo],
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         let geometries = blas_inputs.iter().map(|blas_input| blas_input.geometry).collect_vec();
         let range_infos = blas_inputs.iter().map(|blas_input| blas_input.range).collect_vec();
         let max_primitives = blas_inputs.iter().map(|blas_input| blas_input.range.primitive_count).collect_vec();
@@ -67,9 +60,9 @@ impl Acceleration
         let mut build_geometry_info = vk::AccelerationStructureBuildGeometryInfoKHR::default()
             .ty(vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL)
             .flags(
-                build_flags |
-                    vk::BuildAccelerationStructureFlagsKHR::ALLOW_COMPACTION |
-                    vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE,
+                build_flags
+                    | vk::BuildAccelerationStructureFlagsKHR::ALLOW_COMPACTION
+                    | vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE,
             )
             .geometries(&geometries)
             .mode(vk::BuildAccelerationStructureModeKHR::BUILD);
@@ -177,8 +170,7 @@ impl Acceleration
         instances: &[vk::AccelerationStructureInstanceKHR],
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         let mut acceleration_instance_buffer = Buffer::new_acceleration_instance_buffer(
             render_context.device_functions(),
             render_context.allocator(),
@@ -256,8 +248,7 @@ impl Acceleration
         size: vk::DeviceSize,
         ty: vk::AccelerationStructureTypeKHR,
         debug_name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         let buffer =
             Buffer::new_accleration_buffer(device_functions.clone(), allocator, size as usize, debug_name.as_ref());
 
@@ -280,14 +271,12 @@ impl Acceleration
     }
 
     #[inline]
-    pub fn handle(&self) -> vk::AccelerationStructureKHR
-    {
+    pub fn handle(&self) -> vk::AccelerationStructureKHR {
         self.acceleration_structure
     }
 
     #[inline]
-    pub fn get_device_address(&self) -> vk::DeviceAddress
-    {
+    pub fn get_device_address(&self) -> vk::DeviceAddress {
         unsafe {
             self.device_functions.acceleration_structure.get_acceleration_structure_device_address(
                 &vk::AccelerationStructureDeviceAddressInfoKHR::default()
@@ -297,15 +286,12 @@ impl Acceleration
     }
 
     #[inline]
-    pub fn destroy(self)
-    {
+    pub fn destroy(self) {
         drop(self)
     }
 }
-impl Drop for Acceleration
-{
-    fn drop(&mut self)
-    {
+impl Drop for Acceleration {
+    fn drop(&mut self) {
         unsafe {
             self.device_functions
                 .acceleration_structure

@@ -1,11 +1,12 @@
+use std::{ffi::c_void, mem::offset_of};
+
 use itertools::Itertools;
-use model_manager::component::{DrsGeometry, DrsInstance, DrsMaterial, DrsMesh};
-use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
-use model_manager::vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D};
-use std::ffi::c_void;
-use std::mem::offset_of;
-use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
-use truvis_rhi::render_context::RenderContext;
+use model_manager::{
+    component::{DrsGeometry, DrsInstance, DrsMaterial, DrsMesh},
+    guid_new_type::{InsGuid, MatGuid, MeshGuid},
+    vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D},
+};
+use truvis_rhi::{render_context::RenderContext, resources::special_buffers::index_buffer::IndexBuffer};
 
 pub mod _ffi_bindings;
 use crate::_ffi_bindings::*;
@@ -96,11 +97,8 @@ impl AssimpSceneLoader {
                 }
                 let index_data =
                     std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
-                let mut index_buffer = IndexBuffer::new(
-                    rhi,
-                    index_data.len(),
-                    format!("{}-mesh-{}-indices", self.model_name, mesh_idx),
-                );
+                let mut index_buffer =
+                    IndexBuffer::new(rhi, index_data.len(), format!("{}-mesh-{}-indices", self.model_name, mesh_idx));
                 index_buffer.transfer_data_sync(rhi, index_data);
 
                 // 只有 single geometry 的 mesh
@@ -152,7 +150,8 @@ impl AssimpSceneLoader {
     ///
     /// 由于 Assimp 的复用层级是 geometry，而应用需要的复用层级是 mesh
     ///
-    /// 因此将 Assimp 中的一个 Instance 拆分为多个 Instance，将其 geometry 提升为 mesh
+    /// 因此将 Assimp 中的一个 Instance 拆分为多个 Instance，将其 geometry
+    /// 提升为 mesh
     fn load_instance(&mut self, mut instance_register: impl FnMut(DrsInstance) -> InsGuid) {
         let instance_cnt = unsafe { get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)
@@ -161,11 +160,7 @@ impl AssimpSceneLoader {
                 let instance = &*instance;
 
                 let mesh_cnt = instance.mesh_cnt_;
-                if mesh_cnt == 0 {
-                    None
-                } else {
-                    Some(instance)
-                }
+                if mesh_cnt == 0 { None } else { Some(instance) }
             })
             .flat_map(|instance| unsafe {
                 let mesh_cnt = instance.mesh_cnt_;

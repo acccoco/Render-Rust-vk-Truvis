@@ -30,7 +30,8 @@ pub fn init_log() {
 
             writeln!(
                 buf,
-                "{level_style}[{time}] {level}{level_style:#} {grey_style}[{file}:{line}]{grey_style:#} {black_style}{}{black_style:#}",
+                "{level_style}[{time}] {level}{level_style:#} {grey_style}[{file}:{line}]{grey_style:#} \
+                 {black_style}{}{black_style:#}",
                 record.args()
             )
         })

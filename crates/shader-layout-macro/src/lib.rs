@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta};
+use syn::{Attribute, Data, DeriveInput, Fields, Meta, parse_macro_input};
 
 /// 为结构体实现 ShaderLayout 派生宏
 ///
@@ -96,16 +96,14 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
 /// 属性格式示例：#[binding = 0]
 fn get_binding_value(attrs: &[Attribute]) -> Option<u32> {
     for attr in attrs {
-        if attr.path().is_ident("binding") {
-            if let Meta::NameValue(meta) = &attr.meta {
-                if let syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Int(lit_int),
-                    ..
-                }) = &meta.value
-                {
-                    return Some(lit_int.base10_parse().unwrap());
-                }
-            }
+        if attr.path().is_ident("binding")
+            && let Meta::NameValue(meta) = &attr.meta
+            && let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Int(lit_int),
+                ..
+            }) = &meta.value
+        {
+            return Some(lit_int.base10_parse().unwrap());
         }
     }
     None
@@ -116,17 +114,15 @@ fn get_binding_value(attrs: &[Attribute]) -> Option<u32> {
 /// 属性格式示例：#[descriptor_type = "UNIFORM_BUFFER"]
 fn get_descriptor_type(attrs: &[Attribute]) -> syn::Expr {
     for attr in attrs {
-        if attr.path().is_ident("descriptor_type") {
-            if let Meta::NameValue(meta) = &attr.meta {
-                if let syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(lit_str),
-                    ..
-                }) = &meta.value
-                {
-                    let descriptor_type = format!("vk::DescriptorType::{}", lit_str.value().as_str());
-                    return syn::parse_str(&descriptor_type).unwrap();
-                }
-            }
+        if attr.path().is_ident("descriptor_type")
+            && let Meta::NameValue(meta) = &attr.meta
+            && let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Str(lit_str),
+                ..
+            }) = &meta.value
+        {
+            let descriptor_type = format!("vk::DescriptorType::{}", lit_str.value().as_str());
+            return syn::parse_str(&descriptor_type).unwrap();
         }
     }
     // 默认值：统一缓冲区
@@ -138,10 +134,10 @@ fn get_descriptor_type(attrs: &[Attribute]) -> syn::Expr {
 /// 属性格式示例：#[count = 1]
 fn get_count_value(attrs: &[Attribute]) -> syn::Expr {
     for attr in attrs {
-        if attr.path().is_ident("count") {
-            if let Meta::NameValue(meta) = &attr.meta {
-                return meta.value.clone();
-            }
+        if attr.path().is_ident("count")
+            && let Meta::NameValue(meta) = &attr.meta
+        {
+            return meta.value.clone();
         }
     }
     // 默认值：1
@@ -153,22 +149,17 @@ fn get_count_value(attrs: &[Attribute]) -> syn::Expr {
 /// 属性格式示例：#[stage = "VERTEX | FRAGMENT"]
 fn get_stage_value(attrs: &[Attribute]) -> syn::Expr {
     for attr in attrs {
-        if attr.path().is_ident("stage") {
-            if let Meta::NameValue(meta) = &attr.meta {
-                if let syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(lit_str),
-                    ..
-                }) = &meta.value
-                {
-                    let stage = lit_str.value();
-                    let stage_flags = stage
-                        .split(" | ")
-                        .map(|s| format!("vk::ShaderStageFlags::{}", s))
-                        .collect::<Vec<_>>()
-                        .join(" | ");
-                    return syn::parse_str(&stage_flags).unwrap();
-                }
-            }
+        if attr.path().is_ident("stage")
+            && let Meta::NameValue(meta) = &attr.meta
+            && let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Str(lit_str),
+                ..
+            }) = &meta.value
+        {
+            let stage = lit_str.value();
+            let stage_flags =
+                stage.split(" | ").map(|s| format!("vk::ShaderStageFlags::{}", s)).collect::<Vec<_>>().join(" | ");
+            return syn::parse_str(&stage_flags).unwrap();
         }
     }
 
@@ -181,22 +172,20 @@ fn get_stage_value(attrs: &[Attribute]) -> syn::Expr {
 /// 属性格式示例：#[flags = "UPDATE_AFTER_BIND | PARTIALLY_BOUND"]
 fn get_flags_value(attrs: &[Attribute]) -> syn::Expr {
     for attr in attrs {
-        if attr.path().is_ident("flags") {
-            if let Meta::NameValue(meta) = &attr.meta {
-                if let syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(lit_str),
-                    ..
-                }) = &meta.value
-                {
-                    let flags = lit_str.value();
-                    let binding_flags = flags
-                        .split(" | ")
-                        .map(|s| format!("vk::DescriptorBindingFlags::{}", s))
-                        .collect::<Vec<_>>()
-                        .join(" | ");
-                    return syn::parse_str(&binding_flags).unwrap();
-                }
-            }
+        if attr.path().is_ident("flags")
+            && let Meta::NameValue(meta) = &attr.meta
+            && let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Str(lit_str),
+                ..
+            }) = &meta.value
+        {
+            let flags = lit_str.value();
+            let binding_flags = flags
+                .split(" | ")
+                .map(|s| format!("vk::DescriptorBindingFlags::{}", s))
+                .collect::<Vec<_>>()
+                .join(" | ");
+            return syn::parse_str(&binding_flags).unwrap();
         }
     }
 

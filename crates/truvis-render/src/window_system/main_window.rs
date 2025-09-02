@@ -1,22 +1,21 @@
-use crate::gui::gui::Gui;
-use crate::gui::gui_pass::GuiPass;
-use crate::pipeline_settings::{DefaultRendererSettings, FrameLabel};
-use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_controller::FrameController;
-use crate::renderer::renderer::PresentData;
-use crate::renderer::swapchain::RenderSwapchain;
+use std::{cell::RefCell, rc::Rc};
+
 use ash::vk;
 use itertools::Itertools;
-use std::cell::RefCell;
-use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::commands::submit_info::SubmitInfo;
-use truvis_rhi::commands::barrier::ImageBarrier;
-use truvis_rhi::render_context::RenderContext;
-use winit::event_loop::ActiveEventLoop;
-use winit::platform::windows::WindowAttributesExtWindows;
-use winit::window::Window;
-use truvis_rhi::commands::semaphore::Semaphore;
+use truvis_rhi::{
+    commands::{barrier::ImageBarrier, semaphore::Semaphore, submit_info::SubmitInfo},
+    render_context::RenderContext,
+};
+use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
+
+use crate::{
+    gui::{gui::Gui, gui_pass::GuiPass},
+    pipeline_settings::{DefaultRendererSettings, FrameLabel},
+    renderer::{
+        bindless::BindlessManager, frame_controller::FrameController, renderer::PresentData, swapchain::RenderSwapchain,
+    },
+};
 
 mod helper {
     pub fn load_icon(bytes: &[u8]) -> winit::window::Icon {
@@ -46,9 +45,11 @@ pub struct MainWindow {
     /// 表示 gui 的绘制已经完成；
     ///
     /// 数量和 swapchain 的 image 数量相同，
-    /// 因为每个 image 都需要一个对应的 semaphore 来等待 gui 绘制完成后再进行呈现
+    /// 因为每个 image 都需要一个对应的 semaphore 来等待 gui
+    /// 绘制完成后再进行呈现
     ///
-    /// renderer 的 wait timeline 可以确保 signal 操作已经完成，但是无法 wait 操作已经完成
+    /// renderer 的 wait timeline 可以确保 signal 操作已经完成，但是无法 wait
+    /// 操作已经完成
     render_complete_semaphores: Vec<Semaphore>,
 }
 

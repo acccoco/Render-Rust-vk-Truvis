@@ -1,15 +1,17 @@
 mod triangle_pass;
 mod triangle_pipeline;
 
-use crate::triangle_pipeline::TrianglePipeline;
 use imgui::Ui;
-use model_manager::component::DrsGeometry;
-use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
-use truvis_render::app::TruvisApp;
-use truvis_render::outer_app::OuterApp;
-use truvis_render::platform::camera::DrsCamera;
-use truvis_render::render_pipeline::pipeline_context::PipelineContext;
-use truvis_render::renderer::renderer::Renderer;
+use model_manager::{
+    component::DrsGeometry,
+    vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor},
+};
+use truvis_render::{
+    app::TruvisApp, outer_app::OuterApp, platform::camera::DrsCamera,
+    render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
+};
+
+use crate::triangle_pipeline::TrianglePipeline;
 
 struct HelloTriangle {
     triangle_pipeline: TrianglePipeline,

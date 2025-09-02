@@ -11,31 +11,28 @@ use crate::{
     resources::{buffer::Buffer, buffer_creator::BufferCreateInfo},
 };
 
-pub struct SBTBuffer
-{
+pub struct SBTBuffer {
     _inner: Buffer,
 }
 
 impl_derive_buffer!(SBTBuffer, Buffer, _inner);
-impl SBTBuffer
-{
+impl SBTBuffer {
     pub fn new(
         device_functions: Rc<DeviceFunctions>,
         allocator: Rc<MemAllocator>,
         size: vk::DeviceSize,
         align: vk::DeviceSize,
         name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         let buffer = Self {
             _inner: Buffer::new(
                 device_functions.clone(),
                 allocator,
                 Rc::new(BufferCreateInfo::new(
                     size,
-                    vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR |
-                        vk::BufferUsageFlags::TRANSFER_SRC |
-                        vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                    vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
+                        | vk::BufferUsageFlags::TRANSFER_SRC
+                        | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
                 )),
                 Rc::new(vk_mem::AllocationCreateInfo {
                     usage: vk_mem::MemoryUsage::AutoPreferDevice,
@@ -51,21 +48,17 @@ impl SBTBuffer
     }
 
     #[inline]
-    pub fn handle(&self) -> vk::Buffer
-    {
+    pub fn handle(&self) -> vk::Buffer {
         self._inner.handle
     }
 }
 
-impl DebugType for SBTBuffer
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for SBTBuffer {
+    fn debug_type_name() -> &'static str {
         "SBTBuffer"
     }
 
-    fn vk_handle(&self) -> impl Handle
-    {
+    fn vk_handle(&self) -> impl Handle {
         self.handle()
     }
 }

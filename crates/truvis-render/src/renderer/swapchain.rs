@@ -1,16 +1,16 @@
-use crate::pipeline_settings::PresentSettings;
+use std::rc::Rc;
+
 use ash::vk;
 use itertools::Itertools;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use std::rc::Rc;
-use truvis_rhi::commands::command_queue::CommandQueue;
-use truvis_rhi::commands::fence::Fence;
-use truvis_rhi::foundation::debug_messenger::DebugType;
-use truvis_rhi::foundation::device::Device;
-use truvis_rhi::resources::image_view::ImageViewCreateInfo;
-use truvis_rhi::resources::image_view::Image2DView;
-use truvis_rhi::commands::semaphore::Semaphore;
-use truvis_rhi::render_context::RenderContext;
+use truvis_rhi::{
+    commands::{command_queue::CommandQueue, fence::Fence, semaphore::Semaphore},
+    foundation::{debug_messenger::DebugType, device::Device},
+    render_context::RenderContext,
+    resources::image_view::{Image2DView, ImageViewCreateInfo},
+};
+
+use crate::pipeline_settings::PresentSettings;
 
 struct RhiSurface {
     handle: vk::SurfaceKHR,
@@ -229,7 +229,8 @@ impl RenderSwapchain {
 
         // TODO 解决 suboptimal 的问题
         if !is_optimal {
-            // log::warn!("swapchain acquire image index {} is not optimal", image_index);
+            // log::warn!("swapchain acquire image index {} is not optimal",
+            // image_index);
         }
 
         self.swapchain_image_index = image_index as usize;

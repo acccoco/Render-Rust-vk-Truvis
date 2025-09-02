@@ -1,12 +1,15 @@
-use ash::vk;
 use std::mem::offset_of;
-use truvis_rhi::basic::color::LabelColor;
-use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
-use truvis_rhi::commands::command_buffer::CommandBuffer;
-use truvis_rhi::resources::buffer::Buffer;
-use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
-use truvis_rhi::commands::barrier::BufferBarrier;
-use truvis_rhi::render_context::RenderContext;
+
+use ash::vk;
+use truvis_rhi::{
+    basic::color::LabelColor,
+    commands::{barrier::BufferBarrier, command_buffer::CommandBuffer},
+    render_context::RenderContext,
+    resources::{
+        buffer::Buffer,
+        special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer},
+    },
+};
 
 /// AoS: Array of Structs
 pub struct ImGuiVertex {
@@ -152,11 +155,8 @@ impl GuiMesh {
 
         let indices_size = index_count * size_of::<imgui::DrawIdx>();
         let mut index_buffer = IndexBuffer::new(rhi, indices_size, format!("{}-imgui-index", frame_name));
-        let mut stage_buffer = Buffer::new_stage_buffer(
-            rhi,
-            indices_size as vk::DeviceSize,
-            format!("{}-imgui-index-stage", frame_name),
-        );
+        let mut stage_buffer =
+            Buffer::new_stage_buffer(rhi, indices_size as vk::DeviceSize, format!("{}-imgui-index-stage", frame_name));
         stage_buffer.transfer_data_by_mem_map(&indices);
 
         cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);

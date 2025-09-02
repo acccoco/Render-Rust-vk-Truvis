@@ -1,9 +1,8 @@
 //! 将指定目录下的所有 shader 文件编译为 spv 文件，输出到同一目录下
 
 mod shader_build_config;
-use shader_build_config::EnvPath;
-
 use rayon::prelude::*;
+use shader_build_config::EnvPath;
 use truvis_crate_tools::init_log::init_log;
 
 /// shader 的 stage
@@ -157,7 +156,8 @@ impl ShaderCompileTask {
     fn build_hlsl(&self) {
         // shader model 6.3 支持 ray tracing
         // shader model 6.5 支持 task shader 和 mesh shader
-        // dxc.exe -spirv -T vs_6_1 -E main .\input.vert -Fo .\output.vert.spv -fspv-extension=SPV_EXT_descriptor_indexing
+        // dxc.exe -spirv -T vs_6_1 -E main .\input.vert -Fo .\output.vert.spv
+        // -fspv-extension=SPV_EXT_descriptor_indexing
         let shader_stage_tag = match self.shader_stage {
             ShaderStage::Vertex => "vs",
             ShaderStage::_TessellationControl => "hs",

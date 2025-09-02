@@ -6,7 +6,6 @@ use shader_layout_trait::ShaderBindingLayout;
 use crate::{
     descriptors::descriptor_pool::DescriptorPool,
     foundation::{debug_messenger::DebugType, device::DeviceFunctions},
-    render_context::RenderContext,
 };
 
 /// 描述符集布局
@@ -21,8 +20,7 @@ use crate::{
 ///
 /// # 泛型参数
 /// - T: 实现了 ShaderBindingLayout trait 的类型，定义了具体的绑定布局
-pub struct DescriptorSetLayout<T: ShaderBindingLayout>
-{
+pub struct DescriptorSetLayout<T: ShaderBindingLayout> {
     /// Vulkan 描述符集布局句柄
     layout: vk::DescriptorSetLayout,
     /// 用于在编译时关联泛型参数 T
@@ -30,31 +28,25 @@ pub struct DescriptorSetLayout<T: ShaderBindingLayout>
 
     device_functions: Rc<DeviceFunctions>,
 }
-impl<T: ShaderBindingLayout> Drop for DescriptorSetLayout<T>
-{
-    fn drop(&mut self)
-    {
+impl<T: ShaderBindingLayout> Drop for DescriptorSetLayout<T> {
+    fn drop(&mut self) {
         unsafe {
             log::info!("Destroying RhiDescriptorSetLayout");
             self.device_functions.destroy_descriptor_set_layout(self.layout, None);
         }
     }
 }
-impl<T: ShaderBindingLayout> DebugType for DescriptorSetLayout<T>
-{
-    fn debug_type_name() -> &'static str
-    {
+impl<T: ShaderBindingLayout> DebugType for DescriptorSetLayout<T> {
+    fn debug_type_name() -> &'static str {
         "RhiDescriptorSetLayout"
     }
 
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.layout
     }
 }
 
-impl<T: ShaderBindingLayout> DescriptorSetLayout<T>
-{
+impl<T: ShaderBindingLayout> DescriptorSetLayout<T> {
     /// 创建新的描述符集布局
     ///
     /// # 参数
@@ -67,8 +59,7 @@ impl<T: ShaderBindingLayout> DescriptorSetLayout<T>
         device_functions: Rc<DeviceFunctions>,
         flags: vk::DescriptorSetLayoutCreateFlags,
         debug_name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         // 从类型 T 获取绑定信息
         let (bindings, binding_flags) = T::get_vk_bindings();
         let mut bind_flags_ci = vk::DescriptorSetLayoutBindingFlagsCreateInfo::default().binding_flags(&binding_flags);
@@ -89,14 +80,12 @@ impl<T: ShaderBindingLayout> DescriptorSetLayout<T>
     }
 
     #[inline]
-    pub fn handle(&self) -> vk::DescriptorSetLayout
-    {
+    pub fn handle(&self) -> vk::DescriptorSetLayout {
         self.layout
     }
 
     #[inline]
-    pub fn handle_ref(&self) -> &vk::DescriptorSetLayout
-    {
+    pub fn handle_ref(&self) -> &vk::DescriptorSetLayout {
         &self.layout
     }
 }
@@ -112,8 +101,7 @@ impl<T: ShaderBindingLayout> DescriptorSetLayout<T>
 /// # Destroy
 ///
 /// 跟随 descriptor pool 一起销毁
-pub struct DescriptorSet<T: ShaderBindingLayout>
-{
+pub struct DescriptorSet<T: ShaderBindingLayout> {
     /// Vulkan 描述符集句柄
     handle: vk::DescriptorSet,
     /// 用于在编译时关联泛型参数 T
@@ -121,15 +109,12 @@ pub struct DescriptorSet<T: ShaderBindingLayout>
 
     device_functions: Rc<DeviceFunctions>,
 }
-impl<T: ShaderBindingLayout> DebugType for DescriptorSet<T>
-{
-    fn debug_type_name() -> &'static str
-    {
+impl<T: ShaderBindingLayout> DebugType for DescriptorSet<T> {
+    fn debug_type_name() -> &'static str {
         "RhiDescriptorSet"
     }
 
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.handle
     }
 }
@@ -139,16 +124,14 @@ impl<T: ShaderBindingLayout> DebugType for DescriptorSet<T>
 /// 用于更新描述符集的内容，可以是：
 /// - 图像描述符：用于纹理和采样器
 /// - 缓冲区描述符：用于统一缓冲区和存储缓冲区
-pub enum DescriptorUpdateInfo
-{
+pub enum DescriptorUpdateInfo {
     /// 图像描述符信息
     Image(vk::DescriptorImageInfo),
     /// 缓冲区描述符信息
     Buffer(vk::DescriptorBufferInfo),
 }
 
-impl<T: ShaderBindingLayout> DescriptorSet<T>
-{
+impl<T: ShaderBindingLayout> DescriptorSet<T> {
     /// 创建新的描述符集
     ///
     /// # 参数
@@ -163,8 +146,7 @@ impl<T: ShaderBindingLayout> DescriptorSet<T>
         descriptor_pool: &DescriptorPool,
         layout: &DescriptorSetLayout<T>,
         debug_name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         // 分配描述符集
         let alloc_info = vk::DescriptorSetAllocateInfo::default()
             .descriptor_pool(descriptor_pool.handle())
@@ -180,8 +162,7 @@ impl<T: ShaderBindingLayout> DescriptorSet<T>
     }
 
     #[inline]
-    pub fn handle(&self) -> vk::DescriptorSet
-    {
+    pub fn handle(&self) -> vk::DescriptorSet {
         self.handle
     }
 }

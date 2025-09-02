@@ -13,8 +13,7 @@ use crate::{
 };
 
 /// buffer 内存放的是结构体或者结构体的数组
-pub struct StructuredBuffer<T: bytemuck::Pod>
-{
+pub struct StructuredBuffer<T: bytemuck::Pod> {
     inner: Buffer,
     /// 结构体的数量
     len: usize,
@@ -23,24 +22,22 @@ pub struct StructuredBuffer<T: bytemuck::Pod>
 
 impl_derive_buffer!(StructuredBuffer<T: bytemuck::Pod>, Buffer, inner);
 
-impl<T: bytemuck::Pod> StructuredBuffer<T>
-{
+impl<T: bytemuck::Pod> StructuredBuffer<T> {
     #[inline]
     pub fn new_ubo(
         device_functions: Rc<DeviceFunctions>,
         allocator: Rc<MemAllocator>,
         len: usize,
         debug_name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         Self::new(
             device_functions,
             allocator,
             debug_name,
             len,
-            vk::BufferUsageFlags::UNIFORM_BUFFER |
-                vk::BufferUsageFlags::TRANSFER_DST |
-                vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+            vk::BufferUsageFlags::UNIFORM_BUFFER
+                | vk::BufferUsageFlags::TRANSFER_DST
+                | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
             false,
         )
     }
@@ -51,8 +48,7 @@ impl<T: bytemuck::Pod> StructuredBuffer<T>
         allocator: Rc<MemAllocator>,
         len: usize,
         debug_name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         Self::new(device_functions, allocator, debug_name, len, vk::BufferUsageFlags::TRANSFER_SRC, true)
     }
 
@@ -64,8 +60,7 @@ impl<T: bytemuck::Pod> StructuredBuffer<T>
         len: usize,
         buffer_usage_flags: vk::BufferUsageFlags,
         mapped: bool,
-    ) -> Self
-    {
+    ) -> Self {
         let allocation_create_flags = if mapped {
             // TODO 或许可以优化这个 flag
             vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM
@@ -91,24 +86,20 @@ impl<T: bytemuck::Pod> StructuredBuffer<T>
         }
     }
 
-    pub fn mapped_slice(&mut self) -> &mut [T]
-    {
+    pub fn mapped_slice(&mut self) -> &mut [T] {
         let mapped_ptr = self.inner.mapped_ptr();
         unsafe { std::slice::from_raw_parts_mut(mapped_ptr as *mut T, self.len) }
     }
 }
 
-impl<T: bytemuck::Pod> DebugType for StructuredBuffer<T>
-{
+impl<T: bytemuck::Pod> DebugType for StructuredBuffer<T> {
     #[inline]
-    fn debug_type_name() -> &'static str
-    {
+    fn debug_type_name() -> &'static str {
         "StructuredBuffer"
     }
 
     #[inline]
-    fn vk_handle(&self) -> impl Handle
-    {
+    fn vk_handle(&self) -> impl Handle {
         self.inner.handle
     }
 }

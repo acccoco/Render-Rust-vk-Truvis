@@ -1,6 +1,9 @@
-use model_manager::component::{DrsInstance, DrsMaterial, DrsMesh};
-use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use std::collections::HashMap;
+
+use model_manager::{
+    component::{DrsInstance, DrsMaterial, DrsMesh},
+    guid_new_type::{InsGuid, MatGuid, MeshGuid},
+};
 use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::render_context::RenderContext;
 

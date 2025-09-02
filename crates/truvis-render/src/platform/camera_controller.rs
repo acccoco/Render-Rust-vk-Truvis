@@ -1,6 +1,6 @@
-use crate::platform::camera::DrsCamera;
-use crate::platform::input_manager::InputManager;
 use winit::keyboard::KeyCode;
+
+use crate::platform::{camera::DrsCamera, input_manager::InputManager};
 
 pub struct CameraController {
     camera: DrsCamera,

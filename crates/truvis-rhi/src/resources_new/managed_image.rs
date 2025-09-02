@@ -11,8 +11,7 @@ use crate::{
 
 /// Vulkan 格式相关的工具类
 pub struct VulkanFormatUtils;
-impl VulkanFormatUtils
-{
+impl VulkanFormatUtils {
     /// 计算指定 Vulkan 格式下每个像素需要的字节数
     ///
     /// # Params
@@ -23,8 +22,7 @@ impl VulkanFormatUtils
     ///
     /// # Panic
     /// 当遇到不支持的格式时会 panic
-    pub fn pixel_size_in_bytes(format: vk::Format) -> usize
-    {
+    pub fn pixel_size_in_bytes(format: vk::Format) -> usize {
         // 根据 vulkan specification 得到的 format 顺序
         const BYTE_3_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8_UNORM, vk::Format::B8G8R8_SRGB)];
         const BYTE_4_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8A8_UNORM, vk::Format::B8G8R8A8_SRGB)];
@@ -48,8 +46,7 @@ impl VulkanFormatUtils
     }
 }
 
-pub struct ManagedImage
-{
+pub struct ManagedImage {
     handle: vk::Image,
     allocation: vk_mem::Allocation,
     width: u32,
@@ -58,29 +55,24 @@ pub struct ManagedImage
     name: String,
 }
 
-impl DebugType for ManagedImage
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for ManagedImage {
+    fn debug_type_name() -> &'static str {
         "ManagedImage2D"
     }
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.handle
     }
 }
 
 // 构造方法
-impl ManagedImage
-{
+impl ManagedImage {
     pub(crate) fn new(
         device_functions: Rc<DeviceFunctions>,
         allocator: &MemAllocator,
         image_info: &ImageCreateInfo,
         alloc_info: &vk_mem::AllocationCreateInfo,
         name: &str,
-    ) -> Self
-    {
+    ) -> Self {
         let (image, alloction) =
             unsafe { allocator.create_image(&image_info.as_info(), alloc_info).expect("Failed to create image") };
         let image = Self {
@@ -96,32 +88,26 @@ impl ManagedImage
     }
 }
 // Getter
-impl ManagedImage
-{
+impl ManagedImage {
     #[inline]
-    pub fn handle(&self) -> vk::Image
-    {
+    pub fn handle(&self) -> vk::Image {
         self.handle
     }
     #[inline]
-    pub fn width(&self) -> u32
-    {
+    pub fn width(&self) -> u32 {
         self.width
     }
     #[inline]
-    pub fn height(&self) -> u32
-    {
+    pub fn height(&self) -> u32 {
         self.height
     }
     #[inline]
-    pub fn format(&self) -> vk::Format
-    {
+    pub fn format(&self) -> vk::Format {
         self.format
     }
 }
 // 操作方法
-impl ManagedImage
-{
+impl ManagedImage {
     /// ## 实现步骤
     /// 1. 创建一个 staging buffer，用于存放待复制的数据
     /// 2. 将数据复制到 staging buffer
@@ -134,8 +120,7 @@ impl ManagedImage
         allocator: Rc<MemAllocator>,
         cmd: &CommandBuffer,
         data: &[u8],
-    ) -> Buffer
-    {
+    ) -> Buffer {
         let pixels_cnt = self.width * self.height;
         assert_eq!(data.len(), VulkanFormatUtils::pixel_size_in_bytes(self.format) * pixels_cnt as usize);
 

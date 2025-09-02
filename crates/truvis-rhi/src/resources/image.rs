@@ -10,18 +10,15 @@ use crate::{
     resources::buffer::Buffer,
 };
 
-pub struct ImageCreateInfo
-{
+pub struct ImageCreateInfo {
     inner: vk::ImageCreateInfo<'static>,
 
     queue_family_indices: Vec<u32>,
 }
 
-impl ImageCreateInfo
-{
+impl ImageCreateInfo {
     #[inline]
-    pub fn new_image_2d_info(extent: vk::Extent2D, format: vk::Format, usage: vk::ImageUsageFlags) -> Self
-    {
+    pub fn new_image_2d_info(extent: vk::Extent2D, format: vk::Format, usage: vk::ImageUsageFlags) -> Self {
         Self {
             inner: vk::ImageCreateInfo {
                 image_type: vk::ImageType::TYPE_2D,
@@ -42,27 +39,23 @@ impl ImageCreateInfo
     }
 
     #[inline]
-    pub fn as_info(&self) -> vk::ImageCreateInfo<'_>
-    {
+    pub fn as_info(&self) -> vk::ImageCreateInfo<'_> {
         self.inner.queue_family_indices(&self.queue_family_indices)
     }
 
     // getter
     #[inline]
-    pub fn extent(&self) -> &vk::Extent3D
-    {
+    pub fn extent(&self) -> &vk::Extent3D {
         &self.inner.extent
     }
     #[inline]
-    pub fn format(&self) -> vk::Format
-    {
+    pub fn format(&self) -> vk::Format {
         self.inner.format
     }
 
     // builder
     #[inline]
-    pub fn queue_family_indices(mut self, queue_family_indices: &[u32]) -> Self
-    {
+    pub fn queue_family_indices(mut self, queue_family_indices: &[u32]) -> Self {
         self.inner.sharing_mode = vk::SharingMode::CONCURRENT;
         self.queue_family_indices = queue_family_indices.into();
 
@@ -72,8 +65,7 @@ impl ImageCreateInfo
     }
 }
 
-pub struct Image2D
-{
+pub struct Image2D {
     handle: vk::Image,
 
     allocation: vk_mem::Allocation,
@@ -85,65 +77,53 @@ pub struct Image2D
     device_functions: Rc<DeviceFunctions>,
 }
 
-impl DebugType for Image2D
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for Image2D {
+    fn debug_type_name() -> &'static str {
         "RhiImage2D"
     }
 
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.handle
     }
 }
 
-impl Drop for Image2D
-{
-    fn drop(&mut self)
-    {
+impl Drop for Image2D {
+    fn drop(&mut self) {
         unsafe { self.allocator.destroy_image(self.handle, &mut self.allocation) }
     }
 }
 
 // getter
-impl Image2D
-{
+impl Image2D {
     #[inline]
-    pub fn width(&self) -> u32
-    {
+    pub fn width(&self) -> u32 {
         self.image_info.extent().width
     }
 
     #[inline]
-    pub fn height(&self) -> u32
-    {
+    pub fn height(&self) -> u32 {
         self.image_info.extent().height
     }
 
     #[inline]
-    pub fn handle(&self) -> vk::Image
-    {
+    pub fn handle(&self) -> vk::Image {
         self.handle
     }
 
     #[inline]
-    pub fn format(&self) -> vk::Format
-    {
+    pub fn format(&self) -> vk::Format {
         self.image_info.format()
     }
 }
 
-impl Image2D
-{
+impl Image2D {
     pub fn new(
         device_functions: Rc<DeviceFunctions>,
         allocator: Rc<MemAllocator>,
         image_info: Rc<ImageCreateInfo>,
         alloc_info: &vk_mem::AllocationCreateInfo,
         debug_name: &str,
-    ) -> Self
-    {
+    ) -> Self {
         let (image, alloc) = unsafe { allocator.create_image(&image_info.as_info(), alloc_info).unwrap() };
         let image = Self {
             _name: debug_name.to_string(),
@@ -159,8 +139,7 @@ impl Image2D
         image
     }
     /// 根据 RGBA8_UNORM 的 data 创建 image
-    pub fn from_rgba8(rhi: &RenderContext, width: u32, height: u32, data: &[u8], name: impl AsRef<str>) -> Self
-    {
+    pub fn from_rgba8(rhi: &RenderContext, width: u32, height: u32, data: &[u8], name: impl AsRef<str>) -> Self {
         let image = Self::new(
             rhi.device_functions(),
             rhi.allocator(),
@@ -181,8 +160,7 @@ impl Image2D
         image
     }
 
-    pub fn transfer_data(&self, command_buffer: &CommandBuffer, data: &[u8]) -> Buffer
-    {
+    pub fn transfer_data(&self, command_buffer: &CommandBuffer, data: &[u8]) -> Buffer {
         let pixels_cnt = self.width() * self.height();
         assert_eq!(data.len(), Self::format_byte_count(self.image_info.format()) * pixels_cnt as usize);
 
@@ -243,8 +221,7 @@ impl Image2D
     }
 
     /// 计算某种 format 的一个像素需要的存储空间
-    fn format_byte_count(format: vk::Format) -> usize
-    {
+    fn format_byte_count(format: vk::Format) -> usize {
         // 根据 vulkan specification 得到的 format 顺序
         const BYTE_3_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8_UNORM, vk::Format::B8G8R8_SRGB)];
         const BYTE_4_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8A8_UNORM, vk::Format::B8G8R8A8_SRGB)];
@@ -268,18 +245,15 @@ impl Image2D
     }
 }
 
-pub enum ImageContainer
-{
+pub enum ImageContainer {
     Own(Box<Image2D>),
     Shared(Rc<Image2D>),
     Raw(vk::Image),
 }
 
-impl ImageContainer
-{
+impl ImageContainer {
     #[inline]
-    pub fn vk_image(&self) -> vk::Image
-    {
+    pub fn vk_image(&self) -> vk::Image {
         match self {
             ImageContainer::Own(image) => image.handle(),
             ImageContainer::Shared(image) => image.handle(),

@@ -8,8 +8,7 @@ use crate::{
     pipelines::shader::{ShaderModule, ShaderStageInfo},
 };
 
-pub struct GraphicsPipelineCreateInfo
-{
+pub struct GraphicsPipelineCreateInfo {
     /// dynamic render 需要的 framebuffer 信息
     color_attach_formats: Vec<vk::Format>,
     /// dynamic render 需要的 framebuffer 信息
@@ -36,10 +35,8 @@ pub struct GraphicsPipelineCreateInfo
 
     dynamic_states: Vec<vk::DynamicState>,
 }
-impl Default for GraphicsPipelineCreateInfo
-{
-    fn default() -> Self
-    {
+impl Default for GraphicsPipelineCreateInfo {
+    fn default() -> Self {
         Self {
             color_attach_formats: vec![],
 
@@ -82,8 +79,7 @@ impl Default for GraphicsPipelineCreateInfo
     }
 }
 // builder
-impl GraphicsPipelineCreateInfo
-{
+impl GraphicsPipelineCreateInfo {
     /// builder
     #[inline]
     pub fn attach_info(
@@ -91,8 +87,7 @@ impl GraphicsPipelineCreateInfo
         color_attach_formats: Vec<vk::Format>,
         depth_format: Option<vk::Format>,
         stencil_format: Option<vk::Format>,
-    ) -> &mut Self
-    {
+    ) -> &mut Self {
         self.color_attach_formats = color_attach_formats;
         self.depth_attach_format = depth_format.unwrap_or(vk::Format::UNDEFINED);
         self.stencil_attach_format = stencil_format.unwrap_or(vk::Format::UNDEFINED);
@@ -102,8 +97,7 @@ impl GraphicsPipelineCreateInfo
 
     /// builder
     #[inline]
-    pub fn vertex_shader_stage(&mut self, path: &'static str, entry_point: &'static CStr) -> &mut Self
-    {
+    pub fn vertex_shader_stage(&mut self, path: &'static str, entry_point: &'static CStr) -> &mut Self {
         self.shader_stages.push(ShaderStageInfo {
             stage: vk::ShaderStageFlags::VERTEX,
             entry_point,
@@ -114,8 +108,7 @@ impl GraphicsPipelineCreateInfo
 
     /// builder
     #[inline]
-    pub fn fragment_shader_stage(&mut self, path: &'static str, entry_point: &'static CStr) -> &mut Self
-    {
+    pub fn fragment_shader_stage(&mut self, path: &'static str, entry_point: &'static CStr) -> &mut Self {
         self.shader_stages.push(ShaderStageInfo {
             stage: vk::ShaderStageFlags::FRAGMENT,
             entry_point,
@@ -125,24 +118,21 @@ impl GraphicsPipelineCreateInfo
     }
 
     #[inline]
-    pub fn shader_stages(&mut self, stages: Vec<ShaderStageInfo>) -> &mut Self
-    {
+    pub fn shader_stages(&mut self, stages: Vec<ShaderStageInfo>) -> &mut Self {
         self.shader_stages = stages;
         self
     }
 
     /// builder
     #[inline]
-    pub fn vertex_binding(&mut self, bindings: Vec<vk::VertexInputBindingDescription>) -> &mut Self
-    {
+    pub fn vertex_binding(&mut self, bindings: Vec<vk::VertexInputBindingDescription>) -> &mut Self {
         self.vertex_binding_desc = bindings;
         self
     }
 
     /// builder
     #[inline]
-    pub fn vertex_attribute(&mut self, attributes: Vec<vk::VertexInputAttributeDescription>) -> &mut Self
-    {
+    pub fn vertex_attribute(&mut self, attributes: Vec<vk::VertexInputAttributeDescription>) -> &mut Self {
         self.vertex_attribute_desec = attributes;
         self
     }
@@ -153,8 +143,7 @@ impl GraphicsPipelineCreateInfo
         &mut self,
         states: Vec<vk::PipelineColorBlendAttachmentState>,
         blend_constants: [f32; 4],
-    ) -> &mut Self
-    {
+    ) -> &mut Self {
         self.color_attach_blend_states = states;
         self.blend_info.blend_constants = blend_constants;
         self.blend_info.logic_op_enable = vk::FALSE;
@@ -163,16 +152,14 @@ impl GraphicsPipelineCreateInfo
 
     /// logic op 和 blend op 是互斥的
     #[inline]
-    pub fn blend_logic_op(&mut self, logic_op: vk::LogicOp) -> &mut Self
-    {
+    pub fn blend_logic_op(&mut self, logic_op: vk::LogicOp) -> &mut Self {
         self.blend_info.logic_op = logic_op;
         self.blend_info.logic_op_enable = vk::TRUE;
         self
     }
 
     #[inline]
-    pub fn cull_mode(&mut self, mode: vk::CullModeFlags, front_face: vk::FrontFace) -> &mut Self
-    {
+    pub fn cull_mode(&mut self, mode: vk::CullModeFlags, front_face: vk::FrontFace) -> &mut Self {
         self.rasterize_state_info.cull_mode = mode;
         self.rasterize_state_info.front_face = front_face;
         self
@@ -184,8 +171,7 @@ impl GraphicsPipelineCreateInfo
         depth_test_op: Option<vk::CompareOp>,
         depth_write: bool,
         depth_bounds_test: bool,
-    ) -> &mut Self
-    {
+    ) -> &mut Self {
         self.depth_stencil_info.depth_test_enable = depth_test_op.map_or(vk::FALSE, |_| vk::TRUE);
         self.depth_stencil_info.depth_compare_op = depth_test_op.map_or(vk::CompareOp::NEVER, identity);
         self.depth_stencil_info.depth_write_enable = if depth_write { vk::TRUE } else { vk::FALSE };
@@ -194,48 +180,39 @@ impl GraphicsPipelineCreateInfo
     }
 
     #[inline]
-    pub fn stencil_test(&mut self, enable: bool) -> &mut Self
-    {
+    pub fn stencil_test(&mut self, enable: bool) -> &mut Self {
         self.depth_stencil_info.stencil_test_enable = if enable { vk::TRUE } else { vk::FALSE };
         self
     }
 }
 
-pub struct PipelineLayout
-{
+pub struct PipelineLayout {
     handle: vk::PipelineLayout,
     device_functions: Rc<DeviceFunctions>,
 }
-impl DebugType for PipelineLayout
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for PipelineLayout {
+    fn debug_type_name() -> &'static str {
         "RhiPipelineLayouer"
     }
 
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.handle
     }
 }
-impl Drop for PipelineLayout
-{
-    fn drop(&mut self)
-    {
+impl Drop for PipelineLayout {
+    fn drop(&mut self) {
         unsafe {
             self.device_functions.destroy_pipeline_layout(self.handle, None);
         }
     }
 }
-impl PipelineLayout
-{
+impl PipelineLayout {
     pub fn new(
         device_functions: Rc<DeviceFunctions>,
         descriptor_set_layouts: &[vk::DescriptorSetLayout],
         push_constant_ranges: &[vk::PushConstantRange],
         debug_name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::default()
             .set_layouts(descriptor_set_layouts)
             .push_constant_ranges(push_constant_ranges);
@@ -249,14 +226,12 @@ impl PipelineLayout
     }
 
     #[inline]
-    pub fn handle(&self) -> vk::PipelineLayout
-    {
+    pub fn handle(&self) -> vk::PipelineLayout {
         self.handle
     }
 }
 
-pub struct GraphicsPipeline
-{
+pub struct GraphicsPipeline {
     pipeline: vk::Pipeline,
 
     /// 因为多个 pipeline 可以使用同一个 pipeline layout，所以这里使用 Rc
@@ -264,36 +239,29 @@ pub struct GraphicsPipeline
 
     device_functions: Rc<DeviceFunctions>,
 }
-impl DebugType for GraphicsPipeline
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for GraphicsPipeline {
+    fn debug_type_name() -> &'static str {
         "RhiGraphicsPipeline"
     }
 
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.pipeline
     }
 }
-impl Drop for GraphicsPipeline
-{
-    fn drop(&mut self)
-    {
+impl Drop for GraphicsPipeline {
+    fn drop(&mut self) {
         unsafe {
             self.device_functions.destroy_pipeline(self.pipeline, None);
         }
     }
 }
-impl GraphicsPipeline
-{
+impl GraphicsPipeline {
     pub fn new(
         device_functions: Rc<DeviceFunctions>,
         create_info: &GraphicsPipelineCreateInfo,
         pipeline_layout: Rc<PipelineLayout>,
         debug_name: &str,
-    ) -> Self
-    {
+    ) -> Self {
         // dynamic rendering 需要的 framebuffer 信息
         let mut attach_info = vk::PipelineRenderingCreateInfo::default()
             .color_attachment_formats(&create_info.color_attach_formats)
@@ -381,14 +349,12 @@ impl GraphicsPipeline
     }
 
     #[inline]
-    pub fn handle(&self) -> vk::Pipeline
-    {
+    pub fn handle(&self) -> vk::Pipeline {
         self.pipeline
     }
 
     #[inline]
-    pub fn layout(&self) -> vk::PipelineLayout
-    {
+    pub fn layout(&self) -> vk::PipelineLayout {
         self.pipeline_layout.handle
     }
 }

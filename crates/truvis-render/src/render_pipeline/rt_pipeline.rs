@@ -1,15 +1,17 @@
-use crate::render_pipeline::compute_pass::ComputePass;
-use crate::render_pipeline::pipeline_context::PipelineContext;
-use crate::render_pipeline::rt_pass::SimlpeRtPass;
-use crate::renderer::bindless::BindlessManager;
+use std::{cell::RefCell, rc::Rc};
+
 use ash::vk;
 use shader_binding::shader;
-use std::cell::RefCell;
-use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::commands::submit_info::SubmitInfo;
-use truvis_rhi::commands::barrier::ImageBarrier;
-use truvis_rhi::render_context::RenderContext;
+use truvis_rhi::{
+    commands::{barrier::ImageBarrier, submit_info::SubmitInfo},
+    render_context::RenderContext,
+};
+
+use crate::{
+    render_pipeline::{compute_pass::ComputePass, pipeline_context::PipelineContext, rt_pass::SimlpeRtPass},
+    renderer::bindless::BindlessManager,
+};
 
 /// 整个 RT 管线
 pub struct RtPipeline {

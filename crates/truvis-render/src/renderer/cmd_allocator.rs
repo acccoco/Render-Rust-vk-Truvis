@@ -10,12 +10,12 @@ use truvis_rhi::{
 
 use crate::renderer::frame_controller::FrameController;
 
-pub struct CmdAllocator
-{
+pub struct CmdAllocator {
     /// 为每个 frame 分配一个 command pool
     graphics_command_pools: Vec<Rc<CommandPool>>,
 
-    /// 每个 command pool 已经分配出去的 command buffer，用于集中 free 或其他操作
+    /// 每个 command pool 已经分配出去的 command buffer，用于集中 free
+    /// 或其他操作
     allocated_command_buffers: Vec<Vec<CommandBuffer>>,
 
     frame_ctrl: Rc<FrameController>,
@@ -23,10 +23,8 @@ pub struct CmdAllocator
     device_functions: Rc<DeviceFunctions>,
 }
 
-impl CmdAllocator
-{
-    pub fn new(rhi: &RenderContext, frame_ctrl: Rc<FrameController>) -> Self
-    {
+impl CmdAllocator {
+    pub fn new(rhi: &RenderContext, frame_ctrl: Rc<FrameController>) -> Self {
         let graphics_command_pools = (0..frame_ctrl.fif_count())
             .map(|i| {
                 Rc::new(CommandPool::new(
@@ -47,8 +45,7 @@ impl CmdAllocator
     }
 
     /// 分配 command buffer，在当前 frame 使用
-    pub fn alloc_command_buffer(&mut self, debug_name: &str) -> CommandBuffer
-    {
+    pub fn alloc_command_buffer(&mut self, debug_name: &str) -> CommandBuffer {
         let name = format!("[{}]{}", self.frame_ctrl.frame_name(), debug_name);
         let cmd = CommandBuffer::new(
             self.device_functions.clone(),
@@ -60,8 +57,7 @@ impl CmdAllocator
         cmd
     }
 
-    pub fn free_frame_commands(&mut self)
-    {
+    pub fn free_frame_commands(&mut self) {
         // 释放当前 frame 的 command buffer 的资源
         std::mem::take(&mut self.allocated_command_buffers[*self.frame_ctrl.frame_label()]) //
             .into_iter()

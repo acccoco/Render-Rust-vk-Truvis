@@ -1,6 +1,9 @@
 use std::collections::{HashMap, VecDeque};
-use winit::event::{DeviceEvent, ElementState, KeyEvent, MouseButton, WindowEvent};
-use winit::keyboard::{KeyCode, PhysicalKey};
+
+use winit::{
+    event::{DeviceEvent, ElementState, KeyEvent, MouseButton, WindowEvent},
+    keyboard::{KeyCode, PhysicalKey},
+};
 
 /// 输入事件类型
 #[derive(Debug, Clone)]

@@ -1,6 +1,6 @@
-use crate::platform::camera::DrsCamera;
-use crate::render_pipeline::pipeline_context::PipelineContext;
-use crate::renderer::renderer::Renderer;
+use crate::{
+    platform::camera::DrsCamera, render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
+};
 
 pub trait OuterApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self;

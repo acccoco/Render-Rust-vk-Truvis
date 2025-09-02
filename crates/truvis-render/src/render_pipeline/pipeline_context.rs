@@ -1,15 +1,16 @@
-use crate::pipeline_settings::{FrameSettings, PipelineSettings};
-use crate::platform::timer::Timer;
-use crate::renderer::bindless::BindlessManager;
-use crate::renderer::cmd_allocator::CmdAllocator;
-use crate::renderer::frame_buffers::FrameBuffers;
-use crate::renderer::frame_controller::FrameController;
-use crate::renderer::gpu_scene::GpuScene;
+use std::{cell::RefCell, rc::Rc};
+
 use shader_binding::shader;
-use std::cell::RefCell;
-use std::rc::Rc;
-use truvis_rhi::resources::special_buffers::structured_buffer::StructuredBuffer;
-use truvis_rhi::render_context::RenderContext;
+use truvis_rhi::{render_context::RenderContext, resources::special_buffers::structured_buffer::StructuredBuffer};
+
+use crate::{
+    pipeline_settings::{FrameSettings, PipelineSettings},
+    platform::timer::Timer,
+    renderer::{
+        bindless::BindlessManager, cmd_allocator::CmdAllocator, frame_buffers::FrameBuffers,
+        frame_controller::FrameController, gpu_scene::GpuScene,
+    },
+};
 
 /// Rt 管线上下文，每帧重建
 pub struct PipelineContext<'a> {

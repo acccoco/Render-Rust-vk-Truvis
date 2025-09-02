@@ -1,16 +1,13 @@
 use ash::vk;
 
-pub struct BufferCreateInfo
-{
+pub struct BufferCreateInfo {
     inner: vk::BufferCreateInfo<'static>,
     queue_family_indices: Vec<u32>,
 }
 
-impl BufferCreateInfo
-{
+impl BufferCreateInfo {
     #[inline]
-    pub fn new(size: vk::DeviceSize, usage: vk::BufferUsageFlags) -> Self
-    {
+    pub fn new(size: vk::DeviceSize, usage: vk::BufferUsageFlags) -> Self {
         Self {
             inner: vk::BufferCreateInfo {
                 size,
@@ -23,22 +20,19 @@ impl BufferCreateInfo
 
     /// getter
     #[inline]
-    pub fn info(&self) -> &vk::BufferCreateInfo<'_>
-    {
+    pub fn info(&self) -> &vk::BufferCreateInfo<'_> {
         &self.inner
     }
 
     /// getter
     #[inline]
-    pub fn size(&self) -> vk::DeviceSize
-    {
+    pub fn size(&self) -> vk::DeviceSize {
         self.inner.size
     }
 
     /// builder
     #[inline]
-    pub fn queue_family_indices(mut self, indices: &[u32]) -> Self
-    {
+    pub fn queue_family_indices(mut self, indices: &[u32]) -> Self {
         self.queue_family_indices = indices.to_vec();
 
         self.inner.queue_family_index_count = indices.len() as u32;

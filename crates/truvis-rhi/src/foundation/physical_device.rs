@@ -6,8 +6,7 @@ use itertools::Itertools;
 use crate::{commands::command_queue::QueueFamily, foundation::debug_messenger::DebugType};
 
 /// 表示一张物理显卡
-pub struct PhysicalDevice
-{
+pub struct PhysicalDevice {
     pub(crate) vk_handle: vk::PhysicalDevice,
 
     /// 当前 gpu 支持的 features
@@ -32,13 +31,11 @@ pub struct PhysicalDevice
     pub(crate) transfer_queue_family: QueueFamily,
 }
 
-impl PhysicalDevice
-{
+impl PhysicalDevice {
     /// 创建一个新的物理显卡实例
     ///
     /// 优先选择独立显卡，如果没有则选择第一个可用的显卡
-    pub fn new_descrete_physical_device(instance: &ash::Instance) -> Self
-    {
+    pub fn new_descrete_physical_device(instance: &ash::Instance) -> Self {
         unsafe {
             instance
                 .enumerate_physical_devices()
@@ -51,8 +48,7 @@ impl PhysicalDevice
         }
     }
 
-    fn new(pdevice: vk::PhysicalDevice, instance: &ash::Instance) -> Self
-    {
+    fn new(pdevice: vk::PhysicalDevice, instance: &ash::Instance) -> Self {
         unsafe {
             // 找到符合 ray tracing 条件的 gpu
             let rt_props;
@@ -107,13 +103,14 @@ impl PhysicalDevice
                 })
                 .unwrap();
 
-            // compute queue family: 需要支持 compute，且和前面的 graphics queue family 不是同一个
+            // compute queue family: 需要支持 compute，且和前面的 graphics queue family
+            // 不是同一个
             let compute_queue_family = queue_familiy_props
                 .iter()
                 .enumerate()
                 .find(|(idx, props)| {
-                    !(props.queue_flags & vk::QueueFlags::COMPUTE).is_empty() &&
-                        *idx as u32 != graphics_queue_family.queue_family_index
+                    !(props.queue_flags & vk::QueueFlags::COMPUTE).is_empty()
+                        && *idx as u32 != graphics_queue_family.queue_family_index
                 })
                 .map(|(idx, props)| QueueFamily {
                     name: "compute".to_string(),
@@ -123,15 +120,15 @@ impl PhysicalDevice
                 })
                 .unwrap();
 
-            // transfer queue family: 需要支持 transfer，且和前面的 graphics queue family, compute queue family
-            // 不是同一个
+            // transfer queue family: 需要支持 transfer，且和前面的 graphics queue family,
+            // compute queue family 不是同一个
             let transfer_queue_family = queue_familiy_props
                 .iter()
                 .enumerate()
                 .find(|(idx, props)| {
-                    !(props.queue_flags & vk::QueueFlags::TRANSFER).is_empty() &&
-                        *idx as u32 != graphics_queue_family.queue_family_index &&
-                        *idx as u32 != compute_queue_family.queue_family_index
+                    !(props.queue_flags & vk::QueueFlags::TRANSFER).is_empty()
+                        && *idx as u32 != graphics_queue_family.queue_family_index
+                        && *idx as u32 != compute_queue_family.queue_family_index
                 })
                 .map(|(idx, props)| QueueFamily {
                     name: "transfer".to_string(),
@@ -156,28 +153,23 @@ impl PhysicalDevice
         }
     }
 
-    pub fn destroy(self)
-    {
+    pub fn destroy(self) {
         // 无需销毁
     }
 
     #[inline]
     /// 当前 gpu 是否是独立显卡
-    pub fn is_descrete_gpu(&self) -> bool
-    {
+    pub fn is_descrete_gpu(&self) -> bool {
         self.basic_props.device_type == vk::PhysicalDeviceType::DISCRETE_GPU
     }
 }
 
-impl DebugType for PhysicalDevice
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for PhysicalDevice {
+    fn debug_type_name() -> &'static str {
         "RhiPhysicalDevice"
     }
 
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.vk_handle
     }
 }

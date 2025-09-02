@@ -19,8 +19,7 @@ use crate::{
     vulkan_core::VulkanCore,
 };
 
-pub struct RenderContext
-{
+pub struct RenderContext {
     pub(crate) vk_core: VulkanCore,
     pub(crate) allocator: Rc<MemAllocator>,
 
@@ -30,13 +29,11 @@ pub struct RenderContext
 }
 
 /// 创建与销毁
-impl RenderContext
-{
+impl RenderContext {
     // region init 相关
     const ENGINE_NAME: &'static str = "DruvisIII";
 
-    pub fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self
-    {
+    pub fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
         let vk_ctx = VulkanCore::new(app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts);
         let graphics_command_pool = CommandPool::new(
             vk_ctx.device.functions.clone(),
@@ -60,8 +57,7 @@ impl RenderContext
         }
     }
 
-    pub fn desotry(mut self)
-    {
+    pub fn desotry(mut self) {
         self.resource_mgr.get_mut().desotry();
         self.allocator.destroy();
         self.temp_graphics_command_pool.destroy();
@@ -70,71 +66,59 @@ impl RenderContext
 }
 
 /// getter
-impl RenderContext
-{
+impl RenderContext {
     #[inline]
-    pub fn instance(&self) -> &Instance
-    {
+    pub fn instance(&self) -> &Instance {
         &self.vk_core.instance
     }
 
     #[inline]
-    pub fn device(&self) -> &Device
-    {
+    pub fn device(&self) -> &Device {
         &self.vk_core.device
     }
 
     #[inline]
-    pub fn device_functions(&self) -> Rc<DeviceFunctions>
-    {
+    pub fn device_functions(&self) -> Rc<DeviceFunctions> {
         self.vk_core.device.functions.clone()
     }
 
     #[inline]
-    pub fn allocator(&self) -> Rc<MemAllocator>
-    {
+    pub fn allocator(&self) -> Rc<MemAllocator> {
         self.allocator.clone()
     }
 
     #[inline]
-    pub fn physical_device(&self) -> &PhysicalDevice
-    {
+    pub fn physical_device(&self) -> &PhysicalDevice {
         &self.vk_core.physical_device
     }
 
     #[inline]
-    pub fn graphics_queue_family(&self) -> QueueFamily
-    {
+    pub fn graphics_queue_family(&self) -> QueueFamily {
         self.vk_core.physical_device.graphics_queue_family.clone()
     }
 
     #[inline]
-    pub fn compute_queue_family(&self) -> QueueFamily
-    {
+    pub fn compute_queue_family(&self) -> QueueFamily {
         self.vk_core.physical_device.compute_queue_family.clone()
     }
 
     #[inline]
-    pub fn transfer_queue_family(&self) -> QueueFamily
-    {
+    pub fn transfer_queue_family(&self) -> QueueFamily {
         self.vk_core.physical_device.transfer_queue_family.clone()
     }
 
     #[inline]
-    pub fn graphics_queue(&self) -> &CommandQueue
-    {
+    pub fn graphics_queue(&self) -> &CommandQueue {
         &self.vk_core.graphics_queue
     }
 
     #[inline]
-    pub fn compute_queue(&self) -> &CommandQueue
-    {
+    pub fn compute_queue(&self) -> &CommandQueue {
         &self.vk_core.compute_queue
     }
 
     #[inline]
-    pub fn transfer_queue(&self) -> &CommandQueue
-    {
+    pub fn transfer_queue(&self) -> &CommandQueue {
         &self.vk_core.transfer_queue
     }
 
@@ -142,29 +126,25 @@ impl RenderContext
     ///
     /// 注：这个值一定是 power of 2
     #[inline]
-    pub fn min_ubo_offset_align(&self) -> vk::DeviceSize
-    {
+    pub fn min_ubo_offset_align(&self) -> vk::DeviceSize {
         self.vk_core.physical_device.basic_props.limits.min_uniform_buffer_offset_alignment
     }
 
     #[inline]
-    pub fn rt_pipeline_props(&self) -> &vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'_>
-    {
+    pub fn rt_pipeline_props(&self) -> &vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'_> {
         &self.vk_core.physical_device.rt_pipeline_props
     }
 }
 
 /// tools
-impl RenderContext
-{
+impl RenderContext {
     /// 根据给定的格式，返回支持的格式
     pub fn find_supported_format(
         &self,
         candidates: &[vk::Format],
         tiling: vk::ImageTiling,
         features: vk::FormatFeatureFlags,
-    ) -> Vec<vk::Format>
-    {
+    ) -> Vec<vk::Format> {
         candidates
             .iter()
             .filter(|f| {
@@ -182,7 +162,6 @@ impl RenderContext
             .copied()
             .collect()
     }
-
 
     /// 立即执行某个 command，并同步等待执行结果
     pub fn one_time_exec<F, R>(&self, func: F, name: impl AsRef<str>) -> R

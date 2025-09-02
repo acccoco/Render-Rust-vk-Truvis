@@ -9,8 +9,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub struct QueueFamily
-{
+pub struct QueueFamily {
     pub name: String,
     pub queue_family_index: u32,
     pub queue_flags: vk::QueueFlags,
@@ -20,45 +19,36 @@ pub struct QueueFamily
 /// # destroy
 ///
 /// RhiQueueFamily 在 RhiDevice 销毁时会被销毁
-pub struct CommandQueue
-{
+pub struct CommandQueue {
     pub(crate) vk_queue: vk::Queue,
     pub(crate) queue_family: QueueFamily,
     pub(crate) device_functions: Rc<DeviceFunctions>,
 }
-impl DebugType for CommandQueue
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for CommandQueue {
+    fn debug_type_name() -> &'static str {
         "RhiQueue"
     }
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.vk_queue
     }
 }
 
 /// getter
-impl CommandQueue
-{
+impl CommandQueue {
     #[inline]
-    pub fn queue_family(&self) -> &QueueFamily
-    {
+    pub fn queue_family(&self) -> &QueueFamily {
         &self.queue_family
     }
 
     #[inline]
-    pub fn handle(&self) -> vk::Queue
-    {
+    pub fn handle(&self) -> vk::Queue {
         self.vk_queue
     }
 }
 
 /// tools
-impl CommandQueue
-{
-    pub fn submit(&self, batches: Vec<SubmitInfo>, fence: Option<Fence>)
-    {
+impl CommandQueue {
+    pub fn submit(&self, batches: Vec<SubmitInfo>, fence: Option<Fence>) {
         unsafe {
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = batches.iter().map(|b| b.submit_info()).collect_vec();
@@ -71,15 +61,13 @@ impl CommandQueue
 
     /// 根据 specification，vkQueueWaitIdle 应该和 Fence 效率相同
     #[inline]
-    pub fn wait_idle(&self)
-    {
+    pub fn wait_idle(&self) {
         unsafe { self.device_functions.device.queue_wait_idle(self.vk_queue).unwrap() }
     }
 }
 
 /// debug 相关命令
-impl CommandQueue
-{
+impl CommandQueue {
     #[inline]
     pub fn begin_label<S>(&self, label_name: S, label_color: glam::Vec4)
     where
@@ -95,8 +83,7 @@ impl CommandQueue
     }
 
     #[inline]
-    pub fn end_label(&self)
-    {
+    pub fn end_label(&self) {
         unsafe {
             self.device_functions.debug_utils.queue_end_debug_utils_label(self.vk_queue);
         }

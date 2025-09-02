@@ -1,22 +1,26 @@
-use crate::pipeline_settings::{FrameLabel, FrameSettings};
-use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_buffers::FrameBuffers;
-use crate::renderer::frame_controller::FrameController;
-use crate::renderer::gpu_scene::GpuScene;
-use crate::renderer::scene_manager::SceneManager;
+use std::{cell::RefCell, mem::offset_of, rc::Rc};
+
 use ash::vk;
-use model_manager::vertex::vertex_3d::VertexLayoutAos3D;
-use model_manager::vertex::VertexLayout;
+use model_manager::vertex::{VertexLayout, vertex_3d::VertexLayoutAos3D};
 use shader_binding::shader;
-use std::cell::RefCell;
-use std::mem::offset_of;
-use std::rc::Rc;
-use truvis_rhi::basic::color::LabelColor;
-use truvis_rhi::resources::special_buffers::structured_buffer::StructuredBuffer;
-use truvis_rhi::commands::command_buffer::CommandBuffer;
-use truvis_rhi::pipelines::graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout};
-use truvis_rhi::pipelines::rendering_info::RenderingInfo;
-use truvis_rhi::render_context::RenderContext;
+use truvis_rhi::{
+    basic::color::LabelColor,
+    commands::command_buffer::CommandBuffer,
+    pipelines::{
+        graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},
+        rendering_info::RenderingInfo,
+    },
+    render_context::RenderContext,
+    resources::special_buffers::structured_buffer::StructuredBuffer,
+};
+
+use crate::{
+    pipeline_settings::{FrameLabel, FrameSettings},
+    renderer::{
+        bindless::BindlessManager, frame_buffers::FrameBuffers, frame_controller::FrameController, gpu_scene::GpuScene,
+        scene_manager::SceneManager,
+    },
+};
 
 pub struct PhongPass {
     pipeline: GraphicsPipeline,
@@ -38,9 +42,11 @@ impl PhongPass {
 
         ci.attach_info(vec![color_format], Some(depth_format), None);
         ci.color_blend(
-            vec![vk::PipelineColorBlendAttachmentState::default()
-                .blend_enable(false)
-                .color_write_mask(vk::ColorComponentFlags::RGBA)],
+            vec![
+                vk::PipelineColorBlendAttachmentState::default()
+                    .blend_enable(false)
+                    .color_write_mask(vk::ColorComponentFlags::RGBA),
+            ],
             [0.0; 4],
         );
 

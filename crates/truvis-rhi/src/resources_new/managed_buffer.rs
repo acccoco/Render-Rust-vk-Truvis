@@ -11,8 +11,7 @@ use crate::{
     render_context::RenderContext,
 };
 
-pub struct ManagedBuffer
-{
+pub struct ManagedBuffer {
     vk_handle: vk::Buffer,
     allocation: vk_mem::Allocation,
 
@@ -23,8 +22,7 @@ pub struct ManagedBuffer
 
     debug_name: String,
 }
-impl ManagedBuffer
-{
+impl ManagedBuffer {
     /// # Note
     /// - 默认对齐到 8 字节
     /// - 优先使用 device memory
@@ -35,8 +33,7 @@ impl ManagedBuffer
         buffer_usage: vk::BufferUsageFlags,
         mem_map: bool,
         name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         let buffer_ci = vk::BufferCreateInfo::default().size(buffer_size).usage(buffer_usage);
         let alloc_ci = vk_mem::AllocationCreateInfo {
             usage: vk_mem::MemoryUsage::AutoPreferDevice,
@@ -65,60 +62,52 @@ impl ManagedBuffer
         allocator: Rc<MemAllocator>,
         buffer_size: vk::DeviceSize,
         name: impl AsRef<str>,
-    ) -> Self
-    {
+    ) -> Self {
         Self::new(device_functions, allocator, buffer_size, vk::BufferUsageFlags::TRANSFER_SRC, true, name)
     }
 
-    pub fn destroy(mut self, allocator: &MemAllocator)
-    {
+    pub fn destroy(mut self, allocator: &MemAllocator) {
         unsafe {
             allocator.destroy_buffer(self.vk_handle, &mut self.allocation);
         }
     }
 }
 // getter
-impl ManagedBuffer
-{
+impl ManagedBuffer {
     #[inline]
-    pub fn handle(&self) -> vk::Buffer
-    {
+    pub fn handle(&self) -> vk::Buffer {
         self.vk_handle
     }
     #[inline]
-    pub fn size(&self) -> vk::DeviceSize
-    {
+    pub fn size(&self) -> vk::DeviceSize {
         self.size
     }
 
     #[inline]
-    pub fn mapped_ptr(&self) -> *mut u8
-    {
+    pub fn mapped_ptr(&self) -> *mut u8 {
         self.map_ptr.unwrap_or_else(|| {
             panic!("Buffer is not mapped, please call map() before using mapped_ptr()");
         })
     }
 
     #[inline]
-    pub fn device_address(&self, device: &Device) -> vk::DeviceAddress
-    {
+    pub fn device_address(&self, device: &Device) -> vk::DeviceAddress {
         self.device_addr.unwrap_or_else(|| unsafe {
             device.functions.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.vk_handle))
         })
     }
 }
 // tools
-impl ManagedBuffer
-{
-    /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到 self
+impl ManagedBuffer {
+    /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到
+    /// self
     ///
     /// sync 表示这个函数是同步等待的，会阻塞运行
     ///
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    pub fn transfer_data_sync(&self, rhi: &RenderContext, data: &[impl Sized + Copy])
-    {
+    pub fn transfer_data_sync(&self, rhi: &RenderContext, data: &[impl Sized + Copy]) {
         let mut stage_buffer = Self::new_stage_buffer(
             rhi.device_functions(),
             rhi.allocator(),
@@ -138,7 +127,7 @@ impl ManagedBuffer
                     }],
                 );
             },
-            &format!("{}-transfer-data", &self.debug_name),
+            format!("{}-transfer-data", &self.debug_name),
         );
 
         stage_buffer.destroy(&rhi.allocator);
@@ -165,8 +154,7 @@ impl ManagedBuffer
 
     /// map 和 unmap 需要匹配
     #[inline]
-    pub fn map(&mut self, allocator: &MemAllocator)
-    {
+    pub fn map(&mut self, allocator: &MemAllocator) {
         if self.map_ptr.is_some() {
             return;
         }
@@ -176,14 +164,12 @@ impl ManagedBuffer
     }
 
     #[inline]
-    pub fn flush(&mut self, allocator: &MemAllocator, offset: vk::DeviceSize, size: vk::DeviceSize)
-    {
+    pub fn flush(&mut self, allocator: &MemAllocator, offset: vk::DeviceSize, size: vk::DeviceSize) {
         allocator.flush_allocation(&self.allocation, offset, size).unwrap();
     }
 
     #[inline]
-    pub fn unmap(&mut self, allocator: &MemAllocator)
-    {
+    pub fn unmap(&mut self, allocator: &MemAllocator) {
         if self.map_ptr.is_none() {
             return;
         }

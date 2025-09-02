@@ -1,21 +1,23 @@
-use crate::gui::gui::Gui;
-use crate::gui::mesh::ImGuiVertex;
-use crate::pipeline_settings::FrameLabel;
-use crate::renderer::bindless::BindlessManager;
+use std::{cell::RefCell, mem::offset_of, rc::Rc};
+
 use ash::vk;
 use itertools::Itertools;
-use shader_binding::shader;
-use shader_binding::shader::TextureHandle;
-use std::cell::RefCell;
-use std::mem::offset_of;
-use std::rc::Rc;
-use truvis_crate_tools::count_indexed_array;
-use truvis_crate_tools::const_map;
-use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::commands::command_buffer::CommandBuffer;
-use truvis_rhi::pipelines::graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout};
-use truvis_rhi::pipelines::shader::ShaderStageInfo;
-use truvis_rhi::render_context::RenderContext;
+use shader_binding::{shader, shader::TextureHandle};
+use truvis_crate_tools::{const_map, count_indexed_array, resource::TruvisPath};
+use truvis_rhi::{
+    commands::command_buffer::CommandBuffer,
+    pipelines::{
+        graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},
+        shader::ShaderStageInfo,
+    },
+    render_context::RenderContext,
+};
+
+use crate::{
+    gui::{gui::Gui, mesh::ImGuiVertex},
+    pipeline_settings::FrameLabel,
+    renderer::bindless::BindlessManager,
+};
 
 const_map!(ShaderStage<ShaderStageInfo>: {
     Vertex: ShaderStageInfo {
@@ -49,20 +51,22 @@ impl GuiPass {
             "uipass",
         ));
 
-        let color_blend_attachments = vec![vk::PipelineColorBlendAttachmentState::default()
-            .color_write_mask(
-                vk::ColorComponentFlags::R
-                    | vk::ColorComponentFlags::G
-                    | vk::ColorComponentFlags::B
-                    | vk::ColorComponentFlags::A,
-            )
-            .blend_enable(true)
-            .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
-            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-            .color_blend_op(vk::BlendOp::ADD)
-            .src_alpha_blend_factor(vk::BlendFactor::ONE)
-            .dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-            .alpha_blend_op(vk::BlendOp::ADD)];
+        let color_blend_attachments = vec![
+            vk::PipelineColorBlendAttachmentState::default()
+                .color_write_mask(
+                    vk::ColorComponentFlags::R
+                        | vk::ColorComponentFlags::G
+                        | vk::ColorComponentFlags::B
+                        | vk::ColorComponentFlags::A,
+                )
+                .blend_enable(true)
+                .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+                .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+                .color_blend_op(vk::BlendOp::ADD)
+                .src_alpha_blend_factor(vk::BlendFactor::ONE)
+                .dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+                .alpha_blend_op(vk::BlendOp::ADD),
+        ];
 
         let mut create_info = GraphicsPipelineCreateInfo::default();
         create_info
@@ -203,7 +207,8 @@ impl GuiPass {
                         }];
                         cmd.cmd_set_scissor(0, &scissors);
 
-                        // 加载 texture，如果和上一个 command 使用的 texture 不是同一个，则需要重新加载
+                        // 加载 texture，如果和上一个 command 使用的 texture
+                        // 不是同一个，则需要重新加载
                         if Some(texture_id) != last_texture_id {
                             let texture_key = get_texture_key(texture_id);
                             let texture_handle = bindless_mgr

@@ -1,4 +1,5 @@
-/// 定义一个 macro，自动为各种派生 Buffer 类型实现 Deref、DerefMut 和 RhiDebugType
+/// 定义一个 macro，自动为各种派生 Buffer 类型实现 Deref、DerefMut 和
+/// RhiDebugType
 #[macro_export]
 macro_rules! impl_derive_buffer {
     // 支持泛型的版本

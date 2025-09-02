@@ -10,17 +10,14 @@ use crate::{
 /// # Destroy
 /// 不应该实现 Semaphore，因为可以 Clone，需要手动 destroy
 #[derive(Clone)]
-pub struct Semaphore
-{
+pub struct Semaphore {
     semaphore: vk::Semaphore,
     device_functions: Rc<DeviceFunctions>,
 }
 
 /// 创建与销毁
-impl Semaphore
-{
-    pub fn new(device_functions: Rc<DeviceFunctions>, debug_name: &str) -> Self
-    {
+impl Semaphore {
+    pub fn new(device_functions: Rc<DeviceFunctions>, debug_name: &str) -> Self {
         let semaphore =
             unsafe { device_functions.create_semaphore(&vk::SemaphoreCreateInfo::default(), None).unwrap() };
 
@@ -32,8 +29,7 @@ impl Semaphore
         semaphore
     }
 
-    pub fn new_timeline(rhi: &RenderContext, initial_value: u64, debug_name: &str) -> Self
-    {
+    pub fn new_timeline(rhi: &RenderContext, initial_value: u64, debug_name: &str) -> Self {
         let mut timeline_type_ci = vk::SemaphoreTypeCreateInfo::default()
             .semaphore_type(vk::SemaphoreType::TIMELINE)
             .initial_value(initial_value);
@@ -48,8 +44,7 @@ impl Semaphore
         semaphore
     }
     #[inline]
-    pub fn destroy(self)
-    {
+    pub fn destroy(self) {
         unsafe {
             self.device_functions.destroy_semaphore(self.semaphore, None);
         }
@@ -57,21 +52,17 @@ impl Semaphore
 }
 
 /// getters
-impl Semaphore
-{
+impl Semaphore {
     #[inline]
-    pub fn handle(&self) -> vk::Semaphore
-    {
+    pub fn handle(&self) -> vk::Semaphore {
         self.semaphore
     }
 }
 
 /// tools
-impl Semaphore
-{
+impl Semaphore {
     #[inline]
-    pub fn wait_timeline(&self, timeline_value: u64, timeout_ns: u64)
-    {
+    pub fn wait_timeline(&self, timeline_value: u64, timeout_ns: u64) {
         unsafe {
             let wait_semaphore = [self.semaphore];
             let wait_info = vk::SemaphoreWaitInfo::default()
@@ -82,15 +73,12 @@ impl Semaphore
     }
 }
 
-impl DebugType for Semaphore
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for Semaphore {
+    fn debug_type_name() -> &'static str {
         "RhiSemaphore"
     }
 
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.semaphore
     }
 }

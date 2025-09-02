@@ -1,21 +1,28 @@
-use crate::pipeline_settings::FrameLabel;
-use crate::renderer::bindless::BindlessManager;
-use crate::renderer::frame_controller::FrameController;
-use crate::renderer::scene_manager::SceneManager;
+use std::{collections::HashMap, rc::Rc};
+
 use ash::vk;
 use glam::Vec4Swizzles;
 use itertools::Itertools;
-use model_manager::component::{DrsGeometry3D, DrsInstance};
-use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
+use model_manager::{
+    component::{DrsGeometry3D, DrsInstance},
+    guid_new_type::{InsGuid, MatGuid, MeshGuid},
+};
 use shader_binding::shader;
-use std::collections::HashMap;
-use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::commands::barrier::{BarrierMask, BufferBarrier};
-use truvis_rhi::raytracing::acceleration::Acceleration;
-use truvis_rhi::commands::command_buffer::CommandBuffer;
-use truvis_rhi::resources::special_buffers::structured_buffer::StructuredBuffer;
-use truvis_rhi::render_context::RenderContext;
+use truvis_rhi::{
+    commands::{
+        barrier::{BarrierMask, BufferBarrier},
+        command_buffer::CommandBuffer,
+    },
+    raytracing::acceleration::Acceleration,
+    render_context::RenderContext,
+    resources::special_buffers::structured_buffer::StructuredBuffer,
+};
+
+use crate::{
+    pipeline_settings::FrameLabel,
+    renderer::{bindless::BindlessManager, frame_controller::FrameController, scene_manager::SceneManager},
+};
 
 /// 数据以顺序的方式存储，同时查找时间为 O(1)
 #[derive(Default)]
@@ -198,10 +205,7 @@ impl GpuScene {
     }
 }
 impl GpuScene {
-    pub fn new(
-        rhi: &RenderContext,
-        frame_ctrl: Rc<FrameController>,
-    ) -> Self {
+    pub fn new(rhi: &RenderContext, frame_ctrl: Rc<FrameController>) -> Self {
         let resources = Resources {
             sky: TruvisPath::resources_path("sky.jpg"),
             uv_checker: TruvisPath::resources_path("uv_checker.png"),
@@ -239,7 +243,14 @@ impl GpuScene {
     /// # Phase: Before Render
     ///
     /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
-    pub fn upload_to_buffer(&mut self, rhi: &RenderContext, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
+    pub fn upload_to_buffer(
+        &mut self,
+        rhi: &RenderContext,
+        cmd: &CommandBuffer,
+        barrier_mask: BarrierMask,
+        scene_mgr: &SceneManager,
+        bindless_mgr: &BindlessManager,
+    ) {
         self.upload_mesh_buffer(cmd, barrier_mask, scene_mgr);
         self.upload_instance_buffer(cmd, barrier_mask, scene_mgr);
         self.upload_material_buffer(cmd, barrier_mask, scene_mgr, bindless_mgr);
@@ -309,7 +320,13 @@ impl GpuScene {
     }
 
     /// 将整个场景的数据上传到 scene buffer 中去
-    fn upload_scene_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
+    fn upload_scene_buffer(
+        &mut self,
+        cmd: &CommandBuffer,
+        barrier_mask: BarrierMask,
+        scene_mgr: &SceneManager,
+        bindless_mgr: &BindlessManager,
+    ) {
         let crt_gpu_buffers = &self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let scene_data = shader::Scene {
             all_instances: crt_gpu_buffers.instance_buffer.device_address(),
@@ -381,9 +398,11 @@ impl GpuScene {
                 inv_model: instance.transform.inverse().into(),
             };
 
-            // TODO 对于 mesh 来说，可能不需要间接的索引 buffer，因为 mesh 在 geometry buffer 中是连续的
-            // 首先将 instance 需要的 geometry 的实际索引，写入一个间接索引 buffer: geometry_indirect_buffer，
-            // 然后获得 instance 数据在间接索引 buffer 中的起始 idx 和长度，将这个值写入到 shader::Instance 中
+            // TODO 对于 mesh 来说，可能不需要间接的索引 buffer，因为 mesh 在 geometry
+            // buffer 中是连续的 首先将 instance 需要的 geometry
+            // 的实际索引，写入一个间接索引 buffer: geometry_indirect_buffer，
+            // 然后获得 instance 数据在间接索引 buffer 中的起始 idx 和长度，将这个值写入到
+            // shader::Instance 中
             let geometry_idx_start = self.mesh_geometry_map.get(&instance.mesh).unwrap();
             for submesh_idx in 0..instance.materials.len() {
                 let geometry_idx = geometry_idx_start + submesh_idx;
@@ -419,7 +438,13 @@ impl GpuScene {
     }
 
     /// 将 material 数据上传到 material buffer 中
-    fn upload_material_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager, bindless_mgr: &BindlessManager) {
+    fn upload_material_buffer(
+        &mut self,
+        cmd: &CommandBuffer,
+        barrier_mask: BarrierMask,
+        scene_mgr: &SceneManager,
+        bindless_mgr: &BindlessManager,
+    ) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let crt_material_stage_buffer = &mut crt_gpu_buffers.material_stage_buffer;
         crt_material_stage_buffer.map();
@@ -510,7 +535,12 @@ impl GpuScene {
 // ray tracing
 impl GpuScene {
     /// 根据 instance 信息获得加速结构的 instance 信息
-    fn get_as_instance_info(&self, instance: &DrsInstance, custom_idx: u32, scene_mgr: &SceneManager) -> vk::AccelerationStructureInstanceKHR {
+    fn get_as_instance_info(
+        &self,
+        instance: &DrsInstance,
+        custom_idx: u32,
+        scene_mgr: &SceneManager,
+    ) -> vk::AccelerationStructureInstanceKHR {
         let mesh = scene_mgr.get_mesh(&instance.mesh).expect("Mesh not found");
         vk::AccelerationStructureInstanceKHR {
             // 3x4 row-major matrix
@@ -558,9 +588,13 @@ impl GpuScene {
 
 mod helper {
     use ash::vk;
-    use truvis_rhi::commands::barrier::{BarrierMask, BufferBarrier};
-    use truvis_rhi::commands::command_buffer::CommandBuffer;
-    use truvis_rhi::resources::buffer::Buffer;
+    use truvis_rhi::{
+        commands::{
+            barrier::{BarrierMask, BufferBarrier},
+            command_buffer::CommandBuffer,
+        },
+        resources::buffer::Buffer,
+    };
     /// 三个操作：
     /// 1. 将 stage buffer 的数据 *全部* flush 到 buffer 中
     /// 2. 从 stage buffer 中将 *所有* 数据复制到目标 buffer 中

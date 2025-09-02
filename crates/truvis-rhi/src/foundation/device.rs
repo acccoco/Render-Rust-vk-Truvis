@@ -13,8 +13,7 @@ use crate::{foundation::debug_messenger::DebugType, utilities::shader_cursor::Wr
 ///
 /// 包含了核心设备 API 以及各种扩展的函数指针。
 /// 这些函数指针在整个应用生命周期中保持不变，可以安全共享。
-pub struct DeviceFunctions
-{
+pub struct DeviceFunctions {
     /// 核心 Vulkan 设备 API
     pub(crate) device: ash::Device,
     /// 动态渲染扩展 API
@@ -28,36 +27,29 @@ pub struct DeviceFunctions
 }
 
 /// getters
-impl DeviceFunctions
-{
+impl DeviceFunctions {
     #[inline]
-    pub fn dynamic_rendering(&self) -> &ash::khr::dynamic_rendering::Device
-    {
+    pub fn dynamic_rendering(&self) -> &ash::khr::dynamic_rendering::Device {
         &self.dynamic_rendering
     }
     #[inline]
-    pub fn acceleration_structure(&self) -> &ash::khr::acceleration_structure::Device
-    {
+    pub fn acceleration_structure(&self) -> &ash::khr::acceleration_structure::Device {
         &self.acceleration_structure
     }
     #[inline]
-    pub fn ray_tracing_pipeline(&self) -> &ash::khr::ray_tracing_pipeline::Device
-    {
+    pub fn ray_tracing_pipeline(&self) -> &ash::khr::ray_tracing_pipeline::Device {
         &self.ray_tracing_pipeline
     }
     #[inline]
-    pub fn debug_utils(&self) -> &ash::ext::debug_utils::Device
-    {
+    pub fn debug_utils(&self) -> &ash::ext::debug_utils::Device {
         &self.debug_utils
     }
 }
 
 /// tools
-impl DeviceFunctions
-{
+impl DeviceFunctions {
     #[inline]
-    pub fn write_descriptor_sets(&self, writes: &[WriteDescriptorSet])
-    {
+    pub fn write_descriptor_sets(&self, writes: &[WriteDescriptorSet]) {
         let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();
         unsafe {
             self.device.update_descriptor_sets(&writes, &[]);
@@ -65,8 +57,7 @@ impl DeviceFunctions
     }
 
     #[inline]
-    pub fn set_object_debug_name<T: vk::Handle + Copy>(&self, handle: T, name: impl AsRef<str>)
-    {
+    pub fn set_object_debug_name<T: vk::Handle + Copy>(&self, handle: T, name: impl AsRef<str>) {
         let name = CString::new(name.as_ref()).unwrap();
         unsafe {
             self.debug_utils
@@ -77,8 +68,7 @@ impl DeviceFunctions
         }
     }
 
-    pub fn set_debug_name<T: DebugType>(&self, handle: &T, name: impl AsRef<str>)
-    {
+    pub fn set_debug_name<T: DebugType>(&self, handle: &T, name: impl AsRef<str>) {
         let debug_name = format!("{}::{}", T::debug_type_name(), name.as_ref());
         let debug_name = CString::new(debug_name.as_str()).unwrap();
         unsafe {
@@ -93,17 +83,14 @@ impl DeviceFunctions
     }
 }
 
-impl Deref for DeviceFunctions
-{
+impl Deref for DeviceFunctions {
     type Target = ash::Device;
-    fn deref(&self) -> &Self::Target
-    {
+    fn deref(&self) -> &Self::Target {
         &self.device
     }
 }
 
-pub struct Device
-{
+pub struct Device {
     /// Vulkan 设备函数指针集合
     ///
     /// 使用 Rc 是合理的，因为：
@@ -114,14 +101,12 @@ pub struct Device
 }
 
 /// 构造与销毁
-impl Device
-{
+impl Device {
     pub fn new(
         instance: &ash::Instance,
         pdevice: vk::PhysicalDevice,
         queue_create_info: &[vk::DeviceQueueCreateInfo],
-    ) -> Self
-    {
+    ) -> Self {
         // device 所需的所有 extension
         let device_exts = Self::basic_device_exts().iter().map(|e| e.as_ptr()).collect_vec();
         let mut exts_str = String::new();
@@ -164,8 +149,7 @@ impl Device
         }
     }
 
-    pub fn destroy(self)
-    {
+    pub fn destroy(self) {
         log::info!("destroying device");
         unsafe {
             self.functions.device.destroy_device(None);
@@ -174,11 +158,9 @@ impl Device
 }
 
 /// 创建过程的辅助函数
-impl Device
-{
+impl Device {
     /// 必要的 physical device core features
-    fn physical_device_basic_features() -> vk::PhysicalDeviceFeatures
-    {
+    fn physical_device_basic_features() -> vk::PhysicalDeviceFeatures {
         vk::PhysicalDeviceFeatures::default()
             .sampler_anisotropy(true)
             .fragment_stores_and_atomics(true)
@@ -187,8 +169,7 @@ impl Device
     }
 
     /// 必要的 physical device extension features
-    fn physical_device_extra_features() -> Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>>
-    {
+    fn physical_device_extra_features() -> Vec<Box<dyn vk::ExtendsPhysicalDeviceFeatures2>> {
         vec![
             Box::new(vk::PhysicalDeviceDynamicRenderingFeatures::default().dynamic_rendering(true)),
             Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::default().buffer_device_address(true)),
@@ -209,8 +190,7 @@ impl Device
     }
 
     /// 必要的 device extensions
-    fn basic_device_exts() -> Vec<&'static CStr>
-    {
+    fn basic_device_exts() -> Vec<&'static CStr> {
         let mut exts = vec![];
 
         // swapchain
@@ -239,53 +219,43 @@ impl Device
 }
 
 /// getter
-impl Device
-{
+impl Device {
     #[inline]
-    pub fn ash_handle(&self) -> &ash::Device
-    {
+    pub fn ash_handle(&self) -> &ash::Device {
         &self.functions.device
     }
 
     #[inline]
-    pub fn vk_handle(&self) -> vk::Device
-    {
+    pub fn vk_handle(&self) -> vk::Device {
         self.functions.device.handle()
     }
 
     #[inline]
-    pub fn dynamic_rendering_pf(&self) -> &ash::khr::dynamic_rendering::Device
-    {
+    pub fn dynamic_rendering_pf(&self) -> &ash::khr::dynamic_rendering::Device {
         &self.functions.dynamic_rendering
     }
 
     #[inline]
-    pub fn acceleration_structure_pf(&self) -> &ash::khr::acceleration_structure::Device
-    {
+    pub fn acceleration_structure_pf(&self) -> &ash::khr::acceleration_structure::Device {
         &self.functions.acceleration_structure
     }
 
     #[inline]
-    pub fn rt_pipeline_pf(&self) -> &ash::khr::ray_tracing_pipeline::Device
-    {
+    pub fn rt_pipeline_pf(&self) -> &ash::khr::ray_tracing_pipeline::Device {
         &self.functions.ray_tracing_pipeline
     }
 
     #[inline]
-    pub fn debug_utils(&self) -> &ash::ext::debug_utils::Device
-    {
+    pub fn debug_utils(&self) -> &ash::ext::debug_utils::Device {
         &self.functions.debug_utils
     }
 }
 
-impl DebugType for Device
-{
-    fn debug_type_name() -> &'static str
-    {
+impl DebugType for Device {
+    fn debug_type_name() -> &'static str {
         "RhiDevice"
     }
-    fn vk_handle(&self) -> impl vk::Handle
-    {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.functions.device.handle()
     }
 }

@@ -1,11 +1,15 @@
-use crate::guid_new_type::{MatGuid, MeshGuid};
-use crate::vertex::vertex_3d::Vertex3D;
 use ash::vk;
 use itertools::Itertools;
-use truvis_rhi::raytracing::acceleration::{BlasInputInfo, Acceleration};
-use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
-use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
-use truvis_rhi::render_context::RenderContext;
+use truvis_rhi::{
+    raytracing::acceleration::{Acceleration, BlasInputInfo},
+    render_context::RenderContext,
+    resources::special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer},
+};
+
+use crate::{
+    guid_new_type::{MatGuid, MeshGuid},
+    vertex::vertex_3d::Vertex3D,
+};
 
 #[derive(Default)]
 pub struct DrsMaterial {
@@ -69,7 +73,8 @@ impl DrsGeometry3D {
                 primitive_count: self.index_cnt() / 3,
                 primitive_offset: 0,
                 first_vertex: 0,
-                // 如果上方的 geometry data 中 的 transform_data 有数据，则该 offset 用于指定 transform 的 bytes offset
+                // 如果上方的 geometry data 中 的 transform_data 有数据，则该 offset 用于指定
+                // transform 的 bytes offset
                 transform_offset: 0,
             },
         }

@@ -10,8 +10,8 @@ use truvis_rhi::{
     },
     descriptors::descriptor_pool::{DescriptorPool, DescriptorPoolCreateInfo},
     foundation::device::{Device, DeviceFunctions},
-    resources::{special_buffers::structured_buffer::StructuredBuffer, texture::Texture2D},
     render_context::RenderContext,
+    resources::{special_buffers::structured_buffer::StructuredBuffer, texture::Texture2D},
 };
 
 use crate::{
@@ -24,8 +24,7 @@ use crate::{
     },
 };
 
-pub struct PresentData<'a>
-{
+pub struct PresentData<'a> {
     pub render_target: &'a Texture2D,
     pub render_target_bindless_key: String,
     pub render_target_barrier: BarrierMask,
@@ -33,8 +32,7 @@ pub struct PresentData<'a>
 }
 
 /// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
-pub struct Renderer
-{
+pub struct Renderer {
     pub rhi: Rc<RenderContext>,
 
     pub frame_ctrl: Rc<FrameController>,
@@ -62,10 +60,8 @@ pub struct Renderer
 }
 
 // 手动 drop
-impl Renderer
-{
-    pub fn destroy(self)
-    {
+impl Renderer {
+    pub fn destroy(self) {
         // 在 Renderer 被销毁时，等待 Rhi 设备空闲
         self.wait_idle();
         self.render_timeline_semaphore.destroy();
@@ -73,34 +69,28 @@ impl Renderer
 }
 
 // getter
-impl Renderer
-{
+impl Renderer {
     #[inline]
-    pub fn frame_settings(&self) -> FrameSettings
-    {
+    pub fn frame_settings(&self) -> FrameSettings {
         self.frame_settings
     }
 
     #[inline]
-    pub fn pipeline_settings(&mut self) -> &mut PipelineSettings
-    {
+    pub fn pipeline_settings(&mut self) -> &mut PipelineSettings {
         &mut self.pipeline_settings
     }
 
     #[inline]
-    pub fn accum_frames(&self) -> usize
-    {
+    pub fn accum_frames(&self) -> usize {
         self.accum_data.accum_frames_num
     }
 
-    pub fn deltatime(&self) -> std::time::Duration
-    {
+    pub fn deltatime(&self) -> std::time::Duration {
         self.timer.delta_time
     }
 
     /// 根据 vulkan 实例和显卡，获取合适的深度格式
-    fn get_depth_format(rhi: &RenderContext) -> vk::Format
-    {
+    fn get_depth_format(rhi: &RenderContext) -> vk::Format {
         rhi.find_supported_format(
             DefaultRendererSettings::DEPTH_FORMAT_CANDIDATES,
             vk::ImageTiling::OPTIMAL,
@@ -111,8 +101,7 @@ impl Renderer
         .unwrap_or(vk::Format::UNDEFINED)
     }
 
-    pub fn get_renderer_data(&mut self) -> PresentData<'_>
-    {
+    pub fn get_renderer_data(&mut self) -> PresentData<'_> {
         let crt_frame_label = self.frame_ctrl.frame_label();
 
         let (render_target, render_target_bindless_key) = self.framebuffers.render_target_texture(crt_frame_label);
@@ -130,8 +119,7 @@ impl Renderer
     }
 
     #[inline]
-    pub fn frame_controller(&self) -> &FrameController
-    {
+    pub fn frame_controller(&self) -> &FrameController {
         &self.frame_ctrl
     }
 }
@@ -140,10 +128,8 @@ impl Renderer
 impl Renderer {}
 
 // init
-impl Renderer
-{
-    pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self
-    {
+impl Renderer {
+    pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         let rhi = Rc::new(RenderContext::new("Truvis".to_string(), extra_instance_ext));
 
         let descriptor_pool = Self::init_descriptor_pool(rhi.device_functions().clone());
@@ -198,8 +184,7 @@ impl Renderer
     const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
     const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
 
-    fn init_descriptor_pool(device: Rc<DeviceFunctions>) -> DescriptorPool
-    {
+    fn init_descriptor_pool(device: Rc<DeviceFunctions>) -> DescriptorPool {
         let pool_size = vec![
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
@@ -242,10 +227,8 @@ impl Renderer
 }
 
 // phase call
-impl Renderer
-{
-    pub fn begin_frame(&mut self)
-    {
+impl Renderer {
+    pub fn begin_frame(&mut self) {
         // 等待 fif 的同一帧渲染完成
         {
             let frame_id = self.frame_ctrl.frame_id();
@@ -259,8 +242,7 @@ impl Renderer
         self.timer.tic();
     }
 
-    pub fn end_frame(&mut self)
-    {
+    pub fn end_frame(&mut self) {
         // 设置当前帧结束的 semaphore，用于保护当前帧的资源
         {
             let submit_info = SubmitInfo::new(&[]).signal(
@@ -274,14 +256,12 @@ impl Renderer
         self.frame_ctrl.end_frame();
     }
 
-    pub fn time_to_render(&self) -> bool
-    {
+    pub fn time_to_render(&self) -> bool {
         let limit_elapsed_us = 1000.0 * 1000.0 / self.fps_limit;
         limit_elapsed_us < self.timer.toc().as_micros() as f32
     }
 
-    pub fn before_render(&mut self, input_state: &InputState, camera: &DrsCamera)
-    {
+    pub fn before_render(&mut self, input_state: &InputState, camera: &DrsCamera) {
         let current_camera_dir = glam::vec3(camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg);
         self.accum_data.update_accum_frames(current_camera_dir, camera.position);
         self.update_gpu_scene(input_state, camera);
@@ -289,15 +269,13 @@ impl Renderer
 
     pub fn after_render(&mut self) {}
 
-    pub fn wait_idle(&self)
-    {
+    pub fn wait_idle(&self) {
         unsafe {
             self.rhi.device.device_wait_idle().unwrap();
         }
     }
 
-    pub fn collect_render_ctx(&mut self) -> PipelineContext<'_>
-    {
+    pub fn collect_render_ctx(&mut self) -> PipelineContext<'_> {
         let crt_frame_label = self.frame_ctrl.frame_label();
 
         PipelineContext {
@@ -314,8 +292,7 @@ impl Renderer
         }
     }
 
-    pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D)
-    {
+    pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
         self.accum_data.reset();
         unsafe {
             self.rhi.device.device_wait_idle().unwrap();
@@ -324,8 +301,7 @@ impl Renderer
         self.framebuffers.rebuild(&self.rhi, &self.frame_settings, &mut self.bindless_mgr.borrow_mut());
     }
 
-    fn update_gpu_scene(&mut self, input_state: &InputState, camera: &DrsCamera)
-    {
+    fn update_gpu_scene(&mut self, input_state: &InputState, camera: &DrsCamera) {
         let frame_extent = self.frame_settings.frame_extent;
         let crt_frame_label = self.frame_ctrl.frame_label();
 
@@ -336,9 +312,9 @@ impl Renderer
         let transfer_barrier_mask = BarrierMask {
             src_stage: vk::PipelineStageFlags2::TRANSFER,
             src_access: vk::AccessFlags2::TRANSFER_WRITE,
-            dst_stage: vk::PipelineStageFlags2::VERTEX_SHADER |
-                vk::PipelineStageFlags2::FRAGMENT_SHADER |
-                vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+            dst_stage: vk::PipelineStageFlags2::VERTEX_SHADER
+                | vk::PipelineStageFlags2::FRAGMENT_SHADER
+                | vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
             dst_access: vk::AccessFlags2::SHADER_READ,
         };
 
