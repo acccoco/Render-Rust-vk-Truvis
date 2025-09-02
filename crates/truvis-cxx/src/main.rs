@@ -8,14 +8,14 @@ use truvis_cxx::AssimpSceneLoader;
 use truvis_rhi::render_context::RenderContext;
 
 fn main() {
-    let rhi = RenderContext::new("test".to_string(), vec![]);
+    let render_context = RenderContext::new("test".to_string(), vec![]);
 
     let mut mesh_map: HashMap<MeshGuid, DrsMesh> = HashMap::new();
     let mut mat_map: HashMap<MatGuid, DrsMaterial> = HashMap::new();
     let mut ins_map: HashMap<InsGuid, DrsInstance> = HashMap::new();
 
     let uuids = AssimpSceneLoader::load_scene(
-        &rhi,
+        &render_context,
         std::path::Path::new("assets/obj/spot.obj"),
         |ins: DrsInstance| {
             let uuid = InsGuid::new();

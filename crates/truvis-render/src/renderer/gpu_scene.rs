@@ -94,67 +94,88 @@ struct GpuSceneBuffers {
     tlas: Option<Acceleration>,
 }
 impl GpuSceneBuffers {
-    fn new(rhi: &RenderContext, frame_label: usize) -> Self {
+    fn new(render_context: &RenderContext, frame_label: usize) -> Self {
         let max_light_cnt = 512;
         let max_material_cnt = 1024;
         let max_geometry_cnt = 1024 * 8;
         let max_instance_cnt = 1024;
 
         GpuSceneBuffers {
-            scene_buffer: StructuredBuffer::new_ubo(rhi, 1, format!("scene buffer-{}", frame_label)),
-            light_buffer: StructuredBuffer::new_ubo(rhi, max_light_cnt, format!("light buffer-{}", frame_label)),
+            scene_buffer: StructuredBuffer::new_ubo(
+                render_context.device_functions(),
+                render_context.allocator(),
+                1,
+                format!("scene buffer-{}", frame_label),
+            ),
+            light_buffer: StructuredBuffer::new_ubo(
+                render_context.device_functions(),
+                render_context.allocator(),
+                max_light_cnt,
+                format!("light buffer-{}", frame_label),
+            ),
             light_stage_buffer: StructuredBuffer::new_stage_buffer(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_light_cnt,
                 format!("light stage buffer-{}", frame_label),
             ),
             material_buffer: StructuredBuffer::new_ubo(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_material_cnt,
                 format!("material buffer-{}", frame_label),
             ),
             material_stage_buffer: StructuredBuffer::new_stage_buffer(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_material_cnt,
                 format!("material stage buffer-{}", frame_label),
             ),
             geometry_buffer: StructuredBuffer::new_ubo(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_geometry_cnt,
                 format!("geometry buffer-{}", frame_label),
             ),
             geometry_stage_buffer: StructuredBuffer::new_stage_buffer(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_geometry_cnt,
                 format!("geometry stage buffer-{}", frame_label),
             ),
             instance_buffer: StructuredBuffer::new_ubo(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_instance_cnt,
                 format!("instance buffer-{}", frame_label),
             ),
             instance_stage_buffer: StructuredBuffer::new_stage_buffer(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_instance_cnt,
                 format!("instance stage buffer-{}", frame_label),
             ),
             material_indirect_buffer: StructuredBuffer::new_ubo(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_instance_cnt * 8,
                 format!("instance material buffer-{}", frame_label),
             ),
             material_indirect_stage_buffer: StructuredBuffer::new_stage_buffer(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_instance_cnt * 8,
                 format!("instance material stage buffer-{}", frame_label),
             ),
             geometry_indirect_buffer: StructuredBuffer::new_ubo(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_instance_cnt * 8,
                 format!("instance geometry buffer-{}", frame_label),
             ),
             geometry_indirect_stage_buffer: StructuredBuffer::new_stage_buffer(
-                rhi,
+                render_context.device_functions(),
+                render_context.allocator(),
                 max_instance_cnt * 8,
                 format!("instance geometry stage buffer-{}", frame_label),
             ),
@@ -205,7 +226,7 @@ impl GpuScene {
     }
 }
 impl GpuScene {
-    pub fn new(rhi: &RenderContext, frame_ctrl: Rc<FrameController>) -> Self {
+    pub fn new(render_context: &RenderContext, frame_ctrl: Rc<FrameController>) -> Self {
         let resources = Resources {
             sky: TruvisPath::resources_path("sky.jpg"),
             uv_checker: TruvisPath::resources_path("uv_checker.png"),
@@ -217,16 +238,16 @@ impl GpuScene {
             flatten_meshes: FlattenMap::default(),
             mesh_geometry_map: HashMap::new(),
 
-            gpu_scene_buffers: (0..frame_ctrl.fif_count()).map(|i| GpuSceneBuffers::new(rhi, i)).collect(),
+            gpu_scene_buffers: (0..frame_ctrl.fif_count()).map(|i| GpuSceneBuffers::new(render_context, i)).collect(),
             resources,
             frame_ctrl,
         }
     }
 
     /// 注册 GpuScene 使用的默认纹理
-    pub fn register_default_textures(&self, rhi: &RenderContext, bindless_mgr: &mut BindlessManager) {
-        bindless_mgr.register_texture_by_path(rhi, self.resources.sky.clone());
-        bindless_mgr.register_texture_by_path(rhi, self.resources.uv_checker.clone());
+    pub fn register_default_textures(&self, render_context: &RenderContext, bindless_mgr: &mut BindlessManager) {
+        bindless_mgr.register_texture_by_path(render_context, self.resources.sky.clone());
+        bindless_mgr.register_texture_by_path(render_context, self.resources.uv_checker.clone());
     }
 
     /// # Phase: Before Render
@@ -245,7 +266,7 @@ impl GpuScene {
     /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
     pub fn upload_to_buffer(
         &mut self,
-        rhi: &RenderContext,
+        render_context: &RenderContext,
         cmd: &CommandBuffer,
         barrier_mask: BarrierMask,
         scene_mgr: &SceneManager,
@@ -257,7 +278,7 @@ impl GpuScene {
         self.upload_light_buffer(cmd, barrier_mask, scene_mgr);
 
         // 需要确保 instance 先与 tlas 构建
-        self.build_tlas(rhi, scene_mgr);
+        self.build_tlas(render_context, scene_mgr);
 
         self.upload_scene_buffer(cmd, barrier_mask, scene_mgr, bindless_mgr);
     }
@@ -556,7 +577,7 @@ impl GpuScene {
         }
     }
 
-    fn build_tlas(&mut self, rhi: &RenderContext, scene_mgr: &SceneManager) {
+    fn build_tlas(&mut self, render_context: &RenderContext, scene_mgr: &SceneManager) {
         if self.flatten_instances.is_empty() {
             // 没有实例数据，直接返回
             return;
@@ -576,7 +597,7 @@ impl GpuScene {
             .map(|(ins_idx, ins)| self.get_as_instance_info(ins, ins_idx as u32, scene_mgr))
             .collect_vec();
         let tlas = Acceleration::build_tlas_sync(
-            rhi,
+            render_context,
             &instance_infos,
             vk::BuildAccelerationStructureFlagsKHR::empty(),
             "scene tlas",

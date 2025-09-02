@@ -1,70 +1,17 @@
-use std::rc::Rc;
-
+use crate::commands::command_queue::CommandQueue;
+use crate::commands::fence::Fence;
+use crate::commands::semaphore::Semaphore;
+use crate::foundation::device::DeviceFunctions;
+use crate::resources::image_view::{Image2DView, ImageViewCreateInfo};
+use crate::swapchain::surface::Surface;
+use crate::vulkan_core::VulkanCore;
 use ash::vk;
 use itertools::Itertools;
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use truvis_rhi::{
-    commands::{command_queue::CommandQueue, fence::Fence, semaphore::Semaphore},
-    foundation::{debug_messenger::DebugType, device::Device},
-    render_context::RenderContext,
-    resources::image_view::{Image2DView, ImageViewCreateInfo},
-};
-
-use crate::pipeline_settings::PresentSettings;
-
-struct RhiSurface {
-    handle: vk::SurfaceKHR,
-    pf: ash::khr::surface::Instance,
-
-    capabilities: vk::SurfaceCapabilitiesKHR,
-}
-impl RhiSurface {
-    fn new(rhi: &RenderContext, window: &winit::window::Window) -> Self {
-        let surface_pf = ash::khr::surface::Instance::new(&rhi.vk_pf, rhi.instance());
-
-        let surface = unsafe {
-            ash_window::create_surface(
-                &rhi.vk_pf,
-                rhi.instance(),
-                window.display_handle().unwrap().as_raw(),
-                window.window_handle().unwrap().as_raw(),
-                None,
-            )
-            .unwrap()
-        };
-
-        let surface_capabilities = unsafe {
-            surface_pf.get_physical_device_surface_capabilities(rhi.physical_device().handle, surface).unwrap()
-        };
-
-        let surface = RhiSurface {
-            handle: surface,
-            pf: surface_pf,
-            capabilities: surface_capabilities,
-        };
-        rhi.device.debug_utils().set_debug_name(&surface, "main");
-
-        surface
-    }
-}
-impl Drop for RhiSurface {
-    fn drop(&mut self) {
-        unsafe { self.pf.destroy_surface(self.handle, None) }
-    }
-}
-impl DebugType for RhiSurface {
-    fn debug_type_name() -> &'static str {
-        "RhiSurface"
-    }
-    fn vk_handle(&self) -> impl vk::Handle {
-        self.handle
-    }
-}
+use std::rc::Rc;
 
 pub struct RenderSwapchain {
-    _device: Rc<RhiDeviceFunctions>,
-    _surface: RhiSurface,
-    swapchain_pf: ash::khr::swapchain::Device,
+    device_functions: Rc<DeviceFunctions>,
+    _surface: Surface,
     swapchain_handle: vk::SwapchainKHR,
 
     /// 这里的 image 并非手动创建的，因此无法使用 RhiImage 类型
@@ -75,23 +22,20 @@ pub struct RenderSwapchain {
     color_format: vk::Format,
     extent: vk::Extent2D,
 }
-impl RenderSwapchain {
-    // region ============== constructor ============
 
+/// 构建过程
+impl RenderSwapchain {
     pub fn new(
-        rhi: &RenderContext,
+        vk_core: &VulkanCore,
         window: &winit::window::Window,
         present_mode: vk::PresentModeKHR,
         surface_format: vk::SurfaceFormatKHR,
     ) -> Self {
-        let surface = RhiSurface::new(rhi, window);
-        let swapchain_pf = ash::khr::swapchain::Device::new(rhi.instance(), rhi.device());
-
+        let surface = Surface::new(vk_core, window);
         let extent = surface.capabilities.current_extent;
 
         let swapchain_handle = Self::create_swapchain(
-            rhi,
-            &swapchain_pf,
+            vk_core.device_functions.clone(),
             &surface,
             surface_format.format,
             surface_format.color_space,
@@ -99,16 +43,16 @@ impl RenderSwapchain {
             present_mode,
         );
 
-        let images = unsafe { swapchain_pf.get_swapchain_images(swapchain_handle).unwrap() };
+        let images = unsafe { vk_core.device_functions.swapchain.get_swapchain_images(swapchain_handle).unwrap() };
         for (img_idx, img) in images.iter().enumerate() {
-            rhi.device.debug_utils().set_object_debug_name(*img, format!("swapchain-image-{img_idx}"));
+            vk_core.device_functions.set_object_debug_name(*img, format!("swapchain-image-{img_idx}"));
         }
         let image_views = images
             .iter()
             .enumerate()
             .map(|(idx, img)| {
                 Image2DView::new(
-                    rhi,
+                    vk_core.device_functions.clone(),
                     *img,
                     ImageViewCreateInfo::new_image_view_2d_info(surface_format.format, vk::ImageAspectFlags::COLOR),
                     format!("swapchain-{}", idx),
@@ -117,9 +61,8 @@ impl RenderSwapchain {
             .collect_vec();
 
         Self {
-            _device: rhi.device.clone(),
+            device_functions: vk_core.device_functions.clone(),
             _surface: surface,
-            swapchain_pf,
             swapchain_handle,
             images,
             image_views,
@@ -130,9 +73,8 @@ impl RenderSwapchain {
     }
 
     fn create_swapchain(
-        rhi: &RenderContext,
-        swapchain_pf: &ash::khr::swapchain::Device,
-        surface: &RhiSurface,
+        device_functions: Rc<DeviceFunctions>,
+        surface: &Surface,
         format: vk::Format,
         color_space: vk::ColorSpaceKHR,
         extent: vk::Extent2D,
@@ -166,17 +108,22 @@ impl RenderSwapchain {
             .clipped(true);
 
         unsafe {
-            let swapchain_handle = swapchain_pf.create_swapchain(&create_info, None).unwrap();
-            rhi.device.debug_utils().set_object_debug_name(swapchain_handle, "main");
+            let swapchain_handle = device_functions.swapchain.create_swapchain(&create_info, None).unwrap();
+            device_functions.set_object_debug_name(swapchain_handle, "main");
 
             swapchain_handle
         }
     }
+}
 
-    // endregion ===================
+pub struct SwapchainImageInfo {
+    pub image_extent: vk::Extent2D,
+    pub image_cnt: usize,
+    pub image_format: vk::Format,
+}
 
-    // region ============== getter ============
-
+/// getters
+impl RenderSwapchain {
     #[inline]
     pub fn present_images(&self) -> Vec<vk::Image> {
         self.images.clone()
@@ -203,21 +150,23 @@ impl RenderSwapchain {
     }
 
     #[inline]
-    pub fn present_settings(&self) -> PresentSettings {
-        PresentSettings {
-            canvas_extent: self.extent,
-            swapchain_image_cnt: self.images.len(),
-            color_format: self.color_format,
+    pub fn image_infos(&self) -> SwapchainImageInfo {
+        SwapchainImageInfo {
+            image_extent: self.extent,
+            image_cnt: self.images.len(),
+            image_format: self.color_format,
         }
     }
+}
 
-    // endregion ===================
-
+/// tools
+impl RenderSwapchain {
     /// timeout: nano seconds
     #[inline]
     pub fn acquire_next_image(&mut self, semaphore: Option<&Semaphore>, fence: Option<&Fence>, timeout: u64) {
         let (image_index, is_optimal) = unsafe {
-            self.swapchain_pf
+            self.device_functions
+                .swapchain
                 .acquire_next_image(
                     self.swapchain_handle,
                     timeout,
@@ -245,13 +194,14 @@ impl RenderSwapchain {
             .image_indices(&image_indices)
             .swapchains(std::slice::from_ref(&self.swapchain_handle));
 
-        unsafe { self.swapchain_pf.queue_present(queue.handle(), &present_info).unwrap() };
+        unsafe { self.device_functions.swapchain.queue_present(queue.handle(), &present_info).unwrap() };
     }
 }
+
 impl Drop for RenderSwapchain {
     fn drop(&mut self) {
         unsafe {
-            self.swapchain_pf.destroy_swapchain(self.swapchain_handle, None);
+            self.device_functions.swapchain.destroy_swapchain(self.swapchain_handle, None);
         }
     }
 }

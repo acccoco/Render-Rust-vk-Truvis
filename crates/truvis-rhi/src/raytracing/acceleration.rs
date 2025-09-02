@@ -201,7 +201,7 @@ impl Acceleration {
         // 获得 AccelerationStructure 所需的尺寸
         let size_info = unsafe {
             let mut size_info = vk::AccelerationStructureBuildSizesInfoKHR::default();
-            render_context.device().acceleration_structure_pf().get_acceleration_structure_build_sizes(
+            render_context.device_functions().acceleration_structure.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &build_geometry_info,
                 &[instances.len() as u32],

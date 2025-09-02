@@ -8,13 +8,18 @@ use truvis_rhi::{
 pub struct ImageLoader {}
 
 impl ImageLoader {
-    pub fn load_image(rhi: &RenderContext, tex_path: &std::path::Path) -> Texture2D {
+    pub fn load_image(render_context: &RenderContext, tex_path: &std::path::Path) -> Texture2D {
         let img = image::ImageReader::open(tex_path).unwrap().decode().unwrap().to_rgba8();
 
-        let image =
-            Rc::new(Image2D::from_rgba8(rhi, img.width(), img.height(), img.as_raw(), tex_path.to_str().unwrap()));
+        let image = Rc::new(Image2D::from_rgba8(
+            render_context,
+            img.width(),
+            img.height(),
+            img.as_raw(),
+            tex_path.to_str().unwrap(),
+        ));
 
-        let tex = Texture2D::new(rhi, image.clone(), tex_path.to_str().unwrap());
+        let tex = Texture2D::new(render_context.device_functions(), image.clone(), tex_path.to_str().unwrap());
 
         tex
     }

@@ -42,17 +42,21 @@ impl RtApp {
             _color_padding: Default::default(),
         });
         // scene_mgr.load_scene(
-        //     &renderer.rhi,
+        //     &renderer.render_context,
         //     std::path::Path::new("assets/fbx/sponza/Sponza.fbx"),
         //     &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         // );
-        scene_mgr.load_scene(&renderer.rhi, std::path::Path::new("assets/blender/sponza.fbx"), &glam::Mat4::IDENTITY);
+        scene_mgr.load_scene(
+            &renderer.render_context,
+            std::path::Path::new("assets/blender/sponza.fbx"),
+            &glam::Mat4::IDENTITY,
+        );
     }
 }
 
 impl OuterApp for RtApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
-        let rt_pipeline = RtPipeline::new(&renderer.rhi, renderer.bindless_mgr.clone());
+        let rt_pipeline = RtPipeline::new(&renderer.render_context, renderer.bindless_mgr.clone());
 
         Self::create_scene(renderer, camera);
 

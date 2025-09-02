@@ -29,18 +29,19 @@ impl Semaphore {
         semaphore
     }
 
-    pub fn new_timeline(rhi: &RenderContext, initial_value: u64, debug_name: &str) -> Self {
+    pub fn new_timeline(render_context: &RenderContext, initial_value: u64, debug_name: &str) -> Self {
         let mut timeline_type_ci = vk::SemaphoreTypeCreateInfo::default()
             .semaphore_type(vk::SemaphoreType::TIMELINE)
             .initial_value(initial_value);
         let timeline_semaphore_ci = vk::SemaphoreCreateInfo::default().push_next(&mut timeline_type_ci);
-        let semaphore = unsafe { rhi.device().ash_handle().create_semaphore(&timeline_semaphore_ci, None).unwrap() };
+        let semaphore =
+            unsafe { render_context.device_functions().create_semaphore(&timeline_semaphore_ci, None).unwrap() };
 
         let semaphore = Self {
             semaphore,
-            device_functions: rhi.device().functions.clone(),
+            device_functions: render_context.device_functions(),
         };
-        rhi.device_functions().set_debug_name(&semaphore, debug_name);
+        render_context.device_functions().set_debug_name(&semaphore, debug_name);
         semaphore
     }
     #[inline]

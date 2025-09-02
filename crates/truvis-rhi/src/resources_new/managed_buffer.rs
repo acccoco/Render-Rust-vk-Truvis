@@ -4,10 +4,7 @@ use ash::vk;
 use vk_mem::Alloc;
 
 use crate::{
-    foundation::{
-        device::{Device, DeviceFunctions},
-        mem_allocator::MemAllocator,
-    },
+    foundation::{device::DeviceFunctions, mem_allocator::MemAllocator},
     render_context::RenderContext,
 };
 
@@ -91,9 +88,9 @@ impl ManagedBuffer {
     }
 
     #[inline]
-    pub fn device_address(&self, device: &Device) -> vk::DeviceAddress {
+    pub fn device_address(&self, device: &DeviceFunctions) -> vk::DeviceAddress {
         self.device_addr.unwrap_or_else(|| unsafe {
-            device.functions.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.vk_handle))
+            device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.vk_handle))
         })
     }
 }
@@ -107,16 +104,16 @@ impl ManagedBuffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    pub fn transfer_data_sync(&self, rhi: &RenderContext, data: &[impl Sized + Copy]) {
+    pub fn transfer_data_sync(&self, render_context: &RenderContext, data: &[impl Sized + Copy]) {
         let mut stage_buffer = Self::new_stage_buffer(
-            rhi.device_functions(),
-            rhi.allocator(),
+            render_context.device_functions(),
+            render_context.allocator(),
             size_of_val(data) as vk::DeviceSize,
             format!("{}-stage-buffer", self.debug_name),
         );
-        stage_buffer.transfer_data_by_mem_map(data, &rhi.allocator());
+        stage_buffer.transfer_data_by_mem_map(data, &render_context.allocator());
 
-        rhi.one_time_exec(
+        render_context.one_time_exec(
             |cmd| {
                 cmd.cmd_copy_buffer(
                     &stage_buffer,
@@ -130,7 +127,7 @@ impl ManagedBuffer {
             format!("{}-transfer-data", &self.debug_name),
         );
 
-        stage_buffer.destroy(&rhi.allocator);
+        stage_buffer.destroy(&render_context.allocator);
     }
 
     /// 确保 `[T]` 的内存布局在 CPU 和 GPU 是一致的

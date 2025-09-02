@@ -1,10 +1,12 @@
-use std::ffi::CStr;
-
 use ash::vk;
+use std::ffi::CStr;
+use std::rc::Rc;
 
 use crate::{
     commands::command_queue::CommandQueue,
-    foundation::{debug_messenger::DebugMsger, device::Device, instance::Instance, physical_device::PhysicalDevice},
+    foundation::{
+        debug_messenger::DebugMsger, device::DeviceFunctions, instance::Instance, physical_device::PhysicalDevice,
+    },
 };
 
 pub struct VulkanCore {
@@ -15,7 +17,14 @@ pub struct VulkanCore {
 
     pub(crate) instance: Instance,
     pub(crate) physical_device: PhysicalDevice,
-    pub(crate) device: Device,
+
+    /// Vulkan 设备函数指针集合
+    ///
+    /// 使用 Rc 是合理的，因为：
+    /// 1. 多个组件需要共享相同的设备函数指针（RhiQueue、RhiCommandBuffer 等）
+    /// 2. 函数指针本身很轻量，共享比传递更高效
+    /// 3. 设备生命周期需要精确控制，Rc 确保在所有引用者销毁前设备不被销毁
+    pub(crate) device_functions: Rc<DeviceFunctions>,
 
     pub(crate) debug_utils: DebugMsger,
 
@@ -44,27 +53,22 @@ impl VulkanCore {
                 .queue_priorities(&[1.0]),
         ];
 
-        let device = Device::new(&instance.ash_instance, physical_device.vk_handle, &queue_create_infos);
+        let device =
+            Rc::new(DeviceFunctions::new(&instance.ash_instance, physical_device.vk_handle, &queue_create_infos));
         let graphics_queue = CommandQueue {
-            vk_queue: unsafe {
-                device.functions.get_device_queue(physical_device.graphics_queue_family.queue_family_index, 0)
-            },
+            vk_queue: unsafe { device.get_device_queue(physical_device.graphics_queue_family.queue_family_index, 0) },
             queue_family: physical_device.graphics_queue_family.clone(),
-            device_functions: device.functions.clone(),
+            device_functions: device.clone(),
         };
         let compute_queue = CommandQueue {
-            vk_queue: unsafe {
-                device.functions.get_device_queue(physical_device.compute_queue_family.queue_family_index, 0)
-            },
+            vk_queue: unsafe { device.get_device_queue(physical_device.compute_queue_family.queue_family_index, 0) },
             queue_family: physical_device.compute_queue_family.clone(),
-            device_functions: device.functions.clone(),
+            device_functions: device.clone(),
         };
         let transfer_queue = CommandQueue {
-            vk_queue: unsafe {
-                device.functions.get_device_queue(physical_device.transfer_queue_family.queue_family_index, 0)
-            },
+            vk_queue: unsafe { device.get_device_queue(physical_device.transfer_queue_family.queue_family_index, 0) },
             queue_family: physical_device.transfer_queue_family.clone(),
-            device_functions: device.functions.clone(),
+            device_functions: device.clone(),
         };
 
         let debug_utils = DebugMsger::new(&vk_pf, &instance.ash_instance);
@@ -75,20 +79,20 @@ impl VulkanCore {
 
         // 在 device 以及 debug_utils 之前创建的 vk::Handle
         {
-            device.functions.set_object_debug_name(instance.vk_instance(), "RhiInstance");
-            device.functions.set_object_debug_name(physical_device.vk_handle, "RhiPhysicalDevice");
+            device.set_object_debug_name(instance.vk_instance(), "RhiInstance");
+            device.set_object_debug_name(physical_device.vk_handle, "RhiPhysicalDevice");
 
-            device.functions.set_object_debug_name(device.vk_handle(), "RhiDevice");
-            device.functions.set_object_debug_name(graphics_queue.vk_queue, "graphics_queue");
-            device.functions.set_object_debug_name(compute_queue.vk_queue, "compute_queue");
-            device.functions.set_object_debug_name(transfer_queue.vk_queue, "transfer_queue");
+            device.set_object_debug_name(device.vk_handle(), "RhiDevice");
+            device.set_object_debug_name(graphics_queue.vk_queue, "graphics_queue");
+            device.set_object_debug_name(compute_queue.vk_queue, "compute_queue");
+            device.set_object_debug_name(transfer_queue.vk_queue, "transfer_queue");
         }
 
         Self {
             vk_pf,
             instance,
             physical_device,
-            device,
+            device_functions: device,
             debug_utils,
             graphics_queue,
             compute_queue,
@@ -98,7 +102,7 @@ impl VulkanCore {
 
     pub fn destroy(self) {
         self.debug_utils.destroy();
-        self.device.destroy();
+        self.device_functions.destroy();
         self.physical_device.destroy();
         self.instance.destroy();
     }

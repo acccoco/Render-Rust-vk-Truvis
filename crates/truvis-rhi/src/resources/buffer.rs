@@ -254,10 +254,10 @@ impl Buffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    pub fn transfer_data_sync(&mut self, rhi: &RenderContext, data: &[impl Sized + Copy]) {
+    pub fn transfer_data_sync(&mut self, render_context: &RenderContext, data: &[impl Sized + Copy]) {
         let mut stage_buffer = Self::new_stage_buffer(
-            rhi.device_functions(),
-            rhi.allocator.clone(),
+            render_context.device_functions(),
+            render_context.allocator.clone(),
             size_of_val(data) as vk::DeviceSize,
             format!("{}-stage-buffer", self.debug_name),
         );
@@ -265,7 +265,7 @@ impl Buffer {
         stage_buffer.transfer_data_by_mem_map(data);
 
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
-        rhi.one_time_exec(
+        render_context.one_time_exec(
             |cmd| {
                 cmd.cmd_copy_buffer_1(
                     &stage_buffer,

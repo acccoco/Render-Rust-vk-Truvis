@@ -58,21 +58,27 @@ impl VertexLayout for VertexLayoutAosPosNormalUv {
 
 impl VertexLayoutAosPosNormalUv {
     pub fn create_vertex_buffer(
-        rhi: &RenderContext,
+        render_context: &RenderContext,
         data: &[VertexPosNormalUv],
         name: impl AsRef<str>,
     ) -> VertexBuffer<VertexPosNormalUv> {
-        let mut vertex_buffer = VertexBuffer::new(rhi, data.len(), name.as_ref());
-        vertex_buffer.transfer_data_sync(rhi, data);
+        let mut vertex_buffer =
+            VertexBuffer::new(render_context.device_functions(), render_context.allocator(), data.len(), name.as_ref());
+        vertex_buffer.transfer_data_sync(render_context, data);
 
         vertex_buffer
     }
 
-    pub fn cube(rhi: &RenderContext) -> DrsGeometry<VertexPosNormalUv> {
-        let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::Cube::VERTICES, "cube-vertex-buffer");
+    pub fn cube(render_context: &RenderContext) -> DrsGeometry<VertexPosNormalUv> {
+        let vertex_buffer = Self::create_vertex_buffer(render_context, &shape::Cube::VERTICES, "cube-vertex-buffer");
 
-        let mut index_buffer = IndexBuffer::new(rhi, shape::Cube::INDICES.len(), "cube-index-buffer");
-        index_buffer.transfer_data_sync(rhi, &shape::Cube::INDICES);
+        let mut index_buffer = IndexBuffer::new(
+            render_context.device_functions(),
+            render_context.allocator(),
+            shape::Cube::INDICES.len(),
+            "cube-index-buffer",
+        );
+        index_buffer.transfer_data_sync(render_context, &shape::Cube::INDICES);
 
         DrsGeometry {
             vertex_buffer,
@@ -80,11 +86,16 @@ impl VertexLayoutAosPosNormalUv {
         }
     }
 
-    pub fn floor(rhi: &RenderContext) -> DrsGeometry<VertexPosNormalUv> {
-        let vertex_buffer = Self::create_vertex_buffer(rhi, &shape::Floor::VERTICES, "floor-vertex-buffer");
+    pub fn floor(render_context: &RenderContext) -> DrsGeometry<VertexPosNormalUv> {
+        let vertex_buffer = Self::create_vertex_buffer(render_context, &shape::Floor::VERTICES, "floor-vertex-buffer");
 
-        let mut index_buffer = IndexBuffer::new(rhi, shape::Floor::INDICES.len(), "floor-index-buffer");
-        index_buffer.transfer_data_sync(rhi, &shape::Floor::INDICES);
+        let mut index_buffer = IndexBuffer::new(
+            render_context.device_functions(),
+            render_context.allocator(),
+            shape::Floor::INDICES.len(),
+            "floor-index-buffer",
+        );
+        index_buffer.transfer_data_sync(render_context, &shape::Floor::INDICES);
 
         DrsGeometry {
             vertex_buffer,

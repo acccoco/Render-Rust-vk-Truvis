@@ -18,8 +18,13 @@ pub struct ComputePass<P: bytemuck::Pod> {
     device_functions: Rc<DeviceFunctions>,
 }
 impl<P: bytemuck::Pod> ComputePass<P> {
-    pub fn new(rhi: &RenderContext, bindless_mgr: &BindlessManager, entry_point: &CStr, shader_path: &str) -> Self {
-        let shader_module = ShaderModule::new(rhi, std::path::Path::new(shader_path));
+    pub fn new(
+        render_context: &RenderContext,
+        bindless_mgr: &BindlessManager,
+        entry_point: &CStr,
+        shader_path: &str,
+    ) -> Self {
+        let shader_module = ShaderModule::new(render_context.device_functions(), std::path::Path::new(shader_path));
         let stage_info = vk::PipelineShaderStageCreateInfo::default()
             .module(shader_module.handle())
             .stage(vk::ShaderStageFlags::COMPUTE)
@@ -36,12 +41,13 @@ impl<P: bytemuck::Pod> ComputePass<P> {
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
 
-            unsafe { rhi.device_functions().create_pipeline_layout(&pipeline_layout_ci, None).unwrap() }
+            unsafe { render_context.device_functions().create_pipeline_layout(&pipeline_layout_ci, None).unwrap() }
         };
 
         let pipeline_ci = vk::ComputePipelineCreateInfo::default().stage(stage_info).layout(pipeline_layout);
         let pipeline = unsafe {
-            rhi.device_functions()
+            render_context
+                .device_functions()
                 .create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_ci), None)
                 .unwrap()[0]
         };
@@ -53,7 +59,7 @@ impl<P: bytemuck::Pod> ComputePass<P> {
             pipeline_layout,
 
             _phantom: std::marker::PhantomData,
-            device_functions: rhi.device_functions().clone(),
+            device_functions: render_context.device_functions().clone(),
         }
     }
 

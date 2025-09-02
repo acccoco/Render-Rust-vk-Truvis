@@ -139,10 +139,16 @@ impl Image2D {
         image
     }
     /// 根据 RGBA8_UNORM 的 data 创建 image
-    pub fn from_rgba8(rhi: &RenderContext, width: u32, height: u32, data: &[u8], name: impl AsRef<str>) -> Self {
+    pub fn from_rgba8(
+        render_context: &RenderContext,
+        width: u32,
+        height: u32,
+        data: &[u8],
+        name: impl AsRef<str>,
+    ) -> Self {
         let image = Self::new(
-            rhi.device_functions(),
-            rhi.allocator(),
+            render_context.device_functions(),
+            render_context.allocator(),
             Rc::new(ImageCreateInfo::new_image_2d_info(
                 vk::Extent2D { width, height },
                 vk::Format::R8G8B8A8_UNORM,
@@ -155,7 +161,7 @@ impl Image2D {
             name.as_ref(),
         );
 
-        rhi.one_time_exec(|cmd| image.transfer_data(cmd, data), name.as_ref());
+        render_context.one_time_exec(|cmd| image.transfer_data(cmd, data), name.as_ref());
 
         image
     }

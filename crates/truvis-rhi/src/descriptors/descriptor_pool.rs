@@ -76,7 +76,7 @@ impl DescriptorPool {
     /// 创建新的描述符池
     ///
     /// # 参数
-    /// - rhi: RHI 实例
+    /// - render_context: RHI 实例
     /// - ci: 描述符池创建信息
     /// - name: 用于调试的名称
     ///

@@ -1,7 +1,6 @@
 use std::{
     ffi::{CStr, CString},
     ops::Deref,
-    rc::Rc,
 };
 
 use ash::vk;
@@ -24,84 +23,15 @@ pub struct DeviceFunctions {
     pub(crate) ray_tracing_pipeline: ash::khr::ray_tracing_pipeline::Device,
     /// 调试工具扩展 API
     pub(crate) debug_utils: ash::ext::debug_utils::Device,
-}
+    /// 交换链扩展 API
+    pub(crate) swapchain: ash::khr::swapchain::Device,
 
-/// getters
-impl DeviceFunctions {
-    #[inline]
-    pub fn dynamic_rendering(&self) -> &ash::khr::dynamic_rendering::Device {
-        &self.dynamic_rendering
-    }
-    #[inline]
-    pub fn acceleration_structure(&self) -> &ash::khr::acceleration_structure::Device {
-        &self.acceleration_structure
-    }
-    #[inline]
-    pub fn ray_tracing_pipeline(&self) -> &ash::khr::ray_tracing_pipeline::Device {
-        &self.ray_tracing_pipeline
-    }
-    #[inline]
-    pub fn debug_utils(&self) -> &ash::ext::debug_utils::Device {
-        &self.debug_utils
-    }
-}
-
-/// tools
-impl DeviceFunctions {
-    #[inline]
-    pub fn write_descriptor_sets(&self, writes: &[WriteDescriptorSet]) {
-        let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();
-        unsafe {
-            self.device.update_descriptor_sets(&writes, &[]);
-        }
-    }
-
-    #[inline]
-    pub fn set_object_debug_name<T: vk::Handle + Copy>(&self, handle: T, name: impl AsRef<str>) {
-        let name = CString::new(name.as_ref()).unwrap();
-        unsafe {
-            self.debug_utils
-                .set_debug_utils_object_name(
-                    &vk::DebugUtilsObjectNameInfoEXT::default().object_name(name.as_c_str()).object_handle(handle),
-                )
-                .unwrap();
-        }
-    }
-
-    pub fn set_debug_name<T: DebugType>(&self, handle: &T, name: impl AsRef<str>) {
-        let debug_name = format!("{}::{}", T::debug_type_name(), name.as_ref());
-        let debug_name = CString::new(debug_name.as_str()).unwrap();
-        unsafe {
-            self.debug_utils
-                .set_debug_utils_object_name(
-                    &vk::DebugUtilsObjectNameInfoEXT::default()
-                        .object_name(debug_name.as_c_str())
-                        .object_handle(handle.vk_handle()),
-                )
-                .unwrap();
-        }
-    }
-}
-
-impl Deref for DeviceFunctions {
-    type Target = ash::Device;
-    fn deref(&self) -> &Self::Target {
-        &self.device
-    }
-}
-
-pub struct Device {
-    /// Vulkan 设备函数指针集合
-    ///
-    /// 使用 Rc 是合理的，因为：
-    /// 1. 多个组件需要共享相同的设备函数指针（RhiQueue、RhiCommandBuffer 等）
-    /// 2. 函数指针本身很轻量，共享比传递更高效
-    /// 3. 设备生命周期需要精确控制，Rc 确保在所有引用者销毁前设备不被销毁
-    pub(crate) functions: Rc<DeviceFunctions>,
+    #[cfg(debug_assertions)]
+    destroyed: bool,
 }
 
 /// 构造与销毁
-impl Device {
+impl DeviceFunctions {
     pub fn new(
         instance: &ash::Instance,
         pdevice: vk::PhysicalDevice,
@@ -137,28 +67,30 @@ impl Device {
         let vk_acceleration_struct_pf = ash::khr::acceleration_structure::Device::new(instance, &device);
         let vk_rt_pipeline_pf = ash::khr::ray_tracing_pipeline::Device::new(instance, &device);
         let vk_debug_utils_device = ash::ext::debug_utils::Device::new(instance, &device);
+        let _vk_swapchain = ash::khr::swapchain::Device::new(instance, &device);
 
         Self {
-            functions: Rc::new(DeviceFunctions {
-                device: device.clone(),
-                dynamic_rendering: vk_dynamic_render_pf,
-                acceleration_structure: vk_acceleration_struct_pf,
-                ray_tracing_pipeline: vk_rt_pipeline_pf,
-                debug_utils: vk_debug_utils_device,
-            }),
+            device: device.clone(),
+            dynamic_rendering: vk_dynamic_render_pf,
+            acceleration_structure: vk_acceleration_struct_pf,
+            ray_tracing_pipeline: vk_rt_pipeline_pf,
+            debug_utils: vk_debug_utils_device,
+            swapchain: _vk_swapchain,
+
+            destroyed: false,
         }
     }
 
-    pub fn destroy(self) {
+    pub fn destroy(&self) {
         log::info!("destroying device");
         unsafe {
-            self.functions.device.destroy_device(None);
+            self.device.destroy_device(None);
         }
     }
 }
 
 /// 创建过程的辅助函数
-impl Device {
+impl DeviceFunctions {
     /// 必要的 physical device core features
     fn physical_device_basic_features() -> vk::PhysicalDeviceFeatures {
         vk::PhysicalDeviceFeatures::default()
@@ -218,44 +150,101 @@ impl Device {
     }
 }
 
-/// getter
-impl Device {
-    #[inline]
-    pub fn ash_handle(&self) -> &ash::Device {
-        &self.functions.device
-    }
-
+/// getters
+impl DeviceFunctions {
     #[inline]
     pub fn vk_handle(&self) -> vk::Device {
-        self.functions.device.handle()
+        self.device.handle()
     }
-
     #[inline]
-    pub fn dynamic_rendering_pf(&self) -> &ash::khr::dynamic_rendering::Device {
-        &self.functions.dynamic_rendering
+    pub fn dynamic_rendering(&self) -> &ash::khr::dynamic_rendering::Device {
+        &self.dynamic_rendering
     }
-
     #[inline]
-    pub fn acceleration_structure_pf(&self) -> &ash::khr::acceleration_structure::Device {
-        &self.functions.acceleration_structure
+    pub fn acceleration_structure(&self) -> &ash::khr::acceleration_structure::Device {
+        &self.acceleration_structure
     }
-
     #[inline]
-    pub fn rt_pipeline_pf(&self) -> &ash::khr::ray_tracing_pipeline::Device {
-        &self.functions.ray_tracing_pipeline
+    pub fn ray_tracing_pipeline(&self) -> &ash::khr::ray_tracing_pipeline::Device {
+        &self.ray_tracing_pipeline
     }
-
     #[inline]
     pub fn debug_utils(&self) -> &ash::ext::debug_utils::Device {
-        &self.functions.debug_utils
+        &self.debug_utils
+    }
+    #[inline]
+    pub fn swapchain(&self) -> &ash::khr::swapchain::Device {
+        &self.swapchain
     }
 }
 
-impl DebugType for Device {
+/// tools
+impl DeviceFunctions {
+    #[inline]
+    pub fn write_descriptor_sets(&self, writes: &[WriteDescriptorSet]) {
+        let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();
+        unsafe {
+            self.device.update_descriptor_sets(&writes, &[]);
+        }
+    }
+
+    #[inline]
+    pub fn set_object_debug_name<T: vk::Handle + Copy>(&self, handle: T, name: impl AsRef<str>) {
+        let name = CString::new(name.as_ref()).unwrap();
+        unsafe {
+            self.debug_utils
+                .set_debug_utils_object_name(
+                    &vk::DebugUtilsObjectNameInfoEXT::default().object_name(name.as_c_str()).object_handle(handle),
+                )
+                .unwrap();
+        }
+    }
+
+    pub fn set_debug_name<T: DebugType>(&self, handle: &T, name: impl AsRef<str>) {
+        let debug_name = format!("{}::{}", T::debug_type_name(), name.as_ref());
+        let debug_name = CString::new(debug_name.as_str()).unwrap();
+        unsafe {
+            self.debug_utils
+                .set_debug_utils_object_name(
+                    &vk::DebugUtilsObjectNameInfoEXT::default()
+                        .object_name(debug_name.as_c_str())
+                        .object_handle(handle.vk_handle()),
+                )
+                .unwrap();
+        }
+    }
+
+    #[inline]
+    pub fn wait_idle(&self) {
+        unsafe {
+            self.device.device_wait_idle().unwrap();
+        }
+    }
+}
+
+impl Deref for DeviceFunctions {
+    type Target = ash::Device;
+    fn deref(&self) -> &Self::Target {
+        &self.device
+    }
+}
+impl Drop for DeviceFunctions {
+    fn drop(&mut self) {
+        #[cfg(debug_assertions)]
+        {
+            if !self.destroyed {
+                log::error!(
+                    "DeviceFunctions is being dropped without calling destroy(). This may lead to resource leaks."
+                );
+            }
+        }
+    }
+}
+impl DebugType for DeviceFunctions {
     fn debug_type_name() -> &'static str {
         "RhiDevice"
     }
     fn vk_handle(&self) -> impl vk::Handle {
-        self.functions.device.handle()
+        self.device.handle()
     }
 }

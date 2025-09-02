@@ -39,9 +39,13 @@ pub struct GuiPass {
 }
 
 impl GuiPass {
-    pub fn new(rhi: &RenderContext, bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
+    pub fn new(
+        render_context: &RenderContext,
+        bindless_mgr: Rc<RefCell<BindlessManager>>,
+        color_format: vk::Format,
+    ) -> Self {
         let pipeline_layout = Rc::new(PipelineLayout::new(
-            rhi.device.clone(),
+            render_context.device_functions(),
             &[bindless_mgr.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
@@ -79,7 +83,8 @@ impl GuiPass {
             // TODO 这里不应该由 depth
             .attach_info(vec![color_format], None, None);
 
-        let pipeline = GraphicsPipeline::new(rhi.device.clone(), &create_info, pipeline_layout.clone(), "uipass");
+        let pipeline =
+            GraphicsPipeline::new(render_context.device_functions(), &create_info, pipeline_layout.clone(), "uipass");
 
         Self {
             pipeline,
@@ -90,7 +95,7 @@ impl GuiPass {
 
     pub fn draw(
         &self,
-        rhi: &RenderContext,
+        render_context: &RenderContext,
         canvas_color_view: vk::ImageView,
         canvas_extent: vk::Extent2D,
         cmd: &CommandBuffer,
@@ -117,7 +122,7 @@ impl GuiPass {
         let mesh;
         let draw_data;
         let get_texture_key;
-        if let Some(r) = gui.imgui_render(rhi, cmd, frame_label) {
+        if let Some(r) = gui.imgui_render(render_context, cmd, frame_label) {
             (mesh, draw_data, get_texture_key) = r;
         } else {
             log::warn!("No ImGui draw data available, skipping GUI pass.");

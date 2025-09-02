@@ -50,7 +50,7 @@ impl<T: ShaderBindingLayout> DescriptorSetLayout<T> {
     /// 创建新的描述符集布局
     ///
     /// # 参数
-    /// - rhi: RHI 实例
+    /// - render_context: RHI 实例
     /// - debug_name: 用于调试的名称
     ///
     /// # 返回值
@@ -135,7 +135,7 @@ impl<T: ShaderBindingLayout> DescriptorSet<T> {
     /// 创建新的描述符集
     ///
     /// # 参数
-    /// - rhi: RHI 实例
+    /// - render_context: RHI 实例
     /// - layout: 描述符集布局
     /// - debug_name: 用于调试的名称
     ///

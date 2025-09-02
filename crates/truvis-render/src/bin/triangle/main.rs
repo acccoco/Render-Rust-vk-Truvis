@@ -22,8 +22,8 @@ impl OuterApp for HelloTriangle {
         log::info!("hello triangle init.");
 
         Self {
-            triangle_pipeline: TrianglePipeline::new(&renderer.rhi, &renderer.frame_settings()),
-            triangle: VertexAosLayoutPosColor::triangle(&renderer.rhi),
+            triangle_pipeline: TrianglePipeline::new(&renderer.render_context, &renderer.frame_settings()),
+            triangle: VertexAosLayoutPosColor::triangle(&renderer.render_context),
         }
     }
 

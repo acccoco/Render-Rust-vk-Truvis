@@ -10,10 +10,7 @@ use crate::{
         submit_info::SubmitInfo,
     },
     foundation::{
-        device::{Device, DeviceFunctions},
-        instance::Instance,
-        mem_allocator::MemAllocator,
-        physical_device::PhysicalDevice,
+        device::DeviceFunctions, instance::Instance, mem_allocator::MemAllocator, physical_device::PhysicalDevice,
     },
     resources_new::resource_manager::ResourceManager,
     vulkan_core::VulkanCore,
@@ -33,19 +30,19 @@ impl RenderContext {
     // region init 相关
     const ENGINE_NAME: &'static str = "DruvisIII";
 
-    pub fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
+    fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
         let vk_ctx = VulkanCore::new(app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts);
         let graphics_command_pool = CommandPool::new(
-            vk_ctx.device.functions.clone(),
+            vk_ctx.device_functions.clone(),
             vk_ctx.physical_device.graphics_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),
-            "rhi-graphics",
+            "render_context-graphics",
         );
 
         let allocator = MemAllocator::new(
             &vk_ctx.instance.ash_instance,
             vk_ctx.physical_device.vk_handle,
-            &vk_ctx.device.functions,
+            &vk_ctx.device_functions,
         );
         let resource_mgr = ResourceManager::new();
 
@@ -56,8 +53,28 @@ impl RenderContext {
             resource_mgr: RefCell::new(resource_mgr),
         }
     }
+}
 
-    pub fn desotry(mut self) {
+static mut RENDER_CONTEXT: Option<RenderContext> = None;
+
+/// 单例模式
+/// - RenderContext 自身的生命周期管理比较简单，因此适合使用单例模式
+/// - 让代码变得简单，不再需要考虑复杂的借用规则
+/// - 其他类的类型签名也会变得更简单
+impl RenderContext {
+    /// 单例模式
+    /// - RenderContext 自身的生命周期管理比较简单，因此适合使用单例模式
+    /// - 让代码变得简单，不再需要考虑复杂的借用规则
+    /// - 其他类的类型签名也会变得更简单
+    pub fn instance() -> &'static RenderContext {
+        todo!()
+    }
+
+    pub fn init() {
+
+    }
+
+    pub fn destroy() {
         self.resource_mgr.get_mut().desotry();
         self.allocator.destroy();
         self.temp_graphics_command_pool.destroy();
@@ -68,18 +85,18 @@ impl RenderContext {
 /// getter
 impl RenderContext {
     #[inline]
+    pub fn vk_core(&self) -> &VulkanCore {
+        &self.vk_core
+    }
+
+    #[inline]
     pub fn instance(&self) -> &Instance {
         &self.vk_core.instance
     }
 
     #[inline]
-    pub fn device(&self) -> &Device {
-        &self.vk_core.device
-    }
-
-    #[inline]
     pub fn device_functions(&self) -> Rc<DeviceFunctions> {
-        self.vk_core.device.functions.clone()
+        self.vk_core.device_functions.clone()
     }
 
     #[inline]

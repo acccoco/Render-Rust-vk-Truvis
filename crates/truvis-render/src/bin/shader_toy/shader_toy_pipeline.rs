@@ -12,14 +12,14 @@ pub struct ShaderToyPipeline {
     shader_toy_pass: ShaderToyPass,
 }
 impl ShaderToyPipeline {
-    pub fn new(rhi: &RenderContext, color_format: vk::Format) -> Self {
-        let shader_toy_pass = ShaderToyPass::new(rhi, color_format);
+    pub fn new(render_context: &RenderContext, color_format: vk::Format) -> Self {
+        let shader_toy_pass = ShaderToyPass::new(render_context, color_format);
         Self { shader_toy_pass }
     }
 
     pub fn render(&self, ctx: PipelineContext, shape: &DrsGeometry<VertexPosColor>) {
         let PipelineContext {
-            rhi,
+            render_context,
             gpu_scene: _,
             bindless_mgr: _,
             frame_ctrl,
@@ -73,7 +73,7 @@ impl ShaderToyPipeline {
             );
 
             cmd.end();
-            rhi.graphics_queue.submit(vec![SubmitInfo::new(&[cmd])], None);
+            render_context.graphics_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
         }
     }
 }

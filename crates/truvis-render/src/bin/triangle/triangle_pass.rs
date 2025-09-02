@@ -42,7 +42,7 @@ pub struct TrianglePass {
     _pipeline_layout: Rc<PipelineLayout>,
 }
 impl TrianglePass {
-    pub fn new(rhi: &RenderContext, frame_settings: &FrameSettings) -> Self {
+    pub fn new(render_context: &RenderContext, frame_settings: &FrameSettings) -> Self {
         let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![frame_settings.color_format], None, Some(vk::Format::UNDEFINED));
@@ -57,9 +57,14 @@ impl TrianglePass {
             [0.0; 4],
         );
 
-        let pipeline_layout = Rc::new(PipelineLayout::new(rhi.device.clone(), &[], &[], "hello-triangle"));
-        let pipeline =
-            GraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, pipeline_layout.clone(), "hello-triangle-pipeline");
+        let pipeline_layout =
+            Rc::new(PipelineLayout::new(render_context.device_functions(), &[], &[], "hello-triangle"));
+        let pipeline = GraphicsPipeline::new(
+            render_context.device_functions(),
+            &pipeline_ci,
+            pipeline_layout.clone(),
+            "hello-triangle-pipeline",
+        );
 
         Self {
             _pipeline_layout: pipeline_layout,

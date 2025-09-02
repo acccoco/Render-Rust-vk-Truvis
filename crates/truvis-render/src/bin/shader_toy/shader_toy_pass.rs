@@ -61,7 +61,7 @@ pub struct ShaderToyPass {
     _pipeline_layout: Rc<PipelineLayout>,
 }
 impl ShaderToyPass {
-    pub fn new(rhi: &RenderContext, color_format: vk::Format) -> Self {
+    pub fn new(render_context: &RenderContext, color_format: vk::Format) -> Self {
         let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![color_format], None, Some(vk::Format::UNDEFINED));
@@ -77,7 +77,7 @@ impl ShaderToyPass {
         );
 
         let pipeline_layout = Rc::new(PipelineLayout::new(
-            rhi.device.clone(),
+            render_context.device_functions(),
             &[],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
@@ -86,7 +86,12 @@ impl ShaderToyPass {
             }],
             "shader-toy",
         ));
-        let pipeline = GraphicsPipeline::new(rhi.device.clone(), &pipeline_ci, pipeline_layout.clone(), "shader-toy");
+        let pipeline = GraphicsPipeline::new(
+            render_context.device_functions(),
+            &pipeline_ci,
+            pipeline_layout.clone(),
+            "shader-toy",
+        );
 
         Self {
             _pipeline_layout: pipeline_layout,

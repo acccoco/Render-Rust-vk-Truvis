@@ -2,20 +2,20 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use ash::vk;
-use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::{
-    basic::color::LabelColor,
-    commands::command_buffer::CommandBuffer,
-    foundation::device::{Device, DeviceFunctions},
-    render_context::RenderContext,
-    resources::{image::Image2D, texture::Texture2D},
-};
-
 use crate::{
     gui::mesh::GuiMesh,
     pipeline_settings::{FrameLabel, PresentSettings},
     renderer::bindless::BindlessManager,
+};
+use ash::vk;
+use truvis_crate_tools::resource::TruvisPath;
+use truvis_rhi::swapchain::render_swapchain::SwapchainImageInfo;
+use truvis_rhi::{
+    basic::color::LabelColor,
+    commands::command_buffer::CommandBuffer,
+    foundation::device::DeviceFunctions,
+    render_context::RenderContext,
+    resources::{image::Image2D, texture::Texture2D},
 };
 
 pub struct Gui {
@@ -42,10 +42,10 @@ impl Gui {
     const RENDER_IMAGE_ID: usize = 1;
 
     pub fn new(
-        rhi: &RenderContext,
+        render_context: &RenderContext,
         window: &winit::window::Window,
         fif_num: usize,
-        present_settings: &PresentSettings,
+        swapchain_image_infos: &SwapchainImageInfo,
         bindless_mgr: Rc<RefCell<BindlessManager>>,
     ) -> Self {
         let mut imgui_ctx = imgui::Context::create();
@@ -62,7 +62,7 @@ impl Gui {
         let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui_ctx);
         platform.attach_window(imgui_ctx.io_mut(), window, imgui_winit_support::HiDpiMode::Rounded);
 
-        Self::init_fonts(rhi, &mut imgui_ctx, &platform, &mut bindless_mgr.borrow_mut());
+        Self::init_fonts(render_context, &mut imgui_ctx, &platform, &mut bindless_mgr.borrow_mut());
 
         Self {
             imgui_ctx,
@@ -70,13 +70,13 @@ impl Gui {
 
             render_region: vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
-                extent: present_settings.canvas_extent,
+                extent: swapchain_image_infos.image_extent,
             },
 
             meshes: (0..fif_num).map(|_| None).collect(),
             render_image_key: None,
 
-            device_functions: rhi.device.clone(),
+            device_functions: render_context.device_functions(),
         }
     }
 
@@ -90,7 +90,7 @@ impl Gui {
     ///     "font texture id in imgui"
     /// ```
     fn init_fonts(
-        rhi: &RenderContext,
+        render_context: &RenderContext,
         imgui_ctx: &mut imgui::Context,
         platform: &imgui_winit_support::WinitPlatform,
         bindless_mgr: &mut BindlessManager,
@@ -125,13 +125,13 @@ impl Gui {
             let atlas_texture = fonts.build_rgba32_texture();
 
             let image = Rc::new(Image2D::from_rgba8(
-                rhi,
+                render_context,
                 atlas_texture.width,
                 atlas_texture.height,
                 atlas_texture.data,
                 "imgui-fonts",
             ));
-            Texture2D::new(rhi, image.clone(), "imgui-fonts")
+            Texture2D::new(render_context.device_functions(), image.clone(), "imgui-fonts")
         };
 
         let fonts_texture_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);
@@ -303,7 +303,7 @@ impl Gui {
     /// 使用 imgui 将 ui 操作编译为 draw data；构建 draw 需要的 mesh 数据
     pub fn imgui_render(
         &mut self,
-        rhi: &RenderContext,
+        render_context: &RenderContext,
         cmd: &CommandBuffer,
         frame_label: FrameLabel,
     ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> String + use<'_>)> {
@@ -312,9 +312,9 @@ impl Gui {
             return None;
         }
 
-        rhi.graphics_queue.begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
-        self.meshes[*frame_label].replace(GuiMesh::new(rhi, cmd, &format!("{frame_label}"), draw_data));
-        rhi.graphics_queue.end_label();
+        render_context.graphics_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
+        self.meshes[*frame_label].replace(GuiMesh::new(render_context, cmd, &format!("{frame_label}"), draw_data));
+        render_context.graphics_queue().end_label();
 
         Some((
             self.meshes[*frame_label].as_ref().unwrap(), //

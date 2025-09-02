@@ -9,7 +9,7 @@ use truvis_rhi::{
         submit_info::SubmitInfo,
     },
     descriptors::descriptor_pool::{DescriptorPool, DescriptorPoolCreateInfo},
-    foundation::device::{Device, DeviceFunctions},
+    foundation::device::DeviceFunctions,
     render_context::RenderContext,
     resources::{special_buffers::structured_buffer::StructuredBuffer, texture::Texture2D},
 };
@@ -31,9 +31,9 @@ pub struct PresentData<'a> {
     pub cmd_allocator: &'a mut CmdAllocator,
 }
 
-/// 表示整个渲染器进程，需要考虑 platform, render, rhi, log 之类的各种模块
+/// 表示整个渲染器进程，需要考虑 platform, render, render_context, log 之类的各种模块
 pub struct Renderer {
-    pub rhi: Rc<RenderContext>,
+    pub render_context: Rc<RenderContext>,
 
     pub frame_ctrl: Rc<FrameController>,
     framebuffers: FrameBuffers,
@@ -90,15 +90,16 @@ impl Renderer {
     }
 
     /// 根据 vulkan 实例和显卡，获取合适的深度格式
-    fn get_depth_format(rhi: &RenderContext) -> vk::Format {
-        rhi.find_supported_format(
-            DefaultRendererSettings::DEPTH_FORMAT_CANDIDATES,
-            vk::ImageTiling::OPTIMAL,
-            vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
-        )
-        .first()
-        .copied()
-        .unwrap_or(vk::Format::UNDEFINED)
+    fn get_depth_format(render_context: &RenderContext) -> vk::Format {
+        render_context
+            .find_supported_format(
+                DefaultRendererSettings::DEPTH_FORMAT_CANDIDATES,
+                vk::ImageTiling::OPTIMAL,
+                vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+            )
+            .first()
+            .copied()
+            .unwrap_or(vk::Format::UNDEFINED)
     }
 
     pub fn get_renderer_data(&mut self) -> PresentData<'_> {
@@ -130,12 +131,12 @@ impl Renderer {}
 // init
 impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
-        let rhi = Rc::new(RenderContext::new("Truvis".to_string(), extra_instance_ext));
+        let render_context = Rc::new(RenderContext::new("Truvis".to_string(), extra_instance_ext));
 
-        let descriptor_pool = Self::init_descriptor_pool(rhi.device_functions().clone());
+        let descriptor_pool = Self::init_descriptor_pool(render_context.device_functions().clone());
         let frame_settings = FrameSettings {
             color_format: vk::Format::R32G32B32A32_SFLOAT,
-            depth_format: Self::get_depth_format(&rhi),
+            depth_format: Self::get_depth_format(&render_context),
             frame_extent: vk::Extent2D {
                 width: 400,
                 height: 400,
@@ -143,23 +144,30 @@ impl Renderer {
         };
         let frame_ctrl = Rc::new(FrameController::new());
 
-        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&rhi, &descriptor_pool, frame_ctrl.clone())));
+        let bindless_mgr =
+            Rc::new(RefCell::new(BindlessManager::new(&render_context, &descriptor_pool, frame_ctrl.clone())));
         let scene_mgr = Rc::new(RefCell::new(SceneManager::new(bindless_mgr.clone())));
-        let gpu_scene = GpuScene::new(&rhi, frame_ctrl.clone());
+        let gpu_scene = GpuScene::new(&render_context, frame_ctrl.clone());
 
         // 注册 GPU 场景使用的默认纹理
-        gpu_scene.register_default_textures(&rhi, &mut bindless_mgr.borrow_mut());
+        gpu_scene.register_default_textures(&render_context, &mut bindless_mgr.borrow_mut());
 
         let per_frame_data_buffers = (0..frame_ctrl.fif_count())
             .map(|idx| {
-                StructuredBuffer::<shader::PerFrameData>::new_ubo(&rhi, 1, format!("per-frame-data-buffer-{idx}"))
+                StructuredBuffer::<shader::PerFrameData>::new_ubo(
+                    render_context.device_functions(),
+                    render_context.allocator(),
+                    1,
+                    format!("per-frame-data-buffer-{idx}"),
+                )
             })
             .collect();
 
-        let framebuffers = FrameBuffers::new(&rhi, &frame_settings, frame_ctrl.clone(), &mut bindless_mgr.borrow_mut());
+        let framebuffers =
+            FrameBuffers::new(&render_context, &frame_settings, frame_ctrl.clone(), &mut bindless_mgr.borrow_mut());
 
-        let render_timeline_semaphore = Semaphore::new_timeline(&rhi, 0, "render-timeline");
-        let cmd_allocator = CmdAllocator::new(&rhi, frame_ctrl.clone());
+        let render_timeline_semaphore = Semaphore::new_timeline(&render_context, 0, "render-timeline");
+        let cmd_allocator = CmdAllocator::new(&render_context, frame_ctrl.clone());
 
         Self {
             frame_settings,
@@ -167,7 +175,7 @@ impl Renderer {
             framebuffers,
             accum_data: Default::default(),
             frame_ctrl,
-            rhi,
+            render_context,
             bindless_mgr,
             scene_mgr,
             cmd_allocator,
@@ -250,7 +258,7 @@ impl Renderer {
                 vk::PipelineStageFlags2::NONE,
                 Some(self.frame_ctrl.frame_id() as u64),
             );
-            self.rhi.graphics_queue.submit(vec![submit_info], None);
+            self.render_context.graphics_queue().submit(vec![submit_info], None);
         }
 
         self.frame_ctrl.end_frame();
@@ -271,7 +279,7 @@ impl Renderer {
 
     pub fn wait_idle(&self) {
         unsafe {
-            self.rhi.device.device_wait_idle().unwrap();
+            self.render_context.device_functions().device_wait_idle().unwrap();
         }
     }
 
@@ -279,7 +287,7 @@ impl Renderer {
         let crt_frame_label = self.frame_ctrl.frame_label();
 
         PipelineContext {
-            rhi: &self.rhi,
+            render_context: &self.render_context,
             gpu_scene: &self.gpu_scene,
             bindless_mgr: self.bindless_mgr.clone(),
             per_frame_data: &self.per_frame_data_buffers[*crt_frame_label],
@@ -295,10 +303,10 @@ impl Renderer {
     pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
         self.accum_data.reset();
         unsafe {
-            self.rhi.device.device_wait_idle().unwrap();
+            self.render_context.device_functions().device_wait_idle().unwrap();
         }
         self.frame_settings.frame_extent = new_extent;
-        self.framebuffers.rebuild(&self.rhi, &self.frame_settings, &mut self.bindless_mgr.borrow_mut());
+        self.framebuffers.rebuild(&self.render_context, &self.frame_settings, &mut self.bindless_mgr.borrow_mut());
     }
 
     fn update_gpu_scene(&mut self, input_state: &InputState, camera: &DrsCamera) {
@@ -320,7 +328,7 @@ impl Renderer {
 
         self.gpu_scene.prepare_render_data(&self.scene_mgr.borrow(), &mut self.bindless_mgr.borrow_mut());
         self.gpu_scene.upload_to_buffer(
-            &self.rhi,
+            &self.render_context,
             &cmd,
             transfer_barrier_mask,
             &self.scene_mgr.borrow(),
@@ -368,6 +376,6 @@ impl Renderer {
                 .mask(transfer_barrier_mask)],
         );
         cmd.end();
-        self.rhi.graphics_queue.submit(vec![SubmitInfo::new(std::slice::from_ref(&cmd))], None);
+        self.render_context.graphics_queue().submit(vec![SubmitInfo::new(std::slice::from_ref(&cmd))], None);
     }
 }

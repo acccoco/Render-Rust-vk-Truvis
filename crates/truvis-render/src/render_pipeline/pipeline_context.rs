@@ -14,7 +14,7 @@ use crate::{
 
 /// Rt 管线上下文，每帧重建
 pub struct PipelineContext<'a> {
-    pub rhi: &'a RenderContext,
+    pub render_context: &'a RenderContext,
     pub gpu_scene: &'a GpuScene,
     pub bindless_mgr: Rc<RefCell<BindlessManager>>,
     pub per_frame_data: &'a StructuredBuffer<shader::PerFrameData>,

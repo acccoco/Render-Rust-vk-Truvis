@@ -68,14 +68,14 @@ impl SceneManager {
     /// 向世界中添加一个外部场景
     pub fn load_scene(
         &mut self,
-        rhi: &RenderContext,
+        render_context: &RenderContext,
         model_path: &std::path::Path,
         transform: &glam::Mat4,
     ) -> Vec<InsGuid> {
         let mut ins_guids = vec![];
 
         AssimpSceneLoader::load_scene(
-            rhi,
+            render_context,
             model_path,
             |mut ins| {
                 let guid = InsGuid::new();
@@ -86,7 +86,7 @@ impl SceneManager {
             },
             |mut mesh| {
                 let guid = MeshGuid::new();
-                mesh.build_blas(rhi);
+                mesh.build_blas(render_context);
                 self.mesh_map.insert(guid, mesh);
                 guid
             },
@@ -96,7 +96,7 @@ impl SceneManager {
                 // 注册纹理
                 let mut bindless_mgr = self.bindless_mgr.borrow_mut();
                 if !mat.diffuse_map.is_empty() {
-                    bindless_mgr.register_texture_by_path(rhi, mat.diffuse_map.clone());
+                    bindless_mgr.register_texture_by_path(render_context, mat.diffuse_map.clone());
                 }
 
                 self.mat_map.insert(guid, mat);

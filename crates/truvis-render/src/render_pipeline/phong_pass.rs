@@ -28,7 +28,7 @@ pub struct PhongPass {
 }
 impl PhongPass {
     pub fn new(
-        rhi: &RenderContext,
+        render_context: &RenderContext,
         color_format: vk::Format,
         depth_format: vk::Format,
         bindless_manager: Rc<RefCell<BindlessManager>>,
@@ -51,7 +51,7 @@ impl PhongPass {
         );
 
         let pipeline_layout = Rc::new(PipelineLayout::new(
-            rhi.device.clone(),
+            render_context.device_functions(),
             &[bindless_manager.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
@@ -60,7 +60,7 @@ impl PhongPass {
             "phong-pass",
         ));
 
-        let d3_pipe = GraphicsPipeline::new(rhi.device.clone(), &ci, pipeline_layout, "phong-d3-pipe");
+        let d3_pipe = GraphicsPipeline::new(render_context.device_functions(), &ci, pipeline_layout, "phong-d3-pipe");
 
         Self {
             pipeline: d3_pipe,

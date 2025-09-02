@@ -38,7 +38,7 @@ impl AssimpSceneLoader {
     /// # return
     /// 返回整个场景的所有 instance id
     pub fn load_scene(
-        rhi: &RenderContext,
+        render_context: &RenderContext,
         model_file: &std::path::Path,
         instance_register: impl FnMut(DrsInstance) -> InsGuid,
         mesh_register: impl FnMut(DrsMesh) -> MeshGuid,
@@ -61,8 +61,8 @@ impl AssimpSceneLoader {
                 instances: vec![],
             };
 
-            scene_loader.load_mesh(rhi, mesh_register);
-            scene_loader.load_mats(rhi, mat_register);
+            scene_loader.load_mesh(render_context, mesh_register);
+            scene_loader.load_mats(render_context, mat_register);
             scene_loader.load_instance(instance_register);
 
             free_scene(loader);
@@ -72,7 +72,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中基础的几何体
-    fn load_mesh(&mut self, rhi: &RenderContext, mut mesh_register: impl FnMut(DrsMesh) -> MeshGuid) {
+    fn load_mesh(&mut self, render_context: &RenderContext, mut mesh_register: impl FnMut(DrsMesh) -> MeshGuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -87,7 +87,7 @@ impl AssimpSceneLoader {
                     std::slice::from_raw_parts(mesh.vertex_array_ as *const Vertex3D, mesh.vertex_cnt_ as usize);
 
                 let vertex_buffer = VertexLayoutAos3D::create_vertex_buffer(
-                    rhi,
+                    render_context,
                     vertex_data,
                     format!("{}-mesh-{}", self.model_name, mesh_idx),
                 );
@@ -97,9 +97,13 @@ impl AssimpSceneLoader {
                 }
                 let index_data =
                     std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
-                let mut index_buffer =
-                    IndexBuffer::new(rhi, index_data.len(), format!("{}-mesh-{}-indices", self.model_name, mesh_idx));
-                index_buffer.transfer_data_sync(rhi, index_data);
+                let mut index_buffer = IndexBuffer::new(
+                    render_context.device_functions(),
+                    render_context.allocator(),
+                    index_data.len(),
+                    format!("{}-mesh-{}-indices", self.model_name, mesh_idx),
+                );
+                index_buffer.transfer_data_sync(render_context, index_data);
 
                 // 只有 single geometry 的 mesh
                 let mesh = DrsMesh {
@@ -120,7 +124,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中的所有材质
-    fn load_mats(&mut self, _rhi: &RenderContext, mut mat_register: impl FnMut(DrsMaterial) -> MatGuid) {
+    fn load_mats(&mut self, render_context: &RenderContext, mut mat_register: impl FnMut(DrsMaterial) -> MatGuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)

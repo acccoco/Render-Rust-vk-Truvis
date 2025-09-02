@@ -24,12 +24,12 @@ pub struct CmdAllocator {
 }
 
 impl CmdAllocator {
-    pub fn new(rhi: &RenderContext, frame_ctrl: Rc<FrameController>) -> Self {
+    pub fn new(render_context: &RenderContext, frame_ctrl: Rc<FrameController>) -> Self {
         let graphics_command_pools = (0..frame_ctrl.fif_count())
             .map(|i| {
                 Rc::new(CommandPool::new(
-                    rhi.device(),
-                    rhi.graphics_queue_family(),
+                    render_context.device_functions(),
+                    render_context.graphics_queue_family(),
                     vk::CommandPoolCreateFlags::TRANSIENT,
                     &format!("render_context_graphics_command_pool_{}", i),
                 ))
@@ -39,7 +39,7 @@ impl CmdAllocator {
         Self {
             graphics_command_pools,
             allocated_command_buffers: vec![Vec::new(); frame_ctrl.fif_count()],
-            device_functions: rhi.device_functions().clone(),
+            device_functions: render_context.device_functions().clone(),
             frame_ctrl,
         }
     }

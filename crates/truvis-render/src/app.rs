@@ -82,7 +82,7 @@ impl<T: OuterApp> TruvisApp<T> {
     fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
         let window_system = MainWindow::new(
             event_loop,
-            self.renderer.rhi.clone(),
+            self.renderer.render_context.clone(),
             self.renderer.frame_ctrl.clone(),
             "Truvis".to_string(),
             vk::Extent2D {
