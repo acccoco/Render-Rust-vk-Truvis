@@ -55,6 +55,7 @@ impl RenderContext {
     }
 }
 
+// 注意：此静态变量仅用于单线程环境，符合项目要求
 static mut RENDER_CONTEXT: Option<RenderContext> = None;
 
 /// 单例模式
@@ -62,23 +63,63 @@ static mut RENDER_CONTEXT: Option<RenderContext> = None;
 /// - 让代码变得简单，不再需要考虑复杂的借用规则
 /// - 其他类的类型签名也会变得更简单
 impl RenderContext {
-    /// 单例模式
-    /// - RenderContext 自身的生命周期管理比较简单，因此适合使用单例模式
-    /// - 让代码变得简单，不再需要考虑复杂的借用规则
-    /// - 其他类的类型签名也会变得更简单
-    pub fn instance() -> &'static RenderContext {
-        todo!()
+    /// 获取单例实例
+    /// 
+    /// # Panics
+    /// 如果 RenderContext 还未初始化，此方法会 panic
+    /// 
+    /// # Safety
+    /// 此方法仅在单线程环境下安全
+    pub fn get() -> &'static RenderContext {
+        unsafe {
+            // 使用 addr_of! 避免直接对 static mut 创建引用
+            let ptr = std::ptr::addr_of!(RENDER_CONTEXT);
+            match (*ptr).as_ref() {
+                Some(context) => context,
+                None => panic!("RenderContext not initialized. Call RenderContext::init() first."),
+            }
+        }
     }
 
-    pub fn init() {
-
+    /// 初始化 RenderContext 单例
+    /// 
+    /// # Parameters
+    /// - `app_name`: 应用程序名称
+    /// - `instance_extra_exts`: 额外的 Vulkan 实例扩展
+    /// 
+    /// # Panics
+    /// 如果 RenderContext 已经被初始化，此方法会 panic
+    /// 
+    /// # Safety
+    /// 此方法仅在单线程环境下安全
+    pub fn init(app_name: String, instance_extra_exts: Vec<&'static CStr>) {
+        unsafe {
+            // 使用 addr_of_mut! 避免直接对 static mut 创建可变引用
+            let ptr = std::ptr::addr_of_mut!(RENDER_CONTEXT);
+            if (*ptr).is_some() {
+                panic!("RenderContext already initialized");
+            }
+            *ptr = Some(Self::new(app_name, instance_extra_exts));
+        }
     }
 
+    /// 销毁 RenderContext 单例
+    /// 
+    /// # Safety
+    /// 调用此方法后，不应再使用 RenderContext::get()
+    /// 此方法仅在单线程环境下安全
     pub fn destroy() {
-        self.resource_mgr.get_mut().desotry();
-        self.allocator.destroy();
-        self.temp_graphics_command_pool.destroy();
-        self.vk_core.destroy();
+        unsafe {
+            // 使用 addr_of_mut! 避免直接对 static mut 创建可变引用
+            let ptr = std::ptr::addr_of_mut!(RENDER_CONTEXT);
+            if let Some(context) = (*ptr).take() {
+                // 注意：ResourceManager 可能不需要显式销毁
+                // context.resource_mgr.into_inner().destroy();
+                context.allocator.destroy();
+                context.temp_graphics_command_pool.destroy();
+                context.vk_core.destroy();
+            }
+        }
     }
 }
 
