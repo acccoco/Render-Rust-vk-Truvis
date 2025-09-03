@@ -24,7 +24,9 @@ shader/
 
 ## 🚀 必需的构建流程
 
-```bash
+**⚠️ 关键**: 必须严格按照以下顺序执行，否则编译或运行将失败：
+
+```powershell
 # 1. 首次构建（自动处理 CMake + C++ 依赖）
 cargo build --release
 
@@ -42,6 +44,7 @@ cargo run --bin shader_toy  # 着色器实验
 - **着色器绑定**: `shader-binding/build.rs` 从 `.slangi` 头文件生成 Rust 结构体
 - **C++ 集成**: `truvis-cxx/build.rs` 通过 CMake 构建 Assimp，复制 DLL 到 `target/`
 - **路径管理**: `truvis-crate-tools::TruvisPath` 提供工作区相对路径
+- **并行编译**: `shader-build` 使用 `rayon::par_bridge()` 并行编译所有着色器
 
 ## 🎯 应用开发模式
 
@@ -58,8 +61,8 @@ struct MyApp {
 impl OuterApp for MyApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
         Self {
-            pipeline: MyPipeline::new(&renderer.rhi, &renderer.frame_settings()),
-            geometry: VertexAosLayout::triangle(&renderer.rhi),
+            pipeline: MyPipeline::new(&renderer.render_context, &renderer.frame_settings()),
+            geometry: VertexAosLayout::triangle(&renderer.render_context),
         }
     }
     
@@ -153,7 +156,7 @@ let quad = VertexAosLayoutPosColor::quad(&rhi);
 ## 🔧 开发任务模板
 
 ### 添加新应用
-```bash
+```powershell
 # 1. 创建目录
 mkdir crates/truvis-render/src/bin/my_app/
 
@@ -201,7 +204,7 @@ float4x4 → Float4x4
 ## ⚠️ 关键限制和已知问题
 
 ### 构建依赖（必须按顺序执行）
-```bash
+```powershell
 # 错误：直接运行会失败，因为着色器未编译
 cargo run --bin triangle  # ❌ 失败
 
@@ -319,7 +322,7 @@ pub struct Renderer {
 ## 💡 贡献指南
 
 ### 添加新着色器
-```bash
+```powershell
 # 1. 在 shader/src/ 创建 .slang 文件
 # 2. 如需共享结构体，添加到 shader/include/*.slangi
 # 3. 重新编译着色器
@@ -329,7 +332,7 @@ use shader_binding::MyStruct;
 ```
 
 ### 创建新演示应用
-```bash
+```powershell
 mkdir crates/truvis-render/src/bin/my_demo/
 # 实现 OuterApp trait，参考 triangle/ 目录
 # 在 Cargo.toml 中添加 [[bin]] 条目
