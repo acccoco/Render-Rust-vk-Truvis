@@ -58,9 +58,9 @@ impl TrianglePass {
         );
 
         let pipeline_layout =
-            Rc::new(PipelineLayout::new(render_context.device_functions(), &[], &[], "hello-triangle"));
+            Rc::new(PipelineLayout::new(RenderContext::get().device_functions(), &[], &[], "hello-triangle"));
         let pipeline = GraphicsPipeline::new(
-            render_context.device_functions(),
+            RenderContext::get().device_functions(),
             &pipeline_ci,
             pipeline_layout.clone(),
             "hello-triangle-pipeline",

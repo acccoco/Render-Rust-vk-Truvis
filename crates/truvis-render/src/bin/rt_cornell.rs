@@ -1,13 +1,10 @@
 use imgui::Ui;
 use shader_binding::shader;
 use truvis_render::{
-    app::TruvisApp,
-    outer_app::OuterApp,
-    platform::camera::DrsCamera,
-    render_pipeline::{pipeline_context::PipelineContext, rt_pipeline::RtPipeline},
-    renderer::renderer::Renderer,
+    app::TruvisApp, outer_app::OuterApp, platform::camera::DrsCamera,
+    render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
+    render_pipeline::rt_pipeline::RtPipeline,
 };
-use truvis_rhi::render_context::RenderContext;
 
 struct PhongApp {
     rt_pipeline: RtPipeline,
@@ -48,7 +45,6 @@ impl PhongApp {
         //     &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         // );
         scene_mgr.load_scene(
-            RenderContext::get(),
             std::path::Path::new("assets/blender/coord.fbx"),
             &glam::Mat4::IDENTITY,
         );

@@ -15,7 +15,6 @@ fn main() {
     let mut ins_map: HashMap<InsGuid, DrsInstance> = HashMap::new();
 
     let uuids = AssimpSceneLoader::load_scene(
-        RenderContext::get(),
         std::path::Path::new("assets/obj/spot.obj"),
         |ins: DrsInstance| {
             let uuid = InsGuid::new();

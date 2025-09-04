@@ -13,7 +13,7 @@ pub struct ShaderToyPipeline {
 }
 impl ShaderToyPipeline {
     pub fn new(color_format: vk::Format) -> Self {
-        let shader_toy_pass = ShaderToyPass::new(RenderContext::get(), color_format);
+        let shader_toy_pass = ShaderToyPass::new(color_format);
         Self { shader_toy_pass }
     }
 

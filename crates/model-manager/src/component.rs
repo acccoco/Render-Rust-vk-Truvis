@@ -90,14 +90,13 @@ pub struct DrsMesh {
 }
 
 impl DrsMesh {
-    pub fn build_blas(&mut self, render_context: &RenderContext) {
+    pub fn build_blas(&mut self) {
         if self.blas.is_some() {
             return; // 已经构建过了
         }
 
         let blas_infos = self.geometries.iter().map(|g| g.get_blas_geometry_info()).collect_vec();
         let blas = Acceleration::build_blas_sync(
-            render_context,
             &blas_infos,
             vk::BuildAccelerationStructureFlagsKHR::empty(),
             format!("{}-Blas", self.name),

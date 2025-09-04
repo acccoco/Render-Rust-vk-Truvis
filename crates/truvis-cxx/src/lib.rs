@@ -60,8 +60,8 @@ impl AssimpSceneLoader {
                 instances: vec![],
             };
 
-            scene_loader.load_mesh(render_context, mesh_register);
-            scene_loader.load_mats(render_context, mat_register);
+            scene_loader.load_mesh(mesh_register);
+            scene_loader.load_mats(mat_register);
             scene_loader.load_instance(instance_register);
 
             free_scene(loader);
@@ -86,7 +86,6 @@ impl AssimpSceneLoader {
                     std::slice::from_raw_parts(mesh.vertex_array_ as *const Vertex3D, mesh.vertex_cnt_ as usize);
 
                 let vertex_buffer = VertexLayoutAos3D::create_vertex_buffer(
-                    render_context,
                     vertex_data,
                     format!("{}-mesh-{}", self.model_name, mesh_idx),
                 );
@@ -98,7 +97,7 @@ impl AssimpSceneLoader {
                     std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
                 let mut index_buffer =
                     IndexBuffer::new(index_data.len(), format!("{}-mesh-{}-indices", self.model_name, mesh_idx));
-                index_buffer.transfer_data_sync(render_context, index_data);
+                index_buffer.transfer_data_sync(index_data);
 
                 // 只有 single geometry 的 mesh
                 let mesh = DrsMesh {

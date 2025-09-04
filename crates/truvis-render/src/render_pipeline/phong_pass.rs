@@ -50,7 +50,7 @@ impl PhongPass {
         );
 
         let pipeline_layout = Rc::new(PipelineLayout::new(
-            render_context.device_functions(),
+            RenderContext::get().device_functions(),
             &[bindless_manager.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
@@ -59,7 +59,7 @@ impl PhongPass {
             "phong-pass",
         ));
 
-        let d3_pipe = GraphicsPipeline::new(render_context.device_functions(), &ci, pipeline_layout, "phong-d3-pipe");
+        let d3_pipe = GraphicsPipeline::new(RenderContext::get().device_functions(), &ci, pipeline_layout, "phong-d3-pipe");
 
         Self {
             pipeline: d3_pipe,

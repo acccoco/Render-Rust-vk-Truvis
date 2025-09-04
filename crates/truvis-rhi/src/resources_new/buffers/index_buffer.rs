@@ -58,8 +58,8 @@ impl<T: IndexElement> IndexBuffer<T> {
     #[inline]
     pub fn new_with_data(resoure_mgr: &mut ResourceManager, data: &[T], debug_name: impl AsRef<str>) -> Self {
         let buffer =
-            Self::new_managed(render_context.device_functions(), render_context.allocator(), data.len(), debug_name);
-        buffer.transfer_data_sync(render_context, data);
+            Self::new_managed(RenderContext::get().device_functions(), RenderContext::get().allocator(), data.len(), debug_name);
+        buffer.transfer_data_sync(data);
         Self {
             buffer: resoure_mgr.register_buffer(buffer),
             cnt: data.len(),

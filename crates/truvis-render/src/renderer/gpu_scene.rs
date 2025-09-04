@@ -555,7 +555,6 @@ impl GpuScene {
             .map(|(ins_idx, ins)| self.get_as_instance_info(ins, ins_idx as u32, scene_mgr))
             .collect_vec();
         let tlas = Acceleration::build_tlas_sync(
-            RenderContext::get(),
             &instance_infos,
             vk::BuildAccelerationStructureFlagsKHR::empty(),
             "scene tlas",

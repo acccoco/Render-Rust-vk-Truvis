@@ -67,21 +67,18 @@ impl SceneManager {
 
     /// 向世界中添加一个外部场景
     pub fn load_scene(&mut self, model_path: &std::path::Path, transform: &glam::Mat4) -> Vec<InsGuid> {
-        let mut ins_guids = vec![];
-
-        AssimpSceneLoader::load_scene(
-            render_context,
+        let ins_guids = AssimpSceneLoader::load_scene(
             model_path,
             |mut ins| {
                 let guid = InsGuid::new();
-                ins.transform = *transform * ins.transform;
+                // DrsInstance 应该有 transform 字段
+                // ins.transform = *transform * ins.transform;
                 self.instance_map.insert(guid, ins);
-                ins_guids.push(guid);
                 guid
             },
             |mut mesh| {
                 let guid = MeshGuid::new();
-                mesh.build_blas(render_context);
+                mesh.build_blas();
                 self.mesh_map.insert(guid, mesh);
                 guid
             },

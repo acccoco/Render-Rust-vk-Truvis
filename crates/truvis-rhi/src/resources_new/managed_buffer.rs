@@ -106,14 +106,14 @@ impl ManagedBuffer {
     /// * 这个应该是用来传输大块数据的
     pub fn transfer_data_sync(&self, data: &[impl Sized + Copy]) {
         let mut stage_buffer = Self::new_stage_buffer(
-            render_context.device_functions(),
-            render_context.allocator(),
+            RenderContext::get().device_functions(),
+            RenderContext::get().allocator(),
             size_of_val(data) as vk::DeviceSize,
             format!("{}-stage-buffer", self.debug_name),
         );
-        stage_buffer.transfer_data_by_mem_map(data, &render_context.allocator());
+        stage_buffer.transfer_data_by_mem_map(data, &RenderContext::get().allocator());
 
-        render_context.one_time_exec(
+        RenderContext::get().one_time_exec(
             |cmd| {
                 cmd.cmd_copy_buffer(
                     &stage_buffer,
@@ -127,7 +127,7 @@ impl ManagedBuffer {
             format!("{}-transfer-data", &self.debug_name),
         );
 
-        stage_buffer.destroy(&render_context.allocator);
+        stage_buffer.destroy(&RenderContext::get().allocator);
     }
 
     /// 确保 `[T]` 的内存布局在 CPU 和 GPU 是一致的

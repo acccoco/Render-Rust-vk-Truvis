@@ -57,7 +57,7 @@ impl Gui {
         let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui_ctx);
         platform.attach_window(imgui_ctx.io_mut(), window, imgui_winit_support::HiDpiMode::Rounded);
 
-        Self::init_fonts(render_context, &mut imgui_ctx, &platform, &mut bindless_mgr.borrow_mut());
+        Self::init_fonts(&mut imgui_ctx, &platform, &mut bindless_mgr.borrow_mut());
 
         Self {
             imgui_ctx,
@@ -71,7 +71,7 @@ impl Gui {
             meshes: (0..fif_num).map(|_| None).collect(),
             render_image_key: None,
 
-            device_functions: render_context.device_functions(),
+            device_functions: RenderContext::get().device_functions(),
         }
     }
 
@@ -119,7 +119,6 @@ impl Gui {
             let atlas_texture = fonts.build_rgba32_texture();
 
             let image = Rc::new(Image2D::from_rgba8(
-                render_context,
                 atlas_texture.width,
                 atlas_texture.height,
                 atlas_texture.data,
@@ -306,9 +305,9 @@ impl Gui {
             return None;
         }
 
-        render_context.graphics_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
-        self.meshes[*frame_label].replace(GuiMesh::new(render_context, cmd, &format!("{frame_label}"), draw_data));
-        render_context.graphics_queue().end_label();
+        RenderContext::get().graphics_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
+        self.meshes[*frame_label].replace(GuiMesh::new(cmd, &format!("{frame_label}"), draw_data));
+        RenderContext::get().graphics_queue().end_label();
 
         Some((
             self.meshes[*frame_label].as_ref().unwrap(), //

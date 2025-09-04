@@ -226,7 +226,7 @@ impl Buffer {
         stage_buffer.transfer_data_by_mem_map(data);
 
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
-        render_context.one_time_exec(
+        RenderContext::get().one_time_exec(
             |cmd| {
                 cmd.cmd_copy_buffer_1(
                     &stage_buffer,

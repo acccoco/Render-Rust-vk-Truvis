@@ -7,7 +7,6 @@ use truvis_render::{
     render_pipeline::{pipeline_context::PipelineContext, rt_pipeline::RtPipeline},
     renderer::renderer::Renderer,
 };
-use truvis_rhi::render_context::RenderContext;
 
 struct RtApp {
     rt_pipeline: RtPipeline,
@@ -47,11 +46,7 @@ impl RtApp {
         //     std::path::Path::new("assets/fbx/sponza/Sponza.fbx"),
         //     &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         // );
-        scene_mgr.load_scene(
-            RenderContext::get(),
-            std::path::Path::new("assets/blender/sponza.fbx"),
-            &glam::Mat4::IDENTITY,
-        );
+        scene_mgr.load_scene(std::path::Path::new("assets/blender/sponza.fbx"), &glam::Mat4::IDENTITY);
     }
 }
 

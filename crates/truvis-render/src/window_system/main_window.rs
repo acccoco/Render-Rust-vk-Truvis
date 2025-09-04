@@ -79,13 +79,12 @@ impl MainWindow {
         let swapchain_image_infos = swapchain.image_infos();
 
         let gui = Gui::new(
-            RenderContext::get(),
             &window,
             frame_ctrl.fif_count(),
             &swapchain_image_infos,
             bindless_mgr.clone(),
         );
-        let gui_pass = GuiPass::new(RenderContext::get(), bindless_mgr.clone(), swapchain_image_infos.image_format);
+        let gui_pass = GuiPass::new(bindless_mgr.clone(), swapchain_image_infos.image_format);
 
         let present_complete_semaphores = (0..frame_ctrl.fif_count())
             .map(|i| Semaphore::new(&format!("window-present-complete-{}", i)))
@@ -143,7 +142,6 @@ impl MainWindow {
             );
 
             self.gui_pass.draw(
-                RenderContext::get(),
                 swapchain.current_image_view().handle(),
                 swapchain.extent(),
                 &cmd,

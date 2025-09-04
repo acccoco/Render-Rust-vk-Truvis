@@ -36,12 +36,12 @@ impl<P: bytemuck::Pod> ComputePass<P> {
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
 
-            unsafe { render_context.device_functions().create_pipeline_layout(&pipeline_layout_ci, None).unwrap() }
+            unsafe { RenderContext::get().device_functions().create_pipeline_layout(&pipeline_layout_ci, None).unwrap() }
         };
 
         let pipeline_ci = vk::ComputePipelineCreateInfo::default().stage(stage_info).layout(pipeline_layout);
         let pipeline = unsafe {
-            render_context
+            RenderContext::get()
                 .device_functions()
                 .create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_ci), None)
                 .unwrap()[0]
@@ -54,7 +54,7 @@ impl<P: bytemuck::Pod> ComputePass<P> {
             pipeline_layout,
 
             _phantom: std::marker::PhantomData,
-            device_functions: render_context.device_functions().clone(),
+            device_functions: RenderContext::get().device_functions().clone(),
         }
     }
 

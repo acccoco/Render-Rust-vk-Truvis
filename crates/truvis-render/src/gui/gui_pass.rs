@@ -41,7 +41,7 @@ pub struct GuiPass {
 impl GuiPass {
     pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
         let pipeline_layout = Rc::new(PipelineLayout::new(
-            render_context.device_functions(),
+            RenderContext::get().device_functions(),
             &[bindless_mgr.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
@@ -80,7 +80,7 @@ impl GuiPass {
             .attach_info(vec![color_format], None, None);
 
         let pipeline =
-            GraphicsPipeline::new(render_context.device_functions(), &create_info, pipeline_layout.clone(), "uipass");
+            GraphicsPipeline::new(RenderContext::get().device_functions(), &create_info, pipeline_layout.clone(), "uipass");
 
         Self {
             pipeline,
@@ -118,7 +118,7 @@ impl GuiPass {
         let mesh;
         let draw_data;
         let get_texture_key;
-        if let Some(r) = gui.imgui_render(render_context, cmd, frame_label) {
+        if let Some(r) = gui.imgui_render(cmd, frame_label) {
             (mesh, draw_data, get_texture_key) = r;
         } else {
             log::warn!("No ImGui draw data available, skipping GUI pass.");

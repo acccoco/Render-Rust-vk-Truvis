@@ -111,7 +111,7 @@ impl SBTRegions {
     const CALLABLE_SBT_REGION: &'static [usize] = &[ShaderGroups::DiffuseCall.index()];
 
     pub fn create_sbt(pipeline: &RhiRtPipeline) -> Self {
-        let rt_pipeline_props = render_context.rt_pipeline_props();
+        let rt_pipeline_props = RenderContext::get().rt_pipeline_props();
 
         // 因为不需要 user data，所以可以直接使用 shader group handle size
         let aligned_shader_group_handle_size = helper::align_up(
@@ -177,7 +177,7 @@ impl SBTRegions {
         // binding table 中
         {
             let shader_group_handle_data = unsafe {
-                render_context
+                RenderContext::get()
                     .device_functions()
                     .ray_tracing_pipeline()
                     .get_ray_tracing_shader_group_handles(
@@ -242,7 +242,7 @@ impl SBTRegions {
             sbt_region_hit,
             sbt_region_callable,
             _sbt_buffer: sbt_buffer,
-            device_functions: render_context.device_functions().clone(),
+            device_functions: RenderContext::get().device_functions().clone(),
         }
     }
 }
@@ -301,7 +301,7 @@ impl SimlpeRtPass {
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
 
-            unsafe { render_context.device_functions().create_pipeline_layout(&pipeline_layout_ci, None).unwrap() }
+            unsafe { RenderContext::get().device_functions().create_pipeline_layout(&pipeline_layout_ci, None).unwrap() }
         };
         let pipeline_ci = vk::RayTracingPipelineCreateInfoKHR::default()
             .stages(&stage_infos)
@@ -312,7 +312,7 @@ impl SimlpeRtPass {
             .max_pipeline_ray_recursion_depth(2);
 
         let pipeline = unsafe {
-            render_context
+            RenderContext::get()
                 .device_functions()
                 .ray_tracing_pipeline()
                 .create_ray_tracing_pipelines(
@@ -329,15 +329,15 @@ impl SimlpeRtPass {
         let rt_pipeline = RhiRtPipeline {
             pipeline,
             pipeline_layout,
-            device_functions: render_context.device_functions().clone(),
+            device_functions: RenderContext::get().device_functions().clone(),
         };
-        let sbt = SBTRegions::create_sbt(render_context, &rt_pipeline);
+        let sbt = SBTRegions::create_sbt(&rt_pipeline);
 
         Self {
             pipeline: rt_pipeline,
             _sbt: sbt,
             _bindless_mgr: bindless_mgr,
-            device_functions: render_context.device_functions().clone(),
+            device_functions: RenderContext::get().device_functions().clone(),
         }
     }
     pub fn ray_trace(

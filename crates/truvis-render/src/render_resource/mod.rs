@@ -12,7 +12,6 @@ impl ImageLoader {
         let img = image::ImageReader::open(tex_path).unwrap().decode().unwrap().to_rgba8();
 
         let image = Rc::new(Image2D::from_rgba8(
-            render_context,
             img.width(),
             img.height(),
             img.as_raw(),

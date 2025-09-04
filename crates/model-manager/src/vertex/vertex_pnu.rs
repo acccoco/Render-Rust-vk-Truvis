@@ -59,16 +59,16 @@ impl VertexLayout for VertexLayoutAosPosNormalUv {
 impl VertexLayoutAosPosNormalUv {
     pub fn create_vertex_buffer(data: &[VertexPosNormalUv], name: impl AsRef<str>) -> VertexBuffer<VertexPosNormalUv> {
         let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
-        vertex_buffer.transfer_data_sync(render_context, data);
+        vertex_buffer.transfer_data_sync(data);
 
         vertex_buffer
     }
 
-    pub fn cube(render_context: &RenderContext) -> DrsGeometry<VertexPosNormalUv> {
-        let vertex_buffer = Self::create_vertex_buffer(render_context, &shape::Cube::VERTICES, "cube-vertex-buffer");
+    pub fn cube() -> DrsGeometry<VertexPosNormalUv> {
+        let vertex_buffer = Self::create_vertex_buffer(&shape::Cube::VERTICES, "cube-vertex-buffer");
 
         let mut index_buffer = IndexBuffer::new(shape::Cube::INDICES.len(), "cube-index-buffer");
-        index_buffer.transfer_data_sync(render_context, &shape::Cube::INDICES);
+        index_buffer.transfer_data_sync(&shape::Cube::INDICES);
 
         DrsGeometry {
             vertex_buffer,
@@ -76,11 +76,11 @@ impl VertexLayoutAosPosNormalUv {
         }
     }
 
-    pub fn floor(render_context: &RenderContext) -> DrsGeometry<VertexPosNormalUv> {
-        let vertex_buffer = Self::create_vertex_buffer(render_context, &shape::Floor::VERTICES, "floor-vertex-buffer");
+    pub fn floor() -> DrsGeometry<VertexPosNormalUv> {
+        let vertex_buffer = Self::create_vertex_buffer(&shape::Floor::VERTICES, "floor-vertex-buffer");
 
         let mut index_buffer = IndexBuffer::new(shape::Floor::INDICES.len(), "floor-index-buffer");
-        index_buffer.transfer_data_sync(render_context, &shape::Floor::INDICES);
+        index_buffer.transfer_data_sync(&shape::Floor::INDICES);
 
         DrsGeometry {
             vertex_buffer,

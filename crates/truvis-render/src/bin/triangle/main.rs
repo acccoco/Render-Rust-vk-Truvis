@@ -13,7 +13,6 @@ use truvis_render::{
     app::TruvisApp, outer_app::OuterApp, platform::camera::DrsCamera,
     render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
 };
-use truvis_rhi::render_context::RenderContext;
 
 use crate::triangle_pipeline::TrianglePipeline;
 
@@ -27,7 +26,7 @@ impl OuterApp for HelloTriangle {
 
         Self {
             triangle_pipeline: TrianglePipeline::new(&renderer.frame_settings()),
-            triangle: VertexAosLayoutPosColor::triangle(RenderContext::get()),
+            triangle: VertexAosLayoutPosColor::triangle(),
         }
     }
 

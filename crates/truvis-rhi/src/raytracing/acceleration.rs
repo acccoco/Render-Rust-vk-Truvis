@@ -69,7 +69,7 @@ impl Acceleration {
         // blas 所需的尺寸信息
         let size_info = unsafe {
             let mut size_info = vk::AccelerationStructureBuildSizesInfoKHR::default();
-            render_context.device_functions().acceleration_structure.get_acceleration_structure_build_sizes(
+            RenderContext::get().device_functions().acceleration_structure.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &build_geometry_info,
                 &max_primitives, // 每一个 geometry 里面的最大 primitive 数量
@@ -79,8 +79,8 @@ impl Acceleration {
         };
 
         let uncompact_acceleration = Self::new(
-            render_context.device_functions(),
-            render_context.allocator(),
+            RenderContext::get().device_functions(),
+            RenderContext::get().allocator(),
             size_info.acceleration_structure_size,
             vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
             format!("{}-uncompact-blas", debug_name.as_ref()),
@@ -102,7 +102,7 @@ impl Acceleration {
         query_pool.reset(0, 1);
 
         // 等待初步 build 完成
-        render_context.one_time_exec(
+        RenderContext::get().one_time_exec(
             |cmd| {
                 cmd.build_acceleration_structure(&build_geometry_info, &range_infos);
                 // 查询 compact size 属于 read 操作，需要同步
@@ -125,14 +125,14 @@ impl Acceleration {
         // 提供更紧凑的 acceleration
         let compact_size: Vec<vk::DeviceSize> = query_pool.get_query_result(0, 1);
         let compact_acceleration = Self::new(
-            render_context.device_functions(),
-            render_context.allocator(),
+            RenderContext::get().device_functions(),
+            RenderContext::get().allocator(),
             compact_size[0],
             vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
             format!("{}-compact-blas", debug_name.as_ref()),
         );
 
-        render_context.one_time_exec(
+        RenderContext::get().one_time_exec(
             |cmd| {
                 cmd.cmd_copy_acceleration_structure(
                     &vk::CopyAccelerationStructureInfoKHR::default()
@@ -166,7 +166,7 @@ impl Acceleration {
             size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name.as_ref()),
         );
-        acceleration_instance_buffer.transfer_data_sync(render_context, instances);
+        acceleration_instance_buffer.transfer_data_sync(instances);
 
         let geometry = vk::AccelerationStructureGeometryKHR::default()
             .geometry_type(vk::GeometryTypeKHR::INSTANCES)
@@ -190,7 +190,7 @@ impl Acceleration {
         // 获得 AccelerationStructure 所需的尺寸
         let size_info = unsafe {
             let mut size_info = vk::AccelerationStructureBuildSizesInfoKHR::default();
-            render_context.device_functions().acceleration_structure.get_acceleration_structure_build_sizes(
+            RenderContext::get().device_functions().acceleration_structure.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &build_geometry_info,
                 &[instances.len() as u32],
@@ -201,8 +201,8 @@ impl Acceleration {
         };
 
         let acceleration = Self::new(
-            render_context.device_functions(),
-            render_context.allocator(),
+            RenderContext::get().device_functions(),
+            RenderContext::get().allocator(),
             size_info.acceleration_structure_size,
             vk::AccelerationStructureTypeKHR::TOP_LEVEL,
             format!("{}-tlas", debug_name.as_ref()),
@@ -218,7 +218,7 @@ impl Acceleration {
         build_geometry_info.scratch_data.device_address = scratch_buffer.device_address();
 
         // 正式构建 TLAS
-        render_context.one_time_exec(
+        RenderContext::get().one_time_exec(
             |cmd| {
                 cmd.build_acceleration_structure(&build_geometry_info, std::slice::from_ref(&range_info));
             },
