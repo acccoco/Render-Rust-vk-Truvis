@@ -128,7 +128,9 @@ impl AssimpSceneLoader {
                 let mat = get_mat(self.loader, mat_idx);
                 let mat = &*mat;
 
-                let mat_uuid = mat_register(DrsMaterial {
+                
+
+                mat_register(DrsMaterial {
                     base_color: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.base_color),
                     emissive: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.emissive_color),
                     metallic: mat.metallic_factor,
@@ -137,9 +139,7 @@ impl AssimpSceneLoader {
 
                     diffuse_map: std::ffi::CStr::from_ptr(mat.diffuse_map.as_ptr()).to_str().unwrap().to_string(),
                     normal_map: std::ffi::CStr::from_ptr(mat.normal_map.as_ptr()).to_str().unwrap().to_string(),
-                });
-
-                mat_uuid
+                })
             })
             .collect_vec();
 

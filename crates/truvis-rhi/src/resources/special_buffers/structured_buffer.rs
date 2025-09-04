@@ -7,7 +7,7 @@ use std::{
 use ash::{vk, vk::Handle};
 
 use crate::{
-    foundation::{debug_messenger::DebugType, device::DeviceFunctions, mem_allocator::MemAllocator},
+    foundation::debug_messenger::DebugType,
     impl_derive_buffer,
     resources::{buffer::Buffer, buffer_creator::BufferCreateInfo},
 };

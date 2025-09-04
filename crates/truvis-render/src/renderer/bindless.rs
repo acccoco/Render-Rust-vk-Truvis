@@ -153,7 +153,7 @@ impl BindlessManager {
 // register & unregister
 impl BindlessManager {
     pub fn register_texture_by_path(&mut self, texture_path: String) {
-        let texture = ImageLoader::load_image(&RenderContext::get(), std::path::Path::new(&texture_path));
+        let texture = ImageLoader::load_image(RenderContext::get(), std::path::Path::new(&texture_path));
         self.register_texture(texture_path, Texture2DContainer::Owned(Box::new(texture)));
     }
 

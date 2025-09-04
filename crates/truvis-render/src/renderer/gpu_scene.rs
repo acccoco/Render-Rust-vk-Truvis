@@ -197,7 +197,7 @@ impl GpuScene {
             flatten_meshes: FlattenMap::default(),
             mesh_geometry_map: HashMap::new(),
 
-            gpu_scene_buffers: (0..frame_ctrl.fif_count()).map(|i| GpuSceneBuffers::new(i)).collect(),
+            gpu_scene_buffers: (0..frame_ctrl.fif_count()).map(GpuSceneBuffers::new).collect(),
             resources,
             frame_ctrl,
         }
@@ -555,7 +555,7 @@ impl GpuScene {
             .map(|(ins_idx, ins)| self.get_as_instance_info(ins, ins_idx as u32, scene_mgr))
             .collect_vec();
         let tlas = Acceleration::build_tlas_sync(
-            &RenderContext::get(),
+            RenderContext::get(),
             &instance_infos,
             vk::BuildAccelerationStructureFlagsKHR::empty(),
             "scene tlas",

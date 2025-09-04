@@ -4,7 +4,6 @@ use ash::vk;
 
 use crate::{
     descriptors::sampler::{Sampler, SamplerCreateInfo},
-    render_context::RenderContext,
     resources::{
         image::{Image2D, ImageContainer},
         image_view::{Image2DView, ImageViewCreateInfo},

@@ -3,7 +3,6 @@ use std::{cell::OnceCell, ffi::CStr, sync::OnceLock};
 use ash::vk;
 use raw_window_handle::HasDisplayHandle;
 use truvis_crate_tools::init_log::init_log;
-use truvis_rhi::render_context::RenderContext;
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},

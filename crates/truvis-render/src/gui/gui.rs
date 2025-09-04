@@ -4,7 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     gui::mesh::GuiMesh,
-    pipeline_settings::{FrameLabel, PresentSettings},
+    pipeline_settings::FrameLabel,
     renderer::bindless::BindlessManager,
 };
 use ash::vk;

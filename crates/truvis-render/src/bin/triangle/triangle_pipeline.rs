@@ -13,7 +13,7 @@ pub struct TrianglePipeline {
 }
 impl TrianglePipeline {
     pub fn new(frame_settings: &FrameSettings) -> Self {
-        let triangle_pass = TrianglePass::new(&RenderContext::get(), frame_settings);
+        let triangle_pass = TrianglePass::new(RenderContext::get(), frame_settings);
         Self { triangle_pass }
     }
 

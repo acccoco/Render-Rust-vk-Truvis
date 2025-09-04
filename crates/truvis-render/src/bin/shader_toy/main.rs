@@ -25,7 +25,7 @@ impl OuterApp for ShaderToy {
     fn init(renderer: &mut Renderer, _camera: &mut DrsCamera) -> Self {
         log::info!("shader toy.");
         Self {
-            rectangle: VertexAosLayoutPosColor::rectangle(&RenderContext::get()),
+            rectangle: VertexAosLayoutPosColor::rectangle(RenderContext::get()),
             pipeline: ShaderToyPipeline::new(renderer.frame_settings().color_format),
         }
     }

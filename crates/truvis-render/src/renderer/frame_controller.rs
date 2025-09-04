@@ -11,6 +11,12 @@ pub struct FrameController {
 }
 
 // ctor
+impl Default for FrameController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FrameController {
     pub fn new() -> Self {
         // 初始值应该是 1，因为 timeline semaphore 初始值是 0

@@ -1,7 +1,6 @@
 use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    rc::Rc,
 };
 
 use ash::{vk, vk::Handle};

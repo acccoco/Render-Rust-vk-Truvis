@@ -4,7 +4,7 @@ use ash::vk;
 use vk_mem::Alloc;
 
 use crate::{
-    foundation::{debug_messenger::DebugType, mem_allocator::MemAllocator},
+    foundation::debug_messenger::DebugType,
     render_context::RenderContext,
     resources::buffer_creator::BufferCreateInfo,
 };

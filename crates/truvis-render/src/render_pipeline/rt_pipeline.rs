@@ -21,15 +21,15 @@ pub struct RtPipeline {
 }
 impl RtPipeline {
     pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
-        let rt_pass = SimlpeRtPass::new(&RenderContext::get(), bindless_mgr.clone());
+        let rt_pass = SimlpeRtPass::new(RenderContext::get(), bindless_mgr.clone());
         let blit_pass = ComputePass::<shader::blit::PushConstant>::new(
-            &RenderContext::get(),
+            RenderContext::get(),
             &bindless_mgr.borrow(),
             cstr::cstr!("main"),
             TruvisPath::shader_path("imgui/blit.slang.spv").as_str(),
         );
         let sdr_pass = ComputePass::<shader::sdr::PushConstant>::new(
-            &RenderContext::get(),
+            RenderContext::get(),
             &bindless_mgr.borrow(),
             c"main",
             TruvisPath::shader_path("pass/pp/sdr.slang.spv").as_str(),

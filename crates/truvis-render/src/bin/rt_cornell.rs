@@ -48,7 +48,7 @@ impl PhongApp {
         //     &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         // );
         scene_mgr.load_scene(
-            &RenderContext::get(),
+            RenderContext::get(),
             std::path::Path::new("assets/blender/coord.fbx"),
             &glam::Mat4::IDENTITY,
         );
