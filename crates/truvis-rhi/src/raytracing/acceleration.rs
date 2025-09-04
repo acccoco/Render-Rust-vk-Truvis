@@ -88,8 +88,6 @@ impl Acceleration {
         );
 
         let scratch_buffer = Buffer::new_accleration_scratch_buffer(
-            render_context.device_functions(),
-            render_context.allocator(),
             size_info.build_scratch_size,
             format!("{}-blas-scratch-buffer", debug_name.as_ref()),
         );
@@ -102,7 +100,6 @@ impl Acceleration {
 
         // 创建一个 QueryPool，用于查询 compact size
         let mut query_pool = QueryPool::new(
-            render_context.device_functions(),
             vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
             1,
             "",
@@ -172,8 +169,6 @@ impl Acceleration {
         debug_name: impl AsRef<str>,
     ) -> Self {
         let mut acceleration_instance_buffer = Buffer::new_acceleration_instance_buffer(
-            render_context.device_functions(),
-            render_context.allocator(),
             size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name.as_ref()),
         );
@@ -220,8 +215,6 @@ impl Acceleration {
         );
 
         let scratch_buffer = Buffer::new_accleration_scratch_buffer(
-            render_context.device_functions(),
-            render_context.allocator(),
             size_info.build_scratch_size,
             format!("{}-tlas-scratch-buffer", debug_name.as_ref()),
         );
@@ -250,7 +243,7 @@ impl Acceleration {
         debug_name: impl AsRef<str>,
     ) -> Self {
         let buffer =
-            Buffer::new_accleration_buffer(device_functions.clone(), allocator, size as usize, debug_name.as_ref());
+            Buffer::new_accleration_buffer(size as usize, debug_name.as_ref());
 
         let create_info = vk::AccelerationStructureCreateInfoKHR::default() //
             .ty(ty)

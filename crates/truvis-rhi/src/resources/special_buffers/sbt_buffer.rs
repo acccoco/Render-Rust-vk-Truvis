@@ -6,8 +6,9 @@ use std::{
 use ash::{vk, vk::Handle};
 
 use crate::{
-    foundation::{debug_messenger::DebugType, device::DeviceFunctions, mem_allocator::MemAllocator},
+    foundation::debug_messenger::DebugType,
     impl_derive_buffer,
+    render_context::RenderContext,
     resources::{buffer::Buffer, buffer_creator::BufferCreateInfo},
 };
 
@@ -18,16 +19,12 @@ pub struct SBTBuffer {
 impl_derive_buffer!(SBTBuffer, Buffer, _inner);
 impl SBTBuffer {
     pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
         size: vk::DeviceSize,
         align: vk::DeviceSize,
         name: impl AsRef<str>,
     ) -> Self {
         let buffer = Self {
             _inner: Buffer::new(
-                device_functions.clone(),
-                allocator,
                 Rc::new(BufferCreateInfo::new(
                     size,
                     vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
@@ -43,6 +40,7 @@ impl SBTBuffer {
                 format!("SBTBuffer::{}", name.as_ref()),
             ),
         };
+        let device_functions = RenderContext::get().device_functions();
         device_functions.set_debug_name(&buffer, name.as_ref());
         buffer
     }

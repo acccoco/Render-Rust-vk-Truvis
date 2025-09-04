@@ -66,7 +66,7 @@ impl VertexLayoutAos3D {
         name: impl AsRef<str>,
     ) -> VertexBuffer<Vertex3D> {
         let mut vertex_buffer =
-            VertexBuffer::new(render_context.device_functions(), render_context.allocator(), data.len(), name.as_ref());
+            VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(render_context, data);
 
         vertex_buffer

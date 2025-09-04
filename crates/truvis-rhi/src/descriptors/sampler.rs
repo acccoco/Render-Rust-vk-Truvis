@@ -2,7 +2,10 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::foundation::{debug_messenger::DebugType, device::DeviceFunctions};
+use crate::{
+    foundation::debug_messenger::DebugType,
+    render_context::RenderContext,
+};
 
 pub struct SamplerCreateInfo {
     inner: vk::SamplerCreateInfo<'static>,
@@ -43,7 +46,6 @@ pub struct Sampler {
     handle: vk::Sampler,
 
     _info: Rc<SamplerCreateInfo>,
-    device_functions: Rc<DeviceFunctions>,
 }
 impl DebugType for Sampler {
     fn debug_type_name() -> &'static str {
@@ -56,21 +58,19 @@ impl DebugType for Sampler {
 }
 impl Drop for Sampler {
     fn drop(&mut self) {
+        let device_functions = RenderContext::get().device_functions();
         unsafe {
-            self.device_functions.destroy_sampler(self.handle, None);
+            device_functions.destroy_sampler(self.handle, None);
         }
     }
 }
 
 impl Sampler {
     #[inline]
-    pub fn new(device_functions: Rc<DeviceFunctions>, info: Rc<SamplerCreateInfo>, debug_name: &str) -> Self {
+    pub fn new(info: Rc<SamplerCreateInfo>, debug_name: &str) -> Self {
+        let device_functions = RenderContext::get().device_functions();
         let handle = unsafe { device_functions.create_sampler(&info.inner, None).unwrap() };
-        let sampler = Self {
-            handle,
-            _info: info,
-            device_functions: device_functions.clone(),
-        };
+        let sampler = Self { handle, _info: info };
         device_functions.set_debug_name(&sampler, debug_name);
         sampler
     }

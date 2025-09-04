@@ -1,8 +1,9 @@
-use std::rc::Rc;
-
 use ash::vk;
 
-use crate::foundation::{debug_messenger::DebugType, device::DeviceFunctions};
+use crate::{
+    foundation::debug_messenger::DebugType,
+    render_context::RenderContext,
+};
 
 pub struct QueryPool {
     handle: vk::QueryPool,
@@ -10,8 +11,6 @@ pub struct QueryPool {
 
     /// pool 的容量
     _cnt: u32,
-
-    device_functions: Rc<DeviceFunctions>,
 }
 impl DebugType for QueryPool {
     fn debug_type_name() -> &'static str {
@@ -24,14 +23,16 @@ impl DebugType for QueryPool {
 }
 impl Drop for QueryPool {
     fn drop(&mut self) {
+        let device_functions = RenderContext::get().device_functions();
         unsafe {
-            self.device_functions.destroy_query_pool(self.handle, None);
+            device_functions.destroy_query_pool(self.handle, None);
         }
     }
 }
 impl QueryPool {
     #[inline]
-    pub fn new(device_functions: Rc<DeviceFunctions>, ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self {
+    pub fn new(ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self {
+        let device_functions = RenderContext::get().device_functions();
         let create_info = vk::QueryPoolCreateInfo {
             query_type: ty,
             query_count: cnt,
@@ -41,7 +42,6 @@ impl QueryPool {
         let handle = unsafe { device_functions.create_query_pool(&create_info, None).unwrap() };
 
         let query_pool = Self {
-            device_functions: device_functions.clone(),
             handle,
             query_type: ty,
             _cnt: cnt,
@@ -62,9 +62,10 @@ impl QueryPool {
 
     #[inline]
     pub fn get_query_result<T: Default + Sized + Clone>(&mut self, first_index: u32, query_cnt: u32) -> Vec<T> {
+        let device_functions = RenderContext::get().device_functions();
         unsafe {
             let mut res = vec![Default::default(); query_cnt as usize];
-            self.device_functions
+            device_functions
                 .get_query_pool_results(self.handle, first_index, &mut res, vk::QueryResultFlags::WAIT)
                 .unwrap();
             res
@@ -73,8 +74,9 @@ impl QueryPool {
 
     #[inline]
     pub fn reset(&mut self, first_query: u32, query_cnt: u32) {
+        let device_functions = RenderContext::get().device_functions();
         unsafe {
-            self.device_functions.reset_query_pool(self.handle, first_query, query_cnt);
+            device_functions.reset_query_pool(self.handle, first_query, query_cnt);
         }
     }
 

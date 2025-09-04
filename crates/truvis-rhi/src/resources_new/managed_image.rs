@@ -125,8 +125,6 @@ impl ManagedImage {
         assert_eq!(data.len(), VulkanFormatUtils::pixel_size_in_bytes(self.format) * pixels_cnt as usize);
 
         let mut stage_buffer = Buffer::new(
-            device_functions,
-            allocator,
             // TODO 使用新的 Buffer 创建方式来优化这个代码
             std::rc::Rc::new(crate::resources::buffer_creator::BufferCreateInfo::new(
                 size_of_val(data) as vk::DeviceSize,

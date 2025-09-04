@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate truvis_crate_tools;
+
 mod triangle_pass;
 mod triangle_pipeline;
 
@@ -10,6 +13,7 @@ use truvis_render::{
     app::TruvisApp, outer_app::OuterApp, platform::camera::DrsCamera,
     render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
 };
+use truvis_rhi::render_context::RenderContext;
 
 use crate::triangle_pipeline::TrianglePipeline;
 
@@ -22,8 +26,8 @@ impl OuterApp for HelloTriangle {
         log::info!("hello triangle init.");
 
         Self {
-            triangle_pipeline: TrianglePipeline::new(&renderer.render_context, &renderer.frame_settings()),
-            triangle: VertexAosLayoutPosColor::triangle(&renderer.render_context),
+            triangle_pipeline: TrianglePipeline::new(&renderer.frame_settings()),
+            triangle: VertexAosLayoutPosColor::triangle(&RenderContext::get()),
         }
     }
 

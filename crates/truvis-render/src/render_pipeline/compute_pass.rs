@@ -24,7 +24,7 @@ impl<P: bytemuck::Pod> ComputePass<P> {
         entry_point: &CStr,
         shader_path: &str,
     ) -> Self {
-        let shader_module = ShaderModule::new(render_context.device_functions(), std::path::Path::new(shader_path));
+        let shader_module = ShaderModule::new(std::path::Path::new(shader_path));
         let stage_info = vk::PipelineShaderStageCreateInfo::default()
             .module(shader_module.handle())
             .stage(vk::ShaderStageFlags::COMPUTE)

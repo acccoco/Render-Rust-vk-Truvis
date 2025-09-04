@@ -35,14 +35,13 @@ pub struct FrameBuffers {
 
 impl FrameBuffers {
     pub fn new(
-        render_context: &RenderContext,
         frame_settigns: &FrameSettings,
         frame_ctrl: Rc<FrameController>,
         bindless_mgr: &mut BindlessManager,
     ) -> Self {
-        let (color_image, color_image_view) = Self::create_color_image(render_context, frame_settigns);
-        let (depth_image, depth_image_view) = Self::create_depth_image(render_context, frame_settigns);
-        let render_targets = Self::create_render_targets(render_context, frame_settigns, &frame_ctrl);
+        let (color_image, color_image_view) = Self::create_color_image(frame_settigns);
+        let (depth_image, depth_image_view) = Self::create_depth_image(frame_settigns);
+        let render_targets = Self::create_render_targets(frame_settigns, &frame_ctrl);
         let render_target_bindless_keys = render_targets
             .iter()
             .enumerate()
@@ -64,12 +63,11 @@ impl FrameBuffers {
 
     pub fn rebuild(
         &mut self,
-        render_context: &RenderContext,
         frame_settings: &FrameSettings,
         bindless_mgr: &mut BindlessManager,
     ) {
         self.unregister_bindless(bindless_mgr);
-        *self = Self::new(render_context, frame_settings, self.frame_ctrl.clone(), bindless_mgr);
+        *self = Self::new(frame_settings, self.frame_ctrl.clone(), bindless_mgr);
     }
 
     fn register_bindless(&self, bindless_mgr: &mut BindlessManager) {
@@ -92,12 +90,11 @@ impl FrameBuffers {
 
     /// 创建 RayTracing 需要的 image
     fn create_color_image(
-        render_context: &RenderContext,
         frame_settings: &FrameSettings,
     ) -> (Rc<Image2D>, Rc<Image2DView>) {
         let color_image = Rc::new(Image2D::new(
-            render_context.device_functions(),
-            render_context.allocator(),
+            RenderContext::get().device_functions(),
+            RenderContext::get().allocator(),
             Rc::new(ImageCreateInfo::new_image_2d_info(
                 frame_settings.frame_extent,
                 frame_settings.color_format,
@@ -111,14 +108,13 @@ impl FrameBuffers {
         ));
 
         let color_image_view = Rc::new(Image2DView::new(
-            render_context.device_functions(),
             color_image.handle(),
             ImageViewCreateInfo::new_image_view_2d_info(frame_settings.color_format, vk::ImageAspectFlags::COLOR),
             "framebuffer-color",
         ));
 
         // layout transfer
-        render_context.one_time_exec(
+        RenderContext::get().one_time_exec(
             |cmd| {
                 cmd.image_memory_barrier(
                     vk::DependencyFlags::empty(),
@@ -137,12 +133,11 @@ impl FrameBuffers {
     }
 
     fn create_depth_image(
-        render_context: &RenderContext,
         frame_settings: &FrameSettings,
     ) -> (Rc<Image2D>, Rc<Image2DView>) {
         let depth_image = Rc::new(Image2D::new(
-            render_context.device_functions(),
-            render_context.allocator(),
+            RenderContext::get().device_functions(),
+            RenderContext::get().allocator(),
             Rc::new(ImageCreateInfo::new_image_2d_info(
                 frame_settings.frame_extent,
                 frame_settings.depth_format,
@@ -156,7 +151,6 @@ impl FrameBuffers {
         ));
 
         let depth_image_view = Image2DView::new(
-            render_context.device_functions(),
             depth_image.handle(),
             ImageViewCreateInfo::new_image_view_2d_info(frame_settings.depth_format, vk::ImageAspectFlags::DEPTH),
             "framebuffer-depth",
@@ -166,15 +160,14 @@ impl FrameBuffers {
     }
 
     fn create_render_targets(
-        render_context: &RenderContext,
         frame_settings: &FrameSettings,
         frame_ctrl: &FrameController,
     ) -> Vec<Rc<Texture2D>> {
         let create_texture = |fif_labe: FrameLabel| {
             let name = format!("render-target-{}", fif_labe);
             let color_image = Rc::new(Image2D::new(
-                render_context.device_functions(),
-                render_context.allocator(),
+                RenderContext::get().device_functions(),
+                RenderContext::get().allocator(),
                 Rc::new(ImageCreateInfo::new_image_2d_info(
                     frame_settings.frame_extent,
                     frame_settings.color_format,
@@ -189,7 +182,7 @@ impl FrameBuffers {
                 },
                 &name,
             ));
-            Texture2D::new(render_context.device_functions(), color_image, &name)
+            Texture2D::new(color_image, &name)
         };
 
         (0..frame_ctrl.fif_count())

@@ -7,6 +7,7 @@ use truvis_render::{
     render_pipeline::{pipeline_context::PipelineContext, rt_pipeline::RtPipeline},
     renderer::renderer::Renderer,
 };
+use truvis_rhi::render_context::RenderContext;
 
 struct PhongApp {
     rt_pipeline: RtPipeline,
@@ -47,7 +48,7 @@ impl PhongApp {
         //     &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         // );
         scene_mgr.load_scene(
-            &renderer.render_context,
+            &RenderContext::get(),
             std::path::Path::new("assets/blender/coord.fbx"),
             &glam::Mat4::IDENTITY,
         );
@@ -56,7 +57,7 @@ impl PhongApp {
 
 impl OuterApp for PhongApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
-        let rt_pipeline = RtPipeline::new(&renderer.render_context, renderer.bindless_mgr.clone());
+        let rt_pipeline = RtPipeline::new(renderer.bindless_mgr.clone());
 
         Self::create_scene(renderer, camera);
 

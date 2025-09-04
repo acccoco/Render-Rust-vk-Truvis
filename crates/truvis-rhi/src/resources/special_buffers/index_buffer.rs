@@ -6,7 +6,7 @@ use std::{
 use ash::{vk, vk::Handle};
 
 use crate::{
-    foundation::{debug_messenger::DebugType, device::DeviceFunctions, mem_allocator::MemAllocator},
+    foundation::debug_messenger::DebugType,
     impl_derive_buffer,
     render_context::RenderContext,
     resources::buffer::Buffer,
@@ -23,15 +23,11 @@ pub struct IndexBuffer {
 impl_derive_buffer!(IndexBuffer, Buffer, inner);
 impl IndexBuffer {
     pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
         index_cnt: usize,
         debug_name: impl AsRef<str>,
     ) -> Self {
         let size = index_cnt * size_of::<u32>();
         let buffer = Buffer::new_device_buffer(
-            device_functions.clone(),
-            allocator,
             size as vk::DeviceSize,
             vk::BufferUsageFlags::INDEX_BUFFER
                 | vk::BufferUsageFlags::TRANSFER_DST
@@ -44,6 +40,7 @@ impl IndexBuffer {
             inner: buffer,
             index_cnt,
         };
+        let device_functions = RenderContext::get().device_functions();
         device_functions.set_debug_name(&buffer, &buffer.inner.debug_name);
         buffer
     }
@@ -52,7 +49,7 @@ impl IndexBuffer {
     #[inline]
     pub fn new_with_data(render_context: &RenderContext, data: &[u32], debug_name: impl AsRef<str>) -> Self {
         let mut index_buffer =
-            Self::new(render_context.device_functions(), render_context.allocator.clone(), data.len(), debug_name);
+            Self::new(data.len(), debug_name);
         index_buffer.transfer_data_sync(render_context, data);
         index_buffer
     }

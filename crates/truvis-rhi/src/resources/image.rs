@@ -171,8 +171,6 @@ impl Image2D {
         assert_eq!(data.len(), Self::format_byte_count(self.image_info.format()) * pixels_cnt as usize);
 
         let mut stage_buffer = Buffer::new_stage_buffer(
-            self.device_functions.clone(),
-            self.allocator.clone(),
             size_of_val(data) as vk::DeviceSize,
             "image-stage-buffer",
         );

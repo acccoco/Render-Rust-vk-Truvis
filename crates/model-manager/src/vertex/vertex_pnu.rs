@@ -63,7 +63,7 @@ impl VertexLayoutAosPosNormalUv {
         name: impl AsRef<str>,
     ) -> VertexBuffer<VertexPosNormalUv> {
         let mut vertex_buffer =
-            VertexBuffer::new(render_context.device_functions(), render_context.allocator(), data.len(), name.as_ref());
+            VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(render_context, data);
 
         vertex_buffer
@@ -73,8 +73,6 @@ impl VertexLayoutAosPosNormalUv {
         let vertex_buffer = Self::create_vertex_buffer(render_context, &shape::Cube::VERTICES, "cube-vertex-buffer");
 
         let mut index_buffer = IndexBuffer::new(
-            render_context.device_functions(),
-            render_context.allocator(),
             shape::Cube::INDICES.len(),
             "cube-index-buffer",
         );
@@ -90,8 +88,6 @@ impl VertexLayoutAosPosNormalUv {
         let vertex_buffer = Self::create_vertex_buffer(render_context, &shape::Floor::VERTICES, "floor-vertex-buffer");
 
         let mut index_buffer = IndexBuffer::new(
-            render_context.device_functions(),
-            render_context.allocator(),
             shape::Floor::INDICES.len(),
             "floor-index-buffer",
         );

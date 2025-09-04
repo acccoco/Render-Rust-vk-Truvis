@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::{shader, shader::ImageHandle};
-use truvis_crate_tools::{const_map, count_indexed_array, resource::TruvisPath};
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
     foundation::device::DeviceFunctions,
@@ -136,8 +136,6 @@ impl SBTRegions {
         );
 
         let mut sbt_buffer = SBTBuffer::new(
-            render_context.device_functions(),
-            render_context.allocator(),
             (raygen_shader_group_region_size
                 + miss_shader_group_region_size
                 + hit_shader_group_region_size
@@ -261,7 +259,7 @@ impl SimlpeRtPass {
     pub fn new(render_context: &RenderContext, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         let shader_modules = ShaderStage::iter()
             .map(|stage| stage.value())
-            .map(|stage| ShaderModule::new(render_context.device_functions(), stage.path()))
+            .map(|stage| ShaderModule::new(stage.path()))
             .collect_vec();
         let stage_infos = ShaderStage::iter()
             .map(|stage| stage.value())

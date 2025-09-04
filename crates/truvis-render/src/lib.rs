@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate truvis_crate_tools;
+
 pub mod app;
 pub mod gui;
 pub mod outer_app;

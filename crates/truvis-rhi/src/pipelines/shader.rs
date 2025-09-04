@@ -1,16 +1,17 @@
-use std::{ffi::CStr, rc::Rc};
+use std::ffi::CStr;
 
 use ash::vk;
 
-use crate::foundation::{debug_messenger::DebugType, device::DeviceFunctions};
+use crate::{
+    foundation::debug_messenger::DebugType,
+    render_context::RenderContext,
+};
 
 /// # Destroy
 ///
 /// 需要手动调用 `destroy` 方法来释放资源。
 pub struct ShaderModule {
     handle: vk::ShaderModule,
-
-    device_functions: Rc<DeviceFunctions>,
 }
 impl DebugType for ShaderModule {
     fn debug_type_name() -> &'static str {
@@ -24,7 +25,8 @@ impl DebugType for ShaderModule {
 impl ShaderModule {
     /// # param
     /// * path - spv shader 文件路径
-    pub fn new(device_functions: Rc<DeviceFunctions>, path: &std::path::Path) -> Self {
+    pub fn new(path: &std::path::Path) -> Self {
+        let device_functions = RenderContext::get().device_functions();
         let mut file = std::fs::File::open(path).unwrap();
         let shader_code = ash::util::read_spv(&mut file).unwrap();
 
@@ -32,10 +34,7 @@ impl ShaderModule {
 
         unsafe {
             let shader_module = device_functions.create_shader_module(&shader_module_info, None).unwrap();
-            let shader_module = Self {
-                handle: shader_module,
-                device_functions: device_functions.clone(),
-            };
+            let shader_module = Self { handle: shader_module };
             device_functions.set_debug_name(&shader_module, path.to_str().unwrap());
             shader_module
         }
@@ -48,8 +47,9 @@ impl ShaderModule {
 
     #[inline]
     pub fn destroy(self) {
+        let device_functions = RenderContext::get().device_functions();
         unsafe {
-            self.device_functions.destroy_shader_module(self.handle, None);
+            device_functions.destroy_shader_module(self.handle, None);
         }
     }
 }

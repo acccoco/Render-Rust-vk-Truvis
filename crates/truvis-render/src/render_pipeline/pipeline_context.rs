@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use shader_binding::shader;
-use truvis_rhi::{render_context::RenderContext, resources::special_buffers::structured_buffer::StructuredBuffer};
+use truvis_rhi::resources::special_buffers::structured_buffer::StructuredBuffer;
 
 use crate::{
     pipeline_settings::{FrameSettings, PipelineSettings},
@@ -14,7 +14,6 @@ use crate::{
 
 /// Rt 管线上下文，每帧重建
 pub struct PipelineContext<'a> {
-    pub render_context: &'a RenderContext,
     pub gpu_scene: &'a GpuScene,
     pub bindless_mgr: Rc<RefCell<BindlessManager>>,
     pub per_frame_data: &'a StructuredBuffer<shader::PerFrameData>,

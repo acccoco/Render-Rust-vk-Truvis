@@ -19,7 +19,7 @@ impl ImageLoader {
             tex_path.to_str().unwrap(),
         ));
 
-        let tex = Texture2D::new(render_context.device_functions(), image.clone(), tex_path.to_str().unwrap());
+        let tex = Texture2D::new(image.clone(), tex_path.to_str().unwrap());
 
         tex
     }

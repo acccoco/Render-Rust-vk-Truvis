@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate truvis_crate_tools;
+
 mod shader_toy_pass;
 mod shader_toy_pipeline;
 
@@ -10,6 +13,7 @@ use truvis_render::{
     app::TruvisApp, outer_app::OuterApp, platform::camera::DrsCamera,
     render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
 };
+use truvis_rhi::render_context::RenderContext;
 
 use crate::shader_toy_pipeline::ShaderToyPipeline;
 
@@ -21,8 +25,8 @@ impl OuterApp for ShaderToy {
     fn init(renderer: &mut Renderer, _camera: &mut DrsCamera) -> Self {
         log::info!("shader toy.");
         Self {
-            rectangle: VertexAosLayoutPosColor::rectangle(&renderer.render_context),
-            pipeline: ShaderToyPipeline::new(&renderer.render_context, renderer.frame_settings().color_format),
+            rectangle: VertexAosLayoutPosColor::rectangle(&RenderContext::get()),
+            pipeline: ShaderToyPipeline::new(renderer.frame_settings().color_format),
         }
     }
 

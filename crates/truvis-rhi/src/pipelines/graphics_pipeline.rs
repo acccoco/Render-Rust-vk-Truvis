@@ -271,7 +271,7 @@ impl GraphicsPipeline {
         let shader_modules = create_info
             .shader_stages
             .iter()
-            .map(|stage| ShaderModule::new(device_functions.clone(), stage.path()))
+            .map(|stage| ShaderModule::new(stage.path()))
             .collect_vec();
         let shader_stages_info = create_info
             .shader_stages

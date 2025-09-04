@@ -25,14 +25,10 @@ impl_derive_buffer!(StructuredBuffer<T: bytemuck::Pod>, Buffer, inner);
 impl<T: bytemuck::Pod> StructuredBuffer<T> {
     #[inline]
     pub fn new_ubo(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
         len: usize,
         debug_name: impl AsRef<str>,
     ) -> Self {
         Self::new(
-            device_functions,
-            allocator,
             debug_name,
             len,
             vk::BufferUsageFlags::UNIFORM_BUFFER
@@ -44,18 +40,14 @@ impl<T: bytemuck::Pod> StructuredBuffer<T> {
 
     #[inline]
     pub fn new_stage_buffer(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
         len: usize,
         debug_name: impl AsRef<str>,
     ) -> Self {
-        Self::new(device_functions, allocator, debug_name, len, vk::BufferUsageFlags::TRANSFER_SRC, true)
+        Self::new(debug_name, len, vk::BufferUsageFlags::TRANSFER_SRC, true)
     }
 
     #[inline]
     pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
         debug_name: impl AsRef<str>,
         len: usize,
         buffer_usage_flags: vk::BufferUsageFlags,
@@ -70,8 +62,6 @@ impl<T: bytemuck::Pod> StructuredBuffer<T> {
 
         Self {
             inner: Buffer::new(
-                device_functions,
-                allocator,
                 Rc::new(BufferCreateInfo::new((len * size_of::<T>()) as vk::DeviceSize, buffer_usage_flags)),
                 Rc::new(vk_mem::AllocationCreateInfo {
                     usage: vk_mem::MemoryUsage::AutoPreferDevice,

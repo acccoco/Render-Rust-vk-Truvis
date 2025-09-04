@@ -30,9 +30,12 @@ impl RenderContext {
     // region init 相关
     const ENGINE_NAME: &'static str = "DruvisIII";
 
-    fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
+   fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
         let vk_ctx = VulkanCore::new(app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts);
-        let graphics_command_pool = CommandPool::new(
+        
+        // 注意：在初始化过程中，我们需要使用传统的参数传递方式
+        // 因为 RenderContext 单例还没有被初始化
+        let graphics_command_pool = CommandPool::new_internal(
             vk_ctx.device_functions.clone(),
             vk_ctx.physical_device.graphics_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),

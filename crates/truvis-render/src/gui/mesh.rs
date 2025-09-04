@@ -120,14 +120,10 @@ impl GuiMesh {
 
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
         let mut vertex_buffer = VertexBuffer::<imgui::DrawVert>::new(
-            render_context.device_functions(),
-            render_context.allocator(),
             vertex_count,
             format!("{}-imgui-vertex", frame_name),
         );
         let mut stage_buffer = Buffer::new_stage_buffer(
-            render_context.device_functions(),
-            render_context.allocator(),
             vertices_size as vk::DeviceSize,
             format!("{}-imgui-vertex-stage", frame_name),
         );
@@ -166,14 +162,10 @@ impl GuiMesh {
 
         let indices_size = index_count * size_of::<imgui::DrawIdx>();
         let mut index_buffer = IndexBuffer::new(
-            render_context.device_functions(),
-            render_context.allocator(),
             indices_size,
             format!("{}-imgui-index", frame_name),
         );
         let mut stage_buffer = Buffer::new_stage_buffer(
-            render_context.device_functions(),
-            render_context.allocator(),
             indices_size as vk::DeviceSize,
             format!("{}-imgui-index-stage", frame_name),
         );

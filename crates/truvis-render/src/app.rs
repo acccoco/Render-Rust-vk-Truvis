@@ -3,6 +3,7 @@ use std::{cell::OnceCell, ffi::CStr, sync::OnceLock};
 use ash::vk;
 use raw_window_handle::HasDisplayHandle;
 use truvis_crate_tools::init_log::init_log;
+use truvis_rhi::render_context::RenderContext;
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
@@ -82,7 +83,6 @@ impl<T: OuterApp> TruvisApp<T> {
     fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
         let window_system = MainWindow::new(
             event_loop,
-            self.renderer.render_context.clone(),
             self.renderer.frame_ctrl.clone(),
             "Truvis".to_string(),
             vk::Extent2D {

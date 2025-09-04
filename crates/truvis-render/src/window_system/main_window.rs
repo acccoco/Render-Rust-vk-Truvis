@@ -8,10 +8,10 @@ use crate::{
 use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::swapchain::render_swapchain::RenderSwapchain;
 use truvis_rhi::{
-    commands::{barrier::ImageBarrier, semaphore::Semaphore, submit_info::SubmitInfo},
     render_context::RenderContext,
+    swapchain::render_swapchain::RenderSwapchain,
+    commands::{barrier::ImageBarrier, semaphore::Semaphore, submit_info::SubmitInfo},
 };
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
@@ -28,7 +28,6 @@ mod helper {
 }
 
 pub struct MainWindow {
-    render_context: Rc<RenderContext>,
     winit_window: Window,
 
     swapchain: Option<RenderSwapchain>,
@@ -55,7 +54,6 @@ pub struct MainWindow {
 impl MainWindow {
     pub fn new(
         event_loop: &ActiveEventLoop,
-        render_context: Rc<RenderContext>,
         frame_ctrl: Rc<FrameController>,
         window_title: String,
         window_extent: vk::Extent2D,
@@ -72,7 +70,7 @@ impl MainWindow {
 
         let window = event_loop.create_window(window_attr).unwrap();
         let swapchain = RenderSwapchain::new(
-            render_context.vk_core(),
+            RenderContext::get().vk_core(),
             &window,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
@@ -81,18 +79,17 @@ impl MainWindow {
         let swapchain_image_infos = swapchain.image_infos();
 
         let gui =
-            Gui::new(&render_context, &window, frame_ctrl.fif_count(), &swapchain_image_infos, bindless_mgr.clone());
-        let gui_pass = GuiPass::new(&render_context, bindless_mgr.clone(), swapchain_image_infos.image_format);
+            Gui::new(&RenderContext::get(), &window, frame_ctrl.fif_count(), &swapchain_image_infos, bindless_mgr.clone());
+        let gui_pass = GuiPass::new(&RenderContext::get(), bindless_mgr.clone(), swapchain_image_infos.image_format);
 
         let present_complete_semaphores = (0..frame_ctrl.fif_count())
-            .map(|i| Semaphore::new(render_context.device_functions(), &format!("window-present-complete-{}", i)))
+            .map(|i| Semaphore::new(&format!("window-present-complete-{}", i)))
             .collect_vec();
         let render_complete_semaphores = (0..swapchain_image_infos.image_cnt)
-            .map(|i| Semaphore::new(render_context.device_functions(), &format!("window-render-complete-{}", i)))
+            .map(|i| Semaphore::new(&format!("window-render-complete-{}", i)))
             .collect_vec();
 
         Self {
-            render_context,
             winit_window: window,
             swapchain: Some(swapchain),
             present_complete_semaphores,
@@ -141,7 +138,7 @@ impl MainWindow {
             );
 
             self.gui_pass.draw(
-                &self.render_context,
+                &RenderContext::get(),
                 swapchain.current_image_view().handle(),
                 swapchain.extent(),
                 &cmd,
@@ -179,7 +176,7 @@ impl MainWindow {
                 None,
             );
 
-        self.render_context.graphics_queue().submit(vec![submit_info], None);
+        RenderContext::get().graphics_queue().submit(vec![submit_info], None);
     }
 }
 
@@ -207,7 +204,7 @@ impl MainWindow {
     pub fn present_image(&self) {
         let swapchain = self.swapchain.as_ref().unwrap();
         swapchain.present_image(
-            self.render_context.graphics_queue(),
+            RenderContext::get().graphics_queue(),
             std::slice::from_ref(&self.render_complete_semaphores[swapchain.current_image_index()]),
         );
     }
@@ -242,12 +239,12 @@ impl MainWindow {
 
     pub fn rebuild_after_resized(&mut self) {
         unsafe {
-            self.render_context.device_functions().device_wait_idle().unwrap();
+            RenderContext::get().device_functions().device_wait_idle().unwrap();
         }
 
         self.swapchain = None;
         self.swapchain = Some(RenderSwapchain::new(
-            self.render_context.vk_core(),
+            RenderContext::get().vk_core(),
             &self.winit_window,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,

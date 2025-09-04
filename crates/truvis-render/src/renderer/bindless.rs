@@ -62,19 +62,18 @@ pub struct BindlessManager {
 }
 impl BindlessManager {
     pub fn new(
-        render_context: &RenderContext,
         descriptor_pool: &DescriptorPool,
         frame_ctrl: Rc<FrameController>,
     ) -> Self {
         let bindless_layout = DescriptorSetLayout::<BindlessDescriptorBinding>::new(
-            render_context.device_functions(),
+            RenderContext::get().device_functions(),
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
             "bindless-layout",
         );
         let bindless_descriptor_sets = (0..frame_ctrl.fif_count())
             .map(|idx| {
                 DescriptorSet::<BindlessDescriptorBinding>::new(
-                    render_context.device_functions(),
+                    RenderContext::get().device_functions(),
                     descriptor_pool,
                     &bindless_layout,
                     format!("bindless-descriptor-set-{idx}"),
@@ -92,7 +91,7 @@ impl BindlessManager {
             bindless_images: HashMap::new(),
             images: HashMap::new(),
 
-            device_functions: render_context.device_functions().clone(),
+            device_functions: RenderContext::get().device_functions().clone(),
 
             frame_label: FrameLabel::A,
         }
@@ -156,8 +155,8 @@ impl BindlessManager {
 
 // register & unregister
 impl BindlessManager {
-    pub fn register_texture_by_path(&mut self, render_context: &RenderContext, texture_path: String) {
-        let texture = ImageLoader::load_image(render_context, std::path::Path::new(&texture_path));
+    pub fn register_texture_by_path(&mut self, texture_path: String) {
+        let texture = ImageLoader::load_image(&RenderContext::get(), std::path::Path::new(&texture_path));
         self.register_texture(texture_path, Texture2DContainer::Owned(Box::new(texture)));
     }
 

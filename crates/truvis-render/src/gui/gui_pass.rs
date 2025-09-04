@@ -3,7 +3,7 @@ use std::{cell::RefCell, mem::offset_of, rc::Rc};
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::{shader, shader::TextureHandle};
-use truvis_crate_tools::{const_map, count_indexed_array, resource::TruvisPath};
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
     commands::command_buffer::CommandBuffer,
     pipelines::{

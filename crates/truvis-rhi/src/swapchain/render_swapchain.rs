@@ -52,7 +52,6 @@ impl RenderSwapchain {
             .enumerate()
             .map(|(idx, img)| {
                 Image2DView::new(
-                    vk_core.device_functions.clone(),
                     *img,
                     ImageViewCreateInfo::new_image_view_2d_info(surface_format.format, vk::ImageAspectFlags::COLOR),
                     format!("swapchain-{}", idx),

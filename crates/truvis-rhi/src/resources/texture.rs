@@ -4,7 +4,7 @@ use ash::vk;
 
 use crate::{
     descriptors::sampler::{Sampler, SamplerCreateInfo},
-    foundation::device::DeviceFunctions,
+    render_context::RenderContext,
     resources::{
         image::{Image2D, ImageContainer},
         image_view::{Image2DView, ImageViewCreateInfo},
@@ -21,16 +21,14 @@ pub struct Texture2D {
 
     // FIXME 将 uuid 使用起来
     _uuid: Texture2DUUID,
-    device_functions: Rc<DeviceFunctions>,
 }
 
 impl Texture2D {
     #[inline]
-    pub fn new(device_functions: Rc<DeviceFunctions>, image: Rc<Image2D>, name: &str) -> Self {
-        let sampler = Sampler::new(device_functions.clone(), Rc::new(SamplerCreateInfo::new()), name);
+    pub fn new(image: Rc<Image2D>, name: &str) -> Self {
+        let sampler = Sampler::new(Rc::new(SamplerCreateInfo::new()), name);
 
         let image_view = Image2DView::new(
-            device_functions.clone(),
             image.handle(),
             ImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
             name,
@@ -42,7 +40,6 @@ impl Texture2D {
             image_view,
 
             _uuid: Texture2DUUID(uuid::Uuid::new_v4()),
-            device_functions: device_functions.clone(),
         }
     }
 

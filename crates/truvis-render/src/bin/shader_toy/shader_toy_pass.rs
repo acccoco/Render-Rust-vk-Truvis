@@ -10,7 +10,7 @@ use model_manager::{
         vertex_pc::{VertexAosLayoutPosColor, VertexPosColor},
     },
 };
-use truvis_crate_tools::{const_map, count_indexed_array, resource::TruvisPath};
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_render::{
     pipeline_settings::FrameSettings, platform::timer::Timer, renderer::frame_controller::FrameController,
 };

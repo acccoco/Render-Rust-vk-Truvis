@@ -50,7 +50,7 @@ impl VertexAosLayoutPosColor {
         name: impl AsRef<str>,
     ) -> VertexBuffer<VertexPosColor> {
         let mut vertex_buffer =
-            VertexBuffer::new(render_context.device_functions(), render_context.allocator(), data.len(), name.as_ref());
+            VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(render_context, data);
 
         vertex_buffer
@@ -62,8 +62,6 @@ impl VertexAosLayoutPosColor {
             Self::create_vertex_buffer(render_context, &shape::TRIANGLE_VERTEX_DATA, "triangle-vertex-buffer");
 
         let mut index_buffer = IndexBuffer::new(
-            render_context.device_functions(),
-            render_context.allocator(),
             shape::TRIANGLE_INDEX_DATA.len(),
             "triangle-index-buffer",
         );
@@ -80,8 +78,6 @@ impl VertexAosLayoutPosColor {
             Self::create_vertex_buffer(render_context, &shape::RECTANGLE_VERTEX_DATA, "rectangle-vertex-buffer");
 
         let mut index_buffer = IndexBuffer::new(
-            render_context.device_functions(),
-            render_context.allocator(),
             shape::RECTANGLE_INDEX_DATA.len(),
             "rectangle-index-buffer",
         );

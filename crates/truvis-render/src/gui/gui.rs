@@ -131,7 +131,7 @@ impl Gui {
                 atlas_texture.data,
                 "imgui-fonts",
             ));
-            Texture2D::new(render_context.device_functions(), image.clone(), "imgui-fonts")
+            Texture2D::new(image.clone(), "imgui-fonts")
         };
 
         let fonts_texture_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);

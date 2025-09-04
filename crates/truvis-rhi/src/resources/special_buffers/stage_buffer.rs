@@ -7,8 +7,9 @@ use std::{
 use ash::{vk, vk::Handle};
 
 use crate::{
-    foundation::{debug_messenger::DebugType, device::DeviceFunctions, mem_allocator::MemAllocator},
+    foundation::debug_messenger::DebugType,
     impl_derive_buffer,
+    render_context::RenderContext,
     resources::{buffer::Buffer, buffer_creator::BufferCreateInfo},
 };
 
@@ -20,14 +21,10 @@ pub struct StageBuffer<T: bytemuck::Pod> {
 impl_derive_buffer!(StageBuffer<T: bytemuck::Pod>, Buffer, inner);
 impl<T: bytemuck::Pod> StageBuffer<T> {
     pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
         debug_name: impl AsRef<str>,
     ) -> Self {
         let buffer = Self {
             inner: Buffer::new(
-                device_functions.clone(),
-                allocator,
                 Rc::new(BufferCreateInfo::new(size_of::<T>() as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC)),
                 Rc::new(vk_mem::AllocationCreateInfo {
                     usage: vk_mem::MemoryUsage::AutoPreferDevice,
@@ -39,6 +36,7 @@ impl<T: bytemuck::Pod> StageBuffer<T> {
             ),
             _phantom: PhantomData,
         };
+        let device_functions = RenderContext::get().device_functions();
         device_functions.set_debug_name(&buffer, &buffer.inner.debug_name);
         buffer
     }
@@ -51,7 +49,8 @@ impl<T: bytemuck::Pod> StageBuffer<T> {
 
             trans_func(&mut *ptr);
         }
-        self.inner.allocator.flush_allocation(&self.inner.allocation, 0, size_of::<T>() as vk::DeviceSize).unwrap();
+        let allocator = RenderContext::get().allocator();
+        allocator.flush_allocation(&self.inner.allocation, 0, size_of::<T>() as vk::DeviceSize).unwrap();
         self.inner.unmap();
     }
 }

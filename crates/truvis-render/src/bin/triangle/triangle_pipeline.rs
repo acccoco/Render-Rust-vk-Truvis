@@ -12,14 +12,13 @@ pub struct TrianglePipeline {
     triangle_pass: TrianglePass,
 }
 impl TrianglePipeline {
-    pub fn new(render_context: &RenderContext, frame_settings: &FrameSettings) -> Self {
-        let triangle_pass = TrianglePass::new(render_context, frame_settings);
+    pub fn new(frame_settings: &FrameSettings) -> Self {
+        let triangle_pass = TrianglePass::new(&RenderContext::get(), frame_settings);
         Self { triangle_pass }
     }
 
     pub fn render(&self, ctx: PipelineContext, shape: &DrsGeometry<VertexPosColor>) {
         let PipelineContext {
-            render_context,
             gpu_scene: _,
             bindless_mgr: _,
             frame_ctrl,
@@ -72,7 +71,7 @@ impl TrianglePipeline {
             );
 
             cmd.end();
-            render_context.graphics_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
+            RenderContext::get().graphics_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
         }
     }
 }

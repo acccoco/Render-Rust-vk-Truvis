@@ -20,16 +20,16 @@ pub struct RtPipeline {
     sdr_pass: ComputePass<shader::sdr::PushConstant>,
 }
 impl RtPipeline {
-    pub fn new(render_context: &RenderContext, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
-        let rt_pass = SimlpeRtPass::new(render_context, bindless_mgr.clone());
+    pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
+        let rt_pass = SimlpeRtPass::new(&RenderContext::get(), bindless_mgr.clone());
         let blit_pass = ComputePass::<shader::blit::PushConstant>::new(
-            render_context,
+            &RenderContext::get(),
             &bindless_mgr.borrow(),
             cstr::cstr!("main"),
             TruvisPath::shader_path("imgui/blit.slang.spv").as_str(),
         );
         let sdr_pass = ComputePass::<shader::sdr::PushConstant>::new(
-            render_context,
+            &RenderContext::get(),
             &bindless_mgr.borrow(),
             c"main",
             TruvisPath::shader_path("pass/pp/sdr.slang.spv").as_str(),
@@ -44,7 +44,6 @@ impl RtPipeline {
 
     pub fn render(&self, ctx: PipelineContext) {
         let PipelineContext {
-            render_context,
             gpu_scene,
             bindless_mgr,
             frame_ctrl,
@@ -173,6 +172,6 @@ impl RtPipeline {
             submit_cmds.push(cmd);
         }
 
-        render_context.graphics_queue().submit(vec![SubmitInfo::new(&submit_cmds)], None);
+        RenderContext::get().graphics_queue().submit(vec![SubmitInfo::new(&submit_cmds)], None);
     }
 }

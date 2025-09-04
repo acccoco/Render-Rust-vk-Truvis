@@ -2,7 +2,10 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::foundation::{debug_messenger::DebugType, device::DeviceFunctions};
+use crate::{
+    foundation::debug_messenger::DebugType,
+    render_context::RenderContext,
+};
 
 impl ImageViewCreateInfo {
     #[inline]
@@ -43,14 +46,13 @@ pub struct Image2DView {
 
     _info: Rc<ImageViewCreateInfo>,
     _name: String,
-
-    device_functions: Rc<DeviceFunctions>,
 }
 
 impl Drop for Image2DView {
     fn drop(&mut self) {
         unsafe {
-            self.device_functions.destroy_image_view(self.handle, None);
+            let device_functions = RenderContext::get().device_functions();
+            device_functions.destroy_image_view(self.handle, None);
         }
     }
 }
@@ -67,11 +69,11 @@ impl DebugType for Image2DView {
 
 impl Image2DView {
     pub fn new(
-        device_functions: Rc<DeviceFunctions>,
         image: vk::Image,
         mut info: ImageViewCreateInfo,
         name: impl AsRef<str>,
     ) -> Self {
+        let device_functions = RenderContext::get().device_functions();
         info.inner.image = image;
         let handle = unsafe { device_functions.create_image_view(&info.inner, None).unwrap() };
         let image_view = Self {
@@ -79,7 +81,6 @@ impl Image2DView {
             uuid: Image2DViewUUID(uuid::Uuid::new_v4()),
             _info: Rc::new(info),
             _name: name.as_ref().to_string(),
-            device_functions: device_functions.clone(),
         };
         device_functions.set_debug_name(&image_view, &name);
         image_view
