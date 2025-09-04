@@ -1,7 +1,7 @@
 use crate::vertex::VertexLayout;
 use ash::vk;
 use std::mem::offset_of;
-use truvis_rhi::{render_context::RenderContext, resources::special_buffers::vertex_buffer::VertexBuffer};
+use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy, bytemuck::Pod, bytemuck::Zeroable)]

@@ -1,10 +1,7 @@
 use std::mem::offset_of;
 
 use ash::vk;
-use truvis_rhi::{
-    render_context::RenderContext,
-    resources::special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer},
-};
+use truvis_rhi::resources::special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer};
 
 use crate::{component::DrsGeometry, vertex::VertexLayout};
 

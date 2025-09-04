@@ -6,7 +6,6 @@ use model_manager::{
 };
 use shader_binding::shader;
 use truvis_cxx::AssimpSceneLoader;
-use truvis_rhi::render_context::RenderContext;
 
 use crate::renderer::bindless::BindlessManager;
 
@@ -67,9 +66,9 @@ impl SceneManager {
 
     /// 向世界中添加一个外部场景
     pub fn load_scene(&mut self, model_path: &std::path::Path, transform: &glam::Mat4) -> Vec<InsGuid> {
-        let ins_guids = AssimpSceneLoader::load_scene(
+        AssimpSceneLoader::load_scene(
             model_path,
-            |mut ins| {
+            |ins| {
                 let guid = InsGuid::new();
                 // DrsInstance 应该有 transform 字段
                 // ins.transform = *transform * ins.transform;
@@ -94,9 +93,7 @@ impl SceneManager {
                 self.mat_map.insert(guid, mat);
                 guid
             },
-        );
-
-        ins_guids
+        )
     }
 
     /// 向场景中添加材质

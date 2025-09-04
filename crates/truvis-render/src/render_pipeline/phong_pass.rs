@@ -59,7 +59,8 @@ impl PhongPass {
             "phong-pass",
         ));
 
-        let d3_pipe = GraphicsPipeline::new(RenderContext::get().device_functions(), &ci, pipeline_layout, "phong-d3-pipe");
+        let d3_pipe =
+            GraphicsPipeline::new(RenderContext::get().device_functions(), &ci, pipeline_layout, "phong-d3-pipe");
 
         Self {
             pipeline: d3_pipe,

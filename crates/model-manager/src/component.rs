@@ -2,7 +2,6 @@ use ash::vk;
 use itertools::Itertools;
 use truvis_rhi::{
     raytracing::acceleration::{Acceleration, BlasInputInfo},
-    render_context::RenderContext,
     resources::special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer},
 };
 

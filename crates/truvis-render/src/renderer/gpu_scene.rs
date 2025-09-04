@@ -15,7 +15,6 @@ use truvis_rhi::{
         command_buffer::CommandBuffer,
     },
     raytracing::acceleration::Acceleration,
-    render_context::RenderContext,
     resources::special_buffers::structured_buffer::StructuredBuffer,
 };
 

@@ -2,8 +2,8 @@ use imgui::Ui;
 use shader_binding::shader;
 use truvis_render::{
     app::TruvisApp, outer_app::OuterApp, platform::camera::DrsCamera,
-    render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
-    render_pipeline::rt_pipeline::RtPipeline,
+    render_pipeline::pipeline_context::PipelineContext, render_pipeline::rt_pipeline::RtPipeline,
+    renderer::renderer::Renderer,
 };
 
 struct PhongApp {
@@ -44,10 +44,7 @@ impl PhongApp {
         //     std::path::Path::new("assets/fbx/sponza/Sponza.fbx"),
         //     &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         // );
-        scene_mgr.load_scene(
-            std::path::Path::new("assets/blender/coord.fbx"),
-            &glam::Mat4::IDENTITY,
-        );
+        scene_mgr.load_scene(std::path::Path::new("assets/blender/coord.fbx"), &glam::Mat4::IDENTITY);
     }
 }
 

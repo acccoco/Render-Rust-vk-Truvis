@@ -79,8 +79,12 @@ impl GuiPass {
             // TODO 这里不应该由 depth
             .attach_info(vec![color_format], None, None);
 
-        let pipeline =
-            GraphicsPipeline::new(RenderContext::get().device_functions(), &create_info, pipeline_layout.clone(), "uipass");
+        let pipeline = GraphicsPipeline::new(
+            RenderContext::get().device_functions(),
+            &create_info,
+            pipeline_layout.clone(),
+            "uipass",
+        );
 
         Self {
             pipeline,

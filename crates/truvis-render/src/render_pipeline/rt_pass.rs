@@ -301,7 +301,9 @@ impl SimlpeRtPass {
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
 
-            unsafe { RenderContext::get().device_functions().create_pipeline_layout(&pipeline_layout_ci, None).unwrap() }
+            unsafe {
+                RenderContext::get().device_functions().create_pipeline_layout(&pipeline_layout_ci, None).unwrap()
+            }
         };
         let pipeline_ci = vk::RayTracingPipelineCreateInfoKHR::default()
             .stages(&stage_infos)

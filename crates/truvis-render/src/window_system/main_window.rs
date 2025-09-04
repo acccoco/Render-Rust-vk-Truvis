@@ -78,12 +78,7 @@ impl MainWindow {
 
         let swapchain_image_infos = swapchain.image_infos();
 
-        let gui = Gui::new(
-            &window,
-            frame_ctrl.fif_count(),
-            &swapchain_image_infos,
-            bindless_mgr.clone(),
-        );
+        let gui = Gui::new(&window, frame_ctrl.fif_count(), &swapchain_image_infos, bindless_mgr.clone());
         let gui_pass = GuiPass::new(bindless_mgr.clone(), swapchain_image_infos.image_format);
 
         let present_complete_semaphores = (0..frame_ctrl.fif_count())

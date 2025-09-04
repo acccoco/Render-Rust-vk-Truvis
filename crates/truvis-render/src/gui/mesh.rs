@@ -4,7 +4,6 @@ use ash::vk;
 use truvis_rhi::{
     basic::color::LabelColor,
     commands::{barrier::BufferBarrier, command_buffer::CommandBuffer},
-    render_context::RenderContext,
     resources::{
         buffer::Buffer,
         special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer},
@@ -64,10 +63,8 @@ pub struct GuiMesh {
 
 impl GuiMesh {
     pub fn new(cmd: &CommandBuffer, frame_name: &str, draw_data: &imgui::DrawData) -> Self {
-        let (vertex_buffer, vertex_cnt, vertex_stage_buffer) =
-            Self::create_vertex_buffer(frame_name, cmd, draw_data);
-        let (index_buffer, index_cnt, index_stage_buffer) =
-            Self::create_index_buffer(frame_name, cmd, draw_data);
+        let (vertex_buffer, vertex_cnt, vertex_stage_buffer) = Self::create_vertex_buffer(frame_name, cmd, draw_data);
+        let (index_buffer, index_cnt, index_stage_buffer) = Self::create_index_buffer(frame_name, cmd, draw_data);
 
         cmd.begin_label("uipass-mesh-transfer-barrier", LabelColor::COLOR_CMD);
         {

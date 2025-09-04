@@ -6,7 +6,7 @@ use model_manager::{
     guid_new_type::{InsGuid, MatGuid, MeshGuid},
     vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D},
 };
-use truvis_rhi::{render_context::RenderContext, resources::special_buffers::index_buffer::IndexBuffer};
+use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
 
 pub mod _ffi_bindings;
 use crate::_ffi_bindings::*;
