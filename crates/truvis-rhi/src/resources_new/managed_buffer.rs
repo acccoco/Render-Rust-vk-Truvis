@@ -104,7 +104,7 @@ impl ManagedBuffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    pub fn transfer_data_sync(&self, render_context: &RenderContext, data: &[impl Sized + Copy]) {
+    pub fn transfer_data_sync(&self, data: &[impl Sized + Copy]) {
         let mut stage_buffer = Self::new_stage_buffer(
             render_context.device_functions(),
             render_context.allocator(),

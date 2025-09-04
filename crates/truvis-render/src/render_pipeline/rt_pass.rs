@@ -110,7 +110,7 @@ impl SBTRegions {
     const HIT_SBT_REGION: &'static [usize] = &[ShaderGroups::Hit.index()];
     const CALLABLE_SBT_REGION: &'static [usize] = &[ShaderGroups::DiffuseCall.index()];
 
-    pub fn create_sbt(render_context: &RenderContext, pipeline: &RhiRtPipeline) -> Self {
+    pub fn create_sbt(pipeline: &RhiRtPipeline) -> Self {
         let rt_pipeline_props = render_context.rt_pipeline_props();
 
         // 因为不需要 user data，所以可以直接使用 shader group handle size
@@ -256,7 +256,7 @@ pub struct SimlpeRtPass {
     device_functions: Rc<DeviceFunctions>,
 }
 impl SimlpeRtPass {
-    pub fn new(render_context: &RenderContext, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
         let shader_modules =
             ShaderStage::iter().map(|stage| stage.value()).map(|stage| ShaderModule::new(stage.path())).collect_vec();
         let stage_infos = ShaderStage::iter()

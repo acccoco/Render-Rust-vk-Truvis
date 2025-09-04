@@ -2,11 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{
-    gui::mesh::GuiMesh,
-    pipeline_settings::FrameLabel,
-    renderer::bindless::BindlessManager,
-};
+use crate::{gui::mesh::GuiMesh, pipeline_settings::FrameLabel, renderer::bindless::BindlessManager};
 use ash::vk;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::swapchain::render_swapchain::SwapchainImageInfo;
@@ -42,7 +38,6 @@ impl Gui {
     const RENDER_IMAGE_ID: usize = 1;
 
     pub fn new(
-        render_context: &RenderContext,
         window: &winit::window::Window,
         fif_num: usize,
         swapchain_image_infos: &SwapchainImageInfo,
@@ -90,7 +85,6 @@ impl Gui {
     ///     "font texture id in imgui"
     /// ```
     fn init_fonts(
-        render_context: &RenderContext,
         imgui_ctx: &mut imgui::Context,
         platform: &imgui_winit_support::WinitPlatform,
         bindless_mgr: &mut BindlessManager,
@@ -303,7 +297,7 @@ impl Gui {
     /// 使用 imgui 将 ui 操作编译为 draw data；构建 draw 需要的 mesh 数据
     pub fn imgui_render(
         &mut self,
-        render_context: &RenderContext,
+
         cmd: &CommandBuffer,
         frame_label: FrameLabel,
     ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> String + use<'_>)> {

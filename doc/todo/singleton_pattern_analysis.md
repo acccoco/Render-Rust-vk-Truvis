@@ -36,7 +36,7 @@
    }
    
    pub struct FrameBuffers {
-       render_context: &RenderContext, // 需要传递引用
+         // 需要传递引用
        // ...
    }
    ```
@@ -308,7 +308,7 @@ pub struct VulkanCore {
    ```rust
    // 前：
    impl BindlessManager {
-       pub fn new(render_context: &RenderContext, ...) -> Self
+       pub fn new(  ...) -> Self
    }
    
    // 后：

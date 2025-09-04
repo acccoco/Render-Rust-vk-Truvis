@@ -18,12 +18,7 @@ pub struct ComputePass<P: bytemuck::Pod> {
     device_functions: Rc<DeviceFunctions>,
 }
 impl<P: bytemuck::Pod> ComputePass<P> {
-    pub fn new(
-        render_context: &RenderContext,
-        bindless_mgr: &BindlessManager,
-        entry_point: &CStr,
-        shader_path: &str,
-    ) -> Self {
+    pub fn new(bindless_mgr: &BindlessManager, entry_point: &CStr, shader_path: &str) -> Self {
         let shader_module = ShaderModule::new(std::path::Path::new(shader_path));
         let stage_info = vk::PipelineShaderStageCreateInfo::default()
             .module(shader_module.handle())

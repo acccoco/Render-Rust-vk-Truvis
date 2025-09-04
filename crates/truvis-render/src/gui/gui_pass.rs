@@ -39,11 +39,7 @@ pub struct GuiPass {
 }
 
 impl GuiPass {
-    pub fn new(
-        render_context: &RenderContext,
-        bindless_mgr: Rc<RefCell<BindlessManager>>,
-        color_format: vk::Format,
-    ) -> Self {
+    pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
         let pipeline_layout = Rc::new(PipelineLayout::new(
             render_context.device_functions(),
             &[bindless_mgr.borrow().bindless_descriptor_layout.handle()],
@@ -95,7 +91,7 @@ impl GuiPass {
 
     pub fn draw(
         &self,
-        render_context: &RenderContext,
+
         canvas_color_view: vk::ImageView,
         canvas_extent: vk::Extent2D,
         cmd: &CommandBuffer,

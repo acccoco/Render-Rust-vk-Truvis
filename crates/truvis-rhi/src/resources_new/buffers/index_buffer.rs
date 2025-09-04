@@ -56,12 +56,7 @@ impl<T: IndexElement> IndexBuffer<T> {
 
     /// 创建 index buffer，并向其内写入数据
     #[inline]
-    pub fn new_with_data(
-        render_context: &RenderContext,
-        resoure_mgr: &mut ResourceManager,
-        data: &[T],
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new_with_data(resoure_mgr: &mut ResourceManager, data: &[T], debug_name: impl AsRef<str>) -> Self {
         let buffer =
             Self::new_managed(render_context.device_functions(), render_context.allocator(), data.len(), debug_name);
         buffer.transfer_data_sync(render_context, data);

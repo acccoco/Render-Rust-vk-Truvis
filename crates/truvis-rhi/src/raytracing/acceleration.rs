@@ -47,7 +47,6 @@ impl Acceleration {
     /// # params
     /// - primitives 每个 geometry 的 max primitives 数量
     pub fn build_blas_sync(
-        render_context: &RenderContext,
         blas_inputs: &[BlasInputInfo],
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: impl AsRef<str>,
@@ -159,7 +158,6 @@ impl Acceleration {
     /// 1. 查询构建 tlas 所需的尺寸
     /// 2. 构建 tlas
     pub fn build_tlas_sync(
-        render_context: &RenderContext,
         instances: &[vk::AccelerationStructureInstanceKHR],
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: impl AsRef<str>,

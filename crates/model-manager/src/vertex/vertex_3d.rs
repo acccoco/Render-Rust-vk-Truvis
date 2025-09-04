@@ -60,11 +60,7 @@ impl VertexLayout for VertexLayoutAos3D {
 }
 
 impl VertexLayoutAos3D {
-    pub fn create_vertex_buffer(
-        render_context: &RenderContext,
-        data: &[Vertex3D],
-        name: impl AsRef<str>,
-    ) -> VertexBuffer<Vertex3D> {
+    pub fn create_vertex_buffer(data: &[Vertex3D], name: impl AsRef<str>) -> VertexBuffer<Vertex3D> {
         let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(render_context, data);
 

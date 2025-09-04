@@ -28,7 +28,6 @@ pub struct PhongPass {
 }
 impl PhongPass {
     pub fn new(
-        render_context: &RenderContext,
         color_format: vk::Format,
         depth_format: vk::Format,
         bindless_manager: Rc<RefCell<BindlessManager>>,

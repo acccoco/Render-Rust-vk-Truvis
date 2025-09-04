@@ -38,7 +38,6 @@ impl AssimpSceneLoader {
     /// # return
     /// 返回整个场景的所有 instance id
     pub fn load_scene(
-        render_context: &RenderContext,
         model_file: &std::path::Path,
         instance_register: impl FnMut(DrsInstance) -> InsGuid,
         mesh_register: impl FnMut(DrsMesh) -> MeshGuid,
@@ -72,7 +71,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中基础的几何体
-    fn load_mesh(&mut self, render_context: &RenderContext, mut mesh_register: impl FnMut(DrsMesh) -> MeshGuid) {
+    fn load_mesh(&mut self, mut mesh_register: impl FnMut(DrsMesh) -> MeshGuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -120,15 +119,13 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中的所有材质
-    fn load_mats(&mut self, render_context: &RenderContext, mut mat_register: impl FnMut(DrsMaterial) -> MatGuid) {
+    fn load_mats(&mut self, mut mat_register: impl FnMut(DrsMaterial) -> MatGuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)
             .map(|mat_idx| unsafe {
                 let mat = get_mat(self.loader, mat_idx);
                 let mat = &*mat;
-
-                
 
                 mat_register(DrsMaterial {
                     base_color: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.base_color),

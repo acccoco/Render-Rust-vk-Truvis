@@ -57,11 +57,7 @@ impl VertexLayout for VertexLayoutAosPosNormalUv {
 }
 
 impl VertexLayoutAosPosNormalUv {
-    pub fn create_vertex_buffer(
-        render_context: &RenderContext,
-        data: &[VertexPosNormalUv],
-        name: impl AsRef<str>,
-    ) -> VertexBuffer<VertexPosNormalUv> {
+    pub fn create_vertex_buffer(data: &[VertexPosNormalUv], name: impl AsRef<str>) -> VertexBuffer<VertexPosNormalUv> {
         let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(render_context, data);
 

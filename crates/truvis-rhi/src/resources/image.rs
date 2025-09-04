@@ -139,13 +139,7 @@ impl Image2D {
         image
     }
     /// 根据 RGBA8_UNORM 的 data 创建 image
-    pub fn from_rgba8(
-        render_context: &RenderContext,
-        width: u32,
-        height: u32,
-        data: &[u8],
-        name: impl AsRef<str>,
-    ) -> Self {
+    pub fn from_rgba8(width: u32, height: u32, data: &[u8], name: impl AsRef<str>) -> Self {
         let image = Self::new(
             render_context.device_functions(),
             render_context.allocator(),

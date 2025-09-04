@@ -42,7 +42,7 @@ pub struct TrianglePass {
     _pipeline_layout: Rc<PipelineLayout>,
 }
 impl TrianglePass {
-    pub fn new(render_context: &RenderContext, frame_settings: &FrameSettings) -> Self {
+    pub fn new(frame_settings: &FrameSettings) -> Self {
         let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![frame_settings.color_format], None, Some(vk::Format::UNDEFINED));

@@ -44,11 +44,7 @@ impl VertexLayout for VertexAosLayoutPosColor {
 }
 
 impl VertexAosLayoutPosColor {
-    pub fn create_vertex_buffer(
-        render_context: &RenderContext,
-        data: &[VertexPosColor],
-        name: impl AsRef<str>,
-    ) -> VertexBuffer<VertexPosColor> {
+    pub fn create_vertex_buffer(data: &[VertexPosColor], name: impl AsRef<str>) -> VertexBuffer<VertexPosColor> {
         let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(render_context, data);
 

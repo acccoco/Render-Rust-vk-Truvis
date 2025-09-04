@@ -61,7 +61,7 @@ pub struct ShaderToyPass {
     _pipeline_layout: Rc<PipelineLayout>,
 }
 impl ShaderToyPass {
-    pub fn new(render_context: &RenderContext, color_format: vk::Format) -> Self {
+    pub fn new(color_format: vk::Format) -> Self {
         let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![color_format], None, Some(vk::Format::UNDEFINED));

@@ -63,12 +63,7 @@ pub struct GuiMesh {
 }
 
 impl GuiMesh {
-    pub fn new(
-        render_context: &RenderContext,
-        cmd: &CommandBuffer,
-        frame_name: &str,
-        draw_data: &imgui::DrawData,
-    ) -> Self {
+    pub fn new(cmd: &CommandBuffer, frame_name: &str, draw_data: &imgui::DrawData) -> Self {
         let (vertex_buffer, vertex_cnt, vertex_stage_buffer) =
             Self::create_vertex_buffer(render_context, frame_name, cmd, draw_data);
         let (index_buffer, index_cnt, index_stage_buffer) =
@@ -107,7 +102,6 @@ impl GuiMesh {
     ///
     /// @return (vertex buffer, vertex count, stage buffer)
     fn create_vertex_buffer(
-        render_context: &RenderContext,
         frame_name: &str,
         cmd: &CommandBuffer,
         draw_data: &imgui::DrawData,
@@ -145,7 +139,6 @@ impl GuiMesh {
     ///
     /// @return (index buffer, index count, stage buffer)
     fn create_index_buffer(
-        render_context: &RenderContext,
         frame_name: &str,
         cmd: &CommandBuffer,
         draw_data: &imgui::DrawData,
