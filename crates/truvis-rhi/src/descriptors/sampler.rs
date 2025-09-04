@@ -2,10 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::{
-    foundation::debug_messenger::DebugType,
-    render_context::RenderContext,
-};
+use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
 
 pub struct SamplerCreateInfo {
     inner: vk::SamplerCreateInfo<'static>,

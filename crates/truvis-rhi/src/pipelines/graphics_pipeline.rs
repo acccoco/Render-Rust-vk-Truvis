@@ -268,11 +268,8 @@ impl GraphicsPipeline {
             .depth_attachment_format(create_info.depth_attach_format)
             .stencil_attachment_format(create_info.stencil_attach_format);
 
-        let shader_modules = create_info
-            .shader_stages
-            .iter()
-            .map(|stage| ShaderModule::new(stage.path()))
-            .collect_vec();
+        let shader_modules =
+            create_info.shader_stages.iter().map(|stage| ShaderModule::new(stage.path())).collect_vec();
         let shader_stages_info = create_info
             .shader_stages
             .iter()

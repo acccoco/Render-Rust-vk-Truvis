@@ -101,38 +101,23 @@ impl GpuSceneBuffers {
         let max_instance_cnt = 1024;
 
         GpuSceneBuffers {
-            scene_buffer: StructuredBuffer::new_ubo(
-                1,
-                format!("scene buffer-{}", frame_label),
-            ),
-            light_buffer: StructuredBuffer::new_ubo(
-                max_light_cnt,
-                format!("light buffer-{}", frame_label),
-            ),
+            scene_buffer: StructuredBuffer::new_ubo(1, format!("scene buffer-{}", frame_label)),
+            light_buffer: StructuredBuffer::new_ubo(max_light_cnt, format!("light buffer-{}", frame_label)),
             light_stage_buffer: StructuredBuffer::new_stage_buffer(
                 max_light_cnt,
                 format!("light stage buffer-{}", frame_label),
             ),
-            material_buffer: StructuredBuffer::new_ubo(
-                max_material_cnt,
-                format!("material buffer-{}", frame_label),
-            ),
+            material_buffer: StructuredBuffer::new_ubo(max_material_cnt, format!("material buffer-{}", frame_label)),
             material_stage_buffer: StructuredBuffer::new_stage_buffer(
                 max_material_cnt,
                 format!("material stage buffer-{}", frame_label),
             ),
-            geometry_buffer: StructuredBuffer::new_ubo(
-                max_geometry_cnt,
-                format!("geometry buffer-{}", frame_label),
-            ),
+            geometry_buffer: StructuredBuffer::new_ubo(max_geometry_cnt, format!("geometry buffer-{}", frame_label)),
             geometry_stage_buffer: StructuredBuffer::new_stage_buffer(
                 max_geometry_cnt,
                 format!("geometry stage buffer-{}", frame_label),
             ),
-            instance_buffer: StructuredBuffer::new_ubo(
-                max_instance_cnt,
-                format!("instance buffer-{}", frame_label),
-            ),
+            instance_buffer: StructuredBuffer::new_ubo(max_instance_cnt, format!("instance buffer-{}", frame_label)),
             instance_stage_buffer: StructuredBuffer::new_stage_buffer(
                 max_instance_cnt,
                 format!("instance stage buffer-{}", frame_label),

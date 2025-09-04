@@ -24,10 +24,7 @@ impl_derive_buffer!(StructuredBuffer<T: bytemuck::Pod>, Buffer, inner);
 
 impl<T: bytemuck::Pod> StructuredBuffer<T> {
     #[inline]
-    pub fn new_ubo(
-        len: usize,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new_ubo(len: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new(
             debug_name,
             len,
@@ -39,10 +36,7 @@ impl<T: bytemuck::Pod> StructuredBuffer<T> {
     }
 
     #[inline]
-    pub fn new_stage_buffer(
-        len: usize,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new_stage_buffer(len: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new(debug_name, len, vk::BufferUsageFlags::TRANSFER_SRC, true)
     }
 

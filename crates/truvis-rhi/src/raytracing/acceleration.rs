@@ -99,11 +99,7 @@ impl Acceleration {
         };
 
         // 创建一个 QueryPool，用于查询 compact size
-        let mut query_pool = QueryPool::new(
-            vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
-            1,
-            "",
-        );
+        let mut query_pool = QueryPool::new(vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, 1, "");
         query_pool.reset(0, 1);
 
         // 等待初步 build 完成
@@ -242,8 +238,7 @@ impl Acceleration {
         ty: vk::AccelerationStructureTypeKHR,
         debug_name: impl AsRef<str>,
     ) -> Self {
-        let buffer =
-            Buffer::new_accleration_buffer(size as usize, debug_name.as_ref());
+        let buffer = Buffer::new_accleration_buffer(size as usize, debug_name.as_ref());
 
         let create_info = vk::AccelerationStructureCreateInfoKHR::default() //
             .ty(ty)

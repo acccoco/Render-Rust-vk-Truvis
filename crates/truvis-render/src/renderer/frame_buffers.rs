@@ -61,11 +61,7 @@ impl FrameBuffers {
         framebuffers
     }
 
-    pub fn rebuild(
-        &mut self,
-        frame_settings: &FrameSettings,
-        bindless_mgr: &mut BindlessManager,
-    ) {
+    pub fn rebuild(&mut self, frame_settings: &FrameSettings, bindless_mgr: &mut BindlessManager) {
         self.unregister_bindless(bindless_mgr);
         *self = Self::new(frame_settings, self.frame_ctrl.clone(), bindless_mgr);
     }
@@ -89,9 +85,7 @@ impl FrameBuffers {
     }
 
     /// 创建 RayTracing 需要的 image
-    fn create_color_image(
-        frame_settings: &FrameSettings,
-    ) -> (Rc<Image2D>, Rc<Image2DView>) {
+    fn create_color_image(frame_settings: &FrameSettings) -> (Rc<Image2D>, Rc<Image2DView>) {
         let color_image = Rc::new(Image2D::new(
             RenderContext::get().device_functions(),
             RenderContext::get().allocator(),
@@ -132,9 +126,7 @@ impl FrameBuffers {
         (color_image, color_image_view)
     }
 
-    fn create_depth_image(
-        frame_settings: &FrameSettings,
-    ) -> (Rc<Image2D>, Rc<Image2DView>) {
+    fn create_depth_image(frame_settings: &FrameSettings) -> (Rc<Image2D>, Rc<Image2DView>) {
         let depth_image = Rc::new(Image2D::new(
             RenderContext::get().device_functions(),
             RenderContext::get().allocator(),
@@ -159,10 +151,7 @@ impl FrameBuffers {
         (depth_image, Rc::new(depth_image_view))
     }
 
-    fn create_render_targets(
-        frame_settings: &FrameSettings,
-        frame_ctrl: &FrameController,
-    ) -> Vec<Rc<Texture2D>> {
+    fn create_render_targets(frame_settings: &FrameSettings, frame_ctrl: &FrameController) -> Vec<Rc<Texture2D>> {
         let create_texture = |fif_labe: FrameLabel| {
             let name = format!("render-target-{}", fif_labe);
             let color_image = Rc::new(Image2D::new(

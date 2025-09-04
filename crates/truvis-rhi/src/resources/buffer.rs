@@ -76,11 +76,7 @@ impl Buffer {
     }
 
     #[inline]
-    pub fn new_device_buffer(
-        size: vk::DeviceSize,
-        flags: vk::BufferUsageFlags,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new_device_buffer(size: vk::DeviceSize, flags: vk::BufferUsageFlags, debug_name: impl AsRef<str>) -> Self {
         Self::new(
             Rc::new(BufferCreateInfo::new(size, flags)),
             Rc::new(vk_mem::AllocationCreateInfo {
@@ -93,10 +89,7 @@ impl Buffer {
     }
 
     #[inline]
-    pub fn new_acceleration_instance_buffer(
-        size: vk::DeviceSize,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new_acceleration_instance_buffer(size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
             size,
             vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -107,10 +100,7 @@ impl Buffer {
     }
 
     #[inline]
-    pub fn new_stage_buffer(
-        size: vk::DeviceSize,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new_stage_buffer(size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
         Self::new(
             Rc::new(BufferCreateInfo::new(size, vk::BufferUsageFlags::TRANSFER_SRC)),
             Rc::new(vk_mem::AllocationCreateInfo {
@@ -124,10 +114,7 @@ impl Buffer {
     }
 
     #[inline]
-    pub fn new_accleration_buffer(
-        size: usize,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new_accleration_buffer(size: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
             size as vk::DeviceSize,
             vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
@@ -136,10 +123,7 @@ impl Buffer {
     }
 
     #[inline]
-    pub fn new_accleration_scratch_buffer(
-        size: vk::DeviceSize,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new_accleration_scratch_buffer(size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
             size,
             vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
@@ -238,10 +222,8 @@ impl Buffer {
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
     pub fn transfer_data_sync(&mut self, render_context: &RenderContext, data: &[impl Sized + Copy]) {
-        let mut stage_buffer = Self::new_stage_buffer(
-            size_of_val(data) as vk::DeviceSize,
-            format!("{}-stage-buffer", self.debug_name),
-        );
+        let mut stage_buffer =
+            Self::new_stage_buffer(size_of_val(data) as vk::DeviceSize, format!("{}-stage-buffer", self.debug_name));
 
         stage_buffer.transfer_data_by_mem_map(data);
 

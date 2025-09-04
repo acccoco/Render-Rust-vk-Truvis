@@ -9,9 +9,9 @@ use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
+    commands::{barrier::ImageBarrier, semaphore::Semaphore, submit_info::SubmitInfo},
     render_context::RenderContext,
     swapchain::render_swapchain::RenderSwapchain,
-    commands::{barrier::ImageBarrier, semaphore::Semaphore, submit_info::SubmitInfo},
 };
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
@@ -78,8 +78,13 @@ impl MainWindow {
 
         let swapchain_image_infos = swapchain.image_infos();
 
-        let gui =
-            Gui::new(&RenderContext::get(), &window, frame_ctrl.fif_count(), &swapchain_image_infos, bindless_mgr.clone());
+        let gui = Gui::new(
+            &RenderContext::get(),
+            &window,
+            frame_ctrl.fif_count(),
+            &swapchain_image_infos,
+            bindless_mgr.clone(),
+        );
         let gui_pass = GuiPass::new(&RenderContext::get(), bindless_mgr.clone(), swapchain_image_infos.image_format);
 
         let present_complete_semaphores = (0..frame_ctrl.fif_count())

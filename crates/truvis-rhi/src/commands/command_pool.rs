@@ -1,9 +1,7 @@
 use ash::vk;
 
 use crate::{
-    commands::command_queue::QueueFamily,
-    foundation::debug_messenger::DebugType,
-    render_context::RenderContext,
+    commands::command_queue::QueueFamily, foundation::debug_messenger::DebugType, render_context::RenderContext,
 };
 
 /// command pool 是和 queue family 绑定的，而不是和 queue 绑定的
@@ -17,11 +15,7 @@ pub struct CommandPool {
 impl CommandPool {
     // TODO 使用 new_internal 简化
     #[inline]
-    pub fn new(
-        queue_family: QueueFamily,
-        flags: vk::CommandPoolCreateFlags,
-        debug_name: &str,
-    ) -> Self {
+    pub fn new(queue_family: QueueFamily, flags: vk::CommandPoolCreateFlags, debug_name: &str) -> Self {
         let device_functions = RenderContext::get().device_functions();
         let pool = unsafe {
             device_functions
@@ -96,9 +90,7 @@ impl CommandPool {
     pub fn reset_all_buffers(&self) {
         let device_functions = RenderContext::get().device_functions();
         unsafe {
-            device_functions
-                .reset_command_pool(self.handle, vk::CommandPoolResetFlags::RELEASE_RESOURCES)
-                .unwrap();
+            device_functions.reset_command_pool(self.handle, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();
         }
     }
 }

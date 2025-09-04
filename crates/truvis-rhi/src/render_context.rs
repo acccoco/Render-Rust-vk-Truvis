@@ -30,9 +30,9 @@ impl RenderContext {
     // region init 相关
     const ENGINE_NAME: &'static str = "DruvisIII";
 
-   fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
+    fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
         let vk_ctx = VulkanCore::new(app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts);
-        
+
         // 注意：在初始化过程中，我们需要使用传统的参数传递方式
         // 因为 RenderContext 单例还没有被初始化
         let graphics_command_pool = CommandPool::new_internal(
@@ -67,10 +67,10 @@ static mut RENDER_CONTEXT: Option<RenderContext> = None;
 /// - 其他类的类型签名也会变得更简单
 impl RenderContext {
     /// 获取单例实例
-    /// 
+    ///
     /// # Panics
     /// 如果 RenderContext 还未初始化，此方法会 panic
-    /// 
+    ///
     /// # Safety
     /// 此方法仅在单线程环境下安全
     pub fn get() -> &'static RenderContext {
@@ -85,14 +85,14 @@ impl RenderContext {
     }
 
     /// 初始化 RenderContext 单例
-    /// 
+    ///
     /// # Parameters
     /// - `app_name`: 应用程序名称
     /// - `instance_extra_exts`: 额外的 Vulkan 实例扩展
-    /// 
+    ///
     /// # Panics
     /// 如果 RenderContext 已经被初始化，此方法会 panic
-    /// 
+    ///
     /// # Safety
     /// 此方法仅在单线程环境下安全
     pub fn init(app_name: String, instance_extra_exts: Vec<&'static CStr>) {
@@ -107,7 +107,7 @@ impl RenderContext {
     }
 
     /// 销毁 RenderContext 单例
-    /// 
+    ///
     /// # Safety
     /// 调用此方法后，不应再使用 RenderContext::get()
     /// 此方法仅在单线程环境下安全

@@ -2,10 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::{
-    foundation::debug_messenger::DebugType,
-    render_context::RenderContext,
-};
+use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
 
 impl ImageViewCreateInfo {
     #[inline]
@@ -68,11 +65,7 @@ impl DebugType for Image2DView {
 }
 
 impl Image2DView {
-    pub fn new(
-        image: vk::Image,
-        mut info: ImageViewCreateInfo,
-        name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new(image: vk::Image, mut info: ImageViewCreateInfo, name: impl AsRef<str>) -> Self {
         let device_functions = RenderContext::get().device_functions();
         info.inner.image = image;
         let handle = unsafe { device_functions.create_image_view(&info.inner, None).unwrap() };

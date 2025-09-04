@@ -131,7 +131,7 @@ impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         // 初始化 RenderContext 单例
         RenderContext::init("Truvis".to_string(), extra_instance_ext);
-        
+
         let descriptor_pool = Self::init_descriptor_pool(RenderContext::get().device_functions().clone());
         let frame_settings = FrameSettings {
             color_format: vk::Format::R32G32B32A32_SFLOAT,
@@ -143,8 +143,7 @@ impl Renderer {
         };
         let frame_ctrl = Rc::new(FrameController::new());
 
-        let bindless_mgr =
-            Rc::new(RefCell::new(BindlessManager::new(&descriptor_pool, frame_ctrl.clone())));
+        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&descriptor_pool, frame_ctrl.clone())));
         let scene_mgr = Rc::new(RefCell::new(SceneManager::new(bindless_mgr.clone())));
         let gpu_scene = GpuScene::new(frame_ctrl.clone());
 
@@ -152,16 +151,10 @@ impl Renderer {
         gpu_scene.register_default_textures(&mut bindless_mgr.borrow_mut());
 
         let per_frame_data_buffers = (0..frame_ctrl.fif_count())
-            .map(|idx| {
-                StructuredBuffer::<shader::PerFrameData>::new_ubo(
-                    1,
-                    format!("per-frame-data-buffer-{idx}"),
-                )
-            })
+            .map(|idx| StructuredBuffer::<shader::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{idx}")))
             .collect();
 
-        let framebuffers =
-            FrameBuffers::new(&frame_settings, frame_ctrl.clone(), &mut bindless_mgr.borrow_mut());
+        let framebuffers = FrameBuffers::new(&frame_settings, frame_ctrl.clone(), &mut bindless_mgr.borrow_mut());
 
         let render_timeline_semaphore = Semaphore::new_timeline(0, "render-timeline");
         let cmd_allocator = CmdAllocator::new(frame_ctrl.clone());

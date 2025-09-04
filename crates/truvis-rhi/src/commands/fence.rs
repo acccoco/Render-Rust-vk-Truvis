@@ -1,9 +1,6 @@
 use ash::vk;
 
-use crate::{
-    foundation::debug_messenger::DebugType,
-    render_context::RenderContext,
-};
+use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
 
 /// # Destroy
 /// 不应该实现 Fence，因为可以 Clone，需要手动 destroy

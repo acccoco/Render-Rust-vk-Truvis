@@ -119,14 +119,10 @@ impl GuiMesh {
         }
 
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
-        let mut vertex_buffer = VertexBuffer::<imgui::DrawVert>::new(
-            vertex_count,
-            format!("{}-imgui-vertex", frame_name),
-        );
-        let mut stage_buffer = Buffer::new_stage_buffer(
-            vertices_size as vk::DeviceSize,
-            format!("{}-imgui-vertex-stage", frame_name),
-        );
+        let mut vertex_buffer =
+            VertexBuffer::<imgui::DrawVert>::new(vertex_count, format!("{}-imgui-vertex", frame_name));
+        let mut stage_buffer =
+            Buffer::new_stage_buffer(vertices_size as vk::DeviceSize, format!("{}-imgui-vertex-stage", frame_name));
         stage_buffer.transfer_data_by_mem_map(&vertices);
 
         cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
@@ -161,14 +157,9 @@ impl GuiMesh {
         }
 
         let indices_size = index_count * size_of::<imgui::DrawIdx>();
-        let mut index_buffer = IndexBuffer::new(
-            indices_size,
-            format!("{}-imgui-index", frame_name),
-        );
-        let mut stage_buffer = Buffer::new_stage_buffer(
-            indices_size as vk::DeviceSize,
-            format!("{}-imgui-index-stage", frame_name),
-        );
+        let mut index_buffer = IndexBuffer::new(indices_size, format!("{}-imgui-index", frame_name));
+        let mut stage_buffer =
+            Buffer::new_stage_buffer(indices_size as vk::DeviceSize, format!("{}-imgui-index-stage", frame_name));
         stage_buffer.transfer_data_by_mem_map(&indices);
 
         cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);

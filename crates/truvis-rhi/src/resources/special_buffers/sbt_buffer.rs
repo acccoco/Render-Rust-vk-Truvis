@@ -18,11 +18,7 @@ pub struct SBTBuffer {
 
 impl_derive_buffer!(SBTBuffer, Buffer, _inner);
 impl SBTBuffer {
-    pub fn new(
-        size: vk::DeviceSize,
-        align: vk::DeviceSize,
-        name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new(size: vk::DeviceSize, align: vk::DeviceSize, name: impl AsRef<str>) -> Self {
         let buffer = Self {
             _inner: Buffer::new(
                 Rc::new(BufferCreateInfo::new(

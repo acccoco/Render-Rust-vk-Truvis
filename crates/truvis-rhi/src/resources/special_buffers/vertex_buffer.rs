@@ -7,9 +7,7 @@ use std::{
 use ash::{vk, vk::Handle};
 
 use crate::{
-    foundation::debug_messenger::DebugType,
-    impl_derive_buffer,
-    render_context::RenderContext,
+    foundation::debug_messenger::DebugType, impl_derive_buffer, render_context::RenderContext,
     resources::buffer::Buffer,
 };
 
@@ -24,10 +22,7 @@ pub struct VertexBuffer<V: Sized> {
 
 impl_derive_buffer!(VertexBuffer<V: Sized>, Buffer, inner);
 impl<V: Sized> VertexBuffer<V> {
-    pub fn new(
-        vertex_cnt: usize,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new(vertex_cnt: usize, debug_name: impl AsRef<str>) -> Self {
         let size = vertex_cnt * size_of::<V>();
         let buffer = Buffer::new_device_buffer(
             size as vk::DeviceSize,

@@ -20,9 +20,7 @@ pub struct StageBuffer<T: bytemuck::Pod> {
 
 impl_derive_buffer!(StageBuffer<T: bytemuck::Pod>, Buffer, inner);
 impl<T: bytemuck::Pod> StageBuffer<T> {
-    pub fn new(
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new(debug_name: impl AsRef<str>) -> Self {
         let buffer = Self {
             inner: Buffer::new(
                 Rc::new(BufferCreateInfo::new(size_of::<T>() as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC)),

@@ -1,9 +1,6 @@
 use ash::vk;
 
-use crate::{
-    foundation::debug_messenger::DebugType,
-    render_context::RenderContext,
-};
+use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
 
 pub struct QueryPool {
     handle: vk::QueryPool,

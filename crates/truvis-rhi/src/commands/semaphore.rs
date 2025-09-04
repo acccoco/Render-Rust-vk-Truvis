@@ -1,9 +1,6 @@
 use ash::vk;
 
-use crate::{
-    foundation::debug_messenger::DebugType,
-    render_context::RenderContext,
-};
+use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
 
 /// # Destroy
 /// 不应该实现 Semaphore，因为可以 Clone，需要手动 destroy
@@ -30,8 +27,7 @@ impl Semaphore {
             .semaphore_type(vk::SemaphoreType::TIMELINE)
             .initial_value(initial_value);
         let timeline_semaphore_ci = vk::SemaphoreCreateInfo::default().push_next(&mut timeline_type_ci);
-        let semaphore =
-            unsafe { device_functions.create_semaphore(&timeline_semaphore_ci, None).unwrap() };
+        let semaphore = unsafe { device_functions.create_semaphore(&timeline_semaphore_ci, None).unwrap() };
 
         let semaphore = Self { semaphore };
         device_functions.set_debug_name(&semaphore, debug_name);

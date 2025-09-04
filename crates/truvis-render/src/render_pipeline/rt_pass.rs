@@ -257,10 +257,8 @@ pub struct SimlpeRtPass {
 }
 impl SimlpeRtPass {
     pub fn new(render_context: &RenderContext, bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
-        let shader_modules = ShaderStage::iter()
-            .map(|stage| stage.value())
-            .map(|stage| ShaderModule::new(stage.path()))
-            .collect_vec();
+        let shader_modules =
+            ShaderStage::iter().map(|stage| stage.value()).map(|stage| ShaderModule::new(stage.path())).collect_vec();
         let stage_infos = ShaderStage::iter()
             .map(|stage| stage.value())
             .zip(shader_modules.iter())

@@ -61,10 +61,7 @@ pub struct BindlessManager {
     frame_label: FrameLabel,
 }
 impl BindlessManager {
-    pub fn new(
-        descriptor_pool: &DescriptorPool,
-        frame_ctrl: Rc<FrameController>,
-    ) -> Self {
+    pub fn new(descriptor_pool: &DescriptorPool, frame_ctrl: Rc<FrameController>) -> Self {
         let bindless_layout = DescriptorSetLayout::<BindlessDescriptorBinding>::new(
             RenderContext::get().device_functions(),
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,

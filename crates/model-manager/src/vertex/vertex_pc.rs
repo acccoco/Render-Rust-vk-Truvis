@@ -49,8 +49,7 @@ impl VertexAosLayoutPosColor {
         data: &[VertexPosColor],
         name: impl AsRef<str>,
     ) -> VertexBuffer<VertexPosColor> {
-        let mut vertex_buffer =
-            VertexBuffer::new(data.len(), name.as_ref());
+        let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(render_context, data);
 
         vertex_buffer
@@ -61,10 +60,7 @@ impl VertexAosLayoutPosColor {
         let vertex_buffer =
             Self::create_vertex_buffer(render_context, &shape::TRIANGLE_VERTEX_DATA, "triangle-vertex-buffer");
 
-        let mut index_buffer = IndexBuffer::new(
-            shape::TRIANGLE_INDEX_DATA.len(),
-            "triangle-index-buffer",
-        );
+        let mut index_buffer = IndexBuffer::new(shape::TRIANGLE_INDEX_DATA.len(), "triangle-index-buffer");
         index_buffer.transfer_data_sync(render_context, &shape::TRIANGLE_INDEX_DATA);
 
         DrsGeometry {
@@ -77,10 +73,7 @@ impl VertexAosLayoutPosColor {
         let vertex_buffer =
             Self::create_vertex_buffer(render_context, &shape::RECTANGLE_VERTEX_DATA, "rectangle-vertex-buffer");
 
-        let mut index_buffer = IndexBuffer::new(
-            shape::RECTANGLE_INDEX_DATA.len(),
-            "rectangle-index-buffer",
-        );
+        let mut index_buffer = IndexBuffer::new(shape::RECTANGLE_INDEX_DATA.len(), "rectangle-index-buffer");
         index_buffer.transfer_data_sync(render_context, &shape::RECTANGLE_INDEX_DATA);
 
         DrsGeometry {
