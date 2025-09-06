@@ -52,20 +52,8 @@ unsafe extern "system" fn vk_debug_callback(
 
     let format_msg = format!("[{:?}]\n{}\n", message_type, msg);
 
-    // 这个看起来像个 bug
-    let skip_msg = [
-        "DebugTypePointer: expected operand Base Type is not a valid debug type",
-        "DebugFunctionDefinition: must be in the entry basic block of the function",
-    ];
-
     match message_severity {
         vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
-            for skip_msg in &skip_msg {
-                if format_msg.contains(skip_msg) {
-                    log::warn!("Skipping message: {}", skip_msg);
-                    return vk::FALSE; // 返回 False 表示不需要 layer developer 处理
-                }
-            }
             log::error!("{}", format_msg);
         }
         vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {

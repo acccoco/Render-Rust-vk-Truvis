@@ -3,11 +3,9 @@ use std::{convert::identity, ffi::CStr, rc::Rc};
 use ash::vk;
 use itertools::Itertools;
 
+use crate::pipelines::shader::ShaderModuleCache;
 use crate::render_context::RenderContext;
-use crate::{
-    foundation::debug_messenger::DebugType,
-    pipelines::shader::{ShaderModule, ShaderStageInfo},
-};
+use crate::{foundation::debug_messenger::DebugType, pipelines::shader::ShaderStageInfo};
 
 pub struct PipelineLayout {
     handle: vk::PipelineLayout,
@@ -73,16 +71,14 @@ impl GraphicsPipeline {
             .depth_attachment_format(create_info.depth_attach_format)
             .stencil_attachment_format(create_info.stencil_attach_format);
 
-        let shader_modules =
-            create_info.shader_stages.iter().map(|stage| ShaderModule::new(stage.path())).collect_vec();
+        let mut shader_modules_cache = ShaderModuleCache::new();
         let shader_stages_info = create_info
             .shader_stages
             .iter()
-            .zip(shader_modules.iter())
-            .map(|(stage, module)| {
+            .map(|stage| {
                 vk::PipelineShaderStageCreateInfo::default()
                     .stage(stage.stage)
-                    .module(module.handle())
+                    .module(shader_modules_cache.get_or_load(stage.path()).handle())
                     .name(stage.entry_point)
             })
             .collect_vec();
@@ -143,9 +139,7 @@ impl GraphicsPipeline {
 
         device_functions.set_debug_name(&pipeline, debug_name);
 
-        shader_modules.into_iter().for_each(|module| {
-            module.destroy();
-        });
+        shader_modules_cache.destroy();
 
         pipeline
     }

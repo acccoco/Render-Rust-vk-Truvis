@@ -1,16 +1,14 @@
 use crate::commands::command_queue::CommandQueue;
 use crate::commands::fence::Fence;
 use crate::commands::semaphore::Semaphore;
-use crate::foundation::device::DeviceFunctions;
+use crate::render_context::RenderContext;
 use crate::resources::image_view::{Image2DView, ImageViewCreateInfo};
 use crate::swapchain::surface::Surface;
 use crate::vulkan_core::VulkanCore;
 use ash::vk;
 use itertools::Itertools;
-use std::rc::Rc;
 
 pub struct RenderSwapchain {
-    device_functions: Rc<DeviceFunctions>,
     _surface: Surface,
     swapchain_handle: vk::SwapchainKHR,
 
@@ -34,14 +32,8 @@ impl RenderSwapchain {
         let surface = Surface::new(vk_core, window);
         let extent = surface.capabilities.current_extent;
 
-        let swapchain_handle = Self::create_swapchain(
-            vk_core.device_functions.clone(),
-            &surface,
-            surface_format.format,
-            surface_format.color_space,
-            extent,
-            present_mode,
-        );
+        let swapchain_handle =
+            Self::create_swapchain(&surface, surface_format.format, surface_format.color_space, extent, present_mode);
 
         let images = unsafe { vk_core.device_functions.swapchain.get_swapchain_images(swapchain_handle).unwrap() };
         for (img_idx, img) in images.iter().enumerate() {
@@ -60,7 +52,6 @@ impl RenderSwapchain {
             .collect_vec();
 
         Self {
-            device_functions: vk_core.device_functions.clone(),
             _surface: surface,
             swapchain_handle,
             images,
@@ -72,7 +63,6 @@ impl RenderSwapchain {
     }
 
     fn create_swapchain(
-        device_functions: Rc<DeviceFunctions>,
         surface: &Surface,
         format: vk::Format,
         color_space: vk::ColorSpaceKHR,
@@ -106,6 +96,7 @@ impl RenderSwapchain {
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
             .clipped(true);
 
+        let device_functions = RenderContext::get().device_functions();
         unsafe {
             let swapchain_handle = device_functions.swapchain.create_swapchain(&create_info, None).unwrap();
             device_functions.set_object_debug_name(swapchain_handle, "main");
@@ -164,7 +155,8 @@ impl RenderSwapchain {
     #[inline]
     pub fn acquire_next_image(&mut self, semaphore: Option<&Semaphore>, fence: Option<&Fence>, timeout: u64) {
         let (image_index, is_optimal) = unsafe {
-            self.device_functions
+            RenderContext::get()
+                .device_functions()
                 .swapchain
                 .acquire_next_image(
                     self.swapchain_handle,
@@ -193,14 +185,16 @@ impl RenderSwapchain {
             .image_indices(&image_indices)
             .swapchains(std::slice::from_ref(&self.swapchain_handle));
 
-        unsafe { self.device_functions.swapchain.queue_present(queue.handle(), &present_info).unwrap() };
+        unsafe {
+            RenderContext::get().device_functions().swapchain.queue_present(queue.handle(), &present_info).unwrap()
+        };
     }
 }
 
 impl Drop for RenderSwapchain {
     fn drop(&mut self) {
         unsafe {
-            self.device_functions.swapchain.destroy_swapchain(self.swapchain_handle, None);
+            RenderContext::get().device_functions().swapchain.destroy_swapchain(self.swapchain_handle, None);
         }
     }
 }

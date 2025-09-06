@@ -1,11 +1,12 @@
-use std::{mem::size_of_val, rc::Rc};
+use std::mem::size_of_val;
 
 use ash::vk;
 use vk_mem::Alloc;
 
+use crate::render_context::RenderContext;
 use crate::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
-    foundation::{debug_messenger::DebugType, device::DeviceFunctions, mem_allocator::MemAllocator},
+    foundation::debug_messenger::DebugType,
     resources::{buffer::Buffer, image::ImageCreateInfo},
 };
 
@@ -66,15 +67,13 @@ impl DebugType for ManagedImage {
 
 // 构造方法
 impl ManagedImage {
-    pub(crate) fn new(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: &MemAllocator,
-        image_info: &ImageCreateInfo,
-        alloc_info: &vk_mem::AllocationCreateInfo,
-        name: &str,
-    ) -> Self {
-        let (image, alloction) =
-            unsafe { allocator.create_image(&image_info.as_info(), alloc_info).expect("Failed to create image") };
+    pub(crate) fn new(image_info: &ImageCreateInfo, alloc_info: &vk_mem::AllocationCreateInfo, name: &str) -> Self {
+        let (image, alloction) = unsafe {
+            RenderContext::get()
+                .allocator()
+                .create_image(&image_info.as_info(), alloc_info)
+                .expect("Failed to create image")
+        };
         let image = Self {
             handle: image,
             allocation: alloction,
@@ -83,7 +82,7 @@ impl ManagedImage {
             format: image_info.format(),
             name: name.to_string(),
         };
-        device_functions.set_debug_name(&image, name);
+        RenderContext::get().device_functions().set_debug_name(&image, name);
         image
     }
 }
@@ -114,13 +113,7 @@ impl ManagedImage {
     /// 3. 进行图像布局转换
     /// 4. 将 staging buffer 的数据复制到图像
     /// 5. 进行图像布局转换
-    pub fn copy_from_data(
-        &self,
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
-        cmd: &CommandBuffer,
-        data: &[u8],
-    ) -> Buffer {
+    pub fn copy_from_data(&self, cmd: &CommandBuffer, data: &[u8]) -> Buffer {
         let pixels_cnt = self.width * self.height;
         assert_eq!(data.len(), VulkanFormatUtils::pixel_size_in_bytes(self.format) * pixels_cnt as usize);
 

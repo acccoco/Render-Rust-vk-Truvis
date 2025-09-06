@@ -21,7 +21,6 @@ use truvis_rhi::{
         rendering_info::RenderingInfo,
         shader::ShaderStageInfo,
     },
-    render_context::RenderContext,
 };
 
 const_map!(ShaderStage<ShaderStageInfo>:{

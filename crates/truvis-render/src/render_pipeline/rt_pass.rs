@@ -6,7 +6,7 @@ use shader_binding::{shader, shader::ImageHandle};
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
-    pipelines::shader::{ShaderGroupInfo, ShaderModule, ShaderStageInfo},
+    pipelines::shader::{ShaderGroupInfo, ShaderModule, ShaderModuleCache, ShaderStageInfo},
     render_context::RenderContext,
     resources::special_buffers::{sbt_buffer::SBTBuffer, structured_buffer::StructuredBuffer},
 };
@@ -250,14 +250,12 @@ pub struct SimlpeRtPass {
 }
 impl SimlpeRtPass {
     pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
-        let shader_modules =
-            ShaderStage::iter().map(|stage| stage.value()).map(|stage| ShaderModule::new(stage.path())).collect_vec();
+        let mut shader_module_cache = ShaderModuleCache::new();
         let stage_infos = ShaderStage::iter()
             .map(|stage| stage.value())
-            .zip(shader_modules.iter())
-            .map(|(stage, shader_modele)| {
+            .map(|stage| {
                 vk::PipelineShaderStageCreateInfo::default()
-                    .module(shader_modele.handle())
+                    .module(shader_module_cache.get_or_load(stage.path()).handle())
                     .stage(stage.stage)
                     .name(stage.entry_point)
             })
@@ -319,7 +317,7 @@ impl SimlpeRtPass {
                 .unwrap()[0]
         };
 
-        shader_modules.into_iter().for_each(|module| module.destroy());
+        shader_module_cache.destroy();
 
         let rt_pipeline = RhiRtPipeline {
             pipeline,

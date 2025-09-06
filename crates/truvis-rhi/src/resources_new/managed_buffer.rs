@@ -1,10 +1,7 @@
 use ash::vk;
 use vk_mem::Alloc;
 
-use crate::{
-    foundation::{device::DeviceFunctions, mem_allocator::MemAllocator},
-    render_context::RenderContext,
-};
+use crate::{foundation::device::DeviceFunctions, render_context::RenderContext};
 
 pub struct ManagedBuffer {
     vk_handle: vk::Buffer,
@@ -104,7 +101,7 @@ impl ManagedBuffer {
     pub fn transfer_data_sync(&self, data: &[impl Sized + Copy]) {
         let mut stage_buffer =
             Self::new_stage_buffer(size_of_val(data) as vk::DeviceSize, format!("{}-stage-buffer", self.debug_name));
-        stage_buffer.transfer_data_by_mem_map(data, &RenderContext::get().allocator());
+        stage_buffer.transfer_data_by_mem_map(data);
 
         RenderContext::get().one_time_exec(
             |cmd| {
@@ -126,7 +123,7 @@ impl ManagedBuffer {
     /// 确保 `[T]` 的内存布局在 CPU 和 GPU 是一致的
     ///
     /// 如果需要处理内存对齐的问题，考虑使用 `ash::util::Align`
-    pub fn transfer_data_by_mem_map<T>(&mut self, data: &[T], allocator: &MemAllocator)
+    pub fn transfer_data_by_mem_map<T>(&mut self, data: &[T])
     where
         T: Sized + Copy,
     {
@@ -134,37 +131,40 @@ impl ManagedBuffer {
         let data_bytes = unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, size_of_val(data)) };
         assert!(data_bytes.len() as vk::DeviceSize <= self.size);
 
-        self.map(allocator);
+        self.map();
         unsafe {
             std::ptr::copy_nonoverlapping(data_bytes.as_ptr(), self.map_ptr.unwrap(), size_of_val(data));
         }
-        allocator.flush_allocation(&self.allocation, 0, size_of_val(data) as vk::DeviceSize).unwrap();
-        self.unmap(allocator);
+        RenderContext::get()
+            .allocator()
+            .flush_allocation(&self.allocation, 0, size_of_val(data) as vk::DeviceSize)
+            .unwrap();
+        self.unmap();
     }
 
     /// map 和 unmap 需要匹配
     #[inline]
-    pub fn map(&mut self, allocator: &MemAllocator) {
+    pub fn map(&mut self) {
         if self.map_ptr.is_some() {
             return;
         }
         unsafe {
-            self.map_ptr = Some(allocator.map_memory(&mut self.allocation).unwrap());
+            self.map_ptr = Some(RenderContext::get().allocator().map_memory(&mut self.allocation).unwrap());
         }
     }
 
     #[inline]
-    pub fn flush(&mut self, allocator: &MemAllocator, offset: vk::DeviceSize, size: vk::DeviceSize) {
-        allocator.flush_allocation(&self.allocation, offset, size).unwrap();
+    pub fn flush(&mut self, offset: vk::DeviceSize, size: vk::DeviceSize) {
+        RenderContext::get().allocator().flush_allocation(&self.allocation, offset, size).unwrap();
     }
 
     #[inline]
-    pub fn unmap(&mut self, allocator: &MemAllocator) {
+    pub fn unmap(&mut self) {
         if self.map_ptr.is_none() {
             return;
         }
         unsafe {
-            allocator.unmap_memory(&mut self.allocation);
+            RenderContext::get().allocator().unmap_memory(&mut self.allocation);
             self.map_ptr = None;
         }
     }

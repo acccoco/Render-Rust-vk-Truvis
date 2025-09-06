@@ -200,6 +200,8 @@ impl ShaderCompileTask {
                 "-g2",                         // 生成 debug info 默认是 g2
                 "-matrix-layout-column-major", // 列主序
                 "-fvk-use-entrypoint-name",    // 具有多个 entry 时，需要这个选项
+                "-target",
+                "spirv",
                 "-o",
                 self.output_path.to_str().unwrap(),
                 self.shader_path.to_str().unwrap(),
