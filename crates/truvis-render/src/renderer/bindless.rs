@@ -9,7 +9,6 @@ use truvis_rhi::{
         descriptor::{DescriptorSet, DescriptorSetLayout},
         descriptor_pool::DescriptorPool,
     },
-    foundation::device::DeviceFunctions,
     render_context::RenderContext,
     resources::{
         image_view::{Image2DView, Image2DViewContainer, Image2DViewUUID},
@@ -55,22 +54,18 @@ pub struct BindlessManager {
     bindless_images: HashMap<Image2DViewUUID, u32>,
     images: HashMap<Image2DViewUUID, Image2DViewContainer>,
 
-    device_functions: Rc<DeviceFunctions>,
-
     /// 当前 frame in flight 的标签，每帧更新
     frame_label: FrameLabel,
 }
 impl BindlessManager {
     pub fn new(descriptor_pool: &DescriptorPool, frame_ctrl: Rc<FrameController>) -> Self {
         let bindless_layout = DescriptorSetLayout::<BindlessDescriptorBinding>::new(
-            RenderContext::get().device_functions(),
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
             "bindless-layout",
         );
         let bindless_descriptor_sets = (0..frame_ctrl.fif_count())
             .map(|idx| {
                 DescriptorSet::<BindlessDescriptorBinding>::new(
-                    RenderContext::get().device_functions(),
                     descriptor_pool,
                     &bindless_layout,
                     format!("bindless-descriptor-set-{idx}"),
@@ -87,8 +82,6 @@ impl BindlessManager {
 
             bindless_images: HashMap::new(),
             images: HashMap::new(),
-
-            device_functions: RenderContext::get().device_functions().clone(),
 
             frame_label: FrameLabel::A,
         }
@@ -136,7 +129,7 @@ impl BindlessManager {
                 image_infos,
             ),
         ];
-        self.device_functions.write_descriptor_sets(&writes);
+        RenderContext::get().device_functions().write_descriptor_sets(&writes);
     }
 
     /// 获得纹理在当前帧的 bindless 索引
@@ -149,8 +142,7 @@ impl BindlessManager {
         self.bindless_images.get(image_uuid).copied().map(|idx| shader::ImageHandle { index: idx as _ })
     }
 }
-
-// register & unregister
+/// register & unregister
 impl BindlessManager {
     pub fn register_texture_by_path(&mut self, texture_path: String) {
         let texture = ImageLoader::load_image(std::path::Path::new(&texture_path));

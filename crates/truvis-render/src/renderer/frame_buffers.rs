@@ -32,7 +32,6 @@ pub struct FrameBuffers {
 
     frame_ctrl: Rc<FrameController>,
 }
-
 impl FrameBuffers {
     pub fn new(
         frame_settigns: &FrameSettings,
@@ -87,8 +86,6 @@ impl FrameBuffers {
     /// 创建 RayTracing 需要的 image
     fn create_color_image(frame_settings: &FrameSettings) -> (Rc<Image2D>, Rc<Image2DView>) {
         let color_image = Rc::new(Image2D::new(
-            RenderContext::get().device_functions(),
-            RenderContext::get().allocator(),
             Rc::new(ImageCreateInfo::new_image_2d_info(
                 frame_settings.frame_extent,
                 frame_settings.color_format,
@@ -128,8 +125,6 @@ impl FrameBuffers {
 
     fn create_depth_image(frame_settings: &FrameSettings) -> (Rc<Image2D>, Rc<Image2DView>) {
         let depth_image = Rc::new(Image2D::new(
-            RenderContext::get().device_functions(),
-            RenderContext::get().allocator(),
             Rc::new(ImageCreateInfo::new_image_2d_info(
                 frame_settings.frame_extent,
                 frame_settings.depth_format,
@@ -155,8 +150,6 @@ impl FrameBuffers {
         let create_texture = |fif_labe: FrameLabel| {
             let name = format!("render-target-{}", fif_labe);
             let color_image = Rc::new(Image2D::new(
-                RenderContext::get().device_functions(),
-                RenderContext::get().allocator(),
                 Rc::new(ImageCreateInfo::new_image_2d_info(
                     frame_settings.frame_extent,
                     frame_settings.color_format,
@@ -182,8 +175,7 @@ impl FrameBuffers {
             .collect_vec()
     }
 }
-
-// getter
+/// getter
 impl FrameBuffers {
     #[inline]
     pub fn depth_image_view(&self) -> &Image2DView {
@@ -236,5 +228,10 @@ impl FrameBuffers {
         frame_label: FrameLabel,
     ) -> shader::TextureHandle {
         bindless_mgr.get_texture_handle(&self.render_target_bindless_keys[frame_label as usize]).unwrap()
+    }
+}
+impl Drop for FrameBuffers {
+    fn drop(&mut self) {
+        // RAII
     }
 }

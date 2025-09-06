@@ -101,7 +101,7 @@ impl DrsMesh {
             format!("{}-Blas", self.name),
         );
 
-        self.blas_device_address = Some(blas.get_device_address());
+        self.blas_device_address = Some(blas.device_address());
         self.blas = Some(blas);
     }
 }

@@ -10,7 +10,6 @@ use truvis_rhi::{
         graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},
         shader::ShaderStageInfo,
     },
-    render_context::RenderContext,
 };
 
 use crate::{
@@ -37,11 +36,9 @@ pub struct GuiPass {
     pipeline_layout: Rc<PipelineLayout>,
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
-
 impl GuiPass {
     pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
         let pipeline_layout = Rc::new(PipelineLayout::new(
-            RenderContext::get().device_functions(),
             &[bindless_mgr.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
@@ -79,12 +76,7 @@ impl GuiPass {
             // TODO 这里不应该由 depth
             .attach_info(vec![color_format], None, None);
 
-        let pipeline = GraphicsPipeline::new(
-            RenderContext::get().device_functions(),
-            &create_info,
-            pipeline_layout.clone(),
-            "uipass",
-        );
+        let pipeline = GraphicsPipeline::new(&create_info, pipeline_layout.clone(), "uipass");
 
         Self {
             pipeline,

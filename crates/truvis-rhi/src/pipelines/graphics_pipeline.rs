@@ -3,10 +3,184 @@ use std::{convert::identity, ffi::CStr, rc::Rc};
 use ash::vk;
 use itertools::Itertools;
 
+use crate::render_context::RenderContext;
 use crate::{
-    foundation::{debug_messenger::DebugType, device::DeviceFunctions},
+    foundation::debug_messenger::DebugType,
     pipelines::shader::{ShaderModule, ShaderStageInfo},
 };
+
+pub struct PipelineLayout {
+    handle: vk::PipelineLayout,
+}
+impl PipelineLayout {
+    pub fn new(
+        descriptor_set_layouts: &[vk::DescriptorSetLayout],
+        push_constant_ranges: &[vk::PushConstantRange],
+        debug_name: impl AsRef<str>,
+    ) -> Self {
+        let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::default()
+            .set_layouts(descriptor_set_layouts)
+            .push_constant_ranges(push_constant_ranges);
+        let device_functions = RenderContext::get().device_functions();
+        let handle = unsafe { device_functions.create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() };
+        let layout = PipelineLayout { handle };
+        device_functions.set_debug_name(&layout, debug_name);
+        layout
+    }
+
+    #[inline]
+    pub fn handle(&self) -> vk::PipelineLayout {
+        self.handle
+    }
+
+    #[inline]
+    pub fn destroy(self) {
+        // drop
+    }
+}
+impl Drop for PipelineLayout {
+    fn drop(&mut self) {
+        unsafe {
+            RenderContext::get().device_functions().destroy_pipeline_layout(self.handle, None);
+        }
+    }
+}
+impl DebugType for PipelineLayout {
+    fn debug_type_name() -> &'static str {
+        "RhiPipelineLayouer"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
+
+pub struct GraphicsPipeline {
+    pipeline: vk::Pipeline,
+
+    /// 因为多个 pipeline 可以使用同一个 pipeline layout，所以这里使用 Rc
+    pipeline_layout: Rc<PipelineLayout>,
+}
+impl GraphicsPipeline {
+    pub fn new(
+        create_info: &GraphicsPipelineCreateInfo,
+        pipeline_layout: Rc<PipelineLayout>,
+        debug_name: &str,
+    ) -> Self {
+        // dynamic rendering 需要的 framebuffer 信息
+        let mut attach_info = vk::PipelineRenderingCreateInfo::default()
+            .color_attachment_formats(&create_info.color_attach_formats)
+            .depth_attachment_format(create_info.depth_attach_format)
+            .stencil_attachment_format(create_info.stencil_attach_format);
+
+        let shader_modules =
+            create_info.shader_stages.iter().map(|stage| ShaderModule::new(stage.path())).collect_vec();
+        let shader_stages_info = create_info
+            .shader_stages
+            .iter()
+            .zip(shader_modules.iter())
+            .map(|(stage, module)| {
+                vk::PipelineShaderStageCreateInfo::default()
+                    .stage(stage.stage)
+                    .module(module.handle())
+                    .name(stage.entry_point)
+            })
+            .collect_vec();
+
+        // 顶点和 index
+        let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::default()
+            .vertex_binding_descriptions(&create_info.vertex_binding_desc)
+            .vertex_attribute_descriptions(&create_info.vertex_attribute_desec);
+
+        let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::default()
+            .topology(create_info.primitive_topology)
+            .primitive_restart_enable(false);
+
+        // viewport 和 scissor 具体值由 dynamic 决定，但是数量由该 create info 决定
+        let viewport_info = vk::PipelineViewportStateCreateInfo {
+            viewport_count: 1,
+            scissor_count: 1,
+            ..Default::default()
+        };
+
+        // MSAA 配置
+        let msaa_info = vk::PipelineMultisampleStateCreateInfo::default()
+            .sample_shading_enable(create_info.enable_sample_shading)
+            .rasterization_samples(create_info.msaa_sample);
+
+        // 混合设置：需要为每个 color attachment 分别指定
+        let color_blend_info = create_info.blend_info.attachments(&create_info.color_attach_blend_states);
+
+        let dynamic_state_info =
+            vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&create_info.dynamic_states);
+
+        // =======================================
+        // === 创建 pipeline
+
+        let pipeline_info = vk::GraphicsPipelineCreateInfo::default()
+            .stages(&shader_stages_info)
+            .vertex_input_state(&vertex_input_state_info)
+            .input_assembly_state(&input_assembly_info)
+            .viewport_state(&viewport_info)
+            .rasterization_state(&create_info.rasterize_state_info)
+            .multisample_state(&msaa_info)
+            .color_blend_state(&color_blend_info)
+            .depth_stencil_state(&create_info.depth_stencil_info)
+            .layout(pipeline_layout.handle)
+            .dynamic_state(&dynamic_state_info)
+            .push_next(&mut attach_info);
+
+        let device_functions = RenderContext::get().device_functions();
+        let pipeline = unsafe {
+            device_functions
+                .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
+                .unwrap()[0]
+        };
+        let pipeline = GraphicsPipeline {
+            pipeline,
+            pipeline_layout,
+        };
+
+        device_functions.set_debug_name(&pipeline, debug_name);
+
+        shader_modules.into_iter().for_each(|module| {
+            module.destroy();
+        });
+
+        pipeline
+    }
+
+    #[inline]
+    pub fn handle(&self) -> vk::Pipeline {
+        self.pipeline
+    }
+
+    #[inline]
+    pub fn layout(&self) -> vk::PipelineLayout {
+        self.pipeline_layout.handle
+    }
+
+    #[inline]
+    pub fn destroy(self) {
+        // drop
+    }
+}
+impl Drop for GraphicsPipeline {
+    fn drop(&mut self) {
+        unsafe {
+            RenderContext::get().device_functions().destroy_pipeline(self.pipeline, None);
+        }
+    }
+}
+impl DebugType for GraphicsPipeline {
+    fn debug_type_name() -> &'static str {
+        "RhiGraphicsPipeline"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.pipeline
+    }
+}
 
 pub struct GraphicsPipelineCreateInfo {
     /// dynamic render 需要的 framebuffer 信息
@@ -183,175 +357,5 @@ impl GraphicsPipelineCreateInfo {
     pub fn stencil_test(&mut self, enable: bool) -> &mut Self {
         self.depth_stencil_info.stencil_test_enable = if enable { vk::TRUE } else { vk::FALSE };
         self
-    }
-}
-
-pub struct PipelineLayout {
-    handle: vk::PipelineLayout,
-    device_functions: Rc<DeviceFunctions>,
-}
-impl DebugType for PipelineLayout {
-    fn debug_type_name() -> &'static str {
-        "RhiPipelineLayouer"
-    }
-
-    fn vk_handle(&self) -> impl vk::Handle {
-        self.handle
-    }
-}
-impl Drop for PipelineLayout {
-    fn drop(&mut self) {
-        unsafe {
-            self.device_functions.destroy_pipeline_layout(self.handle, None);
-        }
-    }
-}
-impl PipelineLayout {
-    pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        descriptor_set_layouts: &[vk::DescriptorSetLayout],
-        push_constant_ranges: &[vk::PushConstantRange],
-        debug_name: impl AsRef<str>,
-    ) -> Self {
-        let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::default()
-            .set_layouts(descriptor_set_layouts)
-            .push_constant_ranges(push_constant_ranges);
-        let handle = unsafe { device_functions.create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() };
-        let layout = PipelineLayout {
-            handle,
-            device_functions: device_functions.clone(),
-        };
-        device_functions.set_debug_name(&layout, debug_name);
-        layout
-    }
-
-    #[inline]
-    pub fn handle(&self) -> vk::PipelineLayout {
-        self.handle
-    }
-}
-
-pub struct GraphicsPipeline {
-    pipeline: vk::Pipeline,
-
-    /// 因为多个 pipeline 可以使用同一个 pipeline layout，所以这里使用 Rc
-    pipeline_layout: Rc<PipelineLayout>,
-
-    device_functions: Rc<DeviceFunctions>,
-}
-impl DebugType for GraphicsPipeline {
-    fn debug_type_name() -> &'static str {
-        "RhiGraphicsPipeline"
-    }
-
-    fn vk_handle(&self) -> impl vk::Handle {
-        self.pipeline
-    }
-}
-impl Drop for GraphicsPipeline {
-    fn drop(&mut self) {
-        unsafe {
-            self.device_functions.destroy_pipeline(self.pipeline, None);
-        }
-    }
-}
-impl GraphicsPipeline {
-    pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        create_info: &GraphicsPipelineCreateInfo,
-        pipeline_layout: Rc<PipelineLayout>,
-        debug_name: &str,
-    ) -> Self {
-        // dynamic rendering 需要的 framebuffer 信息
-        let mut attach_info = vk::PipelineRenderingCreateInfo::default()
-            .color_attachment_formats(&create_info.color_attach_formats)
-            .depth_attachment_format(create_info.depth_attach_format)
-            .stencil_attachment_format(create_info.stencil_attach_format);
-
-        let shader_modules =
-            create_info.shader_stages.iter().map(|stage| ShaderModule::new(stage.path())).collect_vec();
-        let shader_stages_info = create_info
-            .shader_stages
-            .iter()
-            .zip(shader_modules.iter())
-            .map(|(stage, module)| {
-                vk::PipelineShaderStageCreateInfo::default()
-                    .stage(stage.stage)
-                    .module(module.handle())
-                    .name(stage.entry_point)
-            })
-            .collect_vec();
-
-        // 顶点和 index
-        let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::default()
-            .vertex_binding_descriptions(&create_info.vertex_binding_desc)
-            .vertex_attribute_descriptions(&create_info.vertex_attribute_desec);
-
-        let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::default()
-            .topology(create_info.primitive_topology)
-            .primitive_restart_enable(false);
-
-        // viewport 和 scissor 具体值由 dynamic 决定，但是数量由该 create info 决定
-        let viewport_info = vk::PipelineViewportStateCreateInfo {
-            viewport_count: 1,
-            scissor_count: 1,
-            ..Default::default()
-        };
-
-        // MSAA 配置
-        let msaa_info = vk::PipelineMultisampleStateCreateInfo::default()
-            .sample_shading_enable(create_info.enable_sample_shading)
-            .rasterization_samples(create_info.msaa_sample);
-
-        // 混合设置：需要为每个 color attachment 分别指定
-        let color_blend_info = create_info.blend_info.attachments(&create_info.color_attach_blend_states);
-
-        let dynamic_state_info =
-            vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&create_info.dynamic_states);
-
-        // =======================================
-        // === 创建 pipeline
-
-        let pipeline_info = vk::GraphicsPipelineCreateInfo::default()
-            .stages(&shader_stages_info)
-            .vertex_input_state(&vertex_input_state_info)
-            .input_assembly_state(&input_assembly_info)
-            .viewport_state(&viewport_info)
-            .rasterization_state(&create_info.rasterize_state_info)
-            .multisample_state(&msaa_info)
-            .color_blend_state(&color_blend_info)
-            .depth_stencil_state(&create_info.depth_stencil_info)
-            .layout(pipeline_layout.handle)
-            .dynamic_state(&dynamic_state_info)
-            .push_next(&mut attach_info);
-
-        let pipeline = unsafe {
-            device_functions
-                .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
-                .unwrap()[0]
-        };
-        let pipeline = GraphicsPipeline {
-            pipeline,
-            pipeline_layout,
-            device_functions: device_functions.clone(),
-        };
-
-        device_functions.set_debug_name(&pipeline, debug_name);
-
-        shader_modules.into_iter().for_each(|module| {
-            module.destroy();
-        });
-
-        pipeline
-    }
-
-    #[inline]
-    pub fn handle(&self) -> vk::Pipeline {
-        self.pipeline
-    }
-
-    #[inline]
-    pub fn layout(&self) -> vk::PipelineLayout {
-        self.pipeline_layout.handle
     }
 }

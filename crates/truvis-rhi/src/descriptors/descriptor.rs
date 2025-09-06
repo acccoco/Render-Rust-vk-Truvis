@@ -1,12 +1,8 @@
-use std::rc::Rc;
-
 use ash::vk;
 use shader_layout_trait::ShaderBindingLayout;
 
-use crate::{
-    descriptors::descriptor_pool::DescriptorPool,
-    foundation::{debug_messenger::DebugType, device::DeviceFunctions},
-};
+use crate::render_context::RenderContext;
+use crate::{descriptors::descriptor_pool::DescriptorPool, foundation::debug_messenger::DebugType};
 
 /// 描述符集布局
 ///
@@ -25,27 +21,7 @@ pub struct DescriptorSetLayout<T: ShaderBindingLayout> {
     layout: vk::DescriptorSetLayout,
     /// 用于在编译时关联泛型参数 T
     phantom_data: std::marker::PhantomData<T>,
-
-    device_functions: Rc<DeviceFunctions>,
 }
-impl<T: ShaderBindingLayout> Drop for DescriptorSetLayout<T> {
-    fn drop(&mut self) {
-        unsafe {
-            log::info!("Destroying RhiDescriptorSetLayout");
-            self.device_functions.destroy_descriptor_set_layout(self.layout, None);
-        }
-    }
-}
-impl<T: ShaderBindingLayout> DebugType for DescriptorSetLayout<T> {
-    fn debug_type_name() -> &'static str {
-        "RhiDescriptorSetLayout"
-    }
-
-    fn vk_handle(&self) -> impl vk::Handle {
-        self.layout
-    }
-}
-
 impl<T: ShaderBindingLayout> DescriptorSetLayout<T> {
     /// 创建新的描述符集布局
     ///
@@ -55,11 +31,7 @@ impl<T: ShaderBindingLayout> DescriptorSetLayout<T> {
     ///
     /// # 返回值
     /// 新的描述符集布局实例
-    pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        flags: vk::DescriptorSetLayoutCreateFlags,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    pub fn new(flags: vk::DescriptorSetLayoutCreateFlags, debug_name: impl AsRef<str>) -> Self {
         // 从类型 T 获取绑定信息
         let (bindings, binding_flags) = T::get_vk_bindings();
         let mut bind_flags_ci = vk::DescriptorSetLayoutBindingFlagsCreateInfo::default().binding_flags(&binding_flags);
@@ -68,12 +40,12 @@ impl<T: ShaderBindingLayout> DescriptorSetLayout<T> {
             vk::DescriptorSetLayoutCreateInfo::default().flags(flags).bindings(&bindings).push_next(&mut bind_flags_ci);
         vk::DescriptorBindingFlags::empty();
 
+        let device_functions = RenderContext::get().device_functions();
         // 创建 Vulkan 描述符集布局
         let layout = unsafe { device_functions.create_descriptor_set_layout(&create_info, None).unwrap() };
         let layout = Self {
             layout,
             phantom_data: std::marker::PhantomData,
-            device_functions: device_functions.clone(),
         };
         device_functions.set_debug_name(&layout, debug_name);
         layout
@@ -85,8 +57,24 @@ impl<T: ShaderBindingLayout> DescriptorSetLayout<T> {
     }
 
     #[inline]
-    pub fn handle_ref(&self) -> &vk::DescriptorSetLayout {
-        &self.layout
+    pub fn destroy(self) {
+        // drop
+    }
+}
+impl<T: ShaderBindingLayout> Drop for DescriptorSetLayout<T> {
+    fn drop(&mut self) {
+        unsafe {
+            RenderContext::get().device_functions().destroy_descriptor_set_layout(self.layout, None);
+        }
+    }
+}
+impl<T: ShaderBindingLayout> DebugType for DescriptorSetLayout<T> {
+    fn debug_type_name() -> &'static str {
+        "RhiDescriptorSetLayout"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.layout
     }
 }
 
@@ -107,7 +95,43 @@ pub struct DescriptorSet<T: ShaderBindingLayout> {
     /// 用于在编译时关联泛型参数 T
     phantom_data: std::marker::PhantomData<T>,
 
-    device_functions: Rc<DeviceFunctions>,
+    _descriptor_pool: vk::DescriptorPool,
+}
+impl<T: ShaderBindingLayout> DescriptorSet<T> {
+    /// 创建新的描述符集
+    ///
+    /// # 参数
+    /// - render_context: RHI 实例
+    /// - layout: 描述符集布局
+    /// - debug_name: 用于调试的名称
+    ///
+    /// # 返回值
+    /// 新的描述符集实例
+    pub fn new(descriptor_pool: &DescriptorPool, layout: &DescriptorSetLayout<T>, debug_name: impl AsRef<str>) -> Self {
+        // 分配描述符集
+        let alloc_info = vk::DescriptorSetAllocateInfo::default()
+            .descriptor_pool(descriptor_pool.handle())
+            .set_layouts(std::slice::from_ref(&layout.layout));
+        let device_functions = RenderContext::get().device_functions();
+        let descriptor_set = unsafe { device_functions.allocate_descriptor_sets(&alloc_info).unwrap()[0] };
+        let set = Self {
+            handle: descriptor_set,
+            phantom_data: std::marker::PhantomData,
+            _descriptor_pool: descriptor_pool.handle(),
+        };
+        device_functions.set_debug_name(&set, debug_name);
+        set
+    }
+
+    #[inline]
+    pub fn handle(&self) -> vk::DescriptorSet {
+        self.handle
+    }
+}
+impl<T: ShaderBindingLayout> Drop for DescriptorSet<T> {
+    fn drop(&mut self) {
+        // 无需手动释放，会跟随 DescriptorPool 一起释放
+    }
 }
 impl<T: ShaderBindingLayout> DebugType for DescriptorSet<T> {
     fn debug_type_name() -> &'static str {
@@ -129,40 +153,4 @@ pub enum DescriptorUpdateInfo {
     Image(vk::DescriptorImageInfo),
     /// 缓冲区描述符信息
     Buffer(vk::DescriptorBufferInfo),
-}
-
-impl<T: ShaderBindingLayout> DescriptorSet<T> {
-    /// 创建新的描述符集
-    ///
-    /// # 参数
-    /// - render_context: RHI 实例
-    /// - layout: 描述符集布局
-    /// - debug_name: 用于调试的名称
-    ///
-    /// # 返回值
-    /// 新的描述符集实例
-    pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        descriptor_pool: &DescriptorPool,
-        layout: &DescriptorSetLayout<T>,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
-        // 分配描述符集
-        let alloc_info = vk::DescriptorSetAllocateInfo::default()
-            .descriptor_pool(descriptor_pool.handle())
-            .set_layouts(std::slice::from_ref(&layout.layout));
-        let descriptor_set = unsafe { device_functions.allocate_descriptor_sets(&alloc_info).unwrap()[0] };
-        let set = Self {
-            handle: descriptor_set,
-            phantom_data: std::marker::PhantomData,
-            device_functions: device_functions.clone(),
-        };
-        device_functions.set_debug_name(&set, debug_name);
-        set
-    }
-
-    #[inline]
-    pub fn handle(&self) -> vk::DescriptorSet {
-        self.handle
-    }
 }

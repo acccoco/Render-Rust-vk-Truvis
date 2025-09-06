@@ -24,6 +24,8 @@ pub struct VulkanCore {
     /// 1. 多个组件需要共享相同的设备函数指针（RhiQueue、RhiCommandBuffer 等）
     /// 2. 函数指针本身很轻量，共享比传递更高效
     /// 3. 设备生命周期需要精确控制，Rc 确保在所有引用者销毁前设备不被销毁
+    ///
+    /// 使用 Rc<> 的时机：在 RenderContext 内部的对象，可以通过 Rc 去访问 DevcesFunctions
     pub(crate) device_functions: Rc<DeviceFunctions>,
 
     pub(crate) debug_utils: DebugMsger,

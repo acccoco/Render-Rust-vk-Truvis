@@ -1,5 +1,6 @@
 use ash::vk;
 
+use crate::commands::command_buffer::CommandBuffer;
 use crate::{
     commands::command_queue::QueueFamily, foundation::debug_messenger::DebugType, render_context::RenderContext,
 };
@@ -91,6 +92,17 @@ impl CommandPool {
         let device_functions = RenderContext::get().device_functions();
         unsafe {
             device_functions.reset_command_pool(self.handle, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();
+        }
+    }
+
+    /// 释放 command buffer
+    ///
+    /// 释放之后，command buffer 不能再被使用
+    pub fn free_command_buffers(&self, command_buffers: Vec<CommandBuffer>) {
+        let command_buffer_handles: Vec<vk::CommandBuffer> =
+            command_buffers.iter().map(|cmd| cmd.vk_handle()).collect();
+        unsafe {
+            RenderContext::get().device_functions().free_command_buffers(self.handle, &command_buffer_handles);
         }
     }
 }

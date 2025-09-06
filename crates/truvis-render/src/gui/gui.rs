@@ -9,7 +9,6 @@ use truvis_rhi::swapchain::render_swapchain::SwapchainImageInfo;
 use truvis_rhi::{
     basic::color::LabelColor,
     commands::command_buffer::CommandBuffer,
-    foundation::device::DeviceFunctions,
     render_context::RenderContext,
     resources::{image::Image2D, texture::Texture2D},
 };
@@ -24,13 +23,7 @@ pub struct Gui {
     /// 存放多帧 imgui 的 mesh 数据
     meshes: Vec<Option<GuiMesh>>,
     render_image_key: Option<String>,
-
-    device_functions: Rc<DeviceFunctions>,
 }
-impl Drop for Gui {
-    fn drop(&mut self) {}
-}
-
 /// 创建过程
 impl Gui {
     const FONT_TEXTURE_ID: usize = 0;
@@ -70,8 +63,6 @@ impl Gui {
 
             meshes: (0..fif_num).map(|_| None).collect(),
             render_image_key: None,
-
-            device_functions: RenderContext::get().device_functions(),
         }
     }
 
@@ -132,7 +123,6 @@ impl Gui {
         imgui_ctx.fonts().tex_id = fonts_texture_id;
     }
 }
-
 /// tools
 impl Gui {
     /// 接受 window 的事件
@@ -323,5 +313,10 @@ impl Gui {
     #[inline]
     pub fn get_render_region(&self) -> vk::Rect2D {
         self.render_region
+    }
+}
+impl Drop for Gui {
+    fn drop(&mut self) {
+        // 每个字段都是 RAII 的
     }
 }

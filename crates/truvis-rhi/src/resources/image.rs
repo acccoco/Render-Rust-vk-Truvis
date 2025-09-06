@@ -5,66 +5,10 @@ use vk_mem::Alloc;
 
 use crate::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
-    foundation::{debug_messenger::DebugType, device::DeviceFunctions, mem_allocator::MemAllocator},
+    foundation::debug_messenger::DebugType,
     render_context::RenderContext,
     resources::buffer::Buffer,
 };
-
-pub struct ImageCreateInfo {
-    inner: vk::ImageCreateInfo<'static>,
-
-    queue_family_indices: Vec<u32>,
-}
-
-impl ImageCreateInfo {
-    #[inline]
-    pub fn new_image_2d_info(extent: vk::Extent2D, format: vk::Format, usage: vk::ImageUsageFlags) -> Self {
-        Self {
-            inner: vk::ImageCreateInfo {
-                image_type: vk::ImageType::TYPE_2D,
-                format,
-                extent: extent.into(),
-                mip_levels: 1,
-                array_layers: 1,
-                samples: vk::SampleCountFlags::TYPE_1,
-                tiling: vk::ImageTiling::OPTIMAL,
-                usage,
-                sharing_mode: vk::SharingMode::EXCLUSIVE,
-                // spec 上面说，这里只能是 UNDEFINED 或者 PREINITIALIZED
-                initial_layout: vk::ImageLayout::UNDEFINED,
-                ..Default::default()
-            },
-            queue_family_indices: Vec::new(),
-        }
-    }
-
-    #[inline]
-    pub fn as_info(&self) -> vk::ImageCreateInfo<'_> {
-        self.inner.queue_family_indices(&self.queue_family_indices)
-    }
-
-    // getter
-    #[inline]
-    pub fn extent(&self) -> &vk::Extent3D {
-        &self.inner.extent
-    }
-    #[inline]
-    pub fn format(&self) -> vk::Format {
-        self.inner.format
-    }
-
-    // builder
-    #[inline]
-    pub fn queue_family_indices(mut self, queue_family_indices: &[u32]) -> Self {
-        self.inner.sharing_mode = vk::SharingMode::CONCURRENT;
-        self.queue_family_indices = queue_family_indices.into();
-
-        self.inner.queue_family_index_count = self.queue_family_indices.len() as u32;
-        self.inner.p_queue_family_indices = self.queue_family_indices.as_ptr();
-        self
-    }
-}
-
 pub struct Image2D {
     handle: vk::Image,
 
@@ -72,27 +16,7 @@ pub struct Image2D {
 
     _name: String,
     image_info: Rc<ImageCreateInfo>,
-
-    allocator: Rc<MemAllocator>,
-    device_functions: Rc<DeviceFunctions>,
 }
-
-impl DebugType for Image2D {
-    fn debug_type_name() -> &'static str {
-        "RhiImage2D"
-    }
-
-    fn vk_handle(&self) -> impl vk::Handle {
-        self.handle
-    }
-}
-
-impl Drop for Image2D {
-    fn drop(&mut self) {
-        unsafe { self.allocator.destroy_image(self.handle, &mut self.allocation) }
-    }
-}
-
 // getter
 impl Image2D {
     #[inline]
@@ -116,14 +40,11 @@ impl Image2D {
     }
 }
 
+/// 构建与销毁
 impl Image2D {
-    pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
-        image_info: Rc<ImageCreateInfo>,
-        alloc_info: &vk_mem::AllocationCreateInfo,
-        debug_name: &str,
-    ) -> Self {
+    pub fn new(image_info: Rc<ImageCreateInfo>, alloc_info: &vk_mem::AllocationCreateInfo, debug_name: &str) -> Self {
+        let allocator = RenderContext::get().allocator();
+        let device_functions = RenderContext::get().device_functions();
         let (image, alloc) = unsafe { allocator.create_image(&image_info.as_info(), alloc_info).unwrap() };
         let image = Self {
             _name: debug_name.to_string(),
@@ -132,8 +53,6 @@ impl Image2D {
             allocation: alloc,
 
             image_info,
-            allocator,
-            device_functions: device_functions.clone(),
         };
         device_functions.set_debug_name(&image, debug_name);
         image
@@ -141,8 +60,6 @@ impl Image2D {
     /// 根据 RGBA8_UNORM 的 data 创建 image
     pub fn from_rgba8(width: u32, height: u32, data: &[u8], name: impl AsRef<str>) -> Self {
         let image = Self::new(
-            RenderContext::get().device_functions(),
-            RenderContext::get().allocator(),
             Rc::new(ImageCreateInfo::new_image_2d_info(
                 vk::Extent2D { width, height },
                 vk::Format::R8G8B8A8_UNORM,
@@ -238,8 +155,28 @@ impl Image2D {
             _ => panic!("unsupported format."),
         }
     }
+
+    #[inline]
+    pub fn destroy(self) {
+        // 通过 drop 实现
+    }
 }
 
+impl Drop for Image2D {
+    fn drop(&mut self) {
+        unsafe { RenderContext::get().allocator().destroy_image(self.handle, &mut self.allocation) }
+    }
+}
+
+impl DebugType for Image2D {
+    fn debug_type_name() -> &'static str {
+        "RhiImage2D"
+    }
+
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
 pub enum ImageContainer {
     Own(Box<Image2D>),
     Shared(Rc<Image2D>),
@@ -254,5 +191,60 @@ impl ImageContainer {
             ImageContainer::Shared(image) => image.handle(),
             ImageContainer::Raw(image) => *image,
         }
+    }
+}
+
+pub struct ImageCreateInfo {
+    inner: vk::ImageCreateInfo<'static>,
+
+    queue_family_indices: Vec<u32>,
+}
+
+impl ImageCreateInfo {
+    #[inline]
+    pub fn new_image_2d_info(extent: vk::Extent2D, format: vk::Format, usage: vk::ImageUsageFlags) -> Self {
+        Self {
+            inner: vk::ImageCreateInfo {
+                image_type: vk::ImageType::TYPE_2D,
+                format,
+                extent: extent.into(),
+                mip_levels: 1,
+                array_layers: 1,
+                samples: vk::SampleCountFlags::TYPE_1,
+                tiling: vk::ImageTiling::OPTIMAL,
+                usage,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                // spec 上面说，这里只能是 UNDEFINED 或者 PREINITIALIZED
+                initial_layout: vk::ImageLayout::UNDEFINED,
+                ..Default::default()
+            },
+            queue_family_indices: Vec::new(),
+        }
+    }
+
+    #[inline]
+    pub fn as_info(&self) -> vk::ImageCreateInfo<'_> {
+        self.inner.queue_family_indices(&self.queue_family_indices)
+    }
+
+    // getter
+    #[inline]
+    pub fn extent(&self) -> &vk::Extent3D {
+        &self.inner.extent
+    }
+    #[inline]
+    pub fn format(&self) -> vk::Format {
+        self.inner.format
+    }
+
+    // builder
+    #[inline]
+    pub fn queue_family_indices(mut self, queue_family_indices: &[u32]) -> Self {
+        self.inner.sharing_mode = vk::SharingMode::CONCURRENT;
+        self.queue_family_indices = queue_family_indices.into();
+
+        self.inner.queue_family_index_count = self.queue_family_indices.len() as u32;
+        self.inner.p_queue_family_indices = self.queue_family_indices.as_ptr();
+        self
     }
 }

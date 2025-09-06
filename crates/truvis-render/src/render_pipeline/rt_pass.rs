@@ -6,7 +6,6 @@ use shader_binding::{shader, shader::ImageHandle};
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
-    foundation::device::DeviceFunctions,
     pipelines::shader::{ShaderGroupInfo, ShaderModule, ShaderStageInfo},
     render_context::RenderContext,
     resources::special_buffers::{sbt_buffer::SBTBuffer, structured_buffer::StructuredBuffer},
@@ -20,14 +19,13 @@ use crate::{
 pub struct RhiRtPipeline {
     pub pipeline: vk::Pipeline,
     pub pipeline_layout: vk::PipelineLayout,
-
-    pub device_functions: Rc<DeviceFunctions>,
 }
 impl Drop for RhiRtPipeline {
     fn drop(&mut self) {
+        let device_functions = RenderContext::get().device_functions();
         unsafe {
-            self.device_functions.destroy_pipeline(self.pipeline, None);
-            self.device_functions.destroy_pipeline_layout(self.pipeline_layout, None);
+            device_functions.destroy_pipeline(self.pipeline, None);
+            device_functions.destroy_pipeline_layout(self.pipeline_layout, None);
         }
     }
 }
@@ -101,8 +99,6 @@ pub struct SBTRegions {
     sbt_region_callable: vk::StridedDeviceAddressRegionKHR,
 
     _sbt_buffer: SBTBuffer,
-
-    device_functions: Rc<DeviceFunctions>,
 }
 impl SBTRegions {
     const RAYGEN_SBT_REGION: usize = ShaderGroups::RayGen.index();
@@ -242,7 +238,6 @@ impl SBTRegions {
             sbt_region_hit,
             sbt_region_callable,
             _sbt_buffer: sbt_buffer,
-            device_functions: RenderContext::get().device_functions().clone(),
         }
     }
 }
@@ -252,8 +247,6 @@ pub struct SimlpeRtPass {
     _bindless_mgr: Rc<RefCell<BindlessManager>>,
 
     _sbt: SBTRegions,
-
-    device_functions: Rc<DeviceFunctions>,
 }
 impl SimlpeRtPass {
     pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
@@ -331,7 +324,6 @@ impl SimlpeRtPass {
         let rt_pipeline = RhiRtPipeline {
             pipeline,
             pipeline_layout,
-            device_functions: RenderContext::get().device_functions().clone(),
         };
         let sbt = SBTRegions::create_sbt(&rt_pipeline);
 
@@ -339,7 +331,6 @@ impl SimlpeRtPass {
             pipeline: rt_pipeline,
             _sbt: sbt,
             _bindless_mgr: bindless_mgr,
-            device_functions: RenderContext::get().device_functions().clone(),
         }
     }
     pub fn ray_trace(

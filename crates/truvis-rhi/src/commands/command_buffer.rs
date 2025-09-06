@@ -1,15 +1,14 @@
-use std::rc::Rc;
-
 use ash::vk;
 use itertools::Itertools;
 
+use crate::render_context::RenderContext;
 use crate::{
     basic::color::LabelColor,
     commands::{
         barrier::{BufferBarrier, ImageBarrier},
         command_pool::CommandPool,
     },
-    foundation::{debug_messenger::DebugType, device::DeviceFunctions},
+    foundation::debug_messenger::DebugType,
     pipelines::rendering_info::RenderingInfo,
     query::query_pool::QueryPool,
     resources::buffer::Buffer,
@@ -20,35 +19,24 @@ use crate::{
 pub struct CommandBuffer {
     vk_handle: vk::CommandBuffer,
     command_pool_handle: vk::CommandPool,
-    pub(crate) device_functions: Rc<DeviceFunctions>,
 }
 
 /// 创建与销毁
 impl CommandBuffer {
-    pub fn new(device_functions: Rc<DeviceFunctions>, command_pool: &CommandPool, debug_name: &str) -> Self {
+    pub fn new(command_pool: &CommandPool, debug_name: &str) -> Self {
         let info = vk::CommandBufferAllocateInfo::default()
             .command_pool(command_pool.handle())
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_buffer_count(1);
 
-        let command_buffer = unsafe { device_functions.allocate_command_buffers(&info).unwrap()[0] };
+        let command_buffer =
+            unsafe { RenderContext::get().device_functions().allocate_command_buffers(&info).unwrap()[0] };
         let cmd_buffer = CommandBuffer {
             vk_handle: command_buffer,
             command_pool_handle: command_pool.handle(),
-            device_functions: device_functions.clone(),
         };
-        device_functions.set_debug_name(&cmd_buffer, debug_name);
+        RenderContext::get().device_functions().set_debug_name(&cmd_buffer, debug_name);
         cmd_buffer
-    }
-
-    /// 释放 command buffer 在 command pool 中所占用的内存
-    ///
-    /// 释放之后 command buffer 就不存在了
-    #[inline]
-    pub fn free(self) {
-        unsafe {
-            self.device_functions.free_command_buffers(self.command_pool_handle, std::slice::from_ref(&self.vk_handle));
-        }
     }
 }
 
@@ -60,7 +48,8 @@ impl CommandBuffer {
     #[inline]
     pub fn begin(&self, usage_flag: vk::CommandBufferUsageFlags, debug_label_name: &str) {
         unsafe {
-            self.device_functions
+            RenderContext::get()
+                .device_functions()
                 .begin_command_buffer(self.vk_handle, &vk::CommandBufferBeginInfo::default().flags(usage_flag))
                 .unwrap();
         }
@@ -73,7 +62,7 @@ impl CommandBuffer {
     #[inline]
     pub fn end(&self) {
         self.end_label();
-        unsafe { self.device_functions.end_command_buffer(self.vk_handle).unwrap() }
+        unsafe { RenderContext::get().device_functions().end_command_buffer(self.vk_handle).unwrap() }
     }
 }
 
@@ -93,7 +82,12 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_copy_buffer_1(&self, src: &Buffer, dst: &mut Buffer, regions: &[vk::BufferCopy]) {
         unsafe {
-            self.device_functions.cmd_copy_buffer(self.vk_handle, src.handle(), dst.handle(), regions);
+            RenderContext::get().device_functions().cmd_copy_buffer(
+                self.vk_handle,
+                src.handle(),
+                dst.handle(),
+                regions,
+            );
         }
     }
 
@@ -102,7 +96,12 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_copy_buffer(&self, src: &ManagedBuffer, dst: &ManagedBuffer, regions: &[vk::BufferCopy]) {
         unsafe {
-            self.device_functions.cmd_copy_buffer(self.vk_handle, src.handle(), dst.handle(), regions);
+            RenderContext::get().device_functions().cmd_copy_buffer(
+                self.vk_handle,
+                src.handle(),
+                dst.handle(),
+                regions,
+            );
         }
     }
 
@@ -110,7 +109,7 @@ impl CommandBuffer {
     /// - 支持的 queue：transfer，graphics，compute
     #[inline]
     pub fn cmd_copy_buffer_to_image(&self, copy_info: &vk::CopyBufferToImageInfo2) {
-        unsafe { self.device_functions.cmd_copy_buffer_to_image2(self.vk_handle, copy_info) }
+        unsafe { RenderContext::get().device_functions().cmd_copy_buffer_to_image2(self.vk_handle, copy_info) }
     }
 
     /// 将 data 传输到 buffer 中，大小限制：65536Bytes=64KB
@@ -125,7 +124,7 @@ impl CommandBuffer {
     /// - supported queue types: transfer, graphics, compute
     #[inline]
     pub fn cmd_update_buffer(&self, buffer: vk::Buffer, offset: vk::DeviceSize, data: &[u8]) {
-        unsafe { self.device_functions.cmd_update_buffer(self.vk_handle, buffer, offset, data) }
+        unsafe { RenderContext::get().device_functions().cmd_update_buffer(self.vk_handle, buffer, offset, data) }
     }
 
     /// - command type: state
@@ -139,7 +138,13 @@ impl CommandBuffer {
         data: &[u8],
     ) {
         unsafe {
-            self.device_functions.cmd_push_constants(self.vk_handle, pipeline_layout, stage, offset, data);
+            RenderContext::get().device_functions().cmd_push_constants(
+                self.vk_handle,
+                pipeline_layout,
+                stage,
+                offset,
+                data,
+            );
         }
     }
 }
@@ -151,14 +156,17 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_begin_rendering(&self, render_info: &vk::RenderingInfo) {
         unsafe {
-            self.device_functions.dynamic_rendering.cmd_begin_rendering(self.vk_handle, render_info);
+            RenderContext::get().device_functions().dynamic_rendering.cmd_begin_rendering(self.vk_handle, render_info);
         }
     }
 
     pub fn cmd_begin_rendering2(&self, rendering_info: &RenderingInfo) {
         let rendering_info = rendering_info.rendering_info();
         unsafe {
-            self.device_functions.dynamic_rendering.cmd_begin_rendering(self.vk_handle, &rendering_info);
+            RenderContext::get()
+                .device_functions()
+                .dynamic_rendering
+                .cmd_begin_rendering(self.vk_handle, &rendering_info);
         }
     }
 
@@ -167,7 +175,7 @@ impl CommandBuffer {
     #[inline]
     pub fn end_rendering(&self) {
         unsafe {
-            self.device_functions.dynamic_rendering.cmd_end_rendering(self.vk_handle);
+            RenderContext::get().device_functions().dynamic_rendering.cmd_end_rendering(self.vk_handle);
         }
     }
 
@@ -183,7 +191,7 @@ impl CommandBuffer {
         vertex_offset: i32,
     ) {
         unsafe {
-            self.device_functions.cmd_draw_indexed(
+            RenderContext::get().device_functions().cmd_draw_indexed(
                 self.vk_handle,
                 index_cnt,
                 instance_cnt,
@@ -201,7 +209,13 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_draw(&self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
         unsafe {
-            self.device_functions.cmd_draw(self.vk_handle, vertex_count, instance_count, first_vertex, first_instance);
+            RenderContext::get().device_functions().cmd_draw(
+                self.vk_handle,
+                vertex_count,
+                instance_count,
+                first_vertex,
+                first_instance,
+            );
         }
     }
 
@@ -217,7 +231,7 @@ impl CommandBuffer {
         dynamic_offsets: Option<&[u32]>,
     ) {
         unsafe {
-            self.device_functions.cmd_bind_descriptor_sets(
+            RenderContext::get().device_functions().cmd_bind_descriptor_sets(
                 self.vk_handle,
                 bind_point,
                 pipeline_layout,
@@ -233,7 +247,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_bind_pipeline(&self, bind_point: vk::PipelineBindPoint, pipeline: vk::Pipeline) {
         unsafe {
-            self.device_functions.cmd_bind_pipeline(self.vk_handle, bind_point, pipeline);
+            RenderContext::get().device_functions().cmd_bind_pipeline(self.vk_handle, bind_point, pipeline);
         }
     }
 
@@ -244,7 +258,12 @@ impl CommandBuffer {
     pub fn cmd_bind_vertex_buffers(&self, first_bind: u32, buffers: &[Buffer], offsets: &[vk::DeviceSize]) {
         unsafe {
             let buffers = buffers.iter().map(|b| b.handle()).collect_vec();
-            self.device_functions.cmd_bind_vertex_buffers(self.vk_handle, first_bind, &buffers, offsets);
+            RenderContext::get().device_functions().cmd_bind_vertex_buffers(
+                self.vk_handle,
+                first_bind,
+                &buffers,
+                offsets,
+            );
         }
     }
 
@@ -253,7 +272,12 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_bind_index_buffer(&self, buffer: &Buffer, offset: vk::DeviceSize, index_type: vk::IndexType) {
         unsafe {
-            self.device_functions.cmd_bind_index_buffer(self.vk_handle, buffer.handle(), offset, index_type);
+            RenderContext::get().device_functions().cmd_bind_index_buffer(
+                self.vk_handle,
+                buffer.handle(),
+                offset,
+                index_type,
+            );
         }
     }
 
@@ -262,7 +286,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_set_viewport(&self, first_viewport: u32, viewports: &[vk::Viewport]) {
         unsafe {
-            self.device_functions.cmd_set_viewport(self.vk_handle, first_viewport, viewports);
+            RenderContext::get().device_functions().cmd_set_viewport(self.vk_handle, first_viewport, viewports);
         }
     }
 
@@ -271,7 +295,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_set_scissor(&self, first_scissor: u32, scissors: &[vk::Rect2D]) {
         unsafe {
-            self.device_functions.cmd_set_scissor(self.vk_handle, first_scissor, scissors);
+            RenderContext::get().device_functions().cmd_set_scissor(self.vk_handle, first_scissor, scissors);
         }
     }
 }
@@ -283,7 +307,10 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_copy_acceleration_structure(&self, copy_info: &vk::CopyAccelerationStructureInfoKHR) {
         unsafe {
-            self.device_functions.acceleration_structure.cmd_copy_acceleration_structure(self.vk_handle, copy_info);
+            RenderContext::get()
+                .device_functions()
+                .acceleration_structure
+                .cmd_copy_acceleration_structure(self.vk_handle, copy_info);
         }
     }
 
@@ -297,7 +324,7 @@ impl CommandBuffer {
     ) {
         unsafe {
             // 该函数可以一次构建多个 AccelerationStructure，这里只构建了 1 个
-            self.device_functions.acceleration_structure.cmd_build_acceleration_structures(
+            RenderContext::get().device_functions().acceleration_structure.cmd_build_acceleration_structures(
                 self.vk_handle,
                 std::slice::from_ref(geometry),
                 &[ranges],
@@ -316,7 +343,7 @@ impl CommandBuffer {
         acceleration_structures: &[vk::AccelerationStructureKHR],
     ) {
         unsafe {
-            self.device_functions.acceleration_structure.cmd_write_acceleration_structures_properties(
+            RenderContext::get().device_functions().acceleration_structure.cmd_write_acceleration_structures_properties(
                 self.vk_handle,
                 acceleration_structures,
                 query_pool.query_type(),
@@ -339,7 +366,7 @@ impl CommandBuffer {
         thread_size: [u32; 3],
     ) {
         unsafe {
-            self.device_functions.ray_tracing_pipeline.cmd_trace_rays(
+            RenderContext::get().device_functions().ray_tracing_pipeline.cmd_trace_rays(
                 self.vk_handle,
                 raygen_table,
                 miss_table,
@@ -358,7 +385,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_dispatch(&self, group_cnt: glam::UVec3) {
         unsafe {
-            self.device_functions.cmd_dispatch(self.vk_handle, group_cnt.x, group_cnt.y, group_cnt.z);
+            RenderContext::get().device_functions().cmd_dispatch(self.vk_handle, group_cnt.x, group_cnt.y, group_cnt.z);
         }
     }
 }
@@ -371,7 +398,7 @@ impl CommandBuffer {
     pub fn memory_barrier(&self, barriers: &[vk::MemoryBarrier2]) {
         let dependency_info = vk::DependencyInfo::default().memory_barriers(barriers);
         unsafe {
-            self.device_functions.cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
+            RenderContext::get().device_functions().cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
         }
     }
 
@@ -383,7 +410,7 @@ impl CommandBuffer {
         let dependency_info =
             vk::DependencyInfo::default().image_memory_barriers(&barriers).dependency_flags(dependency_flags);
         unsafe {
-            self.device_functions.cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
+            RenderContext::get().device_functions().cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
         }
     }
 
@@ -395,7 +422,7 @@ impl CommandBuffer {
         let dependency_info =
             vk::DependencyInfo::default().buffer_memory_barriers(&barriers).dependency_flags(dependency_flags);
         unsafe {
-            self.device_functions.cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
+            RenderContext::get().device_functions().cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
         }
     }
 }
@@ -408,7 +435,7 @@ impl CommandBuffer {
     pub fn begin_label(&self, label_name: &str, label_color: glam::Vec4) {
         let name = std::ffi::CString::new(label_name).unwrap();
         unsafe {
-            self.device_functions.debug_utils.cmd_begin_debug_utils_label(
+            RenderContext::get().device_functions().debug_utils.cmd_begin_debug_utils_label(
                 self.vk_handle,
                 &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(label_color.into()),
             );
@@ -420,7 +447,7 @@ impl CommandBuffer {
     #[inline]
     pub fn end_label(&self) {
         unsafe {
-            self.device_functions.debug_utils.cmd_end_debug_utils_label(self.vk_handle);
+            RenderContext::get().device_functions().debug_utils.cmd_end_debug_utils_label(self.vk_handle);
         }
     }
 
@@ -430,7 +457,7 @@ impl CommandBuffer {
     pub fn insert_label(&self, label_name: &str, label_color: glam::Vec4) {
         let name = std::ffi::CString::new(label_name).unwrap();
         unsafe {
-            self.device_functions.debug_utils.cmd_insert_debug_utils_label(
+            RenderContext::get().device_functions().debug_utils.cmd_insert_debug_utils_label(
                 self.vk_handle,
                 &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(label_color.into()),
             );

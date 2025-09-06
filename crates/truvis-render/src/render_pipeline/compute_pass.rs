@@ -1,9 +1,8 @@
-use std::{ffi::CStr, rc::Rc};
+use std::ffi::CStr;
 
 use ash::vk;
 use truvis_rhi::{
-    commands::command_buffer::CommandBuffer, foundation::device::DeviceFunctions, pipelines::shader::ShaderModule,
-    render_context::RenderContext,
+    commands::command_buffer::CommandBuffer, pipelines::shader::ShaderModule, render_context::RenderContext,
 };
 
 use crate::renderer::bindless::BindlessManager;
@@ -14,8 +13,6 @@ pub struct ComputePass<P: bytemuck::Pod> {
     pipeline_layout: vk::PipelineLayout,
 
     _phantom: std::marker::PhantomData<P>,
-
-    device_functions: Rc<DeviceFunctions>,
 }
 impl<P: bytemuck::Pod> ComputePass<P> {
     pub fn new(bindless_mgr: &BindlessManager, entry_point: &CStr, shader_path: &str) -> Self {
@@ -56,7 +53,6 @@ impl<P: bytemuck::Pod> ComputePass<P> {
             pipeline_layout,
 
             _phantom: std::marker::PhantomData,
-            device_functions: RenderContext::get().device_functions().clone(),
         }
     }
 
@@ -75,12 +71,17 @@ impl<P: bytemuck::Pod> ComputePass<P> {
         // 执行计算
         cmd.cmd_dispatch(group_cnt);
     }
+
+    pub fn destroy(self) {
+        // drop
+    }
 }
 impl<P: bytemuck::Pod> Drop for ComputePass<P> {
     fn drop(&mut self) {
+        let device_functions = RenderContext::get().device_functions();
         unsafe {
-            self.device_functions.destroy_pipeline(self.pipeline, None);
-            self.device_functions.destroy_pipeline_layout(self.pipeline_layout, None);
+            device_functions.destroy_pipeline(self.pipeline, None);
+            device_functions.destroy_pipeline_layout(self.pipeline_layout, None);
         }
     }
 }

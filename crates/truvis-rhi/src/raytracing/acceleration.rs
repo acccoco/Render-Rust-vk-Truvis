@@ -1,36 +1,23 @@
 //! Ray Tracing 所需的加速结构
 
-use std::rc::Rc;
-
 use ash::vk;
 use itertools::Itertools;
 
 use crate::{
-    foundation::{debug_messenger::DebugType, device::DeviceFunctions, mem_allocator::MemAllocator},
-    query::query_pool::QueryPool,
-    render_context::RenderContext,
+    foundation::debug_messenger::DebugType, query::query_pool::QueryPool, render_context::RenderContext,
     resources::buffer::Buffer,
 };
 
-pub struct BlasInputInfo<'a> {
-    pub geometry: vk::AccelerationStructureGeometryKHR<'a>,
-    pub range: vk::AccelerationStructureBuildRangeInfoKHR,
-}
-
 pub struct Acceleration {
-    acceleration_structure: vk::AccelerationStructureKHR,
-    _buffer: Buffer,
-    device_functions: Rc<DeviceFunctions>,
-}
-impl DebugType for Acceleration {
-    fn debug_type_name() -> &'static str {
-        "RhiAcceleration"
-    }
+    /// 加速结构的核心对象
+    ///
+    /// 用于传递给 Gpu 的 device address，也是从该对象上获取到的
+    acceleration_handle: vk::AccelerationStructureKHR,
 
-    fn vk_handle(&self) -> impl vk::Handle {
-        self.acceleration_structure
-    }
+    /// 这里的 buffer 仅仅是用于内存分配，实际的 Acceleration 相关的操作都是通过 acceleration_handle 来进行的
+    _buffer: Buffer,
 }
+/// 构造与销毁
 impl Acceleration {
     /// 同步构建 blas
     ///
@@ -79,8 +66,6 @@ impl Acceleration {
         };
 
         let uncompact_acceleration = Self::new(
-            RenderContext::get().device_functions(),
-            RenderContext::get().allocator(),
             size_info.acceleration_structure_size,
             vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
             format!("{}-uncompact-blas", debug_name.as_ref()),
@@ -92,7 +77,7 @@ impl Acceleration {
         );
 
         // 填充 build geometry info 的剩余部分以 build blas
-        build_geometry_info.dst_acceleration_structure = uncompact_acceleration.acceleration_structure;
+        build_geometry_info.dst_acceleration_structure = uncompact_acceleration.acceleration_handle;
         build_geometry_info.scratch_data = vk::DeviceOrHostAddressKHR {
             device_address: scratch_buffer.device_address(),
         };
@@ -125,8 +110,6 @@ impl Acceleration {
         // 提供更紧凑的 acceleration
         let compact_size: Vec<vk::DeviceSize> = query_pool.get_query_result(0, 1);
         let compact_acceleration = Self::new(
-            RenderContext::get().device_functions(),
-            RenderContext::get().allocator(),
             compact_size[0],
             vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
             format!("{}-compact-blas", debug_name.as_ref()),
@@ -136,8 +119,8 @@ impl Acceleration {
             |cmd| {
                 cmd.cmd_copy_acceleration_structure(
                     &vk::CopyAccelerationStructureInfoKHR::default()
-                        .src(uncompact_acceleration.acceleration_structure)
-                        .dst(compact_acceleration.acceleration_structure)
+                        .src(uncompact_acceleration.acceleration_handle)
+                        .dst(compact_acceleration.acceleration_handle)
                         .mode(vk::CopyAccelerationStructureModeKHR::COMPACT),
                 );
             },
@@ -201,8 +184,6 @@ impl Acceleration {
         };
 
         let acceleration = Self::new(
-            RenderContext::get().device_functions(),
-            RenderContext::get().allocator(),
             size_info.acceleration_structure_size,
             vk::AccelerationStructureTypeKHR::TOP_LEVEL,
             format!("{}-tlas", debug_name.as_ref()),
@@ -214,7 +195,7 @@ impl Acceleration {
         );
 
         // 补全剩下的 build info
-        build_geometry_info.dst_acceleration_structure = acceleration.acceleration_structure;
+        build_geometry_info.dst_acceleration_structure = acceleration.acceleration_handle;
         build_geometry_info.scratch_data.device_address = scratch_buffer.device_address();
 
         // 正式构建 TLAS
@@ -229,13 +210,7 @@ impl Acceleration {
     }
 
     /// 创建 AccelerationStructure 以及 buffer    
-    fn new(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
-        size: vk::DeviceSize,
-        ty: vk::AccelerationStructureTypeKHR,
-        debug_name: impl AsRef<str>,
-    ) -> Self {
+    fn new(size: vk::DeviceSize, ty: vk::AccelerationStructureTypeKHR, debug_name: impl AsRef<str>) -> Self {
         let buffer = Buffer::new_accleration_buffer(size as usize, debug_name.as_ref());
 
         let create_info = vk::AccelerationStructureCreateInfoKHR::default() //
@@ -243,13 +218,13 @@ impl Acceleration {
             .size(size)
             .buffer(buffer.handle());
 
+        let device_functions = RenderContext::get().device_functions();
         let acceleration_structure = unsafe {
             device_functions.acceleration_structure.create_acceleration_structure(&create_info, None).unwrap()
         };
 
         let acc = Self {
-            device_functions: device_functions.clone(),
-            acceleration_structure,
+            acceleration_handle: acceleration_structure,
             _buffer: buffer,
         };
         device_functions.set_debug_name(&acc, debug_name);
@@ -257,31 +232,50 @@ impl Acceleration {
     }
 
     #[inline]
-    pub fn handle(&self) -> vk::AccelerationStructureKHR {
-        self.acceleration_structure
-    }
-
-    #[inline]
-    pub fn get_device_address(&self) -> vk::DeviceAddress {
-        unsafe {
-            self.device_functions.acceleration_structure.get_acceleration_structure_device_address(
-                &vk::AccelerationStructureDeviceAddressInfoKHR::default()
-                    .acceleration_structure(self.acceleration_structure),
-            )
-        }
-    }
-
-    #[inline]
     pub fn destroy(self) {
         drop(self)
+    }
+}
+/// getters
+impl Acceleration {
+    #[inline]
+    pub fn handle(&self) -> vk::AccelerationStructureKHR {
+        self.acceleration_handle
+    }
+
+    #[inline]
+    pub fn device_address(&self) -> vk::DeviceAddress {
+        unsafe {
+            RenderContext::get().device_functions().acceleration_structure.get_acceleration_structure_device_address(
+                &vk::AccelerationStructureDeviceAddressInfoKHR::default()
+                    .acceleration_structure(self.acceleration_handle),
+            )
+        }
     }
 }
 impl Drop for Acceleration {
     fn drop(&mut self) {
         unsafe {
-            self.device_functions
+            RenderContext::get()
+                .device_functions()
                 .acceleration_structure
-                .destroy_acceleration_structure(self.acceleration_structure, None);
+                .destroy_acceleration_structure(self.acceleration_handle, None);
         }
     }
+}
+impl DebugType for Acceleration {
+    fn debug_type_name() -> &'static str {
+        "RhiAcceleration"
+    }
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.acceleration_handle
+    }
+}
+
+/// 用于构建 Blas 的输入信息
+///
+/// 包含 geometry 的 buffer 信息，以及图元的描述信息
+pub struct BlasInputInfo<'a> {
+    pub geometry: vk::AccelerationStructureGeometryKHR<'a>,
+    pub range: vk::AccelerationStructureBuildRangeInfoKHR,
 }

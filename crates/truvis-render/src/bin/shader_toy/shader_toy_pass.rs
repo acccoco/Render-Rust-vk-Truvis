@@ -77,7 +77,6 @@ impl ShaderToyPass {
         );
 
         let pipeline_layout = Rc::new(PipelineLayout::new(
-            RenderContext::get().device_functions(),
             &[],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
@@ -86,12 +85,7 @@ impl ShaderToyPass {
             }],
             "shader-toy",
         ));
-        let pipeline = GraphicsPipeline::new(
-            RenderContext::get().device_functions(),
-            &pipeline_ci,
-            pipeline_layout.clone(),
-            "shader-toy",
-        );
+        let pipeline = GraphicsPipeline::new(&pipeline_ci, pipeline_layout.clone(), "shader-toy");
 
         Self {
             _pipeline_layout: pipeline_layout,

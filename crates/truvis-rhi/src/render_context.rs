@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ffi::CStr, rc::Rc};
+use std::{cell::RefCell, ffi::CStr};
 
 use ash::vk;
 
@@ -18,7 +18,7 @@ use crate::{
 
 pub struct RenderContext {
     pub(crate) vk_core: VulkanCore,
-    pub(crate) allocator: Rc<MemAllocator>,
+    pub(crate) allocator: MemAllocator,
 
     /// 临时的 graphics command pool，主要用于临时的命令缓冲区
     pub(crate) temp_graphics_command_pool: CommandPool,
@@ -51,7 +51,7 @@ impl RenderContext {
 
         Self {
             vk_core: vk_ctx,
-            allocator: Rc::new(allocator),
+            allocator,
             temp_graphics_command_pool: graphics_command_pool,
             resource_mgr: RefCell::new(resource_mgr),
         }
@@ -73,6 +73,7 @@ impl RenderContext {
     ///
     /// # Safety
     /// 此方法仅在单线程环境下安全
+    #[inline]
     pub fn get() -> &'static RenderContext {
         unsafe {
             // 使用 addr_of! 避免直接对 static mut 创建引用
@@ -139,13 +140,13 @@ impl RenderContext {
     }
 
     #[inline]
-    pub fn device_functions(&self) -> Rc<DeviceFunctions> {
-        self.vk_core.device_functions.clone()
+    pub fn device_functions(&self) -> &DeviceFunctions {
+        &self.vk_core.device_functions
     }
 
     #[inline]
-    pub fn allocator(&self) -> Rc<MemAllocator> {
-        self.allocator.clone()
+    pub fn allocator(&self) -> &MemAllocator {
+        &self.allocator
     }
 
     #[inline]
@@ -229,11 +230,8 @@ impl RenderContext {
     where
         F: FnOnce(&CommandBuffer) -> R,
     {
-        let command_buffer = CommandBuffer::new(
-            self.device_functions(),
-            &self.temp_graphics_command_pool,
-            &format!("one-time-{}", name.as_ref()),
-        );
+        let command_buffer =
+            CommandBuffer::new(&self.temp_graphics_command_pool, &format!("one-time-{}", name.as_ref()));
 
         command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, name.as_ref());
         let result = func(&command_buffer);
@@ -242,7 +240,10 @@ impl RenderContext {
         let command_buffer_clone = command_buffer.clone();
         self.graphics_queue().submit(vec![SubmitInfo::new(&[command_buffer_clone])], None);
         self.graphics_queue().wait_idle();
-        command_buffer.free();
+        unsafe {
+            self.device_functions()
+                .free_command_buffers(self.temp_graphics_command_pool.handle(), &[command_buffer.vk_handle()]);
+        }
 
         result
     }

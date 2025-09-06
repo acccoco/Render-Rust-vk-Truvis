@@ -231,13 +231,7 @@ impl Deref for DeviceFunctions {
 impl Drop for DeviceFunctions {
     fn drop(&mut self) {
         #[cfg(debug_assertions)]
-        {
-            if !self.destroyed {
-                log::error!(
-                    "DeviceFunctions is being dropped without calling destroy(). This may lead to resource leaks."
-                );
-            }
-        }
+        debug_assert!(self.destroyed, "DeviceFunctions must be destroyed before being dropped.");
     }
 }
 impl DebugType for DeviceFunctions {

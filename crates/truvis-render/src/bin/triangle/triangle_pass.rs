@@ -21,7 +21,6 @@ use truvis_rhi::{
         rendering_info::RenderingInfo,
         shader::ShaderStageInfo,
     },
-    render_context::RenderContext,
 };
 
 const_map!(ShaderStage<ShaderStageInfo>: {
@@ -57,14 +56,8 @@ impl TrianglePass {
             [0.0; 4],
         );
 
-        let pipeline_layout =
-            Rc::new(PipelineLayout::new(RenderContext::get().device_functions(), &[], &[], "hello-triangle"));
-        let pipeline = GraphicsPipeline::new(
-            RenderContext::get().device_functions(),
-            &pipeline_ci,
-            pipeline_layout.clone(),
-            "hello-triangle-pipeline",
-        );
+        let pipeline_layout = Rc::new(PipelineLayout::new(&[], &[], "hello-triangle"));
+        let pipeline = GraphicsPipeline::new(&pipeline_ci, pipeline_layout.clone(), "hello-triangle-pipeline");
 
         Self {
             _pipeline_layout: pipeline_layout,

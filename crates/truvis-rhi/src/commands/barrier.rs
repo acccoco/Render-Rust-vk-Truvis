@@ -62,7 +62,6 @@ impl ImageBarrier {
     }
 
     /// builder
-    #[allow(clippy::redundant_clone)]
     #[inline]
     pub fn src_mask(mut self, src_stage_mask: vk::PipelineStageFlags2, src_access_mask: vk::AccessFlags2) -> Self {
         self.inner.src_stage_mask = src_stage_mask;
@@ -71,7 +70,6 @@ impl ImageBarrier {
     }
 
     /// builder
-    #[allow(clippy::redundant_clone)]
     #[inline]
     pub fn dst_mask(mut self, dst_stage_mask: vk::PipelineStageFlags2, dst_access_mask: vk::AccessFlags2) -> Self {
         self.inner.dst_stage_mask = dst_stage_mask;

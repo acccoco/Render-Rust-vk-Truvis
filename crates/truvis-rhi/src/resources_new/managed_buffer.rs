@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use ash::vk;
 use vk_mem::Alloc;
 
@@ -18,14 +16,15 @@ pub struct ManagedBuffer {
     device_addr: Option<vk::DeviceAddress>,
 
     debug_name: String,
+
+    #[cfg(debug_assertions)]
+    destroyed: bool,
 }
 impl ManagedBuffer {
     /// # Note
     /// - 默认对齐到 8 字节
     /// - 优先使用 device memory
     pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
         buffer_size: vk::DeviceSize,
         buffer_usage: vk::BufferUsageFlags,
         mem_map: bool,
@@ -41,8 +40,10 @@ impl ManagedBuffer {
             },
             ..Default::default()
         };
-        let (buffer, alloc) = unsafe { allocator.create_buffer_with_alignment(&buffer_ci, &alloc_ci, 8).unwrap() };
-        device_functions.set_object_debug_name(buffer, format!("Buffer::{}", name.as_ref()));
+
+        let (buffer, alloc) =
+            unsafe { RenderContext::get().allocator.create_buffer_with_alignment(&buffer_ci, &alloc_ci, 8).unwrap() };
+        RenderContext::get().device_functions().set_object_debug_name(buffer, format!("Buffer::{}", name.as_ref()));
         Self {
             vk_handle: buffer,
             allocation: alloc,
@@ -50,26 +51,24 @@ impl ManagedBuffer {
             map_ptr: None,
             device_addr: None,
             debug_name: name.as_ref().to_string(),
+
+            #[cfg(debug_assertions)]
+            destroyed: false,
         }
     }
 
     #[inline]
-    pub fn new_stage_buffer(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
-        buffer_size: vk::DeviceSize,
-        name: impl AsRef<str>,
-    ) -> Self {
-        Self::new(device_functions, allocator, buffer_size, vk::BufferUsageFlags::TRANSFER_SRC, true, name)
+    pub fn new_stage_buffer(buffer_size: vk::DeviceSize, name: impl AsRef<str>) -> Self {
+        Self::new(buffer_size, vk::BufferUsageFlags::TRANSFER_SRC, true, name)
     }
 
-    pub fn destroy(mut self, allocator: &MemAllocator) {
+    pub fn destroy(mut self) {
         unsafe {
-            allocator.destroy_buffer(self.vk_handle, &mut self.allocation);
+            RenderContext::get().allocator().destroy_buffer(self.vk_handle, &mut self.allocation);
         }
     }
 }
-// getter
+/// getter
 impl ManagedBuffer {
     #[inline]
     pub fn handle(&self) -> vk::Buffer {
@@ -79,14 +78,12 @@ impl ManagedBuffer {
     pub fn size(&self) -> vk::DeviceSize {
         self.size
     }
-
     #[inline]
     pub fn mapped_ptr(&self) -> *mut u8 {
         self.map_ptr.unwrap_or_else(|| {
             panic!("Buffer is not mapped, please call map() before using mapped_ptr()");
         })
     }
-
     #[inline]
     pub fn device_address(&self, device: &DeviceFunctions) -> vk::DeviceAddress {
         self.device_addr.unwrap_or_else(|| unsafe {
@@ -94,7 +91,7 @@ impl ManagedBuffer {
         })
     }
 }
-// tools
+/// tools
 impl ManagedBuffer {
     /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到
     /// self
@@ -105,12 +102,8 @@ impl ManagedBuffer {
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
     pub fn transfer_data_sync(&self, data: &[impl Sized + Copy]) {
-        let mut stage_buffer = Self::new_stage_buffer(
-            RenderContext::get().device_functions(),
-            RenderContext::get().allocator(),
-            size_of_val(data) as vk::DeviceSize,
-            format!("{}-stage-buffer", self.debug_name),
-        );
+        let mut stage_buffer =
+            Self::new_stage_buffer(size_of_val(data) as vk::DeviceSize, format!("{}-stage-buffer", self.debug_name));
         stage_buffer.transfer_data_by_mem_map(data, &RenderContext::get().allocator());
 
         RenderContext::get().one_time_exec(
@@ -127,7 +120,7 @@ impl ManagedBuffer {
             format!("{}-transfer-data", &self.debug_name),
         );
 
-        stage_buffer.destroy(&RenderContext::get().allocator);
+        stage_buffer.destroy();
     }
 
     /// 确保 `[T]` 的内存布局在 CPU 和 GPU 是一致的
@@ -174,5 +167,12 @@ impl ManagedBuffer {
             allocator.unmap_memory(&mut self.allocation);
             self.map_ptr = None;
         }
+    }
+}
+
+impl Drop for ManagedBuffer {
+    fn drop(&mut self) {
+        #[cfg(debug_assertions)]
+        debug_assert!(self.destroyed, "ManagedBuffer must be destroyed before being dropped.");
     }
 }

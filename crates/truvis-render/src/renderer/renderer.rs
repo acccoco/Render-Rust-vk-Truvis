@@ -9,7 +9,6 @@ use truvis_rhi::{
         submit_info::SubmitInfo,
     },
     descriptors::descriptor_pool::{DescriptorPool, DescriptorPoolCreateInfo},
-    foundation::device::DeviceFunctions,
     render_context::RenderContext,
     resources::{special_buffers::structured_buffer::StructuredBuffer, texture::Texture2D},
 };
@@ -24,10 +23,29 @@ use crate::{
     },
 };
 
+/// 渲染演示数据结构
+///
+/// 包含了向演示窗口提交渲染结果所需的所有数据和资源。
+/// 这个结构体作为渲染器内部状态与外部演示系统之间的桥梁。
 pub struct PresentData<'a> {
+    /// 当前帧的渲染目标纹理
+    ///
+    /// 包含了最终的渲染结果，将被复制或演示到屏幕上
     pub render_target: &'a Texture2D,
+
+    /// 渲染目标在 Bindless 系统中的唯一标识符
+    ///
+    /// 用于在着色器中通过 Bindless 方式访问渲染目标纹理
     pub render_target_bindless_key: String,
+
+    /// 渲染目标的内存屏障配置
+    ///
+    /// 定义了渲染目标纹理的同步需求，确保在读取前所有写入操作已完成
     pub render_target_barrier: BarrierMask,
+
+    /// 命令缓冲区分配器的可变引用
+    ///
+    /// 用于在演示阶段分配和管理 Vulkan 命令缓冲区
     pub cmd_allocator: &'a mut CmdAllocator,
 }
 
@@ -57,7 +75,7 @@ pub struct Renderer {
     fps_limit: f32,
 }
 
-// 手动 drop
+/// 手动 drop
 impl Renderer {
     pub fn destroy(self) {
         // 在 Renderer 被销毁时，等待 Rhi 设备空闲
@@ -66,7 +84,7 @@ impl Renderer {
     }
 }
 
-// getter
+/// getter
 impl Renderer {
     #[inline]
     pub fn frame_settings(&self) -> FrameSettings {
@@ -123,16 +141,16 @@ impl Renderer {
     }
 }
 
-// tools
+/// tools
 impl Renderer {}
 
-// init
+/// init
 impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         // 初始化 RenderContext 单例
         RenderContext::init("Truvis".to_string(), extra_instance_ext);
 
-        let descriptor_pool = Self::init_descriptor_pool(RenderContext::get().device_functions().clone());
+        let descriptor_pool = Self::init_descriptor_pool();
         let frame_settings = FrameSettings {
             color_format: vk::Format::R32G32B32A32_SFLOAT,
             depth_format: Self::get_depth_format(),
@@ -181,7 +199,7 @@ impl Renderer {
     const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
     const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
 
-    fn init_descriptor_pool(device: Rc<DeviceFunctions>) -> DescriptorPool {
+    fn init_descriptor_pool() -> DescriptorPool {
         let pool_size = vec![
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
@@ -219,11 +237,11 @@ impl Renderer {
             pool_size,
         ));
 
-        DescriptorPool::new(device, pool_ci, "renderer")
+        DescriptorPool::new(pool_ci, "renderer")
     }
 }
 
-// phase call
+/// phase call
 impl Renderer {
     pub fn begin_frame(&mut self) {
         // 等待 fif 的同一帧渲染完成

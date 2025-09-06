@@ -18,7 +18,7 @@ pub struct SceneManager {
 
     bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
-// getter
+/// getter
 impl SceneManager {
     #[inline]
     pub fn mat_map(&self) -> &HashMap<MatGuid, DrsMaterial> {

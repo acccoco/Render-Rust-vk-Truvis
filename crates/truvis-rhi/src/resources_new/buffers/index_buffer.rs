@@ -1,9 +1,8 @@
-use std::{marker::PhantomData, rc::Rc};
+use std::marker::PhantomData;
 
 use ash::vk;
 
 use crate::{
-    foundation::{device::DeviceFunctions, mem_allocator::MemAllocator},
     render_context::RenderContext,
     resources_new::{managed_buffer::ManagedBuffer, resource_handles::BufferHandle, resource_manager::ResourceManager},
 };
@@ -39,14 +38,8 @@ pub struct IndexBuffer<T: IndexElement> {
     _phantom_data: PhantomData<T>,
 }
 impl<T: IndexElement> IndexBuffer<T> {
-    pub fn new(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
-        resoure_mgr: &mut ResourceManager,
-        index_cnt: usize,
-        name: impl AsRef<str>,
-    ) -> Self {
-        let buffer = Self::new_managed(device_functions, allocator, index_cnt, name);
+    pub fn new(resoure_mgr: &mut ResourceManager, index_cnt: usize, name: impl AsRef<str>) -> Self {
+        let buffer = Self::new_managed(index_cnt, name);
         Self {
             buffer: resoure_mgr.register_buffer(buffer),
             cnt: index_cnt,
@@ -57,12 +50,7 @@ impl<T: IndexElement> IndexBuffer<T> {
     /// 创建 index buffer，并向其内写入数据
     #[inline]
     pub fn new_with_data(resoure_mgr: &mut ResourceManager, data: &[T], debug_name: impl AsRef<str>) -> Self {
-        let buffer = Self::new_managed(
-            RenderContext::get().device_functions(),
-            RenderContext::get().allocator(),
-            data.len(),
-            debug_name,
-        );
+        let buffer = Self::new_managed(data.len(), debug_name);
         buffer.transfer_data_sync(data);
         Self {
             buffer: resoure_mgr.register_buffer(buffer),
@@ -71,16 +59,9 @@ impl<T: IndexElement> IndexBuffer<T> {
         }
     }
 
-    fn new_managed(
-        device_functions: Rc<DeviceFunctions>,
-        allocator: Rc<MemAllocator>,
-        index_cnt: usize,
-        name: impl AsRef<str>,
-    ) -> ManagedBuffer {
+    fn new_managed(index_cnt: usize, name: impl AsRef<str>) -> ManagedBuffer {
         let size = index_cnt * T::byte_size();
         let buffer = ManagedBuffer::new(
-            device_functions.clone(),
-            allocator,
             size as vk::DeviceSize,
             vk::BufferUsageFlags::INDEX_BUFFER
                 | vk::BufferUsageFlags::TRANSFER_DST
@@ -89,7 +70,9 @@ impl<T: IndexElement> IndexBuffer<T> {
             false,
             name.as_ref(),
         );
-        device_functions.set_object_debug_name(buffer.handle(), format!("IndexBuffer::{}", name.as_ref()));
+        RenderContext::get()
+            .device_functions()
+            .set_object_debug_name(buffer.handle(), format!("IndexBuffer::{}", name.as_ref()));
         buffer
     }
 }

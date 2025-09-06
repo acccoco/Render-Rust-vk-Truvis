@@ -10,7 +10,6 @@ use truvis_rhi::{
         graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},
         rendering_info::RenderingInfo,
     },
-    render_context::RenderContext,
     resources::special_buffers::structured_buffer::StructuredBuffer,
 };
 
@@ -50,7 +49,6 @@ impl PhongPass {
         );
 
         let pipeline_layout = Rc::new(PipelineLayout::new(
-            RenderContext::get().device_functions(),
             &[bindless_manager.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
@@ -59,8 +57,7 @@ impl PhongPass {
             "phong-pass",
         ));
 
-        let d3_pipe =
-            GraphicsPipeline::new(RenderContext::get().device_functions(), &ci, pipeline_layout, "phong-d3-pipe");
+        let d3_pipe = GraphicsPipeline::new(&ci, pipeline_layout, "phong-d3-pipe");
 
         Self {
             pipeline: d3_pipe,
