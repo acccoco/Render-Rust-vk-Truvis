@@ -1,20 +1,22 @@
 #pragma once
 
-#include <assert.h>
+#include <cassert>
 #include <assimp/matrix4x4.h>
 #include <filesystem>
 #include <vector>
 #include <assimp/material.h>
 #include <assimp/mesh.h>
 #include <assimp/scene.h>
-#include <public/scene_loader/c_data_define.hpp>
+
+#include "TruvixxAssimp/c_data_define.hpp"
+#include "TruvixxAssimp/truvixx_assimp_export.h"
 
 
 namespace truvis
 {
 
 /// 场景加载器，使用 Assimp 库加载场景文件
-struct SceneLoader
+struct TRUVIXX_ASSIMP_API SceneLoader
 {
     explicit SceneLoader(const std::filesystem::path& mesh_path)
         : mesh_path_(mesh_path),
@@ -53,13 +55,14 @@ struct SceneLoader
     /// @param mesh_idx mesh 在 assimp 场景中的索引
     /// @param [out]vertex_cnt 返回顶点数量
     /// @return 指向顶点位置的指针，指针类型为 float*，每三个 float 代表一个顶点的 x, y, z 坐标
-    float* get_position(size_t mesh_idx, size_t& vertex_cnt)
+    float* get_position(const size_t mesh_idx, size_t& vertex_cnt) const
     {
         assert(sizeof( aiVector3D) == sizeof(float) * 3);
         const auto mesh = this->ai_scene_->mMeshes[mesh_idx];
         vertex_cnt = mesh->mNumVertices;
         return reinterpret_cast<float*>(mesh->mVertices);
     }
+
 #pragma endregion
 
 private:

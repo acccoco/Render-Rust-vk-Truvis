@@ -1,15 +1,16 @@
 #pragma once
+#include "./truvixx_assimp_export.h"
 
 
 /// 4 字节对齐
-struct alignas(4) CxxVec2f
+struct TRUVIXX_ASSIMP_API alignas(4) CxxVec2f
 {
     float x;
     float y;
 };
 
 /// 4 字节对齐
-struct alignas(4) CxxVec3f
+struct TRUVIXX_ASSIMP_API alignas(4) CxxVec3f
 {
     float x;
     float y;
@@ -17,7 +18,7 @@ struct alignas(4) CxxVec3f
 };
 
 /// 4 字节对齐
-struct alignas(4) CxxVec4f
+struct TRUVIXX_ASSIMP_API alignas(4) CxxVec4f
 {
     float x;
     float y;
@@ -26,13 +27,13 @@ struct alignas(4) CxxVec4f
 };
 
 /// 4x4 矩阵结构体 (列主序)
-struct alignas(4) CxxMat4f
+struct TRUVIXX_ASSIMP_API alignas(4) CxxMat4f
 {
-    float m[16];    // m[0]..m[3] 是第一列，以此类推
+    float m[16]; // m[0]..m[3] 是第一列，以此类推
 };
 
 /// 三角形面结构体
-struct alignas(4) CxxTriangleFace
+struct TRUVIXX_ASSIMP_API alignas(4) CxxTriangleFace
 {
     unsigned int a;
     unsigned int b;
@@ -40,7 +41,7 @@ struct alignas(4) CxxTriangleFace
 };
 
 /// 顶点结构体
-struct alignas(4) CxxVertex3D
+struct TRUVIXX_ASSIMP_API alignas(4) CxxVertex3D
 {
     // 坐标系：右手系，X-Right，Y-Up
     CxxVec3f position;
@@ -51,7 +52,7 @@ struct alignas(4) CxxVertex3D
 };
 
 /// 适合光栅化的几何体结构体，以 AoS(Array of Struct) 的形式组织
-struct CxxRasterGeometry
+struct TRUVIXX_ASSIMP_API CxxRasterGeometry
 {
     CxxRasterGeometry() = default;
     ~CxxRasterGeometry();
@@ -61,7 +62,7 @@ struct CxxRasterGeometry
     CxxRasterGeometry& operator=(const CxxRasterGeometry&) = delete;
     CxxRasterGeometry& operator=(CxxRasterGeometry&&) = delete;
 
-    void init(unsigned int vertex_cnt, const unsigned int face_cnt);
+    void init(unsigned int vertex_cnt, unsigned int face_cnt);
 
     [[nodiscard]] unsigned int vertex_cnt() const { return vertex_cnt_; }
     [[nodiscard]] unsigned int face_cnt() const { return face_cnt_; }
@@ -79,9 +80,9 @@ private:
 constexpr static size_t PATH_BUFFER_SIZE = 256;
 
 /// 材质结构体
-struct CxxMaterial
+struct TRUVIXX_ASSIMP_API CxxMaterial
 {
-    char name[PATH_BUFFER_SIZE];    // 材质名称，使用 C 风格字符数组，确保以 null 结尾
+    char name[PATH_BUFFER_SIZE]; // 材质名称，使用 C 风格字符数组，确保以 null 结尾
 
     CxxVec4f base_color;
     float roughness_factor;
@@ -89,14 +90,14 @@ struct CxxMaterial
 
     CxxVec4f emissive_color;
 
-    float opaque_factor;    // 透射率，1 表示 opaque, 0 表示 transparent
+    float opaque_factor; // 透射率，1 表示 opaque, 0 表示 transparent
 
     /// 字符串使用 C 风格字符数组，确保以 null 结尾
     char diffuse_map[PATH_BUFFER_SIZE];
     char normal_map[PATH_BUFFER_SIZE];
 };
 
-struct CxxInstance
+struct TRUVIXX_ASSIMP_API CxxInstance
 {
     CxxInstance() = default;
     ~CxxInstance();
@@ -115,7 +116,7 @@ struct CxxInstance
 
     /// 坐标系：右手系，X-Right，Y-Up
     CxxMat4f world_transform = {};
-    char name[PATH_BUFFER_SIZE];    // 名称，使用 C 风格字符数组，确保以 null 结尾
+    char name[PATH_BUFFER_SIZE]{}; // 名称，使用 C 风格字符数组，确保以 null 结尾
 
 private:
     unsigned int* mat_indices_ = nullptr;

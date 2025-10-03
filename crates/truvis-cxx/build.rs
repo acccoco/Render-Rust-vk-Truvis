@@ -78,8 +78,7 @@ fn build_cmake_project() {
 
     println!("cargo:rustc-link-search=native={}", CMakeDirs::cmake_custom_output_lib_dir().display());
 
-    let cxx_target = "truvis-assimp-cxx";
-    println!("cargo:rustc-link-lib=static={}", cxx_target);
+    println!("cargo:rustc-link-lib=static={}", "truvixx-interface");
 }
 
 /// 复制 DLL 文件到目标目录
@@ -109,7 +108,7 @@ fn gen_rust_binding() {
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
-        .header("cxx/include/lib.hpp")
+        .header("cxx/truvixx-interface/include/TruvixxInterface/lib.hpp")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

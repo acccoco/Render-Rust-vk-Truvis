@@ -1,8 +1,8 @@
-#include "lib.hpp"
-#include "public/scene_loader/c_data_define.hpp"
-#include "private/scene_loader/scene_loader.hpp"
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
+#include "TruvixxInterface/lib.hpp"
+
+#include "TruvixxAssimp/scene_loader.hpp"
+#include "TruvixxAssimp/c_data_define.hpp"
+
 #include <iostream>
 
 
@@ -40,7 +40,7 @@ size_t get_instance_cnt(void* loader)
 
 float* get_pos_buffer(void* loader, const size_t mesh_idx, size_t* vertex_cnt)
 {
-    const auto scene_loader = reinterpret_cast<truvis::SceneLoader*>(loader);
+    const auto scene_loader = static_cast<truvis::SceneLoader*>(loader);
     return scene_loader->get_position(mesh_idx, *vertex_cnt);
 }
 

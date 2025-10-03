@@ -7,35 +7,26 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
 # mkdkr build
 # cd build
 # cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_CONFIGURATION_TYPES="Debug;Release" ..
-project(TruvisAssimpCxx)
+project(Truvixx)
 
 
 # compile options
 set(CMAKE_CXX_STANDARD 20)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-c++98-compat -Wno-c++98-compat-pedantic")
 
-
-# 第三方库
-###########################################################################
-find_package(assimp CONFIG REQUIRED)
-find_package(glm CONFIG REQUIRED)
-
-
-# 动态库
-###########################################################################
-file(GLOB_RECURSE SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
-file(GLOB_RECURSE HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
-add_library(truvis-assimp-cxx SHARED ${SOURCE_FILES} ${HEADER_FILES})
-target_include_directories(truvis-assimp-cxx PUBLIC include)
-target_link_libraries(truvis-assimp-cxx PUBLIC
-        assimp::assimp
-        glm::glm
-)
-# 定义特殊的宏，表示某些符号需要导出到 dll
-target_compile_definitions(truvis-assimp-cxx PRIVATE BUILDING_DLL)
+# DLL / EXE
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/Debug)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/Release)
+# .lib
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/Debug)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/Release)
+# .dll/.so
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/Debug)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/Release)
+# .pdb
+set(CMAKE_PDB_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/Debug)
+set(CMAKE_PDB_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/Release)
 
 
-# target main
-###########################################################################
-add_executable(main main.cpp)
-target_link_libraries(main truvis-assimp-cxx)
+add_subdirectory(truvixx-assimp)
+add_subdirectory(truvixx-interface)

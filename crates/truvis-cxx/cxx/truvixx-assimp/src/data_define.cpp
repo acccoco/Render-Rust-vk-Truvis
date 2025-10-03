@@ -1,6 +1,6 @@
-﻿#include "public/scene_loader/c_data_define.hpp"
+﻿#include "TruvixxAssimp/c_data_define.hpp"
 
-#include <string.h>
+#include <cstring>
 
 CxxRasterGeometry::~CxxRasterGeometry()
 {

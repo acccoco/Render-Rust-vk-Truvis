@@ -1,5 +1,5 @@
-#include "private/scene_loader/data_convert.hpp"
-#include "private/scene_loader/scene_loader.hpp"
+#include "TruvixxAssimp/data_convert.hpp"
+#include "TruvixxAssimp/scene_loader.hpp"
 
 #include <assimp/matrix4x4.h>
 #include <cassert>
@@ -19,7 +19,7 @@ bool SceneLoader::load_scene()
     {
         std::cerr << std::format("Mesh file {} or dir {} not found", this->mesh_path_.string(),
                                  this->dir_path_.string())
-                  << "\n";
+                << "\n";
         return false;
     }
 
@@ -32,11 +32,11 @@ bool SceneLoader::load_scene()
     // 默认 UV 以左下角为原点，可以通过 FlipUVs 标志修改为左上角
     // 默认矩阵采用 row major 的存储方式
     constexpr auto post_process_flags =
-            aiProcess_CalcTangentSpace           // 如果顶点具有法线属性，自动生成 tangent space 属性
-            | aiProcess_JoinIdenticalVertices    // 确保 index buffer 存在，且每个顶点都是不重复的
-            | aiProcess_Triangulate              // 将所有的面三角化
-            | aiProcess_GenNormals               // 如果没有法线，自动生成面法线
-            | aiProcess_SortByPType              // 在三角化之后发生，可以去除 point 和 line
+            aiProcess_CalcTangentSpace        // 如果顶点具有法线属性，自动生成 tangent space 属性
+            | aiProcess_JoinIdenticalVertices // 确保 index buffer 存在，且每个顶点都是不重复的
+            | aiProcess_Triangulate           // 将所有的面三角化
+            | aiProcess_GenNormals            // 如果没有法线，自动生成面法线
+            | aiProcess_SortByPType           // 在三角化之后发生，可以去除 point 和 line
             | aiProcess_FlipUVs;
 
 
@@ -158,11 +158,11 @@ bool SceneLoader::process_material(CxxMaterial& material, const aiMaterial& ai_m
         const auto get_texture = [&](const aiTextureType tex_type, char* dest, const size_t max_len) {
             if (ai_mat.GetTextureCount(tex_type) == 0)
             {
-                dest[0] = '\0';    // 空字符串
+                dest[0] = '\0'; // 空字符串
                 return;
             }
 
-            aiString out_path;    // 获取到的是相对路径
+            aiString out_path; // 获取到的是相对路径
             ai_mat.GetTexture(tex_type, 0, &out_path);
 
             const auto tex_path = dir_path_ / out_path.C_Str();
@@ -228,4 +228,4 @@ bool SceneLoader::process_geometry(CxxRasterGeometry& geometry, const aiMesh& ai
     return true;
 }
 
-}    // namespace truvis
+} // namespace truvis

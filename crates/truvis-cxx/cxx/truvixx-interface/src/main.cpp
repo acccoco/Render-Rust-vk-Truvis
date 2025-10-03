@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "lib.hpp"
+#include "TruvixxInterface/lib.hpp"
 
 int main(const int argc, char* argv[])
 {
@@ -39,7 +39,7 @@ int main(const int argc, char* argv[])
 
         auto instance_name = std::string(instance->name);
         std::cout << "Instance " << instance_idx << "(" << instance_name << ")"
-                  << ": mesh count = " << instance->mesh_cnt() << "\n";
+                << ": mesh count = " << instance->mesh_cnt() << "\n";
         for (size_t i = 0; i < instance->mesh_cnt(); ++i)
         {
             const auto mesh = get_mesh(loader, instance->mesh_indices()[i]);
@@ -49,7 +49,7 @@ int main(const int argc, char* argv[])
                 continue;
             }
             std::cout << "  Mesh " << i << ": vertex count = " << mesh->vertex_cnt()
-                      << ", face count = " << mesh->face_cnt() << "\n";
+                    << ", face count = " << mesh->face_cnt() << "\n";
 
             const auto mat = get_mat(loader, instance->mat_indices()[i]);
             if (!mat)
@@ -68,7 +68,7 @@ int main(const int argc, char* argv[])
             std::cout << ", transmission factor: " << mat->opaque_factor << "\n";
 
             std::cout << "base color texture: " << mat->diffuse_map << "\n"
-                      << "normal texture: " << mat->normal_map << "\n";
+                    << "normal texture: " << mat->normal_map << "\n";
         }
     }
 
