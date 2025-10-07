@@ -39,8 +39,8 @@ impl CameraController {
         if input_mgr.is_right_button_pressed() {
             let mouse_delta = input_mgr.get_mouse_delta() / 7.0;
 
-            self.camera.rotate_yaw(mouse_delta.x as f32);
-            self.camera.rotate_pitch(mouse_delta.y as f32);
+            self.camera.rotate_yaw(-mouse_delta.x as f32);
+            self.camera.rotate_pitch(-mouse_delta.y as f32);
         }
 
         let move_speed = 320_f32;
@@ -57,10 +57,10 @@ impl CameraController {
             self.camera.move_right(delta_time_s * move_speed);
         }
         if input_mgr.is_key_pressed(KeyCode::KeyE) {
-            self.camera.move_up(-delta_time_s * move_speed);
+            self.camera.move_up(delta_time_s * move_speed);
         }
         if input_mgr.is_key_pressed(KeyCode::KeyQ) {
-            self.camera.move_up(delta_time_s * move_speed);
+            self.camera.move_up(-delta_time_s * move_speed);
         }
     }
 }
