@@ -1,6 +1,6 @@
 #pragma once
 #include <assimp/Importer.hpp>
-#include "TruvixxAssimp/truvixx_assimp_export.h"
+#include "TruvixxAssimp/truvixx_assimp.export.h"
 #include "TruvixxAssimp/c_data_define.hpp"
 
 

@@ -19,7 +19,7 @@ include(GenerateExportHeader)
 generate_export_header(truvixx-assimp
         BASE_NAME TRUVIXX_ASSIMP
         EXPORT_MACRO_NAME TRUVIXX_ASSIMP_API
-        EXPORT_FILE_NAME ${CMAKE_CURRENT_SOURCE_DIR}/include/TruvixxAssimp/truvixx_assimp_export.h
+        EXPORT_FILE_NAME ${CMAKE_CURRENT_SOURCE_DIR}/include/TruvixxAssimp/truvixx_assimp.export.h
         STATIC_DEFINE TRUVIXX_ASSIMP_STATIC_DEFINE
 )
 

@@ -9,7 +9,7 @@
 #include <assimp/scene.h>
 
 #include "TruvixxAssimp/c_data_define.hpp"
-#include "TruvixxAssimp/truvixx_assimp_export.h"
+#include "TruvixxAssimp/truvixx_assimp.export.h"
 
 
 namespace truvis

@@ -1,5 +1,5 @@
 #pragma once
-#include "./truvixx_assimp_export.h"
+#include "./truvixx_assimp.export.h"
 
 
 /// 4 字节对齐

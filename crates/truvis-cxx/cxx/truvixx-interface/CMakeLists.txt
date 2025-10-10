@@ -15,7 +15,7 @@ include(GenerateExportHeader)
 generate_export_header(truvixx-interface
         BASE_NAME TRUVIXX_INTERFACE
         EXPORT_MACRO_NAME TRUVIXX_INTERFACE_API
-        EXPORT_FILE_NAME ${CMAKE_CURRENT_SOURCE_DIR}/include/TruvixxInterface/truvixx_interface_export.h
+        EXPORT_FILE_NAME ${CMAKE_CURRENT_SOURCE_DIR}/include/TruvixxInterface/truvixx_interface.export.h
         STATIC_DEFINE TRUVIXX_INTERFACE_STATIC_DEFINE
 )
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "truvixx_interface_export.h"
+#include "truvixx_interface.export.h"
 #include "../../../truvixx-assimp/include/TruvixxAssimp/c_data_define.hpp"
 
 extern "C" {
