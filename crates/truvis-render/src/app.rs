@@ -44,6 +44,8 @@ impl<T: OuterApp> TruvisApp<T> {
         std::panic::set_hook(Box::new(panic_handler));
 
         init_log();
+        tracy_client::Client::start();
+        tracy_client::set_thread_name!("MiaowThread");
 
         // 创建输入管理器和计时器
         let input_manager = InputManager::new();
@@ -111,6 +113,7 @@ impl<T: OuterApp> TruvisApp<T> {
 
         // Update Gui ==================================
         {
+            tracy_client::span!("Update Gui");
             self.window_system.get_mut().unwrap().update_gui(elapsed, |ui| {
                 // camera info
                 {
@@ -142,6 +145,7 @@ impl<T: OuterApp> TruvisApp<T> {
 
         // Rendere Update ==================================
         {
+            tracy_client::span!("Renderer Update");
             let extent = self.window_system.get().unwrap().get_render_extent();
 
             // Renderer: Resize Framebuffer
@@ -189,6 +193,8 @@ impl<T: OuterApp> TruvisApp<T> {
             self.window_system.get_mut().unwrap().present_image();
         }
         self.renderer.end_frame();
+
+        tracy_client::frame_mark();
     }
 
     fn on_window_resized(&mut self, _width: u32, _height: u32) {
