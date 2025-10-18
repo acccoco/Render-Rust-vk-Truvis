@@ -1,19 +1,18 @@
-use std::{cell::RefCell, rc::Rc};
-
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::{shader, shader::ImageHandle};
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
-    pipelines::shader::{ShaderGroupInfo, ShaderModule, ShaderModuleCache, ShaderStageInfo},
+    pipelines::shader::{ShaderGroupInfo, ShaderModuleCache, ShaderStageInfo},
     render_context::RenderContext,
     resources::special_buffers::{sbt_buffer::SBTBuffer, structured_buffer::StructuredBuffer},
 };
 
+use crate::renderer::frame_context::FrameContext;
 use crate::{
     pipeline_settings::{FrameSettings, PipelineSettings},
-    renderer::{bindless::BindlessManager, frame_controller::FrameController, gpu_scene::GpuScene},
+    renderer::{frame_controller::FrameController, gpu_scene::GpuScene},
 };
 
 pub struct RhiRtPipeline {
@@ -241,15 +240,19 @@ impl SBTRegions {
         }
     }
 }
+impl Drop for SBTRegions {
+    fn drop(&mut self) {
+        log::info!("Destroy SBTRegions");
+    }
+}
 
 pub struct SimlpeRtPass {
     pipeline: RhiRtPipeline,
-    _bindless_mgr: Rc<RefCell<BindlessManager>>,
 
     _sbt: SBTRegions,
 }
 impl SimlpeRtPass {
-    pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new() -> Self {
         let mut shader_module_cache = ShaderModuleCache::new();
         let stage_infos = ShaderStage::iter()
             .map(|stage| stage.value())
@@ -285,9 +288,9 @@ impl SimlpeRtPass {
             .size(size_of::<shader::rt::PushConstants>() as u32);
 
         let pipeline_layout = {
-            let bineless_mgr = bindless_mgr.borrow();
+            let bindless_mgr = FrameContext::bindless_mgr();
 
-            let descriptor_sets = [bineless_mgr.bindless_descriptor_layout.handle()];
+            let descriptor_sets = [bindless_mgr.bindless_descriptor_layout.handle()];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
@@ -328,13 +331,11 @@ impl SimlpeRtPass {
         Self {
             pipeline: rt_pipeline,
             _sbt: sbt,
-            _bindless_mgr: bindless_mgr,
         }
     }
     pub fn ray_trace(
         &self,
         cmd: &CommandBuffer,
-        frame_ctrl: &FrameController,
         framse_settings: &FrameSettings,
         pipeline_settings: &PipelineSettings,
         rt_image: vk::Image,
@@ -342,16 +343,17 @@ impl SimlpeRtPass {
         per_frame_data: &StructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
     ) {
-        let frame_label = frame_ctrl.frame_label();
+        let frame_label = FrameContext::get().frame_ctrl.frame_label();
 
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::RAY_TRACING_KHR, self.pipeline.pipeline);
+        let bindless_mgr = FrameContext::bindless_mgr();
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
             0,
-            &[self._bindless_mgr.borrow().bindless_descriptor_sets[*frame_label].handle()],
+            &[bindless_mgr.bindless_descriptor_sets[*frame_label].handle()],
             None,
         );
         let spp = 4;
@@ -408,6 +410,11 @@ impl SimlpeRtPass {
         }
 
         cmd.end_label();
+    }
+}
+impl Drop for SimlpeRtPass {
+    fn drop(&mut self) {
+        log::info!("Destroy SimlpeRtPass");
     }
 }
 

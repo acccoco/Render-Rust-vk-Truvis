@@ -1,12 +1,12 @@
-use std::{cell::RefCell, rc::Rc};
-
+use crate::renderer::frame_context::FrameContext;
 use crate::{
     gui::{gui::Gui, gui_pass::GuiPass},
     pipeline_settings::{DefaultRendererSettings, FrameLabel},
-    renderer::{bindless::BindlessManager, frame_controller::FrameController, renderer::PresentData},
+    renderer::{frame_controller::FrameController, renderer::PresentData},
 };
 use ash::vk;
 use itertools::Itertools;
+use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, semaphore::Semaphore, submit_info::SubmitInfo},
@@ -57,7 +57,6 @@ impl MainWindow {
         frame_ctrl: Rc<FrameController>,
         window_title: String,
         window_extent: vk::Extent2D,
-        bindless_mgr: Rc<RefCell<BindlessManager>>,
     ) -> Self {
         let icon_data = std::fs::read(TruvisPath::resources_path("DruvisIII.png")).expect("Failed to read icon file");
         let icon = helper::load_icon(icon_data.as_ref());
@@ -78,8 +77,8 @@ impl MainWindow {
 
         let swapchain_image_infos = swapchain.image_infos();
 
-        let gui = Gui::new(&window, frame_ctrl.fif_count(), &swapchain_image_infos, bindless_mgr.clone());
-        let gui_pass = GuiPass::new(bindless_mgr.clone(), swapchain_image_infos.image_format);
+        let gui = Gui::new(&window, frame_ctrl.fif_count(), &swapchain_image_infos);
+        let gui_pass = GuiPass::new(swapchain_image_infos.image_format);
 
         let present_complete_semaphores = (0..frame_ctrl.fif_count())
             .map(|i| Semaphore::new(&format!("window-present-complete-{}", i)))
@@ -109,7 +108,7 @@ impl MainWindow {
         let canvas_idx = swapchain.current_image_index();
         let frame_label = self.frame_ctrl.frame_label();
 
-        let cmd = renderer_data.cmd_allocator.alloc_command_buffer("window-present");
+        let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("window-present");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         {
             // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL

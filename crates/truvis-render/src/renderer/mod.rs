@@ -5,3 +5,5 @@ pub mod frame_controller;
 pub mod gpu_scene;
 pub mod renderer;
 pub mod scene_manager;
+pub mod upload_manager;
+pub mod frame_context;

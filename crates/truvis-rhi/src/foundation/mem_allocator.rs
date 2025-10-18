@@ -21,8 +21,7 @@ impl MemAllocator {
         Self { inner: vma }
     }
 
-    // TODO 外部改用 Rc，因此这里只能是 &self 了
-    pub fn destroy(&self) {
+    pub fn destroy(self) {
         // 通过 drop 触发销毁
     }
 }

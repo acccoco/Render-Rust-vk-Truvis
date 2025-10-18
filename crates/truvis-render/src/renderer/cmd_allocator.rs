@@ -20,6 +20,7 @@ pub struct CmdAllocator {
     frame_ctrl: Rc<FrameController>,
 }
 
+/// init & desotry
 impl CmdAllocator {
     pub fn new(frame_ctrl: Rc<FrameController>) -> Self {
         let graphics_command_pools = (0..frame_ctrl.fif_count())
@@ -38,7 +39,10 @@ impl CmdAllocator {
             frame_ctrl,
         }
     }
+}
 
+/// tools
+impl CmdAllocator {
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer(&mut self, debug_name: &str) -> CommandBuffer {
         let name = format!("[{}]{}", self.frame_ctrl.frame_name(), debug_name);
@@ -49,13 +53,32 @@ impl CmdAllocator {
     }
 
     pub fn free_frame_commands(&mut self) {
+        self.free_frame_commands_internal(*self.frame_ctrl.frame_label());
+    }
+
+    pub fn free_all(&mut self) {
+        for i in 0..self.frame_ctrl.fif_count() {
+            self.free_frame_commands_internal(i);
+        }
+    }
+
+    fn free_frame_commands_internal(&mut self, frame_label: usize) {
         // 释放当前 frame 的 command buffer 的资源
-        let gc_cmds = std::mem::take(&mut self.allocated_command_buffers[*self.frame_ctrl.frame_label()]);
+        let gc_cmds = std::mem::take(&mut self.allocated_command_buffers[frame_label]);
         if !gc_cmds.is_empty() {
-            self.graphics_command_pools[*self.frame_ctrl.frame_label()].free_command_buffers(gc_cmds);
+            self.graphics_command_pools[frame_label].free_command_buffers(gc_cmds);
         }
 
         // 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
-        self.graphics_command_pools[*self.frame_ctrl.frame_label()].reset_all_buffers();
+        self.graphics_command_pools[frame_label].reset_all_buffers();
+    }
+}
+
+impl Drop for CmdAllocator {
+    fn drop(&mut self) {
+        log::info!("Dropping CmdAllocator and destroying command pools.");
+        for pool in &mut self.graphics_command_pools {
+            pool.destroy()
+        }
     }
 }

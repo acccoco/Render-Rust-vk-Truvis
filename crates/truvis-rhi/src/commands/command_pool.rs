@@ -11,8 +11,9 @@ pub struct CommandPool {
     _queue_family: QueueFamily,
 
     _debug_name: String,
+    valid: bool,
 }
-/// 构造函数
+/// init & destory
 impl CommandPool {
     // TODO 使用 new_internal 简化
     #[inline]
@@ -33,6 +34,7 @@ impl CommandPool {
             handle: pool,
             _queue_family: queue_family,
             _debug_name: debug_name.to_string(),
+            valid: true,
         };
         device_functions.set_debug_name(&command_pool, debug_name);
         command_pool
@@ -62,16 +64,25 @@ impl CommandPool {
             handle: pool,
             _queue_family: queue_family,
             _debug_name: debug_name.to_string(),
+            valid: true,
         };
         device_functions.set_debug_name(&command_pool, debug_name);
         command_pool
     }
 
-    pub fn destroy(self) {
+    pub fn destroy(&mut self) {
         let device_functions = RenderContext::get().device_functions();
         unsafe {
             device_functions.destroy_command_pool(self.handle, None);
         }
+        self.valid = false;
+    }
+
+    pub fn destroy_internal(mut self, device_functions: &crate::foundation::device::DeviceFunctions) {
+        unsafe {
+            device_functions.destroy_command_pool(self.handle, None);
+        }
+        self.valid = false;
     }
 }
 
@@ -114,5 +125,12 @@ impl DebugType for CommandPool {
 
     fn vk_handle(&self) -> impl vk::Handle {
         self.handle
+    }
+}
+
+impl Drop for CommandPool {
+    fn drop(&mut self) {
+        assert!(!self.valid, "CommandPool must be destroyed manually.");
+        log::info!("Dropping CommandPool: {}", self._debug_name);
     }
 }

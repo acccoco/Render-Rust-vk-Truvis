@@ -18,6 +18,7 @@ use truvis_rhi::{
     resources::special_buffers::structured_buffer::StructuredBuffer,
 };
 
+use crate::renderer::frame_context::FrameContext;
 use crate::{
     pipeline_settings::FrameLabel,
     renderer::{bindless::BindlessManager, frame_controller::FrameController, scene_manager::SceneManager},
@@ -203,7 +204,8 @@ impl GpuScene {
     }
 
     /// 注册 GpuScene 使用的默认纹理
-    pub fn register_default_textures(&self, bindless_mgr: &mut BindlessManager) {
+    pub fn register_default_textures(&self) {
+        let mut bindless_mgr = FrameContext::bindless_mgr_mut();
         bindless_mgr.register_texture_by_path(self.resources.sky.clone());
         bindless_mgr.register_texture_by_path(self.resources.uv_checker.clone());
     }
@@ -211,7 +213,8 @@ impl GpuScene {
     /// # Phase: Before Render
     ///
     /// 在每一帧开始时调用，将场景数据转换为 GPU 可读的形式
-    pub fn prepare_render_data(&mut self, scene_mgr: &SceneManager, bindless_mgr: &mut BindlessManager) {
+    pub fn prepare_render_data(&mut self, scene_mgr: &SceneManager) {
+        let mut bindless_mgr = FrameContext::bindless_mgr_mut();
         bindless_mgr.prepare_render_data(self.frame_ctrl.frame_label());
 
         self.flatten_material_data(scene_mgr);
@@ -222,22 +225,17 @@ impl GpuScene {
     /// # Phase: Before Render
     ///
     /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
-    pub fn upload_to_buffer(
-        &mut self,
-        cmd: &CommandBuffer,
-        barrier_mask: BarrierMask,
-        scene_mgr: &SceneManager,
-        bindless_mgr: &BindlessManager,
-    ) {
+    pub fn upload_to_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager) {
+        let bindless_mgr = FrameContext::bindless_mgr();
         self.upload_mesh_buffer(cmd, barrier_mask, scene_mgr);
         self.upload_instance_buffer(cmd, barrier_mask, scene_mgr);
-        self.upload_material_buffer(cmd, barrier_mask, scene_mgr, bindless_mgr);
+        self.upload_material_buffer(cmd, barrier_mask, scene_mgr, &bindless_mgr);
         self.upload_light_buffer(cmd, barrier_mask, scene_mgr);
 
         // 需要确保 instance 先与 tlas 构建
         self.build_tlas(scene_mgr);
 
-        self.upload_scene_buffer(cmd, barrier_mask, scene_mgr, bindless_mgr);
+        self.upload_scene_buffer(cmd, barrier_mask, scene_mgr, &bindless_mgr);
     }
 
     /// 绘制场景中的所有实例

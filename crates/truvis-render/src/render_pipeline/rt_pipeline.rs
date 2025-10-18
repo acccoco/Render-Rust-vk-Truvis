@@ -8,6 +8,7 @@ use truvis_rhi::{
     render_context::RenderContext,
 };
 
+use crate::renderer::frame_context::FrameContext;
 use crate::{
     render_pipeline::{compute_pass::ComputePass, pipeline_context::PipelineContext, rt_pass::SimlpeRtPass},
     renderer::bindless::BindlessManager,
@@ -20,15 +21,16 @@ pub struct RtPipeline {
     sdr_pass: ComputePass<shader::sdr::PushConstant>,
 }
 impl RtPipeline {
-    pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
-        let rt_pass = SimlpeRtPass::new(bindless_mgr.clone());
+    pub fn new() -> Self {
+        let rt_pass = SimlpeRtPass::new();
+        let bindless_mgr = FrameContext::bindless_mgr();
         let blit_pass = ComputePass::<shader::blit::PushConstant>::new(
-            &bindless_mgr.borrow(),
+            &bindless_mgr,
             c"main",
             TruvisPath::shader_path("imgui/blit.slang.spv").as_str(),
         );
         let sdr_pass = ComputePass::<shader::sdr::PushConstant>::new(
-            &bindless_mgr.borrow(),
+            &bindless_mgr,
             c"main",
             TruvisPath::shader_path("pass/pp/sdr.slang.spv").as_str(),
         );
@@ -43,27 +45,24 @@ impl RtPipeline {
     pub fn render(&self, ctx: PipelineContext) {
         let PipelineContext {
             gpu_scene,
-            bindless_mgr,
-            frame_ctrl,
             timer: _,
             per_frame_data,
             frame_settings,
             pipeline_settings,
             frame_buffers,
-            cmd_allocator,
         } = ctx;
-        let frame_label = frame_ctrl.frame_label();
+        let frame_label = FrameContext::get().frame_ctrl.frame_label();
+        let bindless_mgr = FrameContext::bindless_mgr();
 
         let color_image = frame_buffers.color_image();
-        let color_image_handle = frame_buffers.color_image_bindless_handle(&bindless_mgr.borrow());
+        let color_image_handle = frame_buffers.color_image_bindless_handle(&bindless_mgr);
         let render_target = frame_buffers.render_target_image(frame_label);
-        let render_target_handle =
-            frame_buffers.render_target_image_bindless_handle(&bindless_mgr.borrow(), frame_label);
+        let render_target_handle = frame_buffers.render_target_image_bindless_handle(&bindless_mgr, frame_label);
 
         let mut submit_cmds = Vec::new();
         // ray tracing
         {
-            let cmd = cmd_allocator.alloc_command_buffer("ray-tracing");
+            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("ray-tracing");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
 
             // frams in flight 使用同一个 rt image，因此需要确保之前的 rt 写入已经完成
@@ -81,7 +80,6 @@ impl RtPipeline {
 
             self.rt_pass.ray_trace(
                 &cmd,
-                frame_ctrl,
                 frame_settings,
                 pipeline_settings,
                 color_image.handle(),
@@ -97,7 +95,7 @@ impl RtPipeline {
 
         // blit
         {
-            let cmd = cmd_allocator.alloc_command_buffer("blit");
+            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("blit");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit");
 
             // 等待 ray-tracing 执行完成
@@ -110,7 +108,7 @@ impl RtPipeline {
 
             self.blit_pass.exec(
                 &cmd,
-                &bindless_mgr.borrow(),
+                &bindless_mgr,
                 &shader::blit::PushConstant {
                     src_image: color_image_handle,
                     dst_image: render_target_handle,
@@ -131,7 +129,7 @@ impl RtPipeline {
 
         // hdr -> sdr
         {
-            let cmd = cmd_allocator.alloc_command_buffer("hdr2sdr");
+            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("hdr2sdr");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "hdr2sdr");
 
             // 等待之前的 compute shader 执行完成
@@ -150,7 +148,7 @@ impl RtPipeline {
 
             self.sdr_pass.exec(
                 &cmd,
-                &bindless_mgr.borrow(),
+                &bindless_mgr,
                 &shader::sdr::PushConstant {
                     src_image: color_image_handle,
                     dst_image: render_target_handle,
@@ -171,5 +169,10 @@ impl RtPipeline {
         }
 
         RenderContext::get().graphics_queue().submit(vec![SubmitInfo::new(&submit_cmds)], None);
+    }
+}
+impl Drop for RtPipeline {
+    fn drop(&mut self) {
+        log::info!("RtPipeline drop");
     }
 }

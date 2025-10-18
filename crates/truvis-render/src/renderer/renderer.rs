@@ -1,26 +1,24 @@
-use std::{cell::RefCell, ffi::CStr, rc::Rc};
-
+use crate::renderer::frame_context::FrameContext;
+use crate::{
+    pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings, PipelineSettings},
+    platform::{camera::DrsCamera, input_manager::InputState, timer::Timer},
+    render_pipeline::pipeline_context::PipelineContext,
+    renderer::{
+        frame_buffers::FrameBuffers, frame_controller::FrameController, gpu_scene::GpuScene,
+        scene_manager::SceneManager,
+    },
+};
 use ash::vk;
 use shader_binding::shader;
+use std::{cell::RefCell, ffi::CStr, rc::Rc};
 use truvis_rhi::{
     commands::{
         barrier::{BarrierMask, BufferBarrier},
         semaphore::Semaphore,
         submit_info::SubmitInfo,
     },
-    descriptors::descriptor_pool::{DescriptorPool, DescriptorPoolCreateInfo},
     render_context::RenderContext,
     resources::{special_buffers::structured_buffer::StructuredBuffer, texture::Texture2D},
-};
-
-use crate::{
-    pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings, PipelineSettings},
-    platform::{camera::DrsCamera, input_manager::InputState, timer::Timer},
-    render_pipeline::pipeline_context::PipelineContext,
-    renderer::{
-        bindless::BindlessManager, cmd_allocator::CmdAllocator, frame_buffers::FrameBuffers,
-        frame_controller::FrameController, gpu_scene::GpuScene, scene_manager::SceneManager,
-    },
 };
 
 /// 渲染演示数据结构
@@ -42,25 +40,19 @@ pub struct PresentData<'a> {
     ///
     /// 定义了渲染目标纹理的同步需求，确保在读取前所有写入操作已完成
     pub render_target_barrier: BarrierMask,
-
-    /// 命令缓冲区分配器的可变引用
-    ///
-    /// 用于在演示阶段分配和管理 Vulkan 命令缓冲区
-    pub cmd_allocator: &'a mut CmdAllocator,
 }
 
 /// 表示整个渲染器进程，需要考虑 platform, render, render_context, log 之类的各种模块
 pub struct Renderer {
+    // TODO 移除 Renderer::frame_ctrl，直接通过 FrameContext 获取
     pub frame_ctrl: Rc<FrameController>,
     framebuffers: FrameBuffers,
 
     frame_settings: FrameSettings,
     pipeline_settings: PipelineSettings,
 
-    pub bindless_mgr: Rc<RefCell<BindlessManager>>,
-    pub scene_mgr: Rc<RefCell<SceneManager>>,
+    pub scene_mgr: RefCell<SceneManager>,
     pub gpu_scene: GpuScene,
-    cmd_allocator: CmdAllocator,
 
     // TODO 优化一下这个 buffer，不该放在这里
     pub per_frame_data_buffers: Vec<StructuredBuffer<shader::PerFrameData>>,
@@ -68,8 +60,6 @@ pub struct Renderer {
 
     /// 帧渲染完成的 timeline，value 就等于 frame_id
     render_timeline_semaphore: Semaphore,
-
-    _descriptor_pool: DescriptorPool,
 
     timer: Timer,
     fps_limit: f32,
@@ -131,7 +121,6 @@ impl Renderer {
                 dst_stage: vk::PipelineStageFlags2::NONE,
                 dst_access: vk::AccessFlags2::NONE,
             },
-            cmd_allocator: &mut self.cmd_allocator,
         }
     }
 
@@ -149,8 +138,8 @@ impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         // 初始化 RenderContext 单例
         RenderContext::init("Truvis".to_string(), extra_instance_ext);
+        FrameContext::init();
 
-        let descriptor_pool = Self::init_descriptor_pool();
         let frame_settings = FrameSettings {
             color_format: vk::Format::R32G32B32A32_SFLOAT,
             depth_format: Self::get_depth_format(),
@@ -159,23 +148,21 @@ impl Renderer {
                 height: 400,
             },
         };
-        let frame_ctrl = Rc::new(FrameController::new());
+        let frame_ctrl = FrameContext::get().frame_ctrl.clone();
 
-        let bindless_mgr = Rc::new(RefCell::new(BindlessManager::new(&descriptor_pool, frame_ctrl.clone())));
-        let scene_mgr = Rc::new(RefCell::new(SceneManager::new(bindless_mgr.clone())));
+        let scene_mgr = RefCell::new(SceneManager::new());
         let gpu_scene = GpuScene::new(frame_ctrl.clone());
 
         // 注册 GPU 场景使用的默认纹理
-        gpu_scene.register_default_textures(&mut bindless_mgr.borrow_mut());
+        gpu_scene.register_default_textures();
 
         let per_frame_data_buffers = (0..frame_ctrl.fif_count())
             .map(|idx| StructuredBuffer::<shader::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{idx}")))
             .collect();
 
-        let framebuffers = FrameBuffers::new(&frame_settings, frame_ctrl.clone(), &mut bindless_mgr.borrow_mut());
+        let framebuffers = FrameBuffers::new(&frame_settings, frame_ctrl.clone());
 
         let render_timeline_semaphore = Semaphore::new_timeline(0, "render-timeline");
-        let cmd_allocator = CmdAllocator::new(frame_ctrl.clone());
 
         Self {
             frame_settings,
@@ -183,61 +170,13 @@ impl Renderer {
             framebuffers,
             accum_data: Default::default(),
             frame_ctrl,
-            bindless_mgr,
             scene_mgr,
-            cmd_allocator,
             gpu_scene,
             per_frame_data_buffers,
             timer: Timer::default(),
-            _descriptor_pool: descriptor_pool,
             fps_limit: 59.9,
             render_timeline_semaphore,
         }
-    }
-
-    const DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
-    const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
-    const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
-
-    fn init_descriptor_pool() -> DescriptorPool {
-        let pool_size = vec![
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
-                descriptor_count: 128,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: Self::DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                descriptor_count: Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::INPUT_ATTACHMENT,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_IMAGE,
-                descriptor_count: Self::DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT + 32,
-            },
-        ];
-
-        let pool_ci = Rc::new(DescriptorPoolCreateInfo::new(
-            vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET | vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND,
-            Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + Self::DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
-            pool_size,
-        ));
-
-        DescriptorPool::new(pool_ci, "renderer")
     }
 }
 
@@ -253,7 +192,7 @@ impl Renderer {
             self.render_timeline_semaphore.wait_timeline(wait_timeline_value, timeout_ns);
         }
 
-        self.cmd_allocator.free_frame_commands();
+        FrameContext::cmd_allocator_mut().free_frame_commands();
         self.timer.tic();
     }
 
@@ -295,14 +234,11 @@ impl Renderer {
 
         PipelineContext {
             gpu_scene: &self.gpu_scene,
-            bindless_mgr: self.bindless_mgr.clone(),
             per_frame_data: &self.per_frame_data_buffers[*crt_frame_label],
-            frame_ctrl: &self.frame_ctrl,
             timer: &self.timer,
             frame_settings: &self.frame_settings,
             pipeline_settings: &self.pipeline_settings,
             frame_buffers: &self.framebuffers,
-            cmd_allocator: &mut self.cmd_allocator,
         }
     }
 
@@ -312,7 +248,7 @@ impl Renderer {
             RenderContext::get().device_functions().device_wait_idle().unwrap();
         }
         self.frame_settings.frame_extent = new_extent;
-        self.framebuffers.rebuild(&self.frame_settings, &mut self.bindless_mgr.borrow_mut());
+        self.framebuffers.rebuild(&self.frame_settings);
     }
 
     fn update_gpu_scene(&mut self, input_state: &InputState, camera: &DrsCamera) {
@@ -320,7 +256,7 @@ impl Renderer {
         let crt_frame_label = self.frame_ctrl.frame_label();
 
         // 将数据上传到 gpu buffer 中
-        let cmd = self.cmd_allocator.alloc_command_buffer("update-draw-buffer");
+        let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("update-draw-buffer");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
 
         let transfer_barrier_mask = BarrierMask {
@@ -332,13 +268,8 @@ impl Renderer {
             dst_access: vk::AccessFlags2::SHADER_READ,
         };
 
-        self.gpu_scene.prepare_render_data(&self.scene_mgr.borrow(), &mut self.bindless_mgr.borrow_mut());
-        self.gpu_scene.upload_to_buffer(
-            &cmd,
-            transfer_barrier_mask,
-            &self.scene_mgr.borrow(),
-            &self.bindless_mgr.borrow(),
-        );
+        self.gpu_scene.prepare_render_data(&self.scene_mgr.borrow());
+        self.gpu_scene.upload_to_buffer(&cmd, transfer_barrier_mask, &self.scene_mgr.borrow());
 
         // 准备好当前帧的数据
         let per_frame_data = {

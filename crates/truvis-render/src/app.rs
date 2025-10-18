@@ -1,20 +1,21 @@
 use std::{cell::OnceCell, ffi::CStr, sync::OnceLock};
 
-use ash::vk;
-use raw_window_handle::HasDisplayHandle;
-use truvis_crate_tools::init_log::init_log;
-use winit::{
-    application::ApplicationHandler,
-    event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
-    event_loop::ActiveEventLoop,
-    window::WindowId,
-};
-
+use crate::renderer::frame_context::FrameContext;
 use crate::{
     outer_app::OuterApp,
     platform::{camera_controller::CameraController, input_manager::InputManager},
     renderer::renderer::Renderer,
     window_system::main_window::MainWindow,
+};
+use ash::vk;
+use raw_window_handle::HasDisplayHandle;
+use truvis_crate_tools::init_log::init_log;
+use truvis_rhi::render_context::RenderContext;
+use winit::{
+    application::ApplicationHandler,
+    event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
+    event_loop::ActiveEventLoop,
+    window::WindowId,
 };
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
@@ -76,6 +77,9 @@ impl<T: OuterApp> TruvisApp<T> {
         log::info!("end run.");
 
         app.destroy();
+
+        FrameContext::destroy();
+        RenderContext::destroy();
     }
 }
 
@@ -90,7 +94,6 @@ impl<T: OuterApp> TruvisApp<T> {
                 width: 1200,
                 height: 800,
             },
-            self.renderer.bindless_mgr.clone(),
         );
 
         let outer_app = T::init(&mut self.renderer, self.camera_controller.camera_mut());

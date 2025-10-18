@@ -2,6 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 
+use crate::renderer::frame_context::FrameContext;
 use crate::{gui::mesh::GuiMesh, pipeline_settings::FrameLabel, renderer::bindless::BindlessManager};
 use ash::vk;
 use truvis_crate_tools::resource::TruvisPath;
@@ -30,12 +31,7 @@ impl Gui {
     const FONT_TEXTURE_KEY: &'static str = "imgui-fonts";
     const RENDER_IMAGE_ID: usize = 1;
 
-    pub fn new(
-        window: &winit::window::Window,
-        fif_num: usize,
-        swapchain_image_infos: &SwapchainImageInfo,
-        bindless_mgr: Rc<RefCell<BindlessManager>>,
-    ) -> Self {
+    pub fn new(window: &winit::window::Window, fif_num: usize, swapchain_image_infos: &SwapchainImageInfo) -> Self {
         let mut imgui_ctx = imgui::Context::create();
         // disable automatic saving .ini file
         imgui_ctx.set_ini_filename(None);
@@ -50,7 +46,8 @@ impl Gui {
         let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui_ctx);
         platform.attach_window(imgui_ctx.io_mut(), window, imgui_winit_support::HiDpiMode::Rounded);
 
-        Self::init_fonts(&mut imgui_ctx, &platform, &mut bindless_mgr.borrow_mut());
+        let mut bindless_mgr = FrameContext::bindless_mgr_mut();
+        Self::init_fonts(&mut imgui_ctx, &platform, &mut bindless_mgr);
 
         Self {
             imgui_ctx,

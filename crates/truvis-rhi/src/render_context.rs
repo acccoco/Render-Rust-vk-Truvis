@@ -76,12 +76,9 @@ impl RenderContext {
     #[inline]
     pub fn get() -> &'static RenderContext {
         unsafe {
-            // 使用 addr_of! 避免直接对 static mut 创建引用
+            // 使用 addr_of! 避免直接对 static mut 创建引用，编译器不允许这种行为
             let ptr = std::ptr::addr_of!(RENDER_CONTEXT);
-            match (*ptr).as_ref() {
-                Some(context) => context,
-                None => panic!("RenderContext not initialized. Call RenderContext::init() first."),
-            }
+            (*ptr).as_ref().expect("RenderContext not initialized. Call RenderContext::init() first.")
         }
     }
 
@@ -100,9 +97,7 @@ impl RenderContext {
         unsafe {
             // 使用 addr_of_mut! 避免直接对 static mut 创建可变引用
             let ptr = std::ptr::addr_of_mut!(RENDER_CONTEXT);
-            if (*ptr).is_some() {
-                panic!("RenderContext already initialized");
-            }
+            assert!((*ptr).is_none(), "RenderContext already initialized");
             *ptr = Some(Self::new(app_name, instance_extra_exts));
         }
     }
@@ -116,13 +111,13 @@ impl RenderContext {
         unsafe {
             // 使用 addr_of_mut! 避免直接对 static mut 创建可变引用
             let ptr = std::ptr::addr_of_mut!(RENDER_CONTEXT);
-            if let Some(context) = (*ptr).take() {
-                // 注意：ResourceManager 可能不需要显式销毁
-                // context.resource_mgr.into_inner().destroy();
-                context.allocator.destroy();
-                context.temp_graphics_command_pool.destroy();
-                context.vk_core.destroy();
-            }
+            let context = (*ptr).take().expect("RenderContext not initialized");
+
+            // 注意：ResourceManager 可能不需要显式销毁
+            // context.resource_mgr.into_inner().destroy();
+            context.allocator.destroy();
+            context.temp_graphics_command_pool.destroy_internal(&context.vk_core.device_functions);
+            context.vk_core.destroy();
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, mem::offset_of, rc::Rc};
+use std::{mem::offset_of, rc::Rc};
 
 use ash::vk;
 use itertools::Itertools;
@@ -12,10 +12,10 @@ use truvis_rhi::{
     },
 };
 
+use crate::renderer::frame_context::FrameContext;
 use crate::{
     gui::{gui::Gui, mesh::ImGuiVertex},
     pipeline_settings::FrameLabel,
-    renderer::bindless::BindlessManager,
 };
 
 const_map!(ShaderStage<ShaderStageInfo>: {
@@ -34,12 +34,12 @@ const_map!(ShaderStage<ShaderStageInfo>: {
 pub struct GuiPass {
     pipeline: GraphicsPipeline,
     pipeline_layout: Rc<PipelineLayout>,
-    bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
 impl GuiPass {
-    pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>, color_format: vk::Format) -> Self {
+    pub fn new(color_format: vk::Format) -> Self {
+        let bindless_mgr = FrameContext::bindless_mgr();
         let pipeline_layout = Rc::new(PipelineLayout::new(
-            &[bindless_mgr.borrow().bindless_descriptor_layout.handle()],
+            &[bindless_mgr.bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 offset: 0,
@@ -81,7 +81,6 @@ impl GuiPass {
         Self {
             pipeline,
             pipeline_layout,
-            bindless_mgr,
         }
     }
 
@@ -146,11 +145,12 @@ impl GuiPass {
             _padding_0: 0,
         };
 
+        let bindless_mgr = FrameContext::bindless_mgr();
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),
             0,
-            &[self.bindless_mgr.borrow().bindless_descriptor_sets[*frame_label].handle()],
+            &[bindless_mgr.bindless_descriptor_sets[*frame_label].handle()],
             None,
         );
 
@@ -170,8 +170,6 @@ impl GuiPass {
         let mut last_texture_id: Option<imgui::TextureId> = None;
         let clip_offset = draw_data.display_pos;
         let clip_scale = draw_data.framebuffer_scale;
-
-        let bindless_mgr = self.bindless_mgr.borrow();
 
         // 简而言之：对于每个 command，设置正确的 vertex, index, texture, scissor 即可
         for draw_list in draw_data.draw_lists() {

@@ -1,10 +1,10 @@
+use ash::vk;
+use itertools::Itertools;
+use std::cell::Cell;
 use std::{
     ffi::{CStr, CString},
     ops::Deref,
 };
-
-use ash::vk;
-use itertools::Itertools;
 
 use crate::{foundation::debug_messenger::DebugType, utilities::shader_cursor::WriteDescriptorSet};
 
@@ -27,7 +27,7 @@ pub struct DeviceFunctions {
     pub(crate) swapchain: ash::khr::swapchain::Device,
 
     #[cfg(debug_assertions)]
-    destroyed: bool,
+    destroyed: Cell<bool>,
 }
 
 /// 构造与销毁
@@ -77,12 +77,13 @@ impl DeviceFunctions {
             debug_utils: vk_debug_utils_device,
             swapchain: _vk_swapchain,
 
-            destroyed: false,
+            destroyed: Cell::new(false),
         }
     }
 
     pub fn destroy(&self) {
         log::info!("destroying device");
+        self.destroyed.set(true);
         unsafe {
             self.device.destroy_device(None);
         }
@@ -231,7 +232,7 @@ impl Deref for DeviceFunctions {
 impl Drop for DeviceFunctions {
     fn drop(&mut self) {
         #[cfg(debug_assertions)]
-        debug_assert!(self.destroyed, "DeviceFunctions must be destroyed before being dropped.");
+        debug_assert!(self.destroyed.get(), "DeviceFunctions must be destroyed before being dropped.");
     }
 }
 impl DebugType for DeviceFunctions {

@@ -13,6 +13,7 @@ use truvis_rhi::{
     },
 };
 
+use crate::renderer::frame_context::FrameContext;
 use crate::{
     pipeline_settings::{FrameLabel, FrameSettings},
     renderer::{bindless::BindlessManager, frame_controller::FrameController},
@@ -33,11 +34,7 @@ pub struct FrameBuffers {
     frame_ctrl: Rc<FrameController>,
 }
 impl FrameBuffers {
-    pub fn new(
-        frame_settigns: &FrameSettings,
-        frame_ctrl: Rc<FrameController>,
-        bindless_mgr: &mut BindlessManager,
-    ) -> Self {
+    pub fn new(frame_settigns: &FrameSettings, frame_ctrl: Rc<FrameController>) -> Self {
         let (color_image, color_image_view) = Self::create_color_image(frame_settigns);
         let (depth_image, depth_image_view) = Self::create_depth_image(frame_settigns);
         let render_targets = Self::create_render_targets(frame_settigns, &frame_ctrl);
@@ -56,16 +53,17 @@ impl FrameBuffers {
             render_target_bindless_keys,
             frame_ctrl,
         };
-        framebuffers.register_bindless(bindless_mgr);
+        framebuffers.register_bindless();
         framebuffers
     }
 
-    pub fn rebuild(&mut self, frame_settings: &FrameSettings, bindless_mgr: &mut BindlessManager) {
-        self.unregister_bindless(bindless_mgr);
-        *self = Self::new(frame_settings, self.frame_ctrl.clone(), bindless_mgr);
+    pub fn rebuild(&mut self, frame_settings: &FrameSettings) {
+        self.unregister_bindless();
+        *self = Self::new(frame_settings, self.frame_ctrl.clone());
     }
 
-    fn register_bindless(&self, bindless_mgr: &mut BindlessManager) {
+    fn register_bindless(&self) {
+        let mut bindless_mgr = FrameContext::bindless_mgr_mut();
         bindless_mgr.register_image_shared(self.color_image_view.clone());
 
         for (render_target, key) in self.render_targets.iter().zip(self.render_target_bindless_keys.iter()) {
@@ -74,7 +72,8 @@ impl FrameBuffers {
         }
     }
 
-    fn unregister_bindless(&self, bindless_mgr: &mut BindlessManager) {
+    fn unregister_bindless(&self) {
+        let mut bindless_mgr = FrameContext::bindless_mgr_mut();
         bindless_mgr.unregister_image(&self.color_image_view.uuid());
 
         for (render_target, key) in self.render_targets.iter().zip(self.render_target_bindless_keys.iter()) {

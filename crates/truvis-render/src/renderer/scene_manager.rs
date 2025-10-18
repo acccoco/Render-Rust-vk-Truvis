@@ -5,9 +5,11 @@ use model_manager::{
     guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid},
 };
 use shader_binding::shader;
+use shader_binding::shader::Scene;
 use truvis_cxx::AssimpSceneLoader;
 
 use crate::renderer::bindless::BindlessManager;
+use crate::renderer::frame_context::FrameContext;
 
 pub struct SceneManager {
     mat_map: HashMap<MatGuid, DrsMaterial>,
@@ -15,8 +17,6 @@ pub struct SceneManager {
     mesh_map: HashMap<MeshGuid, DrsMesh>,
 
     point_light_map: HashMap<LightGuid, shader::PointLight>,
-
-    bindless_mgr: Rc<RefCell<BindlessManager>>,
 }
 /// getter
 impl SceneManager {
@@ -36,15 +36,22 @@ impl SceneManager {
     pub fn point_light_map(&self) -> &HashMap<LightGuid, shader::PointLight> {
         &self.point_light_map
     }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.instance_map.is_empty()
+            && self.mesh_map.is_empty()
+            && self.mat_map.is_empty()
+            && self.point_light_map.is_empty()
+    }
 }
 impl SceneManager {
-    pub fn new(bindless_mgr: Rc<RefCell<BindlessManager>>) -> Self {
+    pub fn new() -> Self {
         Self {
             mat_map: HashMap::new(),
             point_light_map: HashMap::new(),
             instance_map: HashMap::new(),
             mesh_map: HashMap::new(),
-            bindless_mgr,
         }
     }
 
@@ -85,7 +92,7 @@ impl SceneManager {
                 let guid = MatGuid::new();
 
                 // 注册纹理
-                let mut bindless_mgr = self.bindless_mgr.borrow_mut();
+                let mut bindless_mgr = FrameContext::get().bindless_mgr.borrow_mut();
                 if !mat.diffuse_map.is_empty() {
                     bindless_mgr.register_texture_by_path(mat.diffuse_map.clone());
                 }
@@ -122,5 +129,11 @@ impl SceneManager {
         let guid = LightGuid::new();
         self.point_light_map.insert(guid, light);
         guid
+    }
+}
+
+impl Drop for SceneManager {
+    fn drop(&mut self) {
+        log::info!("SceneManager dropped.");
     }
 }

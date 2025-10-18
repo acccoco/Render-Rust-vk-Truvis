@@ -1,9 +1,11 @@
 use std::{collections::HashMap, rc::Rc};
 
+use crate::{pipeline_settings::FrameLabel, render_resource::ImageLoader, renderer::frame_controller::FrameController};
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::shader;
 use shader_layout_macro::ShaderLayout;
+use truvis_rhi::descriptors::descriptor_pool::DescriptorPoolCreateInfo;
 use truvis_rhi::{
     descriptors::{
         descriptor::{DescriptorSet, DescriptorSetLayout},
@@ -16,8 +18,6 @@ use truvis_rhi::{
     },
     utilities::shader_cursor::ShaderCursor,
 };
-
-use crate::{pipeline_settings::FrameLabel, render_resource::ImageLoader, renderer::frame_controller::FrameController};
 
 #[derive(ShaderLayout)]
 pub struct BindlessDescriptorBinding {
@@ -36,7 +36,10 @@ pub struct BindlessDescriptorBinding {
     _images: (),
 }
 
+// TODO: 将 RefCell 移动到 BindlessManager 内部，粒度更细
 pub struct BindlessManager {
+    descriptor_pool: DescriptorPool,
+
     pub bindless_descriptor_layout: DescriptorSetLayout<BindlessDescriptorBinding>,
 
     /// 每一个 frame in flights 都有一个 descriptor set
@@ -57,8 +60,10 @@ pub struct BindlessManager {
     /// 当前 frame in flight 的标签，每帧更新
     frame_label: FrameLabel,
 }
+/// init & destroy
 impl BindlessManager {
-    pub fn new(descriptor_pool: &DescriptorPool, frame_ctrl: Rc<FrameController>) -> Self {
+    pub fn new(frame_ctrl: Rc<FrameController>) -> Self {
+        let descriptor_pool = Self::init_descriptor_pool();
         let bindless_layout = DescriptorSetLayout::<BindlessDescriptorBinding>::new(
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
             "bindless-layout",
@@ -66,7 +71,7 @@ impl BindlessManager {
         let bindless_descriptor_sets = (0..frame_ctrl.fif_count())
             .map(|idx| {
                 DescriptorSet::<BindlessDescriptorBinding>::new(
-                    descriptor_pool,
+                    &descriptor_pool,
                     &bindless_layout,
                     format!("bindless-descriptor-set-{idx}"),
                 )
@@ -74,6 +79,8 @@ impl BindlessManager {
             .collect_vec();
 
         Self {
+            descriptor_pool,
+
             bindless_descriptor_layout: bindless_layout,
             bindless_descriptor_sets,
 
@@ -141,6 +148,51 @@ impl BindlessManager {
     pub fn get_image_handle(&self, image_uuid: &Image2DViewUUID) -> Option<shader::ImageHandle> {
         self.bindless_images.get(image_uuid).copied().map(|idx| shader::ImageHandle { index: idx as _ })
     }
+
+    const DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
+    const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
+    const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
+
+    fn init_descriptor_pool() -> DescriptorPool {
+        let pool_size = vec![
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
+                descriptor_count: 128,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_BUFFER,
+                descriptor_count: Self::DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                descriptor_count: Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::INPUT_ATTACHMENT,
+                descriptor_count: 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
+                descriptor_count: 32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_IMAGE,
+                descriptor_count: Self::DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT + 32,
+            },
+        ];
+
+        let pool_ci = Rc::new(DescriptorPoolCreateInfo::new(
+            vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET | vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND,
+            Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + Self::DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
+            pool_size,
+        ));
+
+        DescriptorPool::new(pool_ci, "renderer")
+    }
 }
 /// register & unregister
 impl BindlessManager {
@@ -189,5 +241,10 @@ impl BindlessManager {
 
     pub fn unregister_image(&mut self, key: &Image2DViewUUID) {
         self.images.remove(key);
+    }
+}
+impl Drop for BindlessManager {
+    fn drop(&mut self) {
+        log::info!("Dropping BindlessManager");
     }
 }

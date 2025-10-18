@@ -97,7 +97,8 @@ impl GuiMesh {
 
     /// 从 draw data 中提取出 vertex 数据，创建 vertex buffer
     ///
-    /// @return (vertex buffer, vertex count, stage buffer)
+    /// ## Return
+    /// `(vertex buffer, vertex count, stage buffer)`
     fn create_vertex_buffer(
         frame_name: &str,
         cmd: &CommandBuffer,
