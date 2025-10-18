@@ -1,13 +1,11 @@
 use std::mem::offset_of;
 
+use crate::renderer::frame_context::FrameContext;
 use ash::vk;
 use truvis_rhi::{
     basic::color::LabelColor,
     commands::{barrier::BufferBarrier, command_buffer::CommandBuffer},
-    resources::{
-        buffer::Buffer,
-        special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer},
-    },
+    resources::special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer},
 };
 
 /// AoS: Array of Structs
@@ -54,17 +52,15 @@ impl ImGuiVertex {
 pub struct GuiMesh {
     pub vertex_buffer: VertexBuffer<imgui::DrawVert>,
     _vertex_count: usize,
-    _vertex_stage_buffer: Buffer,
 
     pub _index_buffer: IndexBuffer,
     _index_count: usize,
-    _index_stage_buffer: Buffer,
 }
 
 impl GuiMesh {
     pub fn new(cmd: &CommandBuffer, frame_name: &str, draw_data: &imgui::DrawData) -> Self {
-        let (vertex_buffer, vertex_cnt, vertex_stage_buffer) = Self::create_vertex_buffer(frame_name, cmd, draw_data);
-        let (index_buffer, index_cnt, index_stage_buffer) = Self::create_index_buffer(frame_name, cmd, draw_data);
+        let (vertex_buffer, vertex_cnt) = Self::create_vertex_buffer(frame_name, cmd, draw_data);
+        let (index_buffer, index_cnt) = Self::create_index_buffer(frame_name, cmd, draw_data);
 
         cmd.begin_label("uipass-mesh-transfer-barrier", LabelColor::COLOR_CMD);
         {
@@ -87,23 +83,21 @@ impl GuiMesh {
         Self {
             vertex_buffer,
             _vertex_count: vertex_cnt,
-            _vertex_stage_buffer: vertex_stage_buffer,
 
             _index_buffer: index_buffer,
             _index_count: index_cnt,
-            _index_stage_buffer: index_stage_buffer,
         }
     }
 
     /// 从 draw data 中提取出 vertex 数据，创建 vertex buffer
     ///
     /// ## Return
-    /// `(vertex buffer, vertex count, stage buffer)`
+    /// `(vertex buffer, vertex count)`
     fn create_vertex_buffer(
         frame_name: &str,
         cmd: &CommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (VertexBuffer<imgui::DrawVert>, usize, Buffer) {
+    ) -> (VertexBuffer<imgui::DrawVert>, usize) {
         let vertex_count = draw_data.total_vtx_count as usize;
         let mut vertices = Vec::with_capacity(vertex_count);
         for draw_list in draw_data.draw_lists() {
@@ -113,8 +107,9 @@ impl GuiMesh {
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
         let mut vertex_buffer =
             VertexBuffer::<imgui::DrawVert>::new(vertex_count, format!("{}-imgui-vertex", frame_name));
-        let mut stage_buffer =
-            Buffer::new_stage_buffer(vertices_size as vk::DeviceSize, format!("{}-imgui-vertex-stage", frame_name));
+        let mut upload_buffer_mgr = FrameContext::upload_buffer_mgr_mut();
+        let stage_buffer = upload_buffer_mgr
+            .alloc_buffer(vertices_size as vk::DeviceSize, &format!("{}-imgui-vertex-stage", frame_name));
         stage_buffer.transfer_data_by_mem_map(&vertices);
 
         cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
@@ -130,17 +125,13 @@ impl GuiMesh {
         }
         cmd.end_label();
 
-        (vertex_buffer, vertex_count, stage_buffer)
+        (vertex_buffer, vertex_count)
     }
 
     /// 从 draw data 中提取出 index 数据，创建 index buffer
     ///
     /// @return (index buffer, index count, stage buffer)
-    fn create_index_buffer(
-        frame_name: &str,
-        cmd: &CommandBuffer,
-        draw_data: &imgui::DrawData,
-    ) -> (IndexBuffer, usize, Buffer) {
+    fn create_index_buffer(frame_name: &str, cmd: &CommandBuffer, draw_data: &imgui::DrawData) -> (IndexBuffer, usize) {
         let index_count = draw_data.total_idx_count as usize;
         let mut indices = Vec::with_capacity(index_count);
         for draw_list in draw_data.draw_lists() {
@@ -149,8 +140,9 @@ impl GuiMesh {
 
         let indices_size = index_count * size_of::<imgui::DrawIdx>();
         let mut index_buffer = IndexBuffer::new(indices_size, format!("{}-imgui-index", frame_name));
-        let mut stage_buffer =
-            Buffer::new_stage_buffer(indices_size as vk::DeviceSize, format!("{}-imgui-index-stage", frame_name));
+        let mut upload_buffer_mgr = FrameContext::upload_buffer_mgr_mut();
+        let stage_buffer = upload_buffer_mgr
+            .alloc_buffer(indices_size as vk::DeviceSize, &format!("{}-imgui-index-stage", frame_name));
         stage_buffer.transfer_data_by_mem_map(&indices);
 
         cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);
@@ -166,6 +158,6 @@ impl GuiMesh {
         }
         cmd.end_label();
 
-        (index_buffer, index_count, stage_buffer)
+        (index_buffer, index_count)
     }
 }

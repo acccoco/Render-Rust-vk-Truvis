@@ -193,6 +193,7 @@ impl Renderer {
         }
 
         FrameContext::cmd_allocator_mut().free_frame_commands();
+        FrameContext::upload_buffer_mgr_mut().clear_frame_buffers();
         self.timer.tic();
     }
 

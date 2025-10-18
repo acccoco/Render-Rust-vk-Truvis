@@ -12,7 +12,7 @@ use truvis_rhi::render_context::RenderContext;
 
 pub struct FrameContext {
     pub frame_ctrl: Rc<FrameController>,
-    pub upload_buffer_mgr: UploadBufferManager,
+    pub upload_buffer_mgr: RefCell<UploadBufferManager>,
     pub bindless_mgr: RefCell<BindlessManager>,
     pub cmd_allocator: RefCell<CmdAllocator>,
 }
@@ -23,7 +23,7 @@ static mut FRAME_CONTEXT: Option<FrameContext> = None;
 impl FrameContext {
     fn new() -> Self {
         let frame_ctrl = Rc::new(FrameController::new());
-        let upload_buffer_mgr = UploadBufferManager::new(frame_ctrl.clone());
+        let upload_buffer_mgr = RefCell::new(UploadBufferManager::new(frame_ctrl.clone()));
         let bindless_mgr = RefCell::new(BindlessManager::new(frame_ctrl.clone()));
         let cmd_allocator = RefCell::new(CmdAllocator::new(frame_ctrl.clone()));
         Self {
@@ -56,7 +56,7 @@ impl FrameContext {
             // 使用 addr_of_mut! 避免直接对 static mut 创建可变引用
             let ptr = std::ptr::addr_of_mut!(FRAME_CONTEXT);
             let mut context = (*ptr).take().expect("FrameContext not initialized");
-            context.upload_buffer_mgr.destroy();
+            drop(context.upload_buffer_mgr);
             drop(context.cmd_allocator);
             drop(context.bindless_mgr);
         }
@@ -81,5 +81,11 @@ impl FrameContext {
     pub fn cmd_allocator_mut() -> RefMut<'static, CmdAllocator> {
         let context = Self::get();
         context.cmd_allocator.borrow_mut()
+    }
+
+    #[inline]
+    pub fn upload_buffer_mgr_mut() -> RefMut<'static, UploadBufferManager> {
+        let context = Self::get();
+        context.upload_buffer_mgr.borrow_mut()
     }
 }
