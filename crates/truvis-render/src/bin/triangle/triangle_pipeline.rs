@@ -1,5 +1,6 @@
 use ash::vk;
 use model_manager::{component::DrsGeometry, vertex::vertex_pc::VertexPosColor};
+use truvis_render::renderer::frame_context::FrameContext;
 use truvis_render::{pipeline_settings::FrameSettings, render_pipeline::pipeline_context::PipelineContext};
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, submit_info::SubmitInfo},
@@ -20,21 +21,18 @@ impl TrianglePipeline {
     pub fn render(&self, ctx: PipelineContext, shape: &DrsGeometry<VertexPosColor>) {
         let PipelineContext {
             gpu_scene: _,
-            bindless_mgr: _,
-            frame_ctrl,
             timer: _,
             per_frame_data: _,
             frame_settings,
             pipeline_settings: _,
             frame_buffers,
-            cmd_allocator,
         } = ctx;
-        let frame_label = frame_ctrl.frame_label();
+        let frame_label = FrameContext::get().frame_ctrl.frame_label();
         let render_target = frame_buffers.render_target_image(frame_label);
 
         // render triangle
         {
-            let cmd = cmd_allocator.alloc_command_buffer("triangle");
+            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("triangle");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "triangle");
 
             // 将 render target 从 general -> color attachment
@@ -54,7 +52,7 @@ impl TrianglePipeline {
                     )],
             );
 
-            self.triangle_pass.draw(&cmd, frame_ctrl.frame_label(), frame_buffers, frame_settings, shape);
+            self.triangle_pass.draw(&cmd, frame_label, frame_buffers, frame_settings, shape);
 
             // 将 render target 从 color attachment -> general
             cmd.image_memory_barrier(

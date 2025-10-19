@@ -1,6 +1,7 @@
 use ash::vk;
 use model_manager::{component::DrsGeometry, vertex::vertex_pc::VertexPosColor};
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
+use truvis_render::renderer::frame_context::FrameContext;
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, submit_info::SubmitInfo},
     render_context::RenderContext,
@@ -20,22 +21,20 @@ impl ShaderToyPipeline {
     pub fn render(&self, ctx: PipelineContext, shape: &DrsGeometry<VertexPosColor>) {
         let PipelineContext {
             gpu_scene: _,
-            bindless_mgr: _,
-            frame_ctrl,
             timer,
             per_frame_data: _,
             frame_settings,
             pipeline_settings: _,
             frame_buffers,
-            cmd_allocator,
         } = ctx;
+        let frame_ctrl = FrameContext::get().frame_ctrl.clone();
         let frame_label = frame_ctrl.frame_label();
         let render_target = frame_buffers.render_target_image(frame_label);
         let render_target_view = frame_buffers.render_target_image_view(frame_label);
 
         // render shader toy
         {
-            let cmd = cmd_allocator.alloc_command_buffer("shader-toy");
+            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("shader-toy");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "shader-toy");
 
             // 将 render target 从 general -> color attachment
@@ -55,7 +54,7 @@ impl ShaderToyPipeline {
                     )],
             );
 
-            self.shader_toy_pass.draw(&cmd, frame_ctrl, frame_settings, render_target_view.handle(), timer, shape);
+            self.shader_toy_pass.draw(&cmd, &frame_ctrl, frame_settings, render_target_view.handle(), timer, shape);
 
             // 将 render target 从 color attachment -> general
             cmd.image_memory_barrier(

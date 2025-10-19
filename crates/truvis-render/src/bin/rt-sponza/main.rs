@@ -52,7 +52,7 @@ impl RtApp {
 
 impl OuterApp for RtApp {
     fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
-        let rt_pipeline = RtPipeline::new(renderer.bindless_mgr.clone());
+        let rt_pipeline = RtPipeline::new();
 
         Self::create_scene(renderer, camera);
 
