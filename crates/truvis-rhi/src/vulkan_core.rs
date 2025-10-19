@@ -35,7 +35,7 @@ pub struct VulkanCore {
     pub(crate) transfer_queue: CommandQueue,
 }
 
-/// 创建与销毁
+// 创建与销毁
 impl VulkanCore {
     pub fn new(app_name: String, engine_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
         let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");

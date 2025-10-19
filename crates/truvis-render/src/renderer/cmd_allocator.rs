@@ -20,7 +20,7 @@ pub struct CmdAllocator {
     frame_ctrl: Rc<FrameController>,
 }
 
-/// init & desotry
+// init & desotry
 impl CmdAllocator {
     pub fn new(frame_ctrl: Rc<FrameController>) -> Self {
         let graphics_command_pools = (0..frame_ctrl.fif_count())
@@ -41,7 +41,7 @@ impl CmdAllocator {
     }
 }
 
-/// tools
+// tools
 impl CmdAllocator {
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer(&mut self, debug_name: &str) -> CommandBuffer {

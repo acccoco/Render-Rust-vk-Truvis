@@ -18,7 +18,7 @@ pub struct SceneManager {
 
     point_light_map: HashMap<LightGuid, shader::PointLight>,
 }
-/// getter
+// getter
 impl SceneManager {
     #[inline]
     pub fn mat_map(&self) -> &HashMap<MatGuid, Material> {

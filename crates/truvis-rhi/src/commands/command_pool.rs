@@ -13,7 +13,7 @@ pub struct CommandPool {
     _debug_name: String,
     valid: bool,
 }
-/// init & destory
+// init & destory
 impl CommandPool {
     // TODO 使用 new_internal 简化
     #[inline]
@@ -86,7 +86,7 @@ impl CommandPool {
     }
 }
 
-/// getters
+// getters
 impl CommandPool {
     /// getter
     #[inline]
@@ -94,7 +94,7 @@ impl CommandPool {
         self.handle
     }
 }
-/// tools
+// tools
 impl CommandPool {
     /// 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
     ///

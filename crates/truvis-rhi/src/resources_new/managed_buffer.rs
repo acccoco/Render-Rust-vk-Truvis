@@ -65,7 +65,7 @@ impl ManagedBuffer {
         }
     }
 }
-/// getter
+// getter
 impl ManagedBuffer {
     #[inline]
     pub fn handle(&self) -> vk::Buffer {
@@ -88,7 +88,7 @@ impl ManagedBuffer {
         })
     }
 }
-/// tools
+// tools
 impl ManagedBuffer {
     /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到
     /// self

@@ -60,7 +60,7 @@ pub struct BindlessManager {
     /// 当前 frame in flight 的标签，每帧更新
     frame_label: FrameLabel,
 }
-/// init & destroy
+// init & destroy
 impl BindlessManager {
     pub fn new(frame_ctrl: Rc<FrameController>) -> Self {
         let descriptor_pool = Self::init_descriptor_pool();
@@ -194,7 +194,7 @@ impl BindlessManager {
         DescriptorPool::new(pool_ci, "renderer")
     }
 }
-/// register & unregister
+// register & unregister
 impl BindlessManager {
     pub fn register_texture_by_path(&mut self, texture_path: String) {
         let texture = ImageLoader::load_image(std::path::Path::new(&texture_path));

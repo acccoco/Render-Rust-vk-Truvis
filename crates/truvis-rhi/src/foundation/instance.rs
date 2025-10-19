@@ -72,7 +72,7 @@ impl Instance {
     }
 }
 
-/// getter
+// getter
 impl Instance {
     #[inline]
     pub fn ash_instance(&self) -> &ash::Instance {
@@ -85,7 +85,7 @@ impl Instance {
     }
 }
 
-/// 构造过程
+// 构造过程
 impl Instance {
     /// 用于在创建 instance 时设置 layer 的参数
     fn _get_layer_setting_for_single<'a, T>(

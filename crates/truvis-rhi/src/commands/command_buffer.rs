@@ -21,7 +21,7 @@ pub struct CommandBuffer {
     command_pool_handle: vk::CommandPool,
 }
 
-/// 创建与销毁
+// 创建与销毁
 impl CommandBuffer {
     pub fn new(command_pool: &CommandPool, debug_name: &str) -> Self {
         let info = vk::CommandBufferAllocateInfo::default()
@@ -40,7 +40,7 @@ impl CommandBuffer {
     }
 }
 
-/// Basic 命令
+// Basic 命令
 impl CommandBuffer {
     /// 开始录制 command
     ///
@@ -66,7 +66,7 @@ impl CommandBuffer {
     }
 }
 
-/// getters
+// getters
 impl CommandBuffer {
     /// getter
     #[inline]
@@ -75,7 +75,7 @@ impl CommandBuffer {
     }
 }
 
-/// 数据传输类型
+// 数据传输类型
 impl CommandBuffer {
     /// - command type: action
     /// - 支持的 queue：transfer，graphics，compute
@@ -149,7 +149,7 @@ impl CommandBuffer {
     }
 }
 
-/// 绘制类型的命令
+// 绘制类型的命令
 impl CommandBuffer {
     /// - command type: action, state
     /// - supported queue types: graphics
@@ -300,7 +300,7 @@ impl CommandBuffer {
     }
 }
 
-/// 光追相关
+// 光追相关
 impl CommandBuffer {
     /// - command type: action
     /// - supported queue types: compute
@@ -380,7 +380,7 @@ impl CommandBuffer {
     }
 }
 
-/// 计算着色器相关命令
+// 计算着色器相关命令
 impl CommandBuffer {
     #[inline]
     pub fn cmd_dispatch(&self, group_cnt: glam::UVec3) {
@@ -390,7 +390,7 @@ impl CommandBuffer {
     }
 }
 
-/// 同步相关命令
+// 同步相关命令
 impl CommandBuffer {
     /// - command type: synchronize
     /// - supported queue types: graphics, compute, transfer
@@ -427,7 +427,7 @@ impl CommandBuffer {
     }
 }
 
-/// debug 相关命令
+// debug 相关命令
 impl CommandBuffer {
     /// - command type: state, action
     /// - supported queue type: graphics, compute

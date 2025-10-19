@@ -21,7 +21,7 @@ pub struct RenderSwapchain {
     extent: vk::Extent2D,
 }
 
-/// 构建过程
+// 构建过程
 impl RenderSwapchain {
     pub fn new(
         vk_core: &VulkanCore,
@@ -112,7 +112,7 @@ pub struct SwapchainImageInfo {
     pub image_format: vk::Format,
 }
 
-/// getters
+// getters
 impl RenderSwapchain {
     #[inline]
     pub fn present_images(&self) -> Vec<vk::Image> {
@@ -149,7 +149,7 @@ impl RenderSwapchain {
     }
 }
 
-/// tools
+// tools
 impl RenderSwapchain {
     /// timeout: nano seconds
     #[inline]

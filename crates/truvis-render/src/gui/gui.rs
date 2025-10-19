@@ -25,7 +25,7 @@ pub struct Gui {
     meshes: Vec<Option<GuiMesh>>,
     render_image_key: Option<String>,
 }
-/// 创建过程
+// 创建过程
 impl Gui {
     const FONT_TEXTURE_ID: usize = 0;
     const FONT_TEXTURE_KEY: &'static str = "imgui-fonts";
@@ -120,7 +120,7 @@ impl Gui {
         imgui_ctx.fonts().tex_id = fonts_texture_id;
     }
 }
-/// tools
+// tools
 impl Gui {
     /// 接受 window 的事件
     pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>) {

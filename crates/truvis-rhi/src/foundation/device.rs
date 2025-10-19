@@ -30,7 +30,7 @@ pub struct DeviceFunctions {
     destroyed: Cell<bool>,
 }
 
-/// 构造与销毁
+// 构造与销毁
 impl DeviceFunctions {
     pub fn new(
         instance: &ash::Instance,
@@ -90,7 +90,7 @@ impl DeviceFunctions {
     }
 }
 
-/// 创建过程的辅助函数
+// 创建过程的辅助函数
 impl DeviceFunctions {
     /// 必要的 physical device core features
     fn physical_device_basic_features() -> vk::PhysicalDeviceFeatures {
@@ -151,7 +151,7 @@ impl DeviceFunctions {
     }
 }
 
-/// getters
+// getters
 impl DeviceFunctions {
     #[inline]
     pub fn vk_handle(&self) -> vk::Device {
@@ -179,7 +179,7 @@ impl DeviceFunctions {
     }
 }
 
-/// tools
+// tools
 impl DeviceFunctions {
     #[inline]
     pub fn write_descriptor_sets(&self, writes: &[WriteDescriptorSet]) {

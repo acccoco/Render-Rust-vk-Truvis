@@ -10,7 +10,7 @@ pub struct UploadBufferManager {
     frame_ctrl: Rc<FrameController>,
 }
 
-/// init & destroy
+// init & destroy
 impl UploadBufferManager {
     pub fn new(frame_ctrl: Rc<FrameController>) -> Self {
         let buffers = (0..frame_ctrl.fif_count()).map(|_| Vec::new()).collect_vec();
@@ -18,7 +18,7 @@ impl UploadBufferManager {
     }
 }
 
-/// tools
+// tools
 impl UploadBufferManager {
     pub fn alloc_buffer(&mut self, size: u64, debug_name: &str) -> &mut Buffer {
         let buffer = Buffer::new_stage_buffer(size, debug_name);

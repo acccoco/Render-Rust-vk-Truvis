@@ -174,7 +174,7 @@ impl FrameBuffers {
             .collect_vec()
     }
 }
-/// getter
+// getter
 impl FrameBuffers {
     #[inline]
     pub fn depth_image_view(&self) -> &Image2DView {

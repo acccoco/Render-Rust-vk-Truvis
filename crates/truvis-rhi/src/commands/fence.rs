@@ -19,7 +19,7 @@ impl DebugType for Fence {
     }
 }
 
-/// 创建与销毁
+// 创建与销毁
 impl Fence {
     /// # param
     /// * signaled - 是否创建时就 signaled
@@ -42,7 +42,7 @@ impl Fence {
     }
 }
 
-/// getters
+// getters
 impl Fence {
     #[inline]
     pub fn handle(&self) -> vk::Fence {
@@ -50,7 +50,7 @@ impl Fence {
     }
 }
 
-/// tools
+// tools
 impl Fence {
     /// 阻塞等待 fence
     #[inline]

@@ -17,7 +17,7 @@ pub struct Acceleration {
     /// 这里的 buffer 仅仅是用于内存分配，实际的 Acceleration 相关的操作都是通过 acceleration_handle 来进行的
     _buffer: Buffer,
 }
-/// 构造与销毁
+// 构造与销毁
 impl Acceleration {
     /// 同步构建 blas
     ///
@@ -236,7 +236,7 @@ impl Acceleration {
         drop(self)
     }
 }
-/// getters
+// getters
 impl Acceleration {
     #[inline]
     pub fn handle(&self) -> vk::AccelerationStructureKHR {

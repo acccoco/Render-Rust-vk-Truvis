@@ -19,7 +19,7 @@ pub struct FrameContext {
 
 static mut FRAME_CONTEXT: Option<FrameContext> = None;
 
-/// init & destroy
+// init & destroy
 impl FrameContext {
     fn new() -> Self {
         let frame_ctrl = Rc::new(FrameController::new());
@@ -63,7 +63,7 @@ impl FrameContext {
     }
 }
 
-/// getter
+// getter
 impl FrameContext {
     #[inline]
     pub fn bindless_mgr_mut() -> RefMut<'static, BindlessManager> {

@@ -33,7 +33,7 @@ impl DebugType for CommandQueue {
     }
 }
 
-/// getter
+// getter
 impl CommandQueue {
     #[inline]
     pub fn queue_family(&self) -> &QueueFamily {
@@ -46,7 +46,7 @@ impl CommandQueue {
     }
 }
 
-/// tools
+// tools
 impl CommandQueue {
     pub fn submit(&self, batches: Vec<SubmitInfo>, fence: Option<Fence>) {
         unsafe {
@@ -66,7 +66,7 @@ impl CommandQueue {
     }
 }
 
-/// debug 相关命令
+// debug 相关命令
 impl CommandQueue {
     #[inline]
     pub fn begin_label<S>(&self, label_name: S, label_color: glam::Vec4)

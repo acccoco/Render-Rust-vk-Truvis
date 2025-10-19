@@ -65,7 +65,7 @@ pub struct Renderer {
     fps_limit: f32,
 }
 
-/// 手动 drop
+// 手动 drop
 impl Renderer {
     pub fn destroy(self) {
         // 在 Renderer 被销毁时，等待 Rhi 设备空闲
@@ -74,7 +74,7 @@ impl Renderer {
     }
 }
 
-/// getter
+// getter
 impl Renderer {
     #[inline]
     pub fn frame_settings(&self) -> FrameSettings {
@@ -130,10 +130,10 @@ impl Renderer {
     }
 }
 
-/// tools
+// tools
 impl Renderer {}
 
-/// init
+// init
 impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
         // 初始化 RenderContext 单例
@@ -180,7 +180,7 @@ impl Renderer {
     }
 }
 
-/// phase call
+// phase call
 impl Renderer {
     pub fn begin_frame(&mut self) {
         // 等待 fif 的同一帧渲染完成

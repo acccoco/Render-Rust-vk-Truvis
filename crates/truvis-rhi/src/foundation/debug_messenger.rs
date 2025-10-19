@@ -69,7 +69,7 @@ unsafe extern "system" fn vk_debug_callback(
     vk::FALSE
 }
 
-/// 构造过程辅助函数
+// 构造过程辅助函数
 impl DebugMsger {
     /// 存放 msg 参数，用于初始化 debug messenger
     pub fn debug_msg_type() -> vk::DebugUtilsMessageTypeFlagsEXT {

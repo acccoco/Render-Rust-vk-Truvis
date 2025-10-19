@@ -25,7 +25,7 @@ pub struct RenderContext {
     pub(crate) resource_mgr: RefCell<ResourceManager>,
 }
 
-/// 创建与销毁
+// 创建与销毁
 impl RenderContext {
     // region init 相关
     const ENGINE_NAME: &'static str = "DruvisIII";
@@ -61,10 +61,10 @@ impl RenderContext {
 // 注意：此静态变量仅用于单线程环境，符合项目要求
 static mut RENDER_CONTEXT: Option<RenderContext> = None;
 
-/// 单例模式
-/// - RenderContext 自身的生命周期管理比较简单，因此适合使用单例模式
-/// - 让代码变得简单，不再需要考虑复杂的借用规则
-/// - 其他类的类型签名也会变得更简单
+// 单例模式
+// - RenderContext 自身的生命周期管理比较简单，因此适合使用单例模式
+// - 让代码变得简单，不再需要考虑复杂的借用规则
+// - 其他类的类型签名也会变得更简单
 impl RenderContext {
     /// 获取单例实例
     ///
@@ -122,7 +122,7 @@ impl RenderContext {
     }
 }
 
-/// getter
+// getter
 impl RenderContext {
     #[inline]
     pub fn vk_core(&self) -> &VulkanCore {
@@ -193,7 +193,7 @@ impl RenderContext {
     }
 }
 
-/// tools
+// tools
 impl RenderContext {
     /// 根据给定的格式，返回支持的格式
     pub fn find_supported_format(

@@ -9,7 +9,7 @@ pub struct Semaphore {
     semaphore: vk::Semaphore,
 }
 
-/// 创建与销毁
+// 创建与销毁
 impl Semaphore {
     pub fn new(debug_name: &str) -> Self {
         let device_functions = RenderContext::get().device_functions();
@@ -42,7 +42,7 @@ impl Semaphore {
     }
 }
 
-/// getters
+// getters
 impl Semaphore {
     #[inline]
     pub fn handle(&self) -> vk::Semaphore {
@@ -50,7 +50,7 @@ impl Semaphore {
     }
 }
 
-/// tools
+// tools
 impl Semaphore {
     #[inline]
     pub fn wait_timeline(&self, timeline_value: u64, timeout_ns: u64) {

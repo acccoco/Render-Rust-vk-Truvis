@@ -40,7 +40,7 @@ impl Image2D {
     }
 }
 
-/// 构建与销毁
+// 构建与销毁
 impl Image2D {
     pub fn new(image_info: Rc<ImageCreateInfo>, alloc_info: &vk_mem::AllocationCreateInfo, debug_name: &str) -> Self {
         let allocator = RenderContext::get().allocator();
