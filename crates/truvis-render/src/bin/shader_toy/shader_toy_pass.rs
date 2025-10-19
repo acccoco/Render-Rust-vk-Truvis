@@ -4,7 +4,7 @@ use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
 use model_manager::{
-    component::DrsGeometry,
+    component::Geometry,
     vertex::{
         VertexLayout,
         vertex_pc::{VertexAosLayoutPosColor, VertexPosColor},
@@ -99,7 +99,7 @@ impl ShaderToyPass {
         frame_settings: &FrameSettings,
         render_target: vk::ImageView,
         timer: &Timer,
-        rect: &DrsGeometry<VertexPosColor>,
+        rect: &Geometry<VertexPosColor>,
     ) {
         let viewport_extent = frame_settings.frame_extent;
 

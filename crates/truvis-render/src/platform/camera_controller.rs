@@ -1,9 +1,9 @@
 use winit::keyboard::KeyCode;
 
-use crate::platform::{camera::DrsCamera, input_manager::InputManager};
+use crate::platform::{camera::Camera, input_manager::InputManager};
 
 pub struct CameraController {
-    camera: DrsCamera,
+    camera: Camera,
 }
 
 impl Default for CameraController {
@@ -16,17 +16,17 @@ impl CameraController {
     /// 创建新的相机控制器
     pub fn new() -> Self {
         Self {
-            camera: DrsCamera::default(),
+            camera: Camera::default(),
         }
     }
 
     /// 获取相机引用
-    pub fn camera(&self) -> &DrsCamera {
+    pub fn camera(&self) -> &Camera {
         &self.camera
     }
 
     /// 获取相机可变引用
-    pub fn camera_mut(&mut self) -> &mut DrsCamera {
+    pub fn camera_mut(&mut self) -> &mut Camera {
         &mut self.camera
     }
 

@@ -3,7 +3,7 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 use model_manager::{
-    component::DrsGeometry,
+    component::Geometry,
     vertex::{
         VertexLayout,
         vertex_pc::{VertexAosLayoutPosColor, VertexPosColor},
@@ -71,7 +71,7 @@ impl TrianglePass {
         frame_label: FrameLabel,
         framebuffers: &FrameBuffers,
         frame_settings: &FrameSettings,
-        shape: &DrsGeometry<VertexPosColor>,
+        shape: &Geometry<VertexPosColor>,
     ) {
         let viewport_extent = frame_settings.frame_extent;
         let rendering_info = RenderingInfo::new(

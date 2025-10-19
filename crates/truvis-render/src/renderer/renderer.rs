@@ -1,7 +1,7 @@
 use crate::renderer::frame_context::FrameContext;
 use crate::{
     pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings, PipelineSettings},
-    platform::{camera::DrsCamera, input_manager::InputState, timer::Timer},
+    platform::{camera::Camera, input_manager::InputState, timer::Timer},
     render_pipeline::pipeline_context::PipelineContext,
     renderer::{
         frame_buffers::FrameBuffers, frame_controller::FrameController, gpu_scene::GpuScene,
@@ -216,7 +216,7 @@ impl Renderer {
         limit_elapsed_us < self.timer.toc().as_micros() as f32
     }
 
-    pub fn before_render(&mut self, input_state: &InputState, camera: &DrsCamera) {
+    pub fn before_render(&mut self, input_state: &InputState, camera: &Camera) {
         let current_camera_dir = glam::vec3(camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg);
         self.accum_data.update_accum_frames(current_camera_dir, camera.position);
         self.update_gpu_scene(input_state, camera);
@@ -252,7 +252,7 @@ impl Renderer {
         self.framebuffers.rebuild(&self.frame_settings);
     }
 
-    fn update_gpu_scene(&mut self, input_state: &InputState, camera: &DrsCamera) {
+    fn update_gpu_scene(&mut self, input_state: &InputState, camera: &Camera) {
         let frame_extent = self.frame_settings.frame_extent;
         let crt_frame_label = self.frame_ctrl.frame_label();
 

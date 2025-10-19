@@ -3,7 +3,7 @@ use std::mem::offset_of;
 use ash::vk;
 use truvis_rhi::resources::special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer};
 
-use crate::{component::DrsGeometry, vertex::VertexLayout};
+use crate::{component::Geometry, vertex::VertexLayout};
 
 /// AoS: Array of structures
 #[repr(C)]
@@ -61,25 +61,25 @@ impl VertexLayoutAosPosNormalUv {
         vertex_buffer
     }
 
-    pub fn cube() -> DrsGeometry<VertexPosNormalUv> {
+    pub fn cube() -> Geometry<VertexPosNormalUv> {
         let vertex_buffer = Self::create_vertex_buffer(&shape::Cube::VERTICES, "cube-vertex-buffer");
 
         let mut index_buffer = IndexBuffer::new(shape::Cube::INDICES.len(), "cube-index-buffer");
         index_buffer.transfer_data_sync(&shape::Cube::INDICES);
 
-        DrsGeometry {
+        Geometry {
             vertex_buffer,
             index_buffer,
         }
     }
 
-    pub fn floor() -> DrsGeometry<VertexPosNormalUv> {
+    pub fn floor() -> Geometry<VertexPosNormalUv> {
         let vertex_buffer = Self::create_vertex_buffer(&shape::Floor::VERTICES, "floor-vertex-buffer");
 
         let mut index_buffer = IndexBuffer::new(shape::Floor::INDICES.len(), "floor-index-buffer");
         index_buffer.transfer_data_sync(&shape::Floor::INDICES);
 
-        DrsGeometry {
+        Geometry {
             vertex_buffer,
             index_buffer,
         }

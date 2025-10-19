@@ -1,5 +1,5 @@
 use ash::vk;
-use model_manager::{component::DrsGeometry, vertex::vertex_pc::VertexPosColor};
+use model_manager::{component::Geometry, vertex::vertex_pc::VertexPosColor};
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
 use truvis_render::renderer::frame_context::FrameContext;
 use truvis_rhi::{
@@ -18,7 +18,7 @@ impl ShaderToyPipeline {
         Self { shader_toy_pass }
     }
 
-    pub fn render(&self, ctx: PipelineContext, shape: &DrsGeometry<VertexPosColor>) {
+    pub fn render(&self, ctx: PipelineContext, shape: &Geometry<VertexPosColor>) {
         let PipelineContext {
             gpu_scene: _,
             timer,

@@ -6,11 +6,11 @@ mod triangle_pipeline;
 
 use imgui::Ui;
 use model_manager::{
-    component::DrsGeometry,
+    component::Geometry,
     vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor},
 };
 use truvis_render::{
-    app::TruvisApp, outer_app::OuterApp, platform::camera::DrsCamera,
+    app::TruvisApp, outer_app::OuterApp, platform::camera::Camera,
     render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
 };
 
@@ -18,10 +18,10 @@ use crate::triangle_pipeline::TrianglePipeline;
 
 struct HelloTriangle {
     triangle_pipeline: TrianglePipeline,
-    triangle: DrsGeometry<VertexPosColor>,
+    triangle: Geometry<VertexPosColor>,
 }
 impl OuterApp for HelloTriangle {
-    fn init(renderer: &mut Renderer, _camera: &mut DrsCamera) -> Self {
+    fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {
         log::info!("hello triangle init.");
 
         Self {

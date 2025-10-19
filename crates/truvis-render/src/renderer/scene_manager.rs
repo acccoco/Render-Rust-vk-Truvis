@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use model_manager::{
-    component::{DrsInstance, DrsMaterial, DrsMesh},
+    component::{Instance, Material, Mesh},
     guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid},
 };
 use shader_binding::shader;
@@ -12,24 +12,24 @@ use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::FrameContext;
 
 pub struct SceneManager {
-    mat_map: HashMap<MatGuid, DrsMaterial>,
-    instance_map: HashMap<InsGuid, DrsInstance>,
-    mesh_map: HashMap<MeshGuid, DrsMesh>,
+    mat_map: HashMap<MatGuid, Material>,
+    instance_map: HashMap<InsGuid, Instance>,
+    mesh_map: HashMap<MeshGuid, Mesh>,
 
     point_light_map: HashMap<LightGuid, shader::PointLight>,
 }
 /// getter
 impl SceneManager {
     #[inline]
-    pub fn mat_map(&self) -> &HashMap<MatGuid, DrsMaterial> {
+    pub fn mat_map(&self) -> &HashMap<MatGuid, Material> {
         &self.mat_map
     }
     #[inline]
-    pub fn instance_map(&self) -> &HashMap<InsGuid, DrsInstance> {
+    pub fn instance_map(&self) -> &HashMap<InsGuid, Instance> {
         &self.instance_map
     }
     #[inline]
-    pub fn mesh_map(&self) -> &HashMap<MeshGuid, DrsMesh> {
+    pub fn mesh_map(&self) -> &HashMap<MeshGuid, Mesh> {
         &self.mesh_map
     }
     #[inline]
@@ -57,17 +57,17 @@ impl SceneManager {
 
     /// getter
     #[inline]
-    pub fn get_instance(&self, guid: &InsGuid) -> Option<&DrsInstance> {
+    pub fn get_instance(&self, guid: &InsGuid) -> Option<&Instance> {
         self.instance_map.get(guid)
     }
 
     #[inline]
-    pub fn get_mesh(&self, guid: &MeshGuid) -> Option<&DrsMesh> {
+    pub fn get_mesh(&self, guid: &MeshGuid) -> Option<&Mesh> {
         self.mesh_map.get(guid)
     }
 
     #[inline]
-    pub fn get_material(&self, guid: &MatGuid) -> Option<&DrsMaterial> {
+    pub fn get_material(&self, guid: &MatGuid) -> Option<&Material> {
         self.mat_map.get(guid)
     }
 
@@ -77,7 +77,7 @@ impl SceneManager {
             model_path,
             |ins| {
                 let guid = InsGuid::new();
-                // DrsInstance 应该有 transform 字段
+                // Instance 应该有 transform 字段
                 // ins.transform = *transform * ins.transform;
                 self.instance_map.insert(guid, ins);
                 guid
@@ -104,21 +104,21 @@ impl SceneManager {
     }
 
     /// 向场景中添加材质
-    pub fn register_mat(&mut self, mat: DrsMaterial) -> MatGuid {
+    pub fn register_mat(&mut self, mat: Material) -> MatGuid {
         let guid = MatGuid::new();
         self.mat_map.insert(guid, mat);
         guid
     }
 
     /// 向场景中添加 mesh
-    pub fn register_mesh(&mut self, mesh: DrsMesh) -> MeshGuid {
+    pub fn register_mesh(&mut self, mesh: Mesh) -> MeshGuid {
         let guid = MeshGuid::new();
         self.mesh_map.insert(guid, mesh);
         guid
     }
 
     /// 向场景中添加 instance
-    pub fn register_instance(&mut self, instance: DrsInstance) -> InsGuid {
+    pub fn register_instance(&mut self, instance: Instance) -> InsGuid {
         let guid = InsGuid::new();
         self.instance_map.insert(guid, instance);
         guid

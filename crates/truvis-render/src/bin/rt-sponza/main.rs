@@ -3,7 +3,7 @@ use shader_binding::shader;
 use truvis_render::{
     app::TruvisApp,
     outer_app::OuterApp,
-    platform::camera::DrsCamera,
+    platform::camera::Camera,
     render_pipeline::{pipeline_context::PipelineContext, rt_pipeline::RtPipeline},
     renderer::renderer::Renderer,
 };
@@ -13,7 +13,7 @@ struct RtApp {
 }
 
 impl RtApp {
-    fn create_scene(renderer: &mut Renderer, camera: &mut DrsCamera) {
+    fn create_scene(renderer: &mut Renderer, camera: &mut Camera) {
         camera.position = glam::vec3(270.0, 194.0, -64.0);
         camera.euler_yaw_deg = 90.0;
         camera.euler_pitch_deg = 0.0;
@@ -51,7 +51,7 @@ impl RtApp {
 }
 
 impl OuterApp for RtApp {
-    fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
+    fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self {
         let rt_pipeline = RtPipeline::new();
 
         Self::create_scene(renderer, camera);

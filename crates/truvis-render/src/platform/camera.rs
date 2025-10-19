@@ -1,4 +1,4 @@
-pub struct DrsCamera {
+pub struct Camera {
     pub position: glam::Vec3,
 
     pub euler_yaw_deg: f32,
@@ -11,7 +11,7 @@ pub struct DrsCamera {
 }
 
 // 一些常量
-impl DrsCamera {
+impl Camera {
     /// 相机的上参考向量
     const CAMERA_UP: glam::Vec3 = glam::Vec3::new(0.0, 1.0, 0.0);
 
@@ -27,7 +27,7 @@ impl DrsCamera {
 }
 
 // getter
-impl DrsCamera {
+impl Camera {
     #[inline]
     fn yaw_rad(&self) -> f32 {
         self.euler_yaw_deg.to_radians()
@@ -77,7 +77,7 @@ impl DrsCamera {
 }
 
 // 相机控制
-impl DrsCamera {
+impl Camera {
     /// 朝相机看向的方向进行移动
     pub fn move_forward(&mut self, length: f32) {
         self.position += self.camera_forward() * length;
@@ -110,7 +110,7 @@ impl DrsCamera {
     }
 }
 
-impl Default for DrsCamera {
+impl Default for Camera {
     fn default() -> Self {
         Self {
             position: glam::Vec3::new(0.0, 0.0, 0.0),

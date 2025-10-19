@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[derive(Default)]
-pub struct DrsMaterial {
+pub struct Material {
     pub base_color: glam::Vec4,
     pub emissive: glam::Vec4,
     pub metallic: f32,
@@ -22,12 +22,12 @@ pub struct DrsMaterial {
     pub normal_map: String,
 }
 
-pub struct DrsGeometry<V: bytemuck::Pod> {
+pub struct Geometry<V: bytemuck::Pod> {
     pub vertex_buffer: VertexBuffer<V>,
     pub index_buffer: IndexBuffer,
 }
-pub type DrsGeometry3D = DrsGeometry<Vertex3D>;
-impl<V: bytemuck::Pod> DrsGeometry<V> {
+pub type Geometry3D = Geometry<Vertex3D>;
+impl<V: bytemuck::Pod> Geometry<V> {
     #[inline]
     pub fn index_type() -> vk::IndexType {
         vk::IndexType::UINT32
@@ -38,7 +38,7 @@ impl<V: bytemuck::Pod> DrsGeometry<V> {
         self.index_buffer.index_cnt() as u32
     }
 }
-impl DrsGeometry3D {
+impl Geometry3D {
     pub fn get_blas_geometry_info(&self) -> BlasInputInfo<'_> {
         let geometry_triangle = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
@@ -80,15 +80,15 @@ impl DrsGeometry3D {
     }
 }
 
-pub struct DrsMesh {
-    pub geometries: Vec<DrsGeometry<Vertex3D>>,
+pub struct Mesh {
+    pub geometries: Vec<Geometry<Vertex3D>>,
 
     pub blas: Option<Acceleration>,
     pub name: String,
     pub blas_device_address: Option<vk::DeviceAddress>,
 }
 
-impl DrsMesh {
+impl Mesh {
     pub fn build_blas(&mut self) {
         if self.blas.is_some() {
             return; // 已经构建过了
@@ -107,7 +107,7 @@ impl DrsMesh {
 }
 
 #[derive(Clone)]
-pub struct DrsInstance {
+pub struct Instance {
     pub mesh: MeshGuid,
     pub materials: Vec<MatGuid>,
     pub transform: glam::Mat4,

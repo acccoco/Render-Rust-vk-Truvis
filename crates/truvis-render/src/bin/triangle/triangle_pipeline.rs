@@ -1,5 +1,5 @@
 use ash::vk;
-use model_manager::{component::DrsGeometry, vertex::vertex_pc::VertexPosColor};
+use model_manager::{component::Geometry, vertex::vertex_pc::VertexPosColor};
 use truvis_render::renderer::frame_context::FrameContext;
 use truvis_render::{pipeline_settings::FrameSettings, render_pipeline::pipeline_context::PipelineContext};
 use truvis_rhi::{
@@ -18,7 +18,7 @@ impl TrianglePipeline {
         Self { triangle_pass }
     }
 
-    pub fn render(&self, ctx: PipelineContext, shape: &DrsGeometry<VertexPosColor>) {
+    pub fn render(&self, ctx: PipelineContext, shape: &Geometry<VertexPosColor>) {
         let PipelineContext {
             gpu_scene: _,
             timer: _,

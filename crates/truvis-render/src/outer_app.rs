@@ -1,9 +1,9 @@
 use crate::{
-    platform::camera::DrsCamera, render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
+    platform::camera::Camera, render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
 };
 
 pub trait OuterApp {
-    fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self;
+    fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self;
 
     fn draw_ui(&mut self, _ui: &imgui::Ui) {}
 

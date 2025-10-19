@@ -2,7 +2,7 @@ use std::{ffi::c_void, mem::offset_of};
 
 use itertools::Itertools;
 use model_manager::{
-    component::{DrsGeometry, DrsInstance, DrsMaterial, DrsMesh},
+    component::{Geometry, Instance, Material, Mesh},
     guid_new_type::{InsGuid, MatGuid, MeshGuid},
     vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D},
 };
@@ -39,9 +39,9 @@ impl AssimpSceneLoader {
     /// 返回整个场景的所有 instance id
     pub fn load_scene(
         model_file: &std::path::Path,
-        instance_register: impl FnMut(DrsInstance) -> InsGuid,
-        mesh_register: impl FnMut(DrsMesh) -> MeshGuid,
-        mat_register: impl FnMut(DrsMaterial) -> MatGuid,
+        instance_register: impl FnMut(Instance) -> InsGuid,
+        mesh_register: impl FnMut(Mesh) -> MeshGuid,
+        mat_register: impl FnMut(Material) -> MatGuid,
     ) -> Vec<InsGuid> {
         validate_vertex_memory_layout();
 
@@ -71,7 +71,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中基础的几何体
-    fn load_mesh(&mut self, mut mesh_register: impl FnMut(DrsMesh) -> MeshGuid) {
+    fn load_mesh(&mut self, mut mesh_register: impl FnMut(Mesh) -> MeshGuid) {
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -100,8 +100,8 @@ impl AssimpSceneLoader {
                 index_buffer.transfer_data_sync(index_data);
 
                 // 只有 single geometry 的 mesh
-                let mesh = DrsMesh {
-                    geometries: vec![DrsGeometry {
+                let mesh = Mesh {
+                    geometries: vec![Geometry {
                         vertex_buffer,
                         index_buffer,
                     }],
@@ -118,7 +118,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中的所有材质
-    fn load_mats(&mut self, mut mat_register: impl FnMut(DrsMaterial) -> MatGuid) {
+    fn load_mats(&mut self, mut mat_register: impl FnMut(Material) -> MatGuid) {
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)
@@ -126,7 +126,7 @@ impl AssimpSceneLoader {
                 let mat = get_mat(self.loader, mat_idx);
                 let mat = &*mat;
 
-                mat_register(DrsMaterial {
+                mat_register(Material {
                     base_color: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.base_color),
                     emissive: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.emissive_color),
                     metallic: mat.metallic_factor,
@@ -148,7 +148,7 @@ impl AssimpSceneLoader {
     ///
     /// 因此将 Assimp 中的一个 Instance 拆分为多个 Instance，将其 geometry
     /// 提升为 mesh
-    fn load_instance(&mut self, mut instance_register: impl FnMut(DrsInstance) -> InsGuid) {
+    fn load_instance(&mut self, mut instance_register: impl FnMut(Instance) -> InsGuid) {
         let instance_cnt = unsafe { get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)
             .filter_map(|instance_idx| unsafe {
@@ -177,7 +177,7 @@ impl AssimpSceneLoader {
 
                 let mut ins_uuids = Vec::with_capacity(mesh_cnt as usize);
                 for (mesh_uuid, mat_uuid) in std::iter::zip(mesh_uuids, mat_uuids) {
-                    let instance = DrsInstance {
+                    let instance = Instance {
                         transform: std::mem::transmute::<CxxMat4f, glam::Mat4>(instance.world_transform),
                         mesh: mesh_uuid,
                         materials: vec![mat_uuid],
