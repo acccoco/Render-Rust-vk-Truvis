@@ -1,21 +1,19 @@
 use std::{mem::offset_of, rc::Rc};
 
+use crate::gui::imgui_vertex_layout::{ImGuiVertex, ImGuiVertexLayoutAoS};
+use crate::renderer::frame_context::FrameContext;
+use crate::{gui::gui::Gui, pipeline_settings::FrameLabel};
 use ash::vk;
 use itertools::Itertools;
 use shader_binding::{shader, shader::TextureHandle};
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_rhi::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_rhi::{
     commands::command_buffer::CommandBuffer,
     pipelines::{
         graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},
         shader::ShaderStageInfo,
     },
-};
-
-use crate::renderer::frame_context::FrameContext;
-use crate::{
-    gui::{gui::Gui, mesh::ImGuiVertex},
-    pipeline_settings::FrameLabel,
 };
 
 const_map!(ShaderStage<ShaderStageInfo>: {
@@ -68,8 +66,8 @@ impl GuiPass {
         let mut create_info = GraphicsPipelineCreateInfo::default();
         create_info
             .shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec())
-            .vertex_attribute(ImGuiVertex::vertex_input_attributes())
-            .vertex_binding(ImGuiVertex::vertex_input_bindings())
+            .vertex_attribute(ImGuiVertexLayoutAoS::vertex_input_attributes())
+            .vertex_binding(ImGuiVertexLayoutAoS::vertex_input_bindings())
             .cull_mode(vk::CullModeFlags::NONE, vk::FrontFace::CLOCKWISE)
             .color_blend(color_blend_attachments, [0.0; 4])
             .depth_test(Some(vk::CompareOp::ALWAYS), false, false)

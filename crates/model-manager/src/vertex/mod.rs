@@ -1,10 +1,4 @@
-use ash::vk;
-pub mod vertex_3d;
-pub mod vertex_pc;
-pub mod vertex_pnu;
-
-pub trait VertexLayout {
-    fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription>;
-
-    fn vertex_input_attributes() -> Vec<vk::VertexInputAttributeDescription>;
-}
+pub mod aos_3d;
+pub mod aos_pos_color;
+pub mod aos_pos_normal_uv;
+pub mod soa_3d;

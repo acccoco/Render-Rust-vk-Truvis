@@ -1,11 +1,12 @@
 use std::{ffi::c_void, mem::offset_of};
 
 use itertools::Itertools;
-use model_manager::{
-    component::{Geometry, Instance, Material, Mesh},
-    guid_new_type::{InsGuid, MatGuid, MeshGuid},
-    vertex::vertex_3d::{Vertex3D, VertexLayoutAos3D},
-};
+use model_manager::components::geometry::Geometry;
+use model_manager::components::instance::Instance;
+use model_manager::components::material::Material;
+use model_manager::components::mesh::Mesh;
+use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
+use model_manager::vertex::aos_3d::{Vertex3D, VertexLayoutAoS3D};
 use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
 
 pub mod _ffi_bindings;
@@ -85,7 +86,7 @@ impl AssimpSceneLoader {
                 let vertex_data =
                     std::slice::from_raw_parts(mesh.vertex_array_ as *const Vertex3D, mesh.vertex_cnt_ as usize);
 
-                let vertex_buffer = VertexLayoutAos3D::create_vertex_buffer(
+                let vertex_buffer = VertexLayoutAoS3D::create_vertex_buffer2(
                     vertex_data,
                     format!("{}-mesh-{}", self.model_name, mesh_idx),
                 );
@@ -97,7 +98,7 @@ impl AssimpSceneLoader {
                     std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
                 let mut index_buffer =
                     IndexBuffer::new(index_data.len(), format!("{}-mesh-{}-indices", self.model_name, mesh_idx));
-                index_buffer.transfer_data_sync(index_data);
+                index_buffer.copy_from_sync(index_data);
 
                 // 只有 single geometry 的 mesh
                 let mesh = Mesh {

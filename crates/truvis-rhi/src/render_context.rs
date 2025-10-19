@@ -22,7 +22,7 @@ pub struct RenderContext {
 
     /// 临时的 graphics command pool，主要用于临时的命令缓冲区
     pub(crate) temp_graphics_command_pool: CommandPool,
-    pub(crate) resource_mgr: RefCell<ResourceManager>,
+    pub(crate) _resource_mgr: RefCell<ResourceManager>,
 }
 
 // 创建与销毁
@@ -53,7 +53,7 @@ impl RenderContext {
             vk_core: vk_ctx,
             allocator,
             temp_graphics_command_pool: graphics_command_pool,
-            resource_mgr: RefCell::new(resource_mgr),
+            _resource_mgr: RefCell::new(resource_mgr),
         }
     }
 }

@@ -1,9 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use model_manager::{
-    component::{Instance, Material, Mesh},
-    guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid},
-};
+use model_manager::guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid};
+use model_manager::components::instance::Instance;
+use model_manager::components::material::Material;
+use model_manager::components::mesh::Mesh;
 use shader_binding::shader;
 use shader_binding::shader::Scene;
 use truvis_cxx::AssimpSceneLoader;
@@ -11,6 +11,7 @@ use truvis_cxx::AssimpSceneLoader;
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::FrameContext;
 
+/// 在 CPU 侧管理场景数据
 pub struct SceneManager {
     mat_map: HashMap<MatGuid, Material>,
     instance_map: HashMap<InsGuid, Instance>,
@@ -45,6 +46,7 @@ impl SceneManager {
             && self.point_light_map.is_empty()
     }
 }
+// init & destroy
 impl SceneManager {
     pub fn new() -> Self {
         Self {
@@ -54,8 +56,9 @@ impl SceneManager {
             mesh_map: HashMap::new(),
         }
     }
-
-    /// getter
+}
+// tools
+impl SceneManager {
     #[inline]
     pub fn get_instance(&self, guid: &InsGuid) -> Option<&Instance> {
         self.instance_map.get(guid)

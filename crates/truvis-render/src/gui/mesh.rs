@@ -1,56 +1,16 @@
-use std::mem::offset_of;
-
+use crate::gui::imgui_vertex_layout::ImGuiVertexLayoutAoS;
 use crate::renderer::frame_context::FrameContext;
 use ash::vk;
+use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
 use truvis_rhi::{
     basic::color::LabelColor,
     commands::{barrier::BufferBarrier, command_buffer::CommandBuffer},
-    resources::special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer},
+    resources::special_buffers::index_buffer::IndexBuffer,
 };
-
-/// AoS: Array of Structs
-pub struct ImGuiVertex {
-    pos: glam::Vec2,
-    uv: glam::Vec2,
-    color: u32, // R8G8B8A8
-}
-
-impl ImGuiVertex {
-    pub fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription> {
-        vec![vk::VertexInputBindingDescription {
-            binding: 0,
-            stride: size_of::<ImGuiVertex>() as u32,
-            input_rate: vk::VertexInputRate::VERTEX,
-        }]
-    }
-
-    pub fn vertex_input_attributes() -> Vec<vk::VertexInputAttributeDescription> {
-        vec![
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 0,
-                format: vk::Format::R32G32_SFLOAT,
-                offset: offset_of!(ImGuiVertex, pos) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 1,
-                format: vk::Format::R32G32_SFLOAT,
-                offset: offset_of!(ImGuiVertex, uv) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 2,
-                format: vk::Format::R8G8B8A8_UNORM,
-                offset: offset_of!(ImGuiVertex, color) as u32,
-            },
-        ]
-    }
-}
 
 /// imgui 绘制所需的 vertex buffer 和 index buffer
 pub struct GuiMesh {
-    pub vertex_buffer: VertexBuffer<imgui::DrawVert>,
+    pub vertex_buffer: VertexBuffer<ImGuiVertexLayoutAoS>,
     _vertex_count: usize,
 
     pub _index_buffer: IndexBuffer,
@@ -97,7 +57,7 @@ impl GuiMesh {
         frame_name: &str,
         cmd: &CommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (VertexBuffer<imgui::DrawVert>, usize) {
+    ) -> (VertexBuffer<ImGuiVertexLayoutAoS>, usize) {
         let vertex_count = draw_data.total_vtx_count as usize;
         let mut vertices = Vec::with_capacity(vertex_count);
         for draw_list in draw_data.draw_lists() {
@@ -106,7 +66,7 @@ impl GuiMesh {
 
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
         let mut vertex_buffer =
-            VertexBuffer::<imgui::DrawVert>::new(vertex_count, format!("{}-imgui-vertex", frame_name));
+            VertexBuffer::<ImGuiVertexLayoutAoS>::new(vertex_count, format!("{}-imgui-vertex", frame_name));
         let mut upload_buffer_mgr = FrameContext::upload_buffer_mgr_mut();
         let stage_buffer = upload_buffer_mgr
             .alloc_buffer(vertices_size as vk::DeviceSize, &format!("{}-imgui-vertex-stage", frame_name));

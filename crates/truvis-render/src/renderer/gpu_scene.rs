@@ -1,13 +1,11 @@
-use std::{collections::HashMap, rc::Rc};
-
 use ash::vk;
 use glam::Vec4Swizzles;
 use itertools::Itertools;
-use model_manager::{
-    component::{Geometry3D, Instance},
-    guid_new_type::{InsGuid, MatGuid, MeshGuid},
-};
+use model_manager::components::geometry::GeometryAoS3D;
+use model_manager::components::instance::Instance;
+use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use shader_binding::shader;
+use std::{collections::HashMap, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
     commands::{
@@ -93,6 +91,7 @@ struct GpuSceneBuffers {
     geometry_indirect_stage_buffer: StructuredBuffer<u32>,
     tlas: Option<Acceleration>,
 }
+// init & destroy
 impl GpuSceneBuffers {
     fn new(frame_label: usize) -> Self {
         let max_light_cnt = 512;
@@ -184,6 +183,7 @@ impl GpuScene {
         self.gpu_scene_buffers[*frame_idx].scene_buffer.device_address()
     }
 }
+// init & destroy
 impl GpuScene {
     pub fn new(frame_ctrl: Rc<FrameController>) -> Self {
         let resources = Resources {
@@ -202,7 +202,9 @@ impl GpuScene {
             frame_ctrl,
         }
     }
-
+}
+// tools
+impl GpuScene {
     /// 注册 GpuScene 使用的默认纹理
     pub fn register_default_textures(&self) {
         let mut bindless_mgr = FrameContext::bindless_mgr_mut();
@@ -247,7 +249,7 @@ impl GpuScene {
             let mesh = scene_mgr.get_mesh(&instance.mesh).unwrap();
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
                 cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&geometry.vertex_buffer), &[0]);
-                cmd.cmd_bind_index_buffer(&geometry.index_buffer, 0, Geometry3D::index_type());
+                cmd.cmd_bind_index_buffer(&geometry.index_buffer, 0, GeometryAoS3D::index_type());
 
                 before_draw(instance_idx as u32, submesh_idx as u32);
                 cmd.draw_indexed(geometry.index_cnt(), 0, 1, 0, 0);

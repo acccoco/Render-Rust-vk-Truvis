@@ -3,13 +3,9 @@ use std::rc::Rc;
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
-use model_manager::{
-    component::Geometry,
-    vertex::{
-        VertexLayout,
-        vertex_pc::{VertexAosLayoutPosColor, VertexPosColor},
-    },
-};
+use model_manager::vertex::aos_pos_color::{VertexLayoutAoSPosColor, VertexPosColor};
+use model_manager::components::geometry::Geometry;
+use model_manager::vertex::vertex_layout::VertexLayoutOld;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_render::{
     pipeline_settings::FrameSettings, platform::timer::Timer, renderer::frame_controller::FrameController,
@@ -64,8 +60,8 @@ impl ShaderToyPass {
         let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![color_format], None, Some(vk::Format::UNDEFINED));
-        pipeline_ci.vertex_binding(VertexAosLayoutPosColor::vertex_input_bindings());
-        pipeline_ci.vertex_attribute(VertexAosLayoutPosColor::vertex_input_attributes());
+        pipeline_ci.vertex_binding(VertexLayoutAoSPosColor::vertex_input_bindings());
+        pipeline_ci.vertex_attribute(VertexLayoutAoSPosColor::vertex_input_attributes());
         pipeline_ci.color_blend(
             vec![
                 vk::PipelineColorBlendAttachmentState::default()

@@ -10,21 +10,33 @@ use crate::{
     resources::buffer::Buffer,
 };
 
-pub struct VertexBuffer<V: Sized> {
-    inner: Buffer,
+/// Vertex Buffer 中顶点布局的 trait 定义
+pub trait VertexLayout {
+    fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription>;
 
-    /// 顶点数量
-    vertex_cnt: usize,
+    fn vertex_input_attributes() -> Vec<vk::VertexInputAttributeDescription>;
 
-    _phantom: PhantomData<V>,
+    /// position 这个顶点属性在 Buffer 中的位置，用于构建 Blas
+    ///
+    /// (stride, offset)
+    fn pos3d_attribute() -> (u32, u32);
+
+    /// 整个 Buffer 的大小
+    fn buffer_size(vertex_cnt: usize) -> usize;
 }
 
-impl_derive_buffer!(VertexBuffer<V: Sized>, Buffer, inner);
-impl<V: Sized> VertexBuffer<V> {
+pub struct VertexBuffer<L: VertexLayout> {
+    inner: Buffer,
+    /// 顶点数量
+    vertex_cnt: usize,
+    _phantom: PhantomData<L>,
+}
+impl_derive_buffer!(VertexBuffer<L: VertexLayout>, Buffer, inner);
+impl<L: VertexLayout> VertexBuffer<L> {
     pub fn new(vertex_cnt: usize, debug_name: impl AsRef<str>) -> Self {
-        let size = vertex_cnt * size_of::<V>();
+        let buffer_size = L::buffer_size(vertex_cnt);
         let buffer = Buffer::new_device_buffer(
-            size as vk::DeviceSize,
+            buffer_size as vk::DeviceSize,
             vk::BufferUsageFlags::VERTEX_BUFFER
                 | vk::BufferUsageFlags::TRANSFER_DST
                 | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
@@ -48,7 +60,7 @@ impl<V: Sized> VertexBuffer<V> {
     }
 }
 
-impl<V: Sized> DebugType for VertexBuffer<V> {
+impl<L: VertexLayout> DebugType for VertexBuffer<L> {
     fn debug_type_name() -> &'static str {
         "VertexBuffer"
     }

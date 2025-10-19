@@ -5,10 +5,8 @@ mod triangle_pass;
 mod triangle_pipeline;
 
 use imgui::Ui;
-use model_manager::{
-    component::Geometry,
-    vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor},
-};
+use model_manager::vertex::aos_pos_color::{VertexLayoutAoSPosColor, VertexPosColor};
+use model_manager::components::geometry::Geometry;
 use truvis_render::{
     app::TruvisApp, outer_app::OuterApp, platform::camera::Camera,
     render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
@@ -26,7 +24,7 @@ impl OuterApp for HelloTriangle {
 
         Self {
             triangle_pipeline: TrianglePipeline::new(&renderer.frame_settings()),
-            triangle: VertexAosLayoutPosColor::triangle(),
+            triangle: VertexLayoutAoSPosColor::triangle(),
         }
     }
 

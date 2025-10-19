@@ -1,5 +1,6 @@
 use ash::vk;
-use model_manager::{component::Geometry, vertex::vertex_pc::VertexPosColor};
+use model_manager::vertex::aos_pos_color::VertexPosColor;
+use model_manager::components::geometry::Geometry;
 use truvis_render::renderer::frame_context::FrameContext;
 use truvis_render::{pipeline_settings::FrameSettings, render_pipeline::pipeline_context::PipelineContext};
 use truvis_rhi::{

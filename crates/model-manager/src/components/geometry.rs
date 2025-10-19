@@ -1,33 +1,18 @@
+use crate::vertex::aos_3d::VertexLayoutAoS3D;
 use ash::vk;
-use itertools::Itertools;
-use truvis_rhi::{
-    raytracing::acceleration::{Acceleration, BlasInputInfo},
-    resources::special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer},
-};
+use truvis_rhi::raytracing::acceleration::BlasInputInfo;
+use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_rhi::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
 
-use crate::{
-    guid_new_type::{MatGuid, MeshGuid},
-    vertex::vertex_3d::Vertex3D,
-};
-
-#[derive(Default)]
-pub struct Material {
-    pub base_color: glam::Vec4,
-    pub emissive: glam::Vec4,
-    pub metallic: f32,
-    pub roughness: f32,
-    pub opaque: f32,
-
-    pub diffuse_map: String,
-    pub normal_map: String,
-}
-
-pub struct Geometry<V: bytemuck::Pod> {
-    pub vertex_buffer: VertexBuffer<V>,
+/// CPU 侧的几何体数据
+pub struct Geometry<L: VertexLayout> {
+    pub vertex_buffer: VertexBuffer<L>,
     pub index_buffer: IndexBuffer,
 }
-pub type Geometry3D = Geometry<Vertex3D>;
-impl<V: bytemuck::Pod> Geometry<V> {
+pub type GeometryAoS3D = Geometry<VertexLayoutAoS3D>;
+
+// getters
+impl<L: VertexLayout> Geometry<L> {
     #[inline]
     pub fn index_type() -> vk::IndexType {
         vk::IndexType::UINT32
@@ -38,15 +23,17 @@ impl<V: bytemuck::Pod> Geometry<V> {
         self.index_buffer.index_cnt() as u32
     }
 }
-impl Geometry3D {
+
+// tools
+impl<L: VertexLayout> Geometry<L> {
     pub fn get_blas_geometry_info(&self) -> BlasInputInfo<'_> {
         let geometry_triangle = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
             vertex_data: vk::DeviceOrHostAddressConstKHR {
                 device_address: self.vertex_buffer.device_address(),
             },
-            vertex_stride: size_of::<Vertex3D>() as vk::DeviceSize,
-            // spec 上说应该是 vertex cnt - 1
+            vertex_stride: L::pos3d_attribute().0 as vk::DeviceSize,
+            // spec 上说应该是 vertex cnt - 1，应该是用作 index
             max_vertex: self.vertex_buffer.vertex_cnt() as u32 - 1,
             index_type: Self::index_type(),
             index_data: vk::DeviceOrHostAddressConstKHR {
@@ -78,37 +65,4 @@ impl Geometry3D {
             },
         }
     }
-}
-
-pub struct Mesh {
-    pub geometries: Vec<Geometry<Vertex3D>>,
-
-    pub blas: Option<Acceleration>,
-    pub name: String,
-    pub blas_device_address: Option<vk::DeviceAddress>,
-}
-
-impl Mesh {
-    pub fn build_blas(&mut self) {
-        if self.blas.is_some() {
-            return; // 已经构建过了
-        }
-
-        let blas_infos = self.geometries.iter().map(|g| g.get_blas_geometry_info()).collect_vec();
-        let blas = Acceleration::build_blas_sync(
-            &blas_infos,
-            vk::BuildAccelerationStructureFlagsKHR::empty(),
-            format!("{}-Blas", self.name),
-        );
-
-        self.blas_device_address = Some(blas.device_address());
-        self.blas = Some(blas);
-    }
-}
-
-#[derive(Clone)]
-pub struct Instance {
-    pub mesh: MeshGuid,
-    pub materials: Vec<MatGuid>,
-    pub transform: glam::Mat4,
 }

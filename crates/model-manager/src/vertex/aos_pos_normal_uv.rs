@@ -1,9 +1,8 @@
-use std::mem::offset_of;
-
+use crate::components::geometry::Geometry;
 use ash::vk;
-use truvis_rhi::resources::special_buffers::{index_buffer::IndexBuffer, vertex_buffer::VertexBuffer};
-
-use crate::{component::Geometry, vertex::VertexLayout};
+use std::mem::offset_of;
+use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_rhi::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
 
 /// AoS: Array of structures
 #[repr(C)]
@@ -19,8 +18,8 @@ impl VertexPosNormalUv {
     }
 }
 
-pub struct VertexLayoutAosPosNormalUv;
-impl VertexLayout for VertexLayoutAosPosNormalUv {
+pub struct VertexLayoutAoSPosNormalUv;
+impl VertexLayout for VertexLayoutAoSPosNormalUv {
     fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription> {
         vec![vk::VertexInputBindingDescription {
             binding: 0,
@@ -51,21 +50,29 @@ impl VertexLayout for VertexLayoutAosPosNormalUv {
             },
         ]
     }
+
+    fn pos3d_attribute() -> (u32, u32) {
+        (size_of::<VertexPosNormalUv>() as u32, offset_of!(VertexPosNormalUv, pos) as u32)
+    }
+
+    fn buffer_size(vertex_cnt: usize) -> usize {
+        vertex_cnt * size_of::<VertexPosNormalUv>()
+    }
 }
 
-impl VertexLayoutAosPosNormalUv {
-    pub fn create_vertex_buffer(data: &[VertexPosNormalUv], name: impl AsRef<str>) -> VertexBuffer<VertexPosNormalUv> {
+impl VertexLayoutAoSPosNormalUv {
+    pub fn create_vertex_buffer2(data: &[VertexPosNormalUv], name: impl AsRef<str>) -> VertexBuffer<Self> {
         let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
-        vertex_buffer.transfer_data_sync(data);
+        vertex_buffer.copy_from_sync(data);
 
         vertex_buffer
     }
 
-    pub fn cube() -> Geometry<VertexPosNormalUv> {
-        let vertex_buffer = Self::create_vertex_buffer(&shape::Cube::VERTICES, "cube-vertex-buffer");
+    pub fn cube() -> Geometry<Self> {
+        let vertex_buffer = Self::create_vertex_buffer2(&shape::Cube::VERTICES, "cube-vertex-buffer");
 
         let mut index_buffer = IndexBuffer::new(shape::Cube::INDICES.len(), "cube-index-buffer");
-        index_buffer.transfer_data_sync(&shape::Cube::INDICES);
+        index_buffer.copy_from_sync(&shape::Cube::INDICES);
 
         Geometry {
             vertex_buffer,
@@ -73,11 +80,11 @@ impl VertexLayoutAosPosNormalUv {
         }
     }
 
-    pub fn floor() -> Geometry<VertexPosNormalUv> {
-        let vertex_buffer = Self::create_vertex_buffer(&shape::Floor::VERTICES, "floor-vertex-buffer");
+    pub fn floor() -> Geometry<Self> {
+        let vertex_buffer = Self::create_vertex_buffer2(&shape::Floor::VERTICES, "floor-vertex-buffer");
 
         let mut index_buffer = IndexBuffer::new(shape::Floor::INDICES.len(), "floor-index-buffer");
-        index_buffer.transfer_data_sync(&shape::Floor::INDICES);
+        index_buffer.copy_from_sync(&shape::Floor::INDICES);
 
         Geometry {
             vertex_buffer,
@@ -86,8 +93,9 @@ impl VertexLayoutAosPosNormalUv {
     }
 }
 
+/// 定义了使用 AoS: Pos + Normal + Uv 格式的顶点数据的基本图形
 mod shape {
-    use crate::vertex::vertex_pnu::VertexPosNormalUv;
+    use crate::vertex::aos_pos_normal_uv::VertexPosNormalUv;
 
     /// Y-up, Right hand 的坐标系中：
     ///

@@ -1,8 +1,15 @@
-use std::{cell::RefCell, mem::offset_of, rc::Rc};
-
+use crate::{
+    pipeline_settings::{FrameLabel, FrameSettings},
+    renderer::{
+        bindless::BindlessManager, frame_buffers::FrameBuffers, frame_controller::FrameController, gpu_scene::GpuScene,
+        scene_manager::SceneManager,
+    },
+};
 use ash::vk;
-use model_manager::vertex::{VertexLayout, vertex_3d::VertexLayoutAos3D};
+use model_manager::vertex::aos_3d::VertexLayoutAoS3D;
 use shader_binding::shader;
+use std::{cell::RefCell, mem::offset_of, rc::Rc};
+use truvis_rhi::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_rhi::{
     basic::color::LabelColor,
     commands::command_buffer::CommandBuffer,
@@ -11,14 +18,6 @@ use truvis_rhi::{
         rendering_info::RenderingInfo,
     },
     resources::special_buffers::structured_buffer::StructuredBuffer,
-};
-
-use crate::{
-    pipeline_settings::{FrameLabel, FrameSettings},
-    renderer::{
-        bindless::BindlessManager, frame_buffers::FrameBuffers, frame_controller::FrameController, gpu_scene::GpuScene,
-        scene_manager::SceneManager,
-    },
 };
 
 pub struct PhongPass {
@@ -35,8 +34,8 @@ impl PhongPass {
         ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv", cstr::cstr!("main"));
         ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv", cstr::cstr!("main"));
 
-        ci.vertex_binding(VertexLayoutAos3D::vertex_input_bindings());
-        ci.vertex_attribute(VertexLayoutAos3D::vertex_input_attributes());
+        ci.vertex_binding(VertexLayoutAoS3D::vertex_input_bindings());
+        ci.vertex_attribute(VertexLayoutAoS3D::vertex_input_attributes());
 
         ci.attach_info(vec![color_format], Some(depth_format), None);
         ci.color_blend(

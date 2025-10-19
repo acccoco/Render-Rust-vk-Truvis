@@ -18,7 +18,7 @@ use crate::{
 #[derive(Clone)]
 pub struct CommandBuffer {
     vk_handle: vk::CommandBuffer,
-    command_pool_handle: vk::CommandPool,
+    _command_pool_handle: vk::CommandPool,
 }
 
 // 创建与销毁
@@ -33,7 +33,7 @@ impl CommandBuffer {
             unsafe { RenderContext::get().device_functions().allocate_command_buffers(&info).unwrap()[0] };
         let cmd_buffer = CommandBuffer {
             vk_handle: command_buffer,
-            command_pool_handle: command_pool.handle(),
+            _command_pool_handle: command_pool.handle(),
         };
         RenderContext::get().device_functions().set_debug_name(&cmd_buffer, debug_name);
         cmd_buffer

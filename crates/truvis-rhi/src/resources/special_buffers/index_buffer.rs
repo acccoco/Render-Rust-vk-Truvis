@@ -41,7 +41,7 @@ impl IndexBuffer {
     #[inline]
     pub fn new_with_data(data: &[u32], debug_name: impl AsRef<str>) -> Self {
         let mut index_buffer = Self::new(data.len(), debug_name);
-        index_buffer.transfer_data_sync(data);
+        index_buffer.copy_from_sync(data);
         index_buffer
     }
 

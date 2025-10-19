@@ -5,10 +5,8 @@ mod shader_toy_pass;
 mod shader_toy_pipeline;
 
 use imgui::Ui;
-use model_manager::{
-    component::Geometry,
-    vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor},
-};
+use model_manager::vertex::aos_pos_color::{VertexLayoutAoSPosColor, VertexPosColor};
+use model_manager::components::geometry::Geometry;
 use truvis_render::{
     app::TruvisApp, outer_app::OuterApp, platform::camera::Camera,
     render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
@@ -24,7 +22,7 @@ impl OuterApp for ShaderToy {
     fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {
         log::info!("shader toy.");
         Self {
-            rectangle: VertexAosLayoutPosColor::rectangle(),
+            rectangle: VertexLayoutAoSPosColor::rectangle(),
             pipeline: ShaderToyPipeline::new(renderer.frame_settings().color_format),
         }
     }
