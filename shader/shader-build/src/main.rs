@@ -1,8 +1,10 @@
 //! 将指定目录下的所有 shader 文件编译为 spv 文件，输出到同一目录下
 
 mod shader_build_config;
+
 use rayon::prelude::*;
 use shader_build_config::EnvPath;
+use std::path::PathBuf;
 use truvis_crate_tools::init_log::init_log;
 
 /// shader 的 stage
@@ -58,7 +60,8 @@ impl ShaderCompileTask {
     ///
     /// entry 是相对于 workspace 的
     fn new(entry: &walkdir::DirEntry) -> Option<Self> {
-        let shader_path = entry.path();
+        let shader_path = entry.path().to_str()?.replace("\\", "/");
+        let shader_path = std::path::Path::new(&shader_path);
         // 相对于 shader 的路径
         let relative_path = shader_path.strip_prefix(EnvPath::SHADER_SRC_DIR).unwrap();
         let shader_name = entry.file_name().to_str().unwrap();

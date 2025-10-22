@@ -2,14 +2,14 @@ use std::rc::Rc;
 
 use ash::vk;
 use itertools::Itertools;
-use model_manager::vertex::aos_pos_color::{VertexLayoutAoSPosColor, VertexPosColor};
 use model_manager::components::geometry::Geometry;
-use model_manager::vertex::vertex_layout::VertexLayoutOld;
+use model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_render::{
     pipeline_settings::{FrameLabel, FrameSettings},
     renderer::frame_buffers::FrameBuffers,
 };
+use truvis_rhi::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_rhi::{
     commands::command_buffer::CommandBuffer,
     pipelines::{
@@ -67,7 +67,7 @@ impl TrianglePass {
         frame_label: FrameLabel,
         framebuffers: &FrameBuffers,
         frame_settings: &FrameSettings,
-        shape: &Geometry<VertexPosColor>,
+        shape: &Geometry<VertexLayoutAoSPosColor>,
     ) {
         let viewport_extent = frame_settings.frame_extent;
         let rendering_info = RenderingInfo::new(

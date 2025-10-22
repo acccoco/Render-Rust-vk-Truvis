@@ -1,4 +1,5 @@
 use crate::vertex::aos_3d::VertexLayoutAoS3D;
+use crate::vertex::soa_3d::VertexLayoutSoA3D;
 use ash::vk;
 use truvis_rhi::raytracing::acceleration::BlasInputInfo;
 use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
@@ -10,6 +11,7 @@ pub struct Geometry<L: VertexLayout> {
     pub index_buffer: IndexBuffer,
 }
 pub type GeometryAoS3D = Geometry<VertexLayoutAoS3D>;
+pub type GeometrySoA3D = Geometry<VertexLayoutSoA3D>;
 
 // getters
 impl<L: VertexLayout> Geometry<L> {
@@ -30,9 +32,9 @@ impl<L: VertexLayout> Geometry<L> {
         let geometry_triangle = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
             vertex_data: vk::DeviceOrHostAddressConstKHR {
-                device_address: self.vertex_buffer.device_address(),
+                device_address: self.vertex_buffer.pos_address(),
             },
-            vertex_stride: L::pos3d_attribute().0 as vk::DeviceSize,
+            vertex_stride: L::pos_stride() as vk::DeviceSize,
             // spec 上说应该是 vertex cnt - 1，应该是用作 index
             max_vertex: self.vertex_buffer.vertex_cnt() as u32 - 1,
             index_type: Self::index_type(),

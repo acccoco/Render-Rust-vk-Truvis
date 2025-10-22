@@ -16,13 +16,30 @@ pub trait VertexLayout {
 
     fn vertex_input_attributes() -> Vec<vk::VertexInputAttributeDescription>;
 
-    /// position 这个顶点属性在 Buffer 中的位置，用于构建 Blas
-    ///
-    /// (stride, offset)
-    fn pos3d_attribute() -> (u32, u32);
-
     /// 整个 Buffer 的大小
     fn buffer_size(vertex_cnt: usize) -> usize;
+
+    /// position 属性的 stride
+    fn pos_stride() -> u32 {
+        unimplemented!()
+    }
+
+    /// position 属性在 Buffer 中的偏移量
+    fn pos_offset(_vertex_cnt: usize) -> vk::DeviceSize {
+        unimplemented!()
+    }
+    /// normal 属性在 Buffer 中的偏移量
+    fn normal_offset(_vertex_cnt: usize) -> vk::DeviceSize {
+        unimplemented!()
+    }
+    /// tangent 属性在 Buffer 中的偏移量
+    fn tangent_offset(_vertex_cnt: usize) -> vk::DeviceSize {
+        unimplemented!()
+    }
+    /// uv 属性在 Buffer 中的偏移量
+    fn uv_offset(_vertex_cnt: usize) -> vk::DeviceSize {
+        unimplemented!()
+    }
 }
 
 pub struct VertexBuffer<L: VertexLayout> {
@@ -57,6 +74,26 @@ impl<L: VertexLayout> VertexBuffer<L> {
     #[inline]
     pub fn vertex_cnt(&self) -> usize {
         self.vertex_cnt
+    }
+
+    #[inline]
+    pub fn pos_address(&self) -> vk::DeviceSize {
+        self.device_address() + L::pos_offset(self.vertex_cnt)
+    }
+
+    #[inline]
+    pub fn normal_address(&self) -> vk::DeviceSize {
+        self.device_address() + L::normal_offset(self.vertex_cnt)
+    }
+
+    #[inline]
+    pub fn tangent_address(&self) -> vk::DeviceSize {
+        self.device_address() + L::tangent_offset(self.vertex_cnt)
+    }
+
+    #[inline]
+    pub fn uv_address(&self) -> vk::DeviceSize {
+        self.device_address() + L::uv_offset(self.vertex_cnt)
     }
 }
 

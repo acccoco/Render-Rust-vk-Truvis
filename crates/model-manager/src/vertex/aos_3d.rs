@@ -63,17 +63,21 @@ impl VertexLayout for VertexLayoutAoS3D {
         ]
     }
 
-    fn pos3d_attribute() -> (u32, u32) {
-        (size_of::<Vertex3D>() as u32, offset_of!(Vertex3D, position) as u32)
-    }
-
     fn buffer_size(vertex_cnt: usize) -> usize {
         vertex_cnt * size_of::<Vertex3D>()
+    }
+
+    fn pos_stride() -> u32 {
+        size_of::<Vertex3D>() as u32
+    }
+
+    fn pos_offset(_vertex_cnt: usize) -> vk::DeviceSize {
+        offset_of!(Vertex3D, position) as vk::DeviceSize
     }
 }
 
 impl VertexLayoutAoS3D {
-    pub fn create_vertex_buffer2(data: &[Vertex3D], name: impl AsRef<str>) -> VertexBuffer<Self> {
+    pub fn create_vertex_buffer(data: &[Vertex3D], name: impl AsRef<str>) -> VertexBuffer<Self> {
         let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.copy_from_sync(data);
 

@@ -131,7 +131,7 @@ impl ManagedImage {
             None,
             format!("{}-stage-buffer", self.name),
         );
-        stage_buffer.transfer_data_by_mem_map(data);
+        stage_buffer.transfer_data_by_mmap(data);
 
         // 1. transition the image layout
         // 2. copy the buffer into the image

@@ -134,9 +134,13 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     const uint primitive_id = PrimitiveIndex();
 
     PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
-    Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
-    const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
-    const float3 world_pos = mul(ObjectToWorld3x4(), float4(interp_vertex.position, 1.f));
+    NewGeometry *geometry = scene.get_geometry(instance_id, geometry_id);
+    const uint3 triangle = geometry.get_triangle(primitive_id);
+    const float3 interp_pos = geometry.get_interp_position(triangle, attr.barycentrics);
+    const float3 interp_normal = geometry.get_interp_normal(triangle, attr.barycentrics);
+    const float2 interp_uv = geometry.get_interp_uv(triangle, attr.barycentrics);
+
+    const float3 world_pos = mul(ObjectToWorld3x4(), float4(interp_pos, 1.f));
 
     // 双面材质：确保每次光线都命中物体的正面
     float3 origin_world_normal;
@@ -144,7 +148,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         // normal mat = obejct mat 的逆转置
         Instance *instance = scene.get_instance(instance_id);
         const float4x4 normal_matrix = transpose(instance.inv_model);
-        origin_world_normal = normalize(mul(normal_matrix, float4(interp_vertex.normal, 0.f)).xyz);
+        origin_world_normal = normalize(mul(normal_matrix, float4(interp_normal, 0.f)).xyz);
     }
     const float3 world_normal = faceforward(origin_world_normal, WorldRayDirection(), origin_world_normal);
 
@@ -153,7 +157,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
         MatPayload mat_payload = {};
         mat_payload.instance_id = instance_id;
         mat_payload.geometry_id = geometry_id;
-        mat_payload.uv = interp_vertex.uv;
+        mat_payload.uv = interp_uv;
         diffuse_callable(mat_payload);
         base_color = mat_payload.out_color;
     }
@@ -306,11 +310,12 @@ void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttribute
     const uint primitive_id = PrimitiveIndex();
 
     PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
-    Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
-    const Vertex interp_vertex = geometry.get_interp_vertex(primitive_id, attr.barycentrics);
+    NewGeometry *geometry = scene.get_geometry(instance_id, geometry_id);
+    const uint3 triangle = geometry.get_triangle(primitive_id);
+    const float2 interp_uv = geometry.get_interp_uv(triangle, attr.barycentrics);
 
     // 当前命中位置 diffuse 贴图是透的，直接忽略该命中
-    const float4 base_color = mat.diffuse_map.sample(interp_vertex.uv);
+    const float4 base_color = mat.diffuse_map.sample(interp_uv);
     if (base_color.w == 0.f)
     {
         IgnoreHit();

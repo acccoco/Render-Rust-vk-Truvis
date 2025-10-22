@@ -1,4 +1,4 @@
-use std::{ffi::c_void, rc::Rc};
+use std::{ffi::c_void, ptr, rc::Rc};
 
 use ash::vk;
 use vk_mem::Alloc;
@@ -190,21 +190,14 @@ impl Buffer {
     }
 
     /// 通过 mem map 的方式将 data 传入到 buffer 中
-    ///
-    /// 注：确保 buffer 内存的对齐方式和 T 保持一致
-    pub fn transfer_data_by_mem_map<T>(&mut self, data: &[T])
+    pub fn transfer_data_by_mmap<T>(&mut self, data: &[T])
     where
         T: Sized + Copy,
     {
         self.map();
         unsafe {
-            // 这里的 size 是 buffer 的最大 size
-            // 这个函数主要处理的是 device 的内存对齐(std140, std430)和 host
-            // 的内存对齐不一致的问题 这个函数会自动的为数据增加 padding
-            // 由于已经手动为 struct 添加了 padding，因此这个函数暂时用不上
-            let mut slice =
-                ash::util::Align::new(self.map_ptr.unwrap() as *mut c_void, align_of::<T>() as u64, self.size);
-            slice.copy_from_slice(data);
+            ptr::copy_nonoverlapping(data.as_ptr() as *const u8, self.mapped_ptr(), size_of_val(data));
+
             let allocator = RenderContext::get().allocator();
             allocator.flush_allocation(&self.allocation, 0, size_of_val(data) as vk::DeviceSize).unwrap();
         }
@@ -223,7 +216,7 @@ impl Buffer {
         let mut stage_buffer =
             Self::new_stage_buffer(size_of_val(data) as vk::DeviceSize, format!("{}-stage-buffer", self.debug_name));
 
-        stage_buffer.transfer_data_by_mem_map(data);
+        stage_buffer.transfer_data_by_mmap(data);
 
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
         RenderContext::get().one_time_exec(
@@ -233,6 +226,35 @@ impl Buffer {
                     self,
                     &[vk::BufferCopy {
                         size: size_of_val(data) as vk::DeviceSize,
+                        ..Default::default()
+                    }],
+                );
+            },
+            &cmd_name,
+        );
+    }
+
+    /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到
+    /// self
+    ///
+    /// sync 表示这个函数是同步等待的，会阻塞运行
+    ///
+    /// # Note
+    /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
+    /// * 这个应该是用来传输大块数据的
+    pub fn copy_from_sync2(&mut self, total_size: vk::DeviceSize, do_with_stage_buffer: impl FnOnce(&mut Buffer)) {
+        let mut stage_buffer = Self::new_stage_buffer(total_size, format!("{}-stage-buffer", self.debug_name));
+
+        do_with_stage_buffer(&mut stage_buffer);
+
+        let cmd_name = format!("{}-transfer-data", &self.debug_name);
+        RenderContext::get().one_time_exec(
+            |cmd| {
+                cmd.cmd_copy_buffer_1(
+                    &stage_buffer,
+                    self,
+                    &[vk::BufferCopy {
+                        size: total_size,
                         ..Default::default()
                     }],
                 );

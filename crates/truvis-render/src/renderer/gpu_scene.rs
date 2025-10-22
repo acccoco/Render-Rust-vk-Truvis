@@ -81,8 +81,8 @@ struct GpuSceneBuffers {
     light_stage_buffer: StructuredBuffer<shader::PointLight>,
     material_buffer: StructuredBuffer<shader::PBRMaterial>,
     material_stage_buffer: StructuredBuffer<shader::PBRMaterial>,
-    geometry_buffer: StructuredBuffer<shader::Geometry>,
-    geometry_stage_buffer: StructuredBuffer<shader::Geometry>,
+    geometry_buffer: StructuredBuffer<shader::NewGeometry>,
+    geometry_stage_buffer: StructuredBuffer<shader::NewGeometry>,
     instance_buffer: StructuredBuffer<shader::Instance>,
     instance_stage_buffer: StructuredBuffer<shader::Instance>,
     material_indirect_buffer: StructuredBuffer<u32>,
@@ -494,8 +494,11 @@ impl GpuScene {
                 panic!("geometry cnt can not be larger than buffer");
             }
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
-                geometry_buffer_slices[crt_geometry_idx + submesh_idx] = shader::Geometry {
-                    position_buffer: geometry.vertex_buffer.device_address(),
+                geometry_buffer_slices[crt_geometry_idx + submesh_idx] = shader::NewGeometry {
+                    position_buffer: geometry.vertex_buffer.pos_address(),
+                    normal_buffer: geometry.vertex_buffer.normal_address(),
+                    tangent_buffer: geometry.vertex_buffer.tangent_address(),
+                    uv_buffer: geometry.vertex_buffer.uv_address(),
                     index_buffer: geometry.index_buffer.device_address(),
                 };
             }

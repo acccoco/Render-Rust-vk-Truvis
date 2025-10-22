@@ -1,5 +1,5 @@
 use ash::vk;
-use model_manager::vertex::aos_pos_color::VertexPosColor;
+use model_manager::vertex::aos_pos_color::{VertexLayoutAoSPosColor, VertexPosColor};
 use model_manager::components::geometry::Geometry;
 use truvis_render::renderer::frame_context::FrameContext;
 use truvis_render::{pipeline_settings::FrameSettings, render_pipeline::pipeline_context::PipelineContext};
@@ -19,7 +19,7 @@ impl TrianglePipeline {
         Self { triangle_pass }
     }
 
-    pub fn render(&self, ctx: PipelineContext, shape: &Geometry<VertexPosColor>) {
+    pub fn render(&self, ctx: PipelineContext, shape: &Geometry<VertexLayoutAoSPosColor>) {
         let PipelineContext {
             gpu_scene: _,
             timer: _,

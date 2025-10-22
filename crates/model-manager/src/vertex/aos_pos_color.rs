@@ -1,5 +1,6 @@
 use crate::components::geometry::Geometry;
 use ash::vk;
+use ash::vk::DeviceSize;
 use std::mem::offset_of;
 use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
 use truvis_rhi::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
@@ -38,11 +39,16 @@ impl VertexLayout for VertexLayoutAoSPosColor {
         ]
     }
 
-    fn pos3d_attribute() -> (u32, u32) {
-        (size_of::<VertexPosColor>() as u32, offset_of!(VertexPosColor, pos) as u32)
-    }
     fn buffer_size(vertex_cnt: usize) -> usize {
         vertex_cnt * size_of::<VertexPosColor>()
+    }
+
+    fn pos_stride() -> u32 {
+        size_of::<VertexPosColor>() as _
+    }
+
+    fn pos_offset(_vertex_cnt: usize) -> DeviceSize {
+        offset_of!(VertexPosColor, pos) as _
     }
 }
 

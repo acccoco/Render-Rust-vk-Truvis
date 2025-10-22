@@ -19,7 +19,7 @@ struct Instance
 struct Scene
 {
     PTR(PBRMaterial, all_mats);
-    PTR(Geometry, all_geometries);
+    PTR(NewGeometry, all_geometries);
 
     PTR(uint, instance_material_map);
     PTR(uint, instance_geometry_map);
@@ -38,12 +38,12 @@ struct Scene
 #ifdef __SLANG__
 
     /// 根据 instance idx 和 submesh idx 获取 geometry
-    Geometry *get_geometry(uint instance_idx, uint submesh_idx)
+    NewGeometry *get_geometry(uint instance_idx, uint submesh_idx)
     {
         Instance *instance = all_instances + instance_idx;
         uint geometry_map_idx = instance->geometry_indirect_idx + submesh_idx;
         uint geometry_idx = instance_geometry_map[geometry_map_idx];
-        Geometry *geometry = all_geometries + geometry_idx;
+        NewGeometry *geometry = all_geometries + geometry_idx;
         return geometry;
     }
 

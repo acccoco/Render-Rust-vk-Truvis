@@ -82,7 +82,7 @@ impl Image2D {
         assert_eq!(data.len(), Self::format_byte_count(self.image_info.format()) * pixels_cnt as usize);
 
         let mut stage_buffer = Buffer::new_stage_buffer(size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
-        stage_buffer.transfer_data_by_mem_map(data);
+        stage_buffer.transfer_data_by_mmap(data);
 
         // 1. transition the image layout
         // 2. copy the buffer into the image

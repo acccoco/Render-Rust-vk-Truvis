@@ -1,6 +1,6 @@
 use ash::vk;
-use model_manager::vertex::aos_pos_color::VertexPosColor;
 use model_manager::components::geometry::Geometry;
+use model_manager::vertex::aos_pos_color::{VertexLayoutAoSPosColor, VertexPosColor};
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
 use truvis_render::renderer::frame_context::FrameContext;
 use truvis_rhi::{
@@ -19,7 +19,7 @@ impl ShaderToyPipeline {
         Self { shader_toy_pass }
     }
 
-    pub fn render(&self, ctx: PipelineContext, shape: &Geometry<VertexPosColor>) {
+    pub fn render(&self, ctx: PipelineContext, shape: &Geometry<VertexLayoutAoSPosColor>) {
         let PipelineContext {
             gpu_scene: _,
             timer,

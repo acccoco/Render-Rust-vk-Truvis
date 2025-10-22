@@ -42,11 +42,6 @@ impl VertexLayout for ImGuiVertexLayoutAoS {
         ]
     }
 
-    fn pos3d_attribute() -> (u32, u32) {
-        // 没有必要有这个属性
-        unimplemented!()
-    }
-
     fn buffer_size(vertex_cnt: usize) -> usize {
         vertex_cnt * size_of::<ImGuiVertex>()
     }

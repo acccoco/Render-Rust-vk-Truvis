@@ -5,18 +5,18 @@ mod triangle_pass;
 mod triangle_pipeline;
 
 use imgui::Ui;
-use model_manager::vertex::aos_pos_color::{VertexLayoutAoSPosColor, VertexPosColor};
 use model_manager::components::geometry::Geometry;
+use model_manager::vertex::aos_pos_color::{VertexLayoutAoSPosColor, VertexPosColor};
 use truvis_render::{
-    app::TruvisApp, outer_app::OuterApp, platform::camera::Camera,
-    render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
+    app::TruvisApp, outer_app::OuterApp, platform::camera::Camera, render_pipeline::pipeline_context::PipelineContext,
+    renderer::renderer::Renderer,
 };
 
 use crate::triangle_pipeline::TrianglePipeline;
 
 struct HelloTriangle {
     triangle_pipeline: TrianglePipeline,
-    triangle: Geometry<VertexPosColor>,
+    triangle: Geometry<VertexLayoutAoSPosColor>,
 }
 impl OuterApp for HelloTriangle {
     fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {

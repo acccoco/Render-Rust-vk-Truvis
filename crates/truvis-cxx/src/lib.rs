@@ -6,7 +6,8 @@ use model_manager::components::instance::Instance;
 use model_manager::components::material::Material;
 use model_manager::components::mesh::Mesh;
 use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
-use model_manager::vertex::aos_3d::{Vertex3D, VertexLayoutAoS3D};
+use model_manager::vertex::aos_3d::Vertex3D;
+use model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
 
 pub mod _ffi_bindings;
@@ -85,9 +86,16 @@ impl AssimpSceneLoader {
                 }
                 let vertex_data =
                     std::slice::from_raw_parts(mesh.vertex_array_ as *const Vertex3D, mesh.vertex_cnt_ as usize);
+                let positions = vertex_data.iter().map(|v| glam::Vec3::from_array(v.position)).collect_vec();
+                let normals = vertex_data.iter().map(|v| glam::Vec3::from_array(v.normal)).collect_vec();
+                let tangents = vertex_data.iter().map(|v| glam::Vec3::from_array(v.tangent)).collect_vec();
+                let uvs = vertex_data.iter().map(|v| glam::Vec2::from_array(v.uv)).collect_vec();
 
-                let vertex_buffer = VertexLayoutAoS3D::create_vertex_buffer2(
-                    vertex_data,
+                let vertex_buffer = VertexLayoutSoA3D::create_vertex_buffer(
+                    &positions,
+                    &normals,
+                    &tangents,
+                    &uvs,
                     format!("{}-mesh-{}", self.model_name, mesh_idx),
                 );
 

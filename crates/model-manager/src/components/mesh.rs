@@ -1,4 +1,4 @@
-use crate::components::geometry::Geometry;
+use crate::components::geometry::{Geometry, GeometryAoS3D, GeometrySoA3D};
 use crate::vertex::aos_3d::VertexLayoutAoS3D;
 use ash::vk;
 use itertools::Itertools;
@@ -6,7 +6,7 @@ use truvis_rhi::raytracing::acceleration::Acceleration;
 
 /// CPU 侧的 Mesh 数据
 pub struct Mesh {
-    pub geometries: Vec<Geometry<VertexLayoutAoS3D>>,
+    pub geometries: Vec<GeometrySoA3D>,
 
     pub blas: Option<Acceleration>,
     pub name: String,

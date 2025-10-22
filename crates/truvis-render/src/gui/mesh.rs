@@ -70,7 +70,7 @@ impl GuiMesh {
         let mut upload_buffer_mgr = FrameContext::upload_buffer_mgr_mut();
         let stage_buffer = upload_buffer_mgr
             .alloc_buffer(vertices_size as vk::DeviceSize, &format!("{}-imgui-vertex-stage", frame_name));
-        stage_buffer.transfer_data_by_mem_map(&vertices);
+        stage_buffer.transfer_data_by_mmap(&vertices);
 
         cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
         {
@@ -103,7 +103,7 @@ impl GuiMesh {
         let mut upload_buffer_mgr = FrameContext::upload_buffer_mgr_mut();
         let stage_buffer = upload_buffer_mgr
             .alloc_buffer(indices_size as vk::DeviceSize, &format!("{}-imgui-index-stage", frame_name));
-        stage_buffer.transfer_data_by_mem_map(&indices);
+        stage_buffer.transfer_data_by_mmap(&indices);
 
         cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);
         {
