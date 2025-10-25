@@ -4,7 +4,6 @@ mod shader_build_config;
 
 use rayon::prelude::*;
 use shader_build_config::EnvPath;
-use std::path::PathBuf;
 use truvis_crate_tools::init_log::init_log;
 
 /// shader 的 stage

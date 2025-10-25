@@ -1,11 +1,6 @@
-fn main() {
-    gen_rust_binding();
-}
-
 // 创建自定义回调实现
 #[derive(Debug)]
 struct ModifyAdder;
-
 impl bindgen::callbacks::ParseCallbacks for ModifyAdder {
     fn item_name(&self, _original_name: &str) -> Option<String> {
         match _original_name {
@@ -49,7 +44,7 @@ fn gen_rust_binding() {
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
         .header("ffi/rust_ffi.hpp")
-        .clang_arg("-I../include")
+        .clang_arg("-I../../shader/include")
         .derive_default(false)
         // 禁用 clippy 的检查
         .raw_line("#![allow(clippy::all)]")
@@ -64,4 +59,8 @@ fn gen_rust_binding() {
     // Write the bindings to the $OUT_DIR/bindings.rs file.
     let out_path = std::path::PathBuf::from("src").join("_shader_bindings.rs");
     bindings.write_to_file(out_path).expect("Couldn't write bindings!");
+}
+
+fn main() {
+    gen_rust_binding();
 }
