@@ -47,16 +47,19 @@ impl VulkanFormatUtils {
     }
 }
 
-pub struct ManagedImage {
+pub struct Image2 {
     handle: vk::Image,
     allocation: vk_mem::Allocation,
     width: u32,
     height: u32,
     format: vk::Format,
     name: String,
+
+    #[cfg(debug_assertions)]
+    destroyed: bool,
 }
 
-impl DebugType for ManagedImage {
+impl DebugType for Image2 {
     fn debug_type_name() -> &'static str {
         "ManagedImage2D"
     }
@@ -64,9 +67,15 @@ impl DebugType for ManagedImage {
         self.handle
     }
 }
+impl Drop for Image2 {
+    fn drop(&mut self) {
+        #[cfg(debug_assertions)]
+        assert!(self.destroyed, "ManagedImage '{}' is not destroyed before drop!", self.name);
+    }
+}
 
-// 构造方法
-impl ManagedImage {
+// init & destroy
+impl Image2 {
     pub(crate) fn new(image_info: &ImageCreateInfo, alloc_info: &vk_mem::AllocationCreateInfo, name: &str) -> Self {
         let (image, alloction) = unsafe {
             RenderContext::get()
@@ -81,15 +90,25 @@ impl ManagedImage {
             height: image_info.extent().height,
             format: image_info.format(),
             name: name.to_string(),
+
+            #[cfg(debug_assertions)]
+            destroyed: false,
         };
         RenderContext::get().device_functions().set_debug_name(&image, name);
         image
     }
+
+    pub fn destroy(mut self) {
+        unsafe {
+            RenderContext::get().allocator().destroy_image(self.handle, &mut self.allocation);
+        }
+        self.destroyed = true;
+    }
 }
 // Getter
-impl ManagedImage {
+impl Image2 {
     #[inline]
-    pub fn handle(&self) -> vk::Image {
+    pub fn vk_image(&self) -> vk::Image {
         self.handle
     }
     #[inline]
@@ -106,7 +125,7 @@ impl ManagedImage {
     }
 }
 // 操作方法
-impl ManagedImage {
+impl Image2 {
     /// ## 实现步骤
     /// 1. 创建一个 staging buffer，用于存放待复制的数据
     /// 2. 将数据复制到 staging buffer

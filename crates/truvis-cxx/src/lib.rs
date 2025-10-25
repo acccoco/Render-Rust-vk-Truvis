@@ -8,7 +8,8 @@ use model_manager::components::mesh::Mesh;
 use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use model_manager::vertex::aos_3d::Vertex3D;
 use model_manager::vertex::soa_3d::VertexLayoutSoA3D;
-use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_rhi::render_context::RenderContext;
+use truvis_rhi::resources_new::buffers::index_buffer::Index32BufferHandle;
 
 pub mod _ffi_bindings;
 use crate::_ffi_bindings::*;
@@ -104,15 +105,23 @@ impl AssimpSceneLoader {
                 }
                 let index_data =
                     std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
-                let mut index_buffer =
-                    IndexBuffer::new(index_data.len(), format!("{}-mesh-{}-indices", self.model_name, mesh_idx));
-                index_buffer.copy_from_sync(index_data);
+
+                let mut index_buffer = Index32BufferHandle::new_managed(
+                    index_data.len(),
+                    format!("{}-mesh-{}-indices", self.model_name, mesh_idx),
+                );
+                index_buffer.transfer_data_sync(index_data);
+                let index_buffer_handle = Index32BufferHandle::new_with_buffer(
+                    &mut RenderContext::get().resource_mgr_mut(),
+                    index_data.len(),
+                    index_buffer,
+                );
 
                 // 只有 single geometry 的 mesh
                 let mesh = Mesh {
                     geometries: vec![Geometry {
                         vertex_buffer,
-                        index_buffer,
+                        index_buffer: index_buffer_handle,
                     }],
                     blas: None,
                     blas_device_address: None,

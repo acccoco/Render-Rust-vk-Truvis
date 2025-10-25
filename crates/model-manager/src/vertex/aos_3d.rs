@@ -79,7 +79,7 @@ impl VertexLayout for VertexLayoutAoS3D {
 impl VertexLayoutAoS3D {
     pub fn create_vertex_buffer(data: &[Vertex3D], name: impl AsRef<str>) -> VertexBuffer<Self> {
         let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
-        vertex_buffer.copy_from_sync(data);
+        vertex_buffer.transfer_data_sync(data);
 
         vertex_buffer
     }

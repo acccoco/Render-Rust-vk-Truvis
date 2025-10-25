@@ -45,6 +45,7 @@ impl Drop for Buffer {
 impl Buffer {
     /// # param
     /// * align: 当 buffer 处于一个大的 memory block 中时，align 用来指定 buffer 的起始 offset
+    #[deprecated]
     pub fn new(
         buffer_ci: Rc<BufferCreateInfo>,
         alloc_ci: Rc<vk_mem::AllocationCreateInfo>,
@@ -73,6 +74,7 @@ impl Buffer {
         }
     }
 
+    #[deprecated]
     #[inline]
     pub fn new_device_buffer(size: vk::DeviceSize, flags: vk::BufferUsageFlags, debug_name: impl AsRef<str>) -> Self {
         Self::new(
@@ -111,6 +113,7 @@ impl Buffer {
         )
     }
 
+    #[deprecated]
     #[inline]
     pub fn new_accleration_buffer(size: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
@@ -120,6 +123,7 @@ impl Buffer {
         )
     }
 
+    #[deprecated]
     #[inline]
     pub fn new_accleration_scratch_buffer(size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
         Self::new_device_buffer(
@@ -130,11 +134,13 @@ impl Buffer {
     }
 
     /// getter
+    #[deprecated]
     #[inline]
     pub fn handle(&self) -> vk::Buffer {
         self.handle
     }
 
+    #[deprecated]
     #[inline]
     pub fn device_address(&self) -> vk::DeviceAddress {
         self.device_addr.unwrap_or_else(|| {
@@ -145,6 +151,7 @@ impl Buffer {
         })
     }
 
+    #[deprecated]
     #[inline]
     pub fn size(&self) -> vk::DeviceSize {
         self.size
@@ -153,6 +160,7 @@ impl Buffer {
 
 // tools
 impl Buffer {
+    #[deprecated]
     #[inline]
     pub fn mapped_ptr(&self) -> *mut u8 {
         self.map_ptr.unwrap_or_else(|| {
@@ -160,6 +168,7 @@ impl Buffer {
         })
     }
 
+    #[deprecated]
     #[inline]
     pub fn map(&mut self) {
         if self.map_ptr.is_some() {
@@ -171,12 +180,14 @@ impl Buffer {
         }
     }
 
+    #[deprecated]
     #[inline]
     pub fn flush(&mut self, offset: vk::DeviceSize, size: vk::DeviceSize) {
         let allocator = RenderContext::get().allocator();
         allocator.flush_allocation(&self.allocation, offset, size).unwrap();
     }
 
+    #[deprecated]
     #[inline]
     pub fn unmap(&mut self) {
         if self.map_ptr.is_none() {
@@ -190,6 +201,7 @@ impl Buffer {
     }
 
     /// 通过 mem map 的方式将 data 传入到 buffer 中
+    #[deprecated]
     pub fn transfer_data_by_mmap<T>(&mut self, data: &[T])
     where
         T: Sized + Copy,
@@ -212,7 +224,8 @@ impl Buffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    pub fn copy_from_sync(&mut self, data: &[impl Sized + Copy]) {
+    #[deprecated]
+    pub fn transfer_data_sync(&mut self, data: &[impl Sized + Copy]) {
         let mut stage_buffer =
             Self::new_stage_buffer(size_of_val(data) as vk::DeviceSize, format!("{}-stage-buffer", self.debug_name));
 
@@ -242,7 +255,8 @@ impl Buffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    pub fn copy_from_sync2(&mut self, total_size: vk::DeviceSize, do_with_stage_buffer: impl FnOnce(&mut Buffer)) {
+    #[deprecated]
+    pub fn transfer_data_sync2(&mut self, total_size: vk::DeviceSize, do_with_stage_buffer: impl FnOnce(&mut Buffer)) {
         let mut stage_buffer = Self::new_stage_buffer(total_size, format!("{}-stage-buffer", self.debug_name));
 
         do_with_stage_buffer(&mut stage_buffer);

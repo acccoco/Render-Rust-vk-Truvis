@@ -2,8 +2,9 @@ use crate::components::geometry::Geometry;
 use ash::vk;
 use ash::vk::DeviceSize;
 use std::mem::offset_of;
-use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_rhi::render_context::RenderContext;
 use truvis_rhi::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
+use truvis_rhi::resources_new::buffers::index_buffer::{Index32BufferHandle, IndexBufferHandle};
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -55,7 +56,7 @@ impl VertexLayout for VertexLayoutAoSPosColor {
 impl VertexLayoutAoSPosColor {
     pub fn create_vertex_buffer2(data: &[VertexPosColor], name: impl AsRef<str>) -> VertexBuffer<Self> {
         let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
-        vertex_buffer.copy_from_sync(data);
+        vertex_buffer.transfer_data_sync(data);
 
         vertex_buffer
     }
@@ -64,24 +65,35 @@ impl VertexLayoutAoSPosColor {
     pub fn triangle() -> Geometry<Self> {
         let vertex_buffer = Self::create_vertex_buffer2(&shape::TRIANGLE_VERTEX_DATA, "triangle-vertex-buffer");
 
-        let mut index_buffer = IndexBuffer::new(shape::TRIANGLE_INDEX_DATA.len(), "triangle-index-buffer");
-        index_buffer.copy_from_sync(&shape::TRIANGLE_INDEX_DATA);
+        let mut index_buffer =
+            Index32BufferHandle::new_managed(shape::TRIANGLE_INDEX_DATA.len(), "triangle-index-buffer");
+        index_buffer.transfer_data_sync(&shape::TRIANGLE_INDEX_DATA);
+        let index_buffer_handle = IndexBufferHandle::new_with_buffer(
+            &mut RenderContext::get().resource_mgr_mut(),
+            shape::TRIANGLE_INDEX_DATA.len(),
+            index_buffer,
+        );
 
         Geometry {
             vertex_buffer,
-            index_buffer,
+            index_buffer: index_buffer_handle,
         }
     }
 
     pub fn rectangle() -> Geometry<Self> {
         let vertex_buffer = Self::create_vertex_buffer2(&shape::RECTANGLE_VERTEX_DATA, "rectangle-vertex-buffer");
 
-        let mut index_buffer = IndexBuffer::new(shape::RECTANGLE_INDEX_DATA.len(), "rectangle-index-buffer");
-        index_buffer.copy_from_sync(&shape::RECTANGLE_INDEX_DATA);
+        let index_buffer =
+            Index32BufferHandle::new_managed(shape::RECTANGLE_INDEX_DATA.len(), "rectangle-index-buffer");
+        let index_buffer_handle = IndexBufferHandle::new_with_buffer(
+            &mut RenderContext::get().resource_mgr_mut(),
+            shape::RECTANGLE_INDEX_DATA.len(),
+            index_buffer,
+        );
 
         Geometry {
             vertex_buffer,
-            index_buffer,
+            index_buffer: index_buffer_handle,
         }
     }
 }

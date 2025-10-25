@@ -149,7 +149,7 @@ impl Acceleration {
             size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name.as_ref()),
         );
-        acceleration_instance_buffer.copy_from_sync(instances);
+        acceleration_instance_buffer.transfer_data_sync(instances);
 
         let geometry = vk::AccelerationStructureGeometryKHR::default()
             .geometry_type(vk::GeometryTypeKHR::INSTANCES)

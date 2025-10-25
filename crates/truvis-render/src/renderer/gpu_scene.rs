@@ -1,3 +1,8 @@
+use crate::renderer::frame_context::FrameContext;
+use crate::{
+    pipeline_settings::FrameLabel,
+    renderer::{bindless::BindlessManager, frame_controller::FrameController, scene_manager::SceneManager},
+};
 use ash::vk;
 use glam::Vec4Swizzles;
 use itertools::Itertools;
@@ -7,6 +12,7 @@ use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use shader_binding::shader;
 use std::{collections::HashMap, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_rhi::render_context::RenderContext;
 use truvis_rhi::{
     commands::{
         barrier::{BarrierMask, BufferBarrier},
@@ -14,12 +20,6 @@ use truvis_rhi::{
     },
     raytracing::acceleration::Acceleration,
     resources::special_buffers::structured_buffer::StructuredBuffer,
-};
-
-use crate::renderer::frame_context::FrameContext;
-use crate::{
-    pipeline_settings::FrameLabel,
-    renderer::{bindless::BindlessManager, frame_controller::FrameController, scene_manager::SceneManager},
 };
 
 /// 数据以顺序的方式存储，同时查找时间为 O(1)
@@ -249,7 +249,7 @@ impl GpuScene {
             let mesh = scene_mgr.get_mesh(&instance.mesh).unwrap();
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
                 cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&geometry.vertex_buffer), &[0]);
-                cmd.cmd_bind_index_buffer(&geometry.index_buffer, 0, GeometryAoS3D::index_type());
+                cmd.cmd_bind_index_buffer2(&geometry.index_buffer, 0);
 
                 before_draw(instance_idx as u32, submesh_idx as u32);
                 cmd.draw_indexed(geometry.index_cnt(), 0, 1, 0, 0);
@@ -499,7 +499,7 @@ impl GpuScene {
                     normal_buffer: geometry.vertex_buffer.normal_address(),
                     tangent_buffer: geometry.vertex_buffer.tangent_address(),
                     uv_buffer: geometry.vertex_buffer.uv_address(),
-                    index_buffer: geometry.index_buffer.device_address(),
+                    index_buffer: geometry.index_buffer.device_address(&RenderContext::get().resource_mgr()),
                 };
             }
             crt_geometry_idx += mesh.geometries.len();

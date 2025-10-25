@@ -22,7 +22,7 @@ pub struct RenderContext {
 
     /// 临时的 graphics command pool，主要用于临时的命令缓冲区
     pub(crate) temp_graphics_command_pool: CommandPool,
-    pub(crate) _resource_mgr: RefCell<ResourceManager>,
+    pub(crate) resource_mgr: RefCell<ResourceManager>,
 }
 
 // 创建与销毁
@@ -53,7 +53,7 @@ impl RenderContext {
             vk_core: vk_ctx,
             allocator,
             temp_graphics_command_pool: graphics_command_pool,
-            _resource_mgr: RefCell::new(resource_mgr),
+            resource_mgr: RefCell::new(resource_mgr),
         }
     }
 }
@@ -114,7 +114,7 @@ impl RenderContext {
             let context = (*ptr).take().expect("RenderContext not initialized");
 
             // 注意：ResourceManager 可能不需要显式销毁
-            // context.resource_mgr.into_inner().destroy();
+            context.resource_mgr.into_inner().desotry();
             context.allocator.destroy();
             context.temp_graphics_command_pool.destroy_internal(&context.vk_core.device_functions);
             context.vk_core.destroy();
@@ -190,6 +190,15 @@ impl RenderContext {
     #[inline]
     pub fn rt_pipeline_props(&self) -> &vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'_> {
         &self.vk_core.physical_device.rt_pipeline_props
+    }
+
+    #[inline]
+    pub fn resource_mgr_mut(&self) -> std::cell::RefMut<'_, ResourceManager> {
+        self.resource_mgr.borrow_mut()
+    }
+    #[inline]
+    pub fn resource_mgr(&self) -> std::cell::Ref<'_, ResourceManager> {
+        self.resource_mgr.borrow()
     }
 }
 

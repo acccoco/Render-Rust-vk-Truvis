@@ -2,13 +2,14 @@ use crate::vertex::aos_3d::VertexLayoutAoS3D;
 use crate::vertex::soa_3d::VertexLayoutSoA3D;
 use ash::vk;
 use truvis_rhi::raytracing::acceleration::BlasInputInfo;
-use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_rhi::render_context::RenderContext;
 use truvis_rhi::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
+use truvis_rhi::resources_new::buffers::index_buffer::Index32BufferHandle;
 
 /// CPU 侧的几何体数据
 pub struct Geometry<L: VertexLayout> {
     pub vertex_buffer: VertexBuffer<L>,
-    pub index_buffer: IndexBuffer,
+    pub index_buffer: Index32BufferHandle,
 }
 pub type GeometryAoS3D = Geometry<VertexLayoutAoS3D>;
 pub type GeometrySoA3D = Geometry<VertexLayoutSoA3D>;
@@ -39,7 +40,7 @@ impl<L: VertexLayout> Geometry<L> {
             max_vertex: self.vertex_buffer.vertex_cnt() as u32 - 1,
             index_type: Self::index_type(),
             index_data: vk::DeviceOrHostAddressConstKHR {
-                device_address: self.index_buffer.device_address(),
+                device_address: self.index_buffer.device_address(&RenderContext::get().resource_mgr()),
             },
 
             // 并不需要为每个 geometry 设置变换数据
@@ -66,5 +67,12 @@ impl<L: VertexLayout> Geometry<L> {
                 transform_offset: 0,
             },
         }
+    }
+}
+
+impl<L: VertexLayout> Drop for Geometry<L> {
+    fn drop(&mut self) {
+        let mut resource_mgr = RenderContext::get().resource_mgr_mut();
+        resource_mgr.unregister_buffer(self.index_buffer.buffer_handle());
     }
 }

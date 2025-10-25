@@ -50,6 +50,7 @@ pub struct VertexBuffer<L: VertexLayout> {
 }
 impl_derive_buffer!(VertexBuffer<L: VertexLayout>, Buffer, inner);
 impl<L: VertexLayout> VertexBuffer<L> {
+    #[deprecated]
     pub fn new(vertex_cnt: usize, debug_name: impl AsRef<str>) -> Self {
         let buffer_size = L::buffer_size(vertex_cnt);
         let buffer = Buffer::new_device_buffer(
@@ -72,6 +73,7 @@ impl<L: VertexLayout> VertexBuffer<L> {
     }
 
     #[inline]
+    #[deprecated]
     pub fn vertex_cnt(&self) -> usize {
         self.vertex_cnt
     }

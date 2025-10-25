@@ -1,9 +1,11 @@
+use bindgen::callbacks::ItemInfo;
+
 // 创建自定义回调实现
 #[derive(Debug)]
 struct ModifyAdder;
 impl bindgen::callbacks::ParseCallbacks for ModifyAdder {
-    fn item_name(&self, _original_name: &str) -> Option<String> {
-        match _original_name {
+    fn item_name(&self, _original_name: ItemInfo) -> Option<String> {
+        match _original_name.name {
             "uint" => Some("Uint".to_string()),
             "uint2" => Some("Uint2".to_string()),
             "uint3" => Some("Uint3".to_string()),
