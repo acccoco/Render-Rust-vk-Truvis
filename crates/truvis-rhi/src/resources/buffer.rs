@@ -141,7 +141,7 @@ impl Buffer {
     }
 
     /// 通过 mem map 的方式将 data 传入到 buffer 中
-    pub fn transfer_data_by_mmap<T>(&mut self, data: &[T])
+    pub fn transfer_data_by_mmap<T>(&self, data: &[T])
     where
         T: Sized + Copy,
     {
@@ -161,8 +161,8 @@ impl Buffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    pub fn transfer_data_sync(&mut self, data: &[impl Sized + Copy]) {
-        let mut stage_buffer =
+    pub fn transfer_data_sync(&self, data: &[impl Sized + Copy]) {
+        let stage_buffer =
             Self::new_stage_buffer(size_of_val(data) as vk::DeviceSize, format!("{}-stage-buffer", self.debug_name));
 
         stage_buffer.transfer_data_by_mmap(data);
@@ -191,10 +191,10 @@ impl Buffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    pub fn transfer_data_sync2(&mut self, total_size: vk::DeviceSize, do_with_stage_buffer: impl FnOnce(&mut Buffer)) {
-        let mut stage_buffer = Self::new_stage_buffer(total_size, format!("{}-stage-buffer", self.debug_name));
+    pub fn transfer_data_sync2(&self, total_size: vk::DeviceSize, do_with_stage_buffer: impl FnOnce(&Buffer)) {
+        let stage_buffer = Self::new_stage_buffer(total_size, format!("{}-stage-buffer", self.debug_name));
 
-        do_with_stage_buffer(&mut stage_buffer);
+        do_with_stage_buffer(&stage_buffer);
 
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
         RenderContext::get().one_time_exec(

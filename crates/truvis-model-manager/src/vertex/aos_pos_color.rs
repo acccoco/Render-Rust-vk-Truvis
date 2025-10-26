@@ -54,7 +54,7 @@ impl VertexLayout for VertexLayoutAoSPosColor {
 
 impl VertexLayoutAoSPosColor {
     pub fn create_vertex_buffer2(data: &[VertexPosColor], name: impl AsRef<str>) -> VertexBuffer<Self> {
-        let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
+        let vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(data);
 
         vertex_buffer
@@ -64,7 +64,7 @@ impl VertexLayoutAoSPosColor {
     pub fn triangle() -> Geometry<Self> {
         let vertex_buffer = Self::create_vertex_buffer2(&shape::TRIANGLE_VERTEX_DATA, "triangle-vertex-buffer");
 
-        let mut index_buffer = Index32Buffer::new(shape::TRIANGLE_INDEX_DATA.len(), "triangle-index-buffer");
+        let index_buffer = Index32Buffer::new(shape::TRIANGLE_INDEX_DATA.len(), "triangle-index-buffer");
         index_buffer.transfer_data_sync(&shape::TRIANGLE_INDEX_DATA);
 
         Geometry {
@@ -76,7 +76,7 @@ impl VertexLayoutAoSPosColor {
     pub fn rectangle() -> Geometry<Self> {
         let vertex_buffer = Self::create_vertex_buffer2(&shape::RECTANGLE_VERTEX_DATA, "rectangle-vertex-buffer");
 
-        let mut index_buffer = Index32Buffer::new(shape::RECTANGLE_INDEX_DATA.len(), "rectangle-index-buffer");
+        let index_buffer = Index32Buffer::new(shape::RECTANGLE_INDEX_DATA.len(), "rectangle-index-buffer");
         index_buffer.transfer_data_sync(&shape::RECTANGLE_INDEX_DATA);
 
         Geometry {

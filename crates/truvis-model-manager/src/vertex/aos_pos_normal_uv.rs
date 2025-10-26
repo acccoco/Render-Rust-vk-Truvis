@@ -67,7 +67,7 @@ impl VertexLayout for VertexLayoutAoSPosNormalUv {
 
 impl VertexLayoutAoSPosNormalUv {
     pub fn create_vertex_buffer2(data: &[VertexPosNormalUv], name: impl AsRef<str>) -> VertexBuffer<Self> {
-        let mut vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
+        let vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(data);
 
         vertex_buffer
@@ -76,7 +76,7 @@ impl VertexLayoutAoSPosNormalUv {
     pub fn cube() -> Geometry<Self> {
         let vertex_buffer = Self::create_vertex_buffer2(&shape::Cube::VERTICES, "cube-vertex-buffer");
 
-        let mut index_buffer = Index32Buffer::new(shape::Cube::INDICES.len(), "cube-index-buffer");
+        let index_buffer = Index32Buffer::new(shape::Cube::INDICES.len(), "cube-index-buffer");
         index_buffer.transfer_data_sync(&shape::Cube::INDICES);
 
         Geometry {
@@ -88,7 +88,7 @@ impl VertexLayoutAoSPosNormalUv {
     pub fn floor() -> Geometry<Self> {
         let vertex_buffer = Self::create_vertex_buffer2(&shape::Floor::VERTICES, "floor-vertex-buffer");
 
-        let mut index_buffer = Index32Buffer::new(shape::Floor::INDICES.len(), "floor-index-buffer");
+        let index_buffer = Index32Buffer::new(shape::Floor::INDICES.len(), "floor-index-buffer");
         index_buffer.transfer_data_sync(&shape::Floor::INDICES);
 
         Geometry {

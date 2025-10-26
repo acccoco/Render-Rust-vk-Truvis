@@ -105,8 +105,8 @@ impl GuiMesh {
 
         let index_buffer_size = index_count * size_of::<imgui::DrawIdx>();
 
-        let mut index_buffer = IndexBuffer::<imgui::DrawIdx>::new(index_count, format!("{}-imgui-index", frame_name));
-        let mut stage_buffer =
+        let index_buffer = IndexBuffer::<imgui::DrawIdx>::new(index_count, format!("{}-imgui-index", frame_name));
+        let stage_buffer =
             Buffer::new_stage_buffer(index_buffer_size as vk::DeviceSize, format!("{}-imgui-index-stage", frame_name));
         stage_buffer.transfer_data_by_mmap(&indices);
 
@@ -114,7 +114,7 @@ impl GuiMesh {
         {
             cmd.cmd_copy_buffer(
                 &stage_buffer,
-                &mut index_buffer,
+                &index_buffer,
                 &[vk::BufferCopy {
                     size: index_buffer_size as vk::DeviceSize,
                     ..Default::default()

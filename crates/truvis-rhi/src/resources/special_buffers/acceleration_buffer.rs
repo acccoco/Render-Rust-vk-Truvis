@@ -1,8 +1,10 @@
-use crate::impl_derive_buffer;
-use crate::resources::buffer::Buffer;
-use ash::vk;
 use std::ops::Deref;
 use std::ops::DerefMut;
+
+use ash::vk;
+
+use crate::impl_derive_buffer;
+use crate::resources::buffer::Buffer;
 
 pub struct AccelerationScratchBuffer {
     inner: Buffer,

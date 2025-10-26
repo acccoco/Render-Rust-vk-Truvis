@@ -105,7 +105,7 @@ impl AssimpSceneLoader {
                 let index_data =
                     std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
 
-                let mut index_buffer =
+                let index_buffer =
                     Index32Buffer::new(index_data.len(), format!("{}-mesh-{}-indices", self.model_name, mesh_idx));
                 index_buffer.transfer_data_sync(index_data);
 

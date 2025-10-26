@@ -30,7 +30,7 @@ impl<T: bytemuck::Pod> StageBuffer<T> {
     }
 
     // BUG 可能需要考虑内存对齐
-    pub fn transfer(&mut self, trans_func: &dyn Fn(&mut T)) {
+    pub fn transfer(&self, trans_func: &dyn Fn(&mut T)) {
         unsafe {
             let ptr = self.inner.map_ptr.unwrap() as *mut T;
 

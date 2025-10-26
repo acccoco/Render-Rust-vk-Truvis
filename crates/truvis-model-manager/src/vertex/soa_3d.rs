@@ -98,7 +98,7 @@ impl VertexLayoutSoA3D {
         let vertex_cnt = positions.len();
         assert!(vertex_cnt == normals.len() && vertex_cnt == tangents.len() && vertex_cnt == uvs.len());
 
-        let mut vertex_buffer = VertexBuffer::new(vertex_cnt, name.as_ref());
+        let vertex_buffer = VertexBuffer::new(vertex_cnt, name.as_ref());
         vertex_buffer.transfer_data_sync2(Self::buffer_size(vertex_cnt) as vk::DeviceSize, |stage_buffer| unsafe {
             ptr::copy_nonoverlapping(
                 positions.as_ptr() as *const u8,

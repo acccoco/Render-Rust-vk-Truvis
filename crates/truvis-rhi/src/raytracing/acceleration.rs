@@ -145,7 +145,7 @@ impl Acceleration {
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: impl AsRef<str>,
     ) -> Self {
-        let mut acceleration_instance_buffer = AccelerationInstanceBuffer::new(
+        let acceleration_instance_buffer = AccelerationInstanceBuffer::new(
             size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name.as_ref()),
         );

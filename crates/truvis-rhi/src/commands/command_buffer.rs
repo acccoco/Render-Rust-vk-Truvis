@@ -80,7 +80,7 @@ impl CommandBuffer {
     /// - command type: action
     /// - 支持的 queue：transfer，graphics，compute
     #[inline]
-    pub fn cmd_copy_buffer(&self, src: &Buffer, dst: &mut Buffer, regions: &[vk::BufferCopy]) {
+    pub fn cmd_copy_buffer(&self, src: &Buffer, dst: &Buffer, regions: &[vk::BufferCopy]) {
         unsafe {
             RenderContext::get().device_functions().cmd_copy_buffer(
                 self.vk_handle,

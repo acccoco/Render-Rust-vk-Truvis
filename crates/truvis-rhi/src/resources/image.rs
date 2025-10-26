@@ -126,7 +126,7 @@ impl Image2D {
         let pixels_cnt = self.width() * self.height();
         assert_eq!(data.len(), VulkanFormatUtils::pixel_size_in_bytes(self.image_info.format()) * pixels_cnt as usize);
 
-        let mut stage_buffer = Buffer::new_stage_buffer(size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
+        let stage_buffer = Buffer::new_stage_buffer(size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
         stage_buffer.transfer_data_by_mmap(data);
 
         // 1. transition the image layout
