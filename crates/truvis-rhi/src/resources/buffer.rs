@@ -187,7 +187,7 @@ impl Buffer {
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
         RenderContext::get().one_time_exec(
             |cmd| {
-                cmd.cmd_copy_buffer_1(
+                cmd.cmd_copy_buffer(
                     &stage_buffer,
                     self,
                     &[vk::BufferCopy {
@@ -216,7 +216,7 @@ impl Buffer {
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
         RenderContext::get().one_time_exec(
             |cmd| {
-                cmd.cmd_copy_buffer_1(
+                cmd.cmd_copy_buffer(
                     &stage_buffer,
                     self,
                     &[vk::BufferCopy {

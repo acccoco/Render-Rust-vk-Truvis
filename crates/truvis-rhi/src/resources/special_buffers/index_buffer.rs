@@ -2,11 +2,27 @@ use std::ops::{Deref, DerefMut};
 
 use ash::{vk, vk::Handle};
 
-use crate::resources_new::buffers::index_buffer::IndexType;
 use crate::{
     foundation::debug_messenger::DebugType, impl_derive_buffer, render_context::RenderContext,
     resources::buffer::Buffer,
 };
+
+pub trait IndexType: Sized + Copy {
+    const VK_INDEX_TYPE: vk::IndexType;
+    fn byte_size() -> usize;
+}
+impl IndexType for u16 {
+    const VK_INDEX_TYPE: vk::IndexType = vk::IndexType::UINT16;
+    fn byte_size() -> usize {
+        size_of::<u16>()
+    }
+}
+impl IndexType for u32 {
+    const VK_INDEX_TYPE: vk::IndexType = vk::IndexType::UINT32;
+    fn byte_size() -> usize {
+        size_of::<u32>()
+    }
+}
 
 /// 顶点类型是 u32
 pub struct IndexBuffer<T: IndexType> {

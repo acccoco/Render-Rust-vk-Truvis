@@ -2,10 +2,8 @@ use crate::components::geometry::Geometry;
 use ash::vk;
 use ash::vk::DeviceSize;
 use std::mem::offset_of;
-use truvis_rhi::render_context::RenderContext;
 use truvis_rhi::resources::special_buffers::index_buffer::Index32Buffer;
 use truvis_rhi::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
-use truvis_rhi::resources_new::buffers::index_buffer::{Index32BufferHandle, IndexBufferHandle};
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy, bytemuck::Pod, bytemuck::Zeroable)]

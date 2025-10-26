@@ -1,7 +1,8 @@
-use std::{cell::RefCell, ffi::CStr};
+use std::ffi::CStr;
 
 use ash::vk;
 
+use crate::vulkan_core::VulkanCore;
 use crate::{
     commands::{
         command_buffer::CommandBuffer,
@@ -12,8 +13,6 @@ use crate::{
     foundation::{
         device::DeviceFunctions, instance::Instance, mem_allocator::MemAllocator, physical_device::PhysicalDevice,
     },
-    resources_new::resource_manager::ResourceManager,
-    vulkan_core::VulkanCore,
 };
 
 pub struct RenderContext {
@@ -22,7 +21,6 @@ pub struct RenderContext {
 
     /// 临时的 graphics command pool，主要用于临时的命令缓冲区
     pub(crate) temp_graphics_command_pool: CommandPool,
-    pub(crate) resource_mgr: RefCell<ResourceManager>,
 }
 
 // 创建与销毁
@@ -47,13 +45,11 @@ impl RenderContext {
             vk_ctx.physical_device.vk_handle,
             &vk_ctx.device_functions,
         );
-        let resource_mgr = ResourceManager::new();
 
         Self {
             vk_core: vk_ctx,
             allocator,
             temp_graphics_command_pool: graphics_command_pool,
-            resource_mgr: RefCell::new(resource_mgr),
         }
     }
 }
@@ -113,8 +109,6 @@ impl RenderContext {
             let ptr = std::ptr::addr_of_mut!(RENDER_CONTEXT);
             let context = (*ptr).take().expect("RenderContext not initialized");
 
-            // 注意：ResourceManager 可能不需要显式销毁
-            context.resource_mgr.into_inner().desotry();
             context.allocator.destroy();
             context.temp_graphics_command_pool.destroy_internal(&context.vk_core.device_functions);
             context.vk_core.destroy();
@@ -190,15 +184,6 @@ impl RenderContext {
     #[inline]
     pub fn rt_pipeline_props(&self) -> &vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'_> {
         &self.vk_core.physical_device.rt_pipeline_props
-    }
-
-    #[inline]
-    pub fn resource_mgr_mut(&self) -> std::cell::RefMut<'_, ResourceManager> {
-        self.resource_mgr.borrow_mut()
-    }
-    #[inline]
-    pub fn resource_mgr(&self) -> std::cell::Ref<'_, ResourceManager> {
-        self.resource_mgr.borrow()
     }
 }
 

@@ -1,16 +1,15 @@
-use crate::gui::imgui_vertex_layout::ImGuiVertexLayoutAoS;
-use crate::renderer::frame_context::FrameContext;
 use ash::vk;
-use truvis_rhi::render_context::RenderContext;
+
 use truvis_rhi::resources::buffer::Buffer;
 use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
 use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
-use truvis_rhi::resources_new::buffers::index_buffer::IndexBufferHandle;
-use truvis_rhi::resources_new::managed_buffer::Buffer2;
 use truvis_rhi::{
     basic::color::LabelColor,
     commands::{barrier::BufferBarrier, command_buffer::CommandBuffer},
 };
+
+use crate::gui::imgui_vertex_layout::ImGuiVertexLayoutAoS;
+use crate::renderer::frame_context::FrameContext;
 
 /// imgui 绘制所需的 vertex buffer 和 index buffer
 pub struct GuiMesh {
@@ -76,7 +75,7 @@ impl GuiMesh {
 
         cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
         {
-            cmd.cmd_copy_buffer_1(
+            cmd.cmd_copy_buffer(
                 &stage_buffer,
                 &mut vertex_buffer,
                 &[vk::BufferCopy {
@@ -113,7 +112,7 @@ impl GuiMesh {
 
         cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);
         {
-            cmd.cmd_copy_buffer_1(
+            cmd.cmd_copy_buffer(
                 &stage_buffer,
                 &mut index_buffer,
                 &[vk::BufferCopy {

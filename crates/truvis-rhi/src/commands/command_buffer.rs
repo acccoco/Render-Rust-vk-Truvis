@@ -2,9 +2,7 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::render_context::RenderContext;
-use crate::resources::special_buffers::index_buffer::IndexBuffer;
-use crate::resources_new::buffers::index_buffer::{Index32BufferHandle, IndexBufferHandle, IndexType};
-use crate::resources_new::resource_handles::BufferHandle;
+use crate::resources::special_buffers::index_buffer::{IndexBuffer, IndexType};
 use crate::{
     basic::color::LabelColor,
     commands::{
@@ -15,7 +13,6 @@ use crate::{
     pipelines::rendering_info::RenderingInfo,
     query::query_pool::QueryPool,
     resources::buffer::Buffer,
-    resources_new::managed_buffer::Buffer2,
 };
 
 #[derive(Clone)]
@@ -83,21 +80,7 @@ impl CommandBuffer {
     /// - command type: action
     /// - 支持的 queue：transfer，graphics，compute
     #[inline]
-    pub fn cmd_copy_buffer_1(&self, src: &Buffer, dst: &mut Buffer, regions: &[vk::BufferCopy]) {
-        unsafe {
-            RenderContext::get().device_functions().cmd_copy_buffer(
-                self.vk_handle,
-                src.vk_buffer(),
-                dst.vk_buffer(),
-                regions,
-            );
-        }
-    }
-
-    /// - command type: action
-    /// - 支持的 queue：transfer，graphics，compute
-    #[inline]
-    pub fn cmd_copy_buffer(&self, src: &Buffer2, dst: &Buffer2, regions: &[vk::BufferCopy]) {
+    pub fn cmd_copy_buffer(&self, src: &Buffer, dst: &mut Buffer, regions: &[vk::BufferCopy]) {
         unsafe {
             RenderContext::get().device_functions().cmd_copy_buffer(
                 self.vk_handle,
@@ -286,20 +269,6 @@ impl CommandBuffer {
 
     #[inline]
     pub fn cmd_bind_index_buffer1<T: IndexType>(&self, buffer: &IndexBuffer<T>, offset: vk::DeviceSize) {
-        unsafe {
-            RenderContext::get().device_functions().cmd_bind_index_buffer(
-                self.vk_handle,
-                buffer.vk_buffer(),
-                offset,
-                T::VK_INDEX_TYPE,
-            );
-        }
-    }
-
-    /// - command type: state
-    /// - supported queue types: graphics
-    #[inline]
-    pub fn cmd_bind_index_buffer2<T: IndexType>(&self, buffer: &IndexBufferHandle<T>, offset: vk::DeviceSize) {
         unsafe {
             RenderContext::get().device_functions().cmd_bind_index_buffer(
                 self.vk_handle,

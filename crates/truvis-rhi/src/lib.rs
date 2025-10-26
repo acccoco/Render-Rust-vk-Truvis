@@ -7,7 +7,6 @@ pub mod query;
 pub mod raytracing;
 pub mod render_context;
 pub mod resources;
-pub mod resources_new;
 pub mod swapchain;
 pub mod utilities;
 pub mod vulkan_core;

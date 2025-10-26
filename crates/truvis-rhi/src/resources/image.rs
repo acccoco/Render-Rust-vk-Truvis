@@ -9,6 +9,45 @@ use crate::{
     render_context::RenderContext,
     resources::buffer::Buffer,
 };
+
+/// Vulkan 格式相关的工具类
+pub struct VulkanFormatUtils;
+
+impl VulkanFormatUtils {
+    /// 计算指定 Vulkan 格式下每个像素需要的字节数
+    ///
+    /// # Params
+    /// * `format` - Vulkan 图像格式
+    ///
+    /// # return
+    /// 每个像素的字节数
+    ///
+    /// # Panic
+    /// 当遇到不支持的格式时会 panic
+    pub fn pixel_size_in_bytes(format: vk::Format) -> usize {
+        // 根据 vulkan specification 得到的 format 顺序
+        const BYTE_3_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8_UNORM, vk::Format::B8G8R8_SRGB)];
+        const BYTE_4_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8A8_UNORM, vk::Format::B8G8R8A8_SRGB)];
+        const BYTE_6_FORMAT: [(vk::Format, vk::Format); 1] =
+            [(vk::Format::R16G16B16_UNORM, vk::Format::R16G16B16_SFLOAT)];
+        const BYTE_8_FORMAT: [(vk::Format, vk::Format); 1] =
+            [(vk::Format::R16G16B16A16_UNORM, vk::Format::R16G16B16A16_SFLOAT)];
+
+        let is_in_format_region = |format: vk::Format, regions: &[(vk::Format, vk::Format)]| {
+            let n = format.as_raw();
+            regions.iter().any(|(begin, end)| begin.as_raw() <= n && n < end.as_raw())
+        };
+
+        match format {
+            f if is_in_format_region(f, &BYTE_3_FORMAT) => 3,
+            f if is_in_format_region(f, &BYTE_4_FORMAT) => 4,
+            f if is_in_format_region(f, &BYTE_6_FORMAT) => 6,
+            f if is_in_format_region(f, &BYTE_8_FORMAT) => 8,
+            _ => panic!("unsupported format: {:?}", format),
+        }
+    }
+}
+
 pub struct Image2D {
     handle: vk::Image,
 
@@ -77,9 +116,15 @@ impl Image2D {
         image
     }
 
+    /// # 实现步骤
+    /// 1. 创建一个 staging buffer，用于存放待复制的数据
+    /// 2. 将数据复制到 staging buffer
+    /// 3. 进行图像布局转换
+    /// 4. 将 staging buffer 的数据复制到图像
+    /// 5. 进行图像布局转换
     pub fn transfer_data(&self, command_buffer: &CommandBuffer, data: &[u8]) -> Buffer {
         let pixels_cnt = self.width() * self.height();
-        assert_eq!(data.len(), Self::format_byte_count(self.image_info.format()) * pixels_cnt as usize);
+        assert_eq!(data.len(), VulkanFormatUtils::pixel_size_in_bytes(self.image_info.format()) * pixels_cnt as usize);
 
         let mut stage_buffer = Buffer::new_stage_buffer(size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
         stage_buffer.transfer_data_by_mmap(data);
@@ -130,30 +175,6 @@ impl Image2D {
         }
 
         stage_buffer
-    }
-
-    /// 计算某种 format 的一个像素需要的存储空间
-    fn format_byte_count(format: vk::Format) -> usize {
-        // 根据 vulkan specification 得到的 format 顺序
-        const BYTE_3_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8_UNORM, vk::Format::B8G8R8_SRGB)];
-        const BYTE_4_FORMAT: [(vk::Format, vk::Format); 1] = [(vk::Format::R8G8B8A8_UNORM, vk::Format::B8G8R8A8_SRGB)];
-        const BYTE_6_FORMAT: [(vk::Format, vk::Format); 1] =
-            [(vk::Format::R16G16B16_UNORM, vk::Format::R16G16B16_SFLOAT)];
-        const BYTE_8_FORMAT: [(vk::Format, vk::Format); 1] =
-            [(vk::Format::R16G16B16A16_UNORM, vk::Format::R16G16B16A16_SFLOAT)];
-
-        let is_in_format_region = |format: vk::Format, regions: &[(vk::Format, vk::Format)]| {
-            let n = format.as_raw();
-            regions.iter().any(|(begin, end)| begin.as_raw() <= n && n < end.as_raw())
-        };
-
-        match format {
-            f if is_in_format_region(f, &BYTE_3_FORMAT) => 3,
-            f if is_in_format_region(f, &BYTE_4_FORMAT) => 4,
-            f if is_in_format_region(f, &BYTE_6_FORMAT) => 6,
-            f if is_in_format_region(f, &BYTE_8_FORMAT) => 8,
-            _ => panic!("unsupported format."),
-        }
     }
 
     #[inline]

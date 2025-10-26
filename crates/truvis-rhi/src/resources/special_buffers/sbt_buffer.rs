@@ -1,7 +1,4 @@
-use std::{
-    ops::{Deref, DerefMut},
-    rc::Rc,
-};
+use std::ops::{Deref, DerefMut};
 
 use ash::{vk, vk::Handle};
 
@@ -17,6 +14,8 @@ pub struct SBTBuffer {
 }
 
 impl_derive_buffer!(SBTBuffer, Buffer, _inner);
+
+// init & destroy
 impl SBTBuffer {
     pub fn new(size: vk::DeviceSize, align: vk::DeviceSize, name: impl AsRef<str>) -> Self {
         let inner = Buffer::new(

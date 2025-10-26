@@ -1,18 +1,13 @@
-use crate::renderer::frame_context::FrameContext;
-use crate::{
-    pipeline_settings::FrameLabel,
-    renderer::{bindless::BindlessManager, frame_controller::FrameController, scene_manager::SceneManager},
-};
+use std::{collections::HashMap, rc::Rc};
+
 use ash::vk;
 use glam::Vec4Swizzles;
 use itertools::Itertools;
-use model_manager::components::geometry::GeometryAoS3D;
+
 use model_manager::components::instance::Instance;
 use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use shader_binding::shader;
-use std::{collections::HashMap, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::render_context::RenderContext;
 use truvis_rhi::{
     commands::{
         barrier::{BarrierMask, BufferBarrier},
@@ -20,6 +15,12 @@ use truvis_rhi::{
     },
     raytracing::acceleration::Acceleration,
     resources::special_buffers::structured_buffer::StructuredBuffer,
+};
+
+use crate::renderer::frame_context::FrameContext;
+use crate::{
+    pipeline_settings::FrameLabel,
+    renderer::{bindless::BindlessManager, frame_controller::FrameController, scene_manager::SceneManager},
 };
 
 /// 数据以顺序的方式存储，同时查找时间为 O(1)
@@ -590,7 +591,7 @@ mod helper {
             stage_buffer.flush(0, buffer_size);
             stage_buffer.unmap();
         }
-        cmd.cmd_copy_buffer_1(
+        cmd.cmd_copy_buffer(
             stage_buffer,
             dst,
             &[vk::BufferCopy {
