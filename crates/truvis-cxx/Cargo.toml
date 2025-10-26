@@ -6,7 +6,7 @@ description = "为 Truvis 提供 Assimp 绑定"
 
 
 [dependencies]
-model-manager = { workspace = true }
+truvis-model-manager = { workspace = true }
 truvis-rhi = { workspace = true }
 
 itertools = { workspace = true }

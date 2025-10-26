@@ -1,6 +1,7 @@
 use ash::vk;
-use shader_layout_macro::ShaderLayout;
-use shader_layout_trait::ShaderBindingLayout;
+
+use truvis_shader_layout_macro::ShaderLayout;
+use truvis_shader_layout_trait::ShaderBindingLayout;
 
 /// 示例：使用 ShaderLayout 派生宏定义着色器布局
 ///

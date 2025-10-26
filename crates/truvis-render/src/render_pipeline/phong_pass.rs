@@ -6,9 +6,8 @@ use crate::{
     },
 };
 use ash::vk;
-use model_manager::vertex::aos_3d::VertexLayoutAoS3D;
-use shader_binding::shader;
 use std::{cell::RefCell, mem::offset_of, rc::Rc};
+use truvis_model_manager::vertex::aos_3d::VertexLayoutAoS3D;
 use truvis_rhi::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_rhi::{
     basic::color::LabelColor,
@@ -19,6 +18,7 @@ use truvis_rhi::{
     },
     resources::special_buffers::structured_buffer::StructuredBuffer,
 };
+use truvis_shader_binding::shader;
 
 pub struct PhongPass {
     pipeline: GraphicsPipeline,

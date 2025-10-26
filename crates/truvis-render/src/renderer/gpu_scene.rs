@@ -4,10 +4,9 @@ use ash::vk;
 use glam::Vec4Swizzles;
 use itertools::Itertools;
 
-use model_manager::components::instance::Instance;
-use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
-use shader_binding::shader;
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_model_manager::components::instance::Instance;
+use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use truvis_rhi::{
     commands::{
         barrier::{BarrierMask, BufferBarrier},
@@ -16,6 +15,7 @@ use truvis_rhi::{
     raytracing::acceleration::Acceleration,
     resources::special_buffers::structured_buffer::StructuredBuffer,
 };
+use truvis_shader_binding::shader;
 
 use crate::renderer::frame_context::FrameContext;
 use crate::{

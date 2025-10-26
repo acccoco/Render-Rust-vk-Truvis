@@ -9,7 +9,6 @@ use crate::{
     },
 };
 use ash::vk;
-use shader_binding::shader;
 use std::{cell::RefCell, ffi::CStr, rc::Rc};
 use truvis_rhi::{
     commands::{
@@ -20,6 +19,7 @@ use truvis_rhi::{
     render_context::RenderContext,
     resources::{special_buffers::structured_buffer::StructuredBuffer, texture::Texture2D},
 };
+use truvis_shader_binding::shader;
 
 /// 渲染演示数据结构
 ///

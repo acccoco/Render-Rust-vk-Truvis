@@ -1,5 +1,5 @@
 [package]
-name = "model-manager"
+name = "truvis-model-manager"
 version = "0.1.0"
 edition = "2024"
 description = "基础的模型管理，提供了模型的基础定义"

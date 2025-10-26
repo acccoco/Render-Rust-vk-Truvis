@@ -1,12 +1,12 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use model_manager::guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid};
-use model_manager::components::instance::Instance;
-use model_manager::components::material::Material;
-use model_manager::components::mesh::Mesh;
-use shader_binding::shader;
-use shader_binding::shader::Scene;
 use truvis_cxx::AssimpSceneLoader;
+use truvis_model_manager::components::instance::Instance;
+use truvis_model_manager::components::material::Material;
+use truvis_model_manager::components::mesh::Mesh;
+use truvis_model_manager::guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid};
+use truvis_shader_binding::shader;
+use truvis_shader_binding::shader::Scene;
 
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::FrameContext;

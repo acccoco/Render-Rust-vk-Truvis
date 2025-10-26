@@ -3,8 +3,6 @@ use std::{collections::HashMap, rc::Rc};
 use crate::{pipeline_settings::FrameLabel, render_resource::ImageLoader, renderer::frame_controller::FrameController};
 use ash::vk;
 use itertools::Itertools;
-use shader_binding::shader;
-use shader_layout_macro::ShaderLayout;
 use truvis_rhi::descriptors::descriptor_pool::DescriptorPoolCreateInfo;
 use truvis_rhi::{
     descriptors::{
@@ -18,6 +16,8 @@ use truvis_rhi::{
     },
     utilities::shader_cursor::ShaderCursor,
 };
+use truvis_shader_binding::shader;
+use truvis_shader_layout_macro::ShaderLayout;
 
 #[derive(ShaderLayout)]
 pub struct BindlessDescriptorBinding {

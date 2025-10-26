@@ -1,0 +1,16 @@
+[package]
+name = "truvis-shader-layout-macro"
+version = "0.1.0"
+edition = "2024"
+description = "简化 shader binding，通过属性宏来生成 descriptor bindings"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+truvis-shader-layout-trait = { workspace = true }
+
+syn = { workspace = true, features = ["full"] }
+quote = { workspace = true }
+proc-macro2 = { workspace = true }
+ash = { workspace = true }

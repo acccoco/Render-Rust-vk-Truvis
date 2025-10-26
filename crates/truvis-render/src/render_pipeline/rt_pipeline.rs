@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use ash::vk;
-use shader_binding::shader;
+use truvis_shader_binding::shader;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, submit_info::SubmitInfo},

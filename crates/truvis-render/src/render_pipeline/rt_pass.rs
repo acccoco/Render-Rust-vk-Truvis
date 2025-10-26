@@ -1,6 +1,5 @@
 use ash::vk;
 use itertools::Itertools;
-use shader_binding::{shader, shader::ImageHandle};
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
@@ -8,6 +7,7 @@ use truvis_rhi::{
     render_context::RenderContext,
     resources::special_buffers::{sbt_buffer::SBTBuffer, structured_buffer::StructuredBuffer},
 };
+use truvis_shader_binding::{shader, shader::ImageHandle};
 
 use crate::renderer::frame_context::FrameContext;
 use crate::{

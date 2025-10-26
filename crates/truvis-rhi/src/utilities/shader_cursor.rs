@@ -1,5 +1,5 @@
 use ash::vk;
-use shader_layout_trait::ShaderBindingItem;
+use truvis_shader_layout_trait::ShaderBindingItem;
 
 pub struct WriteDescriptorSet {
     pub dst_set: vk::DescriptorSet,

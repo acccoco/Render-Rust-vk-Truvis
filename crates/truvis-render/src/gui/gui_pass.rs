@@ -5,7 +5,6 @@ use crate::renderer::frame_context::FrameContext;
 use crate::{gui::gui::Gui, pipeline_settings::FrameLabel};
 use ash::vk;
 use itertools::Itertools;
-use shader_binding::{shader, shader::TextureHandle};
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_rhi::{
@@ -15,6 +14,7 @@ use truvis_rhi::{
         shader::ShaderStageInfo,
     },
 };
+use truvis_shader_binding::{shader, shader::TextureHandle};
 
 const_map!(ShaderStage<ShaderStageInfo>: {
     Vertex: ShaderStageInfo {

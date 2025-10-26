@@ -3,8 +3,8 @@ fn main() {
     println!("cargo:rerun-if-changed=cxx/CMakeLists.txt");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=cxx/vcpkg.json");
-    println!("cargo:rerun-if-changed=cxx/include");
-    println!("cargo:rerun-if-changed=cxx/src");
+    println!("cargo:rerun-if-changed=cxx/truvixx-assimp");
+    println!("cargo:rerun-if-changed=cxx/truvixx-interface");
 
     // 编译 CMake 项目
     build_cmake_project();

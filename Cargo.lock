@@ -1481,18 +1481,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e53debba6bda7a793e5f99b8dacf19e626084f525f7829104ba9898f367d85ff"
 
 [[package]]
-name = "model-manager"
-version = "0.1.0"
-dependencies = [
- "ash",
- "bytemuck",
- "glam",
- "itertools 0.10.5",
- "truvis-rhi",
- "uuid",
-]
-
-[[package]]
 name = "ndk"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2393,46 +2381,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shader-binding"
-version = "0.1.0"
-dependencies = [
- "bindgen",
- "bytemuck",
- "glam",
-]
-
-[[package]]
-name = "shader-build"
-version = "0.1.0"
-dependencies = [
- "anstyle",
- "chrono",
- "env_logger",
- "log",
- "rayon",
- "truvis-crate-tools",
- "walkdir",
-]
-
-[[package]]
-name = "shader-layout-macro"
-version = "0.1.0"
-dependencies = [
- "ash",
- "proc-macro2",
- "quote 1.0.38",
- "shader-layout-trait",
- "syn 2.0.100",
-]
-
-[[package]]
-name = "shader-layout-trait"
-version = "0.1.0"
-dependencies = [
- "ash",
-]
-
-[[package]]
 name = "sharded-slab"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2814,7 +2762,19 @@ dependencies = [
  "cmake",
  "glam",
  "itertools 0.10.5",
- "model-manager",
+ "truvis-model-manager",
+ "truvis-rhi",
+ "uuid",
+]
+
+[[package]]
+name = "truvis-model-manager"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "bytemuck",
+ "glam",
+ "itertools 0.10.5",
  "truvis-rhi",
  "uuid",
 ]
@@ -2847,22 +2807,22 @@ dependencies = [
  "itertools 0.10.5",
  "lazy_static",
  "log",
- "model-manager",
  "rand",
  "rand_derive",
  "raw-window-handle",
  "scopeguard",
  "serde",
  "serde_json",
- "shader-binding",
- "shader-layout-macro",
- "shader-layout-trait",
  "static_init",
  "tobj",
  "tracy-client",
  "truvis-crate-tools",
  "truvis-cxx",
+ "truvis-model-manager",
  "truvis-rhi",
+ "truvis-shader-binding",
+ "truvis-shader-layout-macro",
+ "truvis-shader-layout-trait",
  "uuid",
  "vk-mem",
  "winit",
@@ -2882,11 +2842,51 @@ dependencies = [
  "itertools 0.10.5",
  "log",
  "raw-window-handle",
- "shader-layout-macro",
- "shader-layout-trait",
+ "truvis-shader-layout-macro",
+ "truvis-shader-layout-trait",
  "uuid",
  "vk-mem",
  "winit",
+]
+
+[[package]]
+name = "truvis-shader-binding"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "bytemuck",
+ "glam",
+]
+
+[[package]]
+name = "truvis-shader-build"
+version = "0.1.0"
+dependencies = [
+ "anstyle",
+ "chrono",
+ "env_logger",
+ "log",
+ "rayon",
+ "truvis-crate-tools",
+ "walkdir",
+]
+
+[[package]]
+name = "truvis-shader-layout-macro"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "proc-macro2",
+ "quote 1.0.38",
+ "syn 2.0.100",
+ "truvis-shader-layout-trait",
+]
+
+[[package]]
+name = "truvis-shader-layout-trait"
+version = "0.1.0"
+dependencies = [
+ "ash",
 ]
 
 [[package]]

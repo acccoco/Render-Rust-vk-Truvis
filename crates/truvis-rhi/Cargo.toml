@@ -5,8 +5,8 @@ edition = "2024"
 description = "Truvis 的 RHI 层，提供 Vulkan 的封装和抽象"
 
 [dependencies]
-shader-layout-macro = { workspace = true }
-shader-layout-trait = { workspace = true }
+truvis-shader-layout-macro = { workspace = true }
+truvis-shader-layout-trait = { workspace = true }
 
 
 # 默认 features：

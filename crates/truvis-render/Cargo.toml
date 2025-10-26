@@ -5,11 +5,11 @@ edition = "2024"
 
 [dependencies]
 truvis-rhi = { workspace = true }
-shader-layout-trait = { workspace = true }
-shader-layout-macro = { workspace = true }
-model-manager = { workspace = true }
+truvis-shader-layout-trait = { workspace = true }
+truvis-shader-layout-macro = { workspace = true }
+truvis-model-manager = { workspace = true }
 truvis-cxx = { workspace = true }
-shader-binding = { workspace = true }
+truvis-shader-binding = { workspace = true }
 truvis-crate-tools = { workspace = true }
 
 # 默认 features：

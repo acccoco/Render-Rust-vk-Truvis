@@ -1,13 +1,13 @@
 use std::{ffi::c_void, mem::offset_of};
 
 use itertools::Itertools;
-use model_manager::components::geometry::Geometry;
-use model_manager::components::instance::Instance;
-use model_manager::components::material::Material;
-use model_manager::components::mesh::Mesh;
-use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
-use model_manager::vertex::aos_3d::Vertex3D;
-use model_manager::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_model_manager::components::geometry::Geometry;
+use truvis_model_manager::components::instance::Instance;
+use truvis_model_manager::components::material::Material;
+use truvis_model_manager::components::mesh::Mesh;
+use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
+use truvis_model_manager::vertex::aos_3d::Vertex3D;
+use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_rhi::resources::special_buffers::index_buffer::Index32Buffer;
 
 pub mod _ffi_bindings;
