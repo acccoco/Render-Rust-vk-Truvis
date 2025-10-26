@@ -7,4 +7,4 @@ pub mod gpu_scene;
 pub mod renderer;
 pub mod scene_manager;
 pub mod subsystem;
-pub mod upload_manager;
+pub mod stage_buffer_manager;

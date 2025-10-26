@@ -2,6 +2,8 @@ use crate::gui::imgui_vertex_layout::ImGuiVertexLayoutAoS;
 use crate::renderer::frame_context::FrameContext;
 use ash::vk;
 use truvis_rhi::render_context::RenderContext;
+use truvis_rhi::resources::buffer::Buffer;
+use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
 use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
 use truvis_rhi::resources_new::buffers::index_buffer::IndexBufferHandle;
 use truvis_rhi::resources_new::managed_buffer::Buffer2;
@@ -15,7 +17,7 @@ pub struct GuiMesh {
     pub vertex_buffer: VertexBuffer<ImGuiVertexLayoutAoS>,
     _vertex_count: usize,
 
-    pub index_buffer: IndexBufferHandle<imgui::DrawIdx>,
+    pub index_buffer: IndexBuffer<imgui::DrawIdx>,
 }
 
 impl GuiMesh {
@@ -35,7 +37,7 @@ impl GuiMesh {
                     BufferBarrier::default()
                         .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
                         .dst_mask(vk::PipelineStageFlags2::VERTEX_INPUT, vk::AccessFlags2::VERTEX_ATTRIBUTE_READ)
-                        .buffer(vertex_buffer.handle(), 0, vk::WHOLE_SIZE),
+                        .buffer(vertex_buffer.vk_buffer(), 0, vk::WHOLE_SIZE),
                 ],
             );
         }
@@ -67,7 +69,7 @@ impl GuiMesh {
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
         let mut vertex_buffer =
             VertexBuffer::<ImGuiVertexLayoutAoS>::new(vertex_count, format!("{}-imgui-vertex", frame_name));
-        let mut upload_buffer_mgr = FrameContext::upload_buffer_mgr_mut();
+        let mut upload_buffer_mgr = FrameContext::stage_buffer_manager();
         let stage_buffer = upload_buffer_mgr
             .alloc_buffer(vertices_size as vk::DeviceSize, &format!("{}-imgui-vertex-stage", frame_name));
         stage_buffer.transfer_data_by_mmap(&vertices);
@@ -95,7 +97,7 @@ impl GuiMesh {
         frame_name: &str,
         cmd: &CommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (IndexBufferHandle<imgui::DrawIdx>) {
+    ) -> (IndexBuffer<imgui::DrawIdx>) {
         let index_count = draw_data.total_idx_count as usize;
         let mut indices = Vec::with_capacity(index_count);
         for draw_list in draw_data.draw_lists() {
@@ -103,17 +105,15 @@ impl GuiMesh {
         }
 
         let index_buffer_size = index_count * size_of::<imgui::DrawIdx>();
-        let mut index_buffer =
-            IndexBufferHandle::<imgui::DrawIdx>::new_managed(index_buffer_size, format!("{}-imgui-index", frame_name));
-        let mut stage_buffer = Buffer2::new_stage_buffer(
-            index_buffer_size as vk::DeviceSize,
-            format!("{}-imgui-index-stage", frame_name),
-        );
+
+        let mut index_buffer = IndexBuffer::<imgui::DrawIdx>::new(index_count, format!("{}-imgui-index", frame_name));
+        let mut stage_buffer =
+            Buffer::new_stage_buffer(index_buffer_size as vk::DeviceSize, format!("{}-imgui-index-stage", frame_name));
         stage_buffer.transfer_data_by_mmap(&indices);
 
         cmd.begin_label("uipass-index-buffer-transfer", LabelColor::COLOR_CMD);
         {
-            cmd.cmd_copy_buffer(
+            cmd.cmd_copy_buffer_1(
                 &stage_buffer,
                 &mut index_buffer,
                 &[vk::BufferCopy {
@@ -124,20 +124,8 @@ impl GuiMesh {
         }
         cmd.end_label();
 
-        FrameContext::upload_buffer_mgr_mut().register_stage_buffer(stage_buffer);
+        FrameContext::stage_buffer_manager().register_stage_buffer(stage_buffer);
 
-        let index_buffer_handle = IndexBufferHandle::<imgui::DrawIdx>::new_with_buffer(
-            &mut RenderContext::get().resource_mgr_mut(),
-            index_count,
-            index_buffer,
-        );
-
-        index_buffer_handle
-    }
-}
-
-impl Drop for GuiMesh {
-    fn drop(&mut self) {
-        RenderContext::get().resource_mgr_mut().unregister_buffer(self.index_buffer.buffer_handle())
+        index_buffer
     }
 }

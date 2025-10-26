@@ -193,7 +193,7 @@ impl Renderer {
         }
 
         FrameContext::cmd_allocator_mut().free_frame_commands();
-        FrameContext::upload_buffer_mgr_mut().clear_frame_buffers();
+        FrameContext::stage_buffer_manager().clear_frame_buffers();
         self.timer.tic();
     }
 
@@ -302,14 +302,14 @@ impl Renderer {
             }
         };
         cmd.cmd_update_buffer(
-            self.per_frame_data_buffers[*crt_frame_label].handle(),
+            self.per_frame_data_buffers[*crt_frame_label].vk_buffer(),
             0,
             bytemuck::bytes_of(&per_frame_data),
         );
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
             &[BufferBarrier::default()
-                .buffer(self.per_frame_data_buffers[*crt_frame_label].handle(), 0, vk::WHOLE_SIZE)
+                .buffer(self.per_frame_data_buffers[*crt_frame_label].vk_buffer(), 0, vk::WHOLE_SIZE)
                 .mask(transfer_barrier_mask)],
         );
         cmd.end();

@@ -3,6 +3,9 @@
 use ash::vk;
 use itertools::Itertools;
 
+use crate::resources::special_buffers::acceleration_buffer::{
+    AccelerationInstanceBuffer, AccelerationScratchBuffer, AccelerationStructureBuffer,
+};
 use crate::{
     foundation::debug_messenger::DebugType, query::query_pool::QueryPool, render_context::RenderContext,
     resources::buffer::Buffer,
@@ -15,7 +18,7 @@ pub struct Acceleration {
     acceleration_handle: vk::AccelerationStructureKHR,
 
     /// 这里的 buffer 仅仅是用于内存分配，实际的 Acceleration 相关的操作都是通过 acceleration_handle 来进行的
-    _buffer: Buffer,
+    _buffer: AccelerationStructureBuffer,
 }
 // 构造与销毁
 impl Acceleration {
@@ -71,7 +74,7 @@ impl Acceleration {
             format!("{}-uncompact-blas", debug_name.as_ref()),
         );
 
-        let scratch_buffer = Buffer::new_accleration_scratch_buffer(
+        let scratch_buffer = AccelerationScratchBuffer::new(
             size_info.build_scratch_size,
             format!("{}-blas-scratch-buffer", debug_name.as_ref()),
         );
@@ -145,7 +148,7 @@ impl Acceleration {
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: impl AsRef<str>,
     ) -> Self {
-        let mut acceleration_instance_buffer = Buffer::new_acceleration_instance_buffer(
+        let mut acceleration_instance_buffer = AccelerationInstanceBuffer::new(
             size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name.as_ref()),
         );
@@ -189,7 +192,7 @@ impl Acceleration {
             format!("{}-tlas", debug_name.as_ref()),
         );
 
-        let scratch_buffer = Buffer::new_accleration_scratch_buffer(
+        let scratch_buffer = AccelerationScratchBuffer::new(
             size_info.build_scratch_size,
             format!("{}-tlas-scratch-buffer", debug_name.as_ref()),
         );
@@ -211,12 +214,12 @@ impl Acceleration {
 
     /// 创建 AccelerationStructure 以及 buffer    
     fn new(size: vk::DeviceSize, ty: vk::AccelerationStructureTypeKHR, debug_name: impl AsRef<str>) -> Self {
-        let buffer = Buffer::new_accleration_buffer(size as usize, debug_name.as_ref());
+        let buffer = AccelerationStructureBuffer::new(size, debug_name.as_ref());
 
         let create_info = vk::AccelerationStructureCreateInfoKHR::default() //
             .ty(ty)
             .size(size)
-            .buffer(buffer.handle());
+            .buffer(buffer.vk_buffer());
 
         let device_functions = RenderContext::get().device_functions();
         let acceleration_structure = unsafe {

@@ -22,6 +22,7 @@ impl Buffer2 {
     /// # Note
     /// - align: 其实地址的内存对齐，默认对齐到 8 字节
     /// - 优先使用 device memory
+    #[deprecated]
     pub fn new(
         buffer_size: vk::DeviceSize,
         buffer_usage: vk::BufferUsageFlags,

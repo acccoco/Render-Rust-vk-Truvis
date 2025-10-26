@@ -2,9 +2,8 @@ use crate::components::geometry::Geometry;
 use ash::vk;
 use ash::vk::DeviceSize;
 use std::mem::offset_of;
-use truvis_rhi::render_context::RenderContext;
+use truvis_rhi::resources::special_buffers::index_buffer::Index32Buffer;
 use truvis_rhi::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
-use truvis_rhi::resources_new::buffers::index_buffer::{Index32BufferHandle, IndexBufferHandle};
 
 /// AoS: Array of structures
 #[repr(C)]
@@ -77,34 +76,24 @@ impl VertexLayoutAoSPosNormalUv {
     pub fn cube() -> Geometry<Self> {
         let vertex_buffer = Self::create_vertex_buffer2(&shape::Cube::VERTICES, "cube-vertex-buffer");
 
-        let mut index_buffer = Index32BufferHandle::new_managed(shape::Cube::INDICES.len(), "cube-index-buffer");
+        let mut index_buffer = Index32Buffer::new(shape::Cube::INDICES.len(), "cube-index-buffer");
         index_buffer.transfer_data_sync(&shape::Cube::INDICES);
-        let index_buffer_handle = IndexBufferHandle::new_with_buffer(
-            &mut RenderContext::get().resource_mgr_mut(),
-            shape::Cube::INDICES.len(),
-            index_buffer,
-        );
 
         Geometry {
             vertex_buffer,
-            index_buffer: index_buffer_handle,
+            index_buffer,
         }
     }
 
     pub fn floor() -> Geometry<Self> {
         let vertex_buffer = Self::create_vertex_buffer2(&shape::Floor::VERTICES, "floor-vertex-buffer");
 
-        let mut index_buffer = Index32BufferHandle::new_managed(shape::Floor::INDICES.len(), "floor-index-buffer");
+        let mut index_buffer = Index32Buffer::new(shape::Floor::INDICES.len(), "floor-index-buffer");
         index_buffer.transfer_data_sync(&shape::Floor::INDICES);
-        let index_buffer_handle = IndexBufferHandle::new_with_buffer(
-            &mut RenderContext::get().resource_mgr_mut(),
-            shape::Floor::INDICES.len(),
-            index_buffer,
-        );
 
         Geometry {
             vertex_buffer,
-            index_buffer: index_buffer_handle,
+            index_buffer,
         }
     }
 }

@@ -2,6 +2,7 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::render_context::RenderContext;
+use crate::resources::special_buffers::index_buffer::IndexBuffer;
 use crate::resources_new::buffers::index_buffer::{Index32BufferHandle, IndexBufferHandle, IndexType};
 use crate::resources_new::resource_handles::BufferHandle;
 use crate::{
@@ -86,8 +87,8 @@ impl CommandBuffer {
         unsafe {
             RenderContext::get().device_functions().cmd_copy_buffer(
                 self.vk_handle,
-                src.handle(),
-                dst.handle(),
+                src.vk_buffer(),
+                dst.vk_buffer(),
                 regions,
             );
         }
@@ -259,7 +260,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_bind_vertex_buffers(&self, first_bind: u32, buffers: &[Buffer], offsets: &[vk::DeviceSize]) {
         unsafe {
-            let buffers = buffers.iter().map(|b| b.handle()).collect_vec();
+            let buffers = buffers.iter().map(|b| b.vk_buffer()).collect_vec();
             RenderContext::get().device_functions().cmd_bind_vertex_buffers(
                 self.vk_handle,
                 first_bind,
@@ -276,9 +277,21 @@ impl CommandBuffer {
         unsafe {
             RenderContext::get().device_functions().cmd_bind_index_buffer(
                 self.vk_handle,
-                buffer.handle(),
+                buffer.vk_buffer(),
                 offset,
                 index_type,
+            );
+        }
+    }
+
+    #[inline]
+    pub fn cmd_bind_index_buffer1<T: IndexType>(&self, buffer: &IndexBuffer<T>, offset: vk::DeviceSize) {
+        unsafe {
+            RenderContext::get().device_functions().cmd_bind_index_buffer(
+                self.vk_handle,
+                buffer.vk_buffer(),
+                offset,
+                T::VK_INDEX_TYPE,
             );
         }
     }

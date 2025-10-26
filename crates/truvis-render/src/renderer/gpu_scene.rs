@@ -249,7 +249,7 @@ impl GpuScene {
             let mesh = scene_mgr.get_mesh(&instance.mesh).unwrap();
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
                 cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&geometry.vertex_buffer), &[0]);
-                cmd.cmd_bind_index_buffer2(&geometry.index_buffer, 0);
+                cmd.cmd_bind_index_buffer1(&geometry.index_buffer, 0);
 
                 before_draw(instance_idx as u32, submesh_idx as u32);
                 cmd.draw_indexed(geometry.index_cnt(), 0, 1, 0, 0);
@@ -322,11 +322,11 @@ impl GpuScene {
             uv_checker: bindless_mgr.get_texture_handle(&self.resources.uv_checker).unwrap(),
         };
 
-        cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.handle(), 0, bytemuck::bytes_of(&scene_data));
+        cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.vk_buffer(), 0, bytemuck::bytes_of(&scene_data));
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
             &[BufferBarrier::default().mask(barrier_mask).buffer(
-                crt_gpu_buffers.scene_buffer.handle(),
+                crt_gpu_buffers.scene_buffer.vk_buffer(),
                 0,
                 vk::WHOLE_SIZE,
             )],
@@ -499,7 +499,7 @@ impl GpuScene {
                     normal_buffer: geometry.vertex_buffer.normal_address(),
                     tangent_buffer: geometry.vertex_buffer.tangent_address(),
                     uv_buffer: geometry.vertex_buffer.uv_address(),
-                    index_buffer: geometry.index_buffer.device_address(&RenderContext::get().resource_mgr()),
+                    index_buffer: geometry.index_buffer.device_address(),
                 };
             }
             crt_geometry_idx += mesh.geometries.len();
@@ -600,7 +600,7 @@ mod helper {
         );
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
-            &[BufferBarrier::default().mask(barrier_mask).buffer(dst.handle(), 0, vk::WHOLE_SIZE)],
+            &[BufferBarrier::default().mask(barrier_mask).buffer(dst.vk_buffer(), 0, vk::WHOLE_SIZE)],
         );
     }
 

@@ -21,17 +21,10 @@ pub struct StageBuffer<T: bytemuck::Pod> {
 impl_derive_buffer!(StageBuffer<T: bytemuck::Pod>, Buffer, inner);
 impl<T: bytemuck::Pod> StageBuffer<T> {
     pub fn new(debug_name: impl AsRef<str>) -> Self {
+        let inner =
+            Buffer::new(size_of::<T>() as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, None, true, debug_name);
         let buffer = Self {
-            inner: Buffer::new(
-                Rc::new(BufferCreateInfo::new(size_of::<T>() as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC)),
-                Rc::new(vk_mem::AllocationCreateInfo {
-                    usage: vk_mem::MemoryUsage::AutoPreferDevice,
-                    flags: vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM,
-                    ..Default::default()
-                }),
-                None,
-                debug_name,
-            ),
+            inner,
             _phantom: PhantomData,
         };
         let device_functions = RenderContext::get().device_functions();

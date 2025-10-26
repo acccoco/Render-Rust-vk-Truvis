@@ -14,12 +14,10 @@ pub struct Buffer {
     pub map_ptr: Option<*mut u8>,
     pub size: vk::DeviceSize,
 
-    pub debug_name: String,
-
     pub device_addr: Option<vk::DeviceAddress>,
 
-    _buffer_info: Rc<BufferCreateInfo>,
-    _alloc_info: Rc<vk_mem::AllocationCreateInfo>,
+    #[cfg(debug_assertions)]
+    pub debug_name: String,
 }
 
 impl DebugType for Buffer {
@@ -43,104 +41,66 @@ impl Drop for Buffer {
 
 // constructor & getter & builder
 impl Buffer {
-    /// # param
-    /// * align: 当 buffer 处于一个大的 memory block 中时，align 用来指定 buffer 的起始 offset
-    #[deprecated]
+    /// - align: 当 buffer 处于一个大的 memory block 中时，align 用来指定 buffer 的起始 offset,
+    /// 其实地址的内存对齐，默认对齐到 8 字节
+    /// - 优先使用 device memory
     pub fn new(
-        buffer_ci: Rc<BufferCreateInfo>,
-        alloc_ci: Rc<vk_mem::AllocationCreateInfo>,
+        buffer_size: vk::DeviceSize,
+        buffer_usage: vk::BufferUsageFlags,
         align: Option<vk::DeviceSize>,
-        debug_name: impl AsRef<str>,
+        mem_map: bool,
+        name: impl AsRef<str>,
     ) -> Self {
-        let device_functions = RenderContext::get().device_functions();
-        let allocator = RenderContext::get().allocator();
-        unsafe {
-            // 默认给 8 的 align，表示所有的 buffer 其实地址一定会和 8 对齐
-            let (buffer, allocation) =
-                allocator.create_buffer_with_alignment(buffer_ci.info(), &alloc_ci, align.unwrap_or(8)).unwrap();
+        let buffer_ci = vk::BufferCreateInfo::default().size(buffer_size).usage(buffer_usage);
+        let alloc_ci = vk_mem::AllocationCreateInfo {
+            usage: vk_mem::MemoryUsage::AutoPreferDevice,
+            flags: if mem_map {
+                vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM
+            } else {
+                vk_mem::AllocationCreateFlags::empty()
+            },
+            ..Default::default()
+        };
 
-            let buffer = Self {
-                handle: buffer,
-                allocation,
-                map_ptr: None,
-                size: buffer_ci.size(),
-                debug_name: debug_name.as_ref().to_string(),
-                _buffer_info: buffer_ci,
-                _alloc_info: alloc_ci,
-                device_addr: None,
-            };
-            device_functions.set_debug_name(&buffer, &buffer.debug_name);
-            buffer
+        let align = align.unwrap_or(8);
+        let (buffer, alloc) = unsafe {
+            RenderContext::get().allocator.create_buffer_with_alignment(&buffer_ci, &alloc_ci, align).unwrap()
+        };
+
+        let mut device_addr = None;
+        if buffer_usage.contains(vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS) {
+            let device_functions = RenderContext::get().device_functions();
+            unsafe {
+                device_addr = Some(
+                    device_functions.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(buffer)),
+                );
+            }
         }
-    }
 
-    #[deprecated]
-    #[inline]
-    pub fn new_device_buffer(size: vk::DeviceSize, flags: vk::BufferUsageFlags, debug_name: impl AsRef<str>) -> Self {
-        Self::new(
-            Rc::new(BufferCreateInfo::new(size, flags)),
-            Rc::new(vk_mem::AllocationCreateInfo {
-                usage: vk_mem::MemoryUsage::AutoPreferDevice,
-                ..Default::default()
-            }),
-            None,
-            debug_name,
-        )
-    }
-
-    #[inline]
-    pub fn new_acceleration_instance_buffer(size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
-        Self::new_device_buffer(
-            size,
-            vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
-                | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR
-                | vk::BufferUsageFlags::TRANSFER_DST,
-            debug_name.as_ref(),
-        )
+        RenderContext::get().device_functions().set_object_debug_name(buffer, format!("Buffer::{}", name.as_ref()));
+        Self {
+            handle: buffer,
+            allocation: alloc,
+            size: buffer_size,
+            map_ptr: None,
+            device_addr,
+            debug_name: name.as_ref().to_string(),
+        }
     }
 
     #[inline]
     pub fn new_stage_buffer(size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
-        Self::new(
-            Rc::new(BufferCreateInfo::new(size, vk::BufferUsageFlags::TRANSFER_SRC)),
-            Rc::new(vk_mem::AllocationCreateInfo {
-                usage: vk_mem::MemoryUsage::Auto,
-                flags: vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM,
-                ..Default::default()
-            }),
-            None,
-            debug_name,
-        )
+        Self::new(size, vk::BufferUsageFlags::TRANSFER_SRC, None, true, debug_name)
     }
+}
 
-    #[deprecated]
+// getter
+impl Buffer {
     #[inline]
-    pub fn new_accleration_buffer(size: usize, debug_name: impl AsRef<str>) -> Self {
-        Self::new_device_buffer(
-            size as vk::DeviceSize,
-            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
-            debug_name,
-        )
-    }
-
-    #[deprecated]
-    #[inline]
-    pub fn new_accleration_scratch_buffer(size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
-        Self::new_device_buffer(
-            size,
-            vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
-            debug_name,
-        )
-    }
-
-    /// getter
-    #[deprecated]
-    #[inline]
-    pub fn handle(&self) -> vk::Buffer {
+    pub fn vk_buffer(&self) -> vk::Buffer {
         self.handle
     }
 
-    #[deprecated]
     #[inline]
     pub fn device_address(&self) -> vk::DeviceAddress {
         self.device_addr.unwrap_or_else(|| {
@@ -151,7 +111,6 @@ impl Buffer {
         })
     }
 
-    #[deprecated]
     #[inline]
     pub fn size(&self) -> vk::DeviceSize {
         self.size
@@ -160,7 +119,6 @@ impl Buffer {
 
 // tools
 impl Buffer {
-    #[deprecated]
     #[inline]
     pub fn mapped_ptr(&self) -> *mut u8 {
         self.map_ptr.unwrap_or_else(|| {
@@ -168,7 +126,6 @@ impl Buffer {
         })
     }
 
-    #[deprecated]
     #[inline]
     pub fn map(&mut self) {
         if self.map_ptr.is_some() {
@@ -180,14 +137,12 @@ impl Buffer {
         }
     }
 
-    #[deprecated]
     #[inline]
     pub fn flush(&mut self, offset: vk::DeviceSize, size: vk::DeviceSize) {
         let allocator = RenderContext::get().allocator();
         allocator.flush_allocation(&self.allocation, offset, size).unwrap();
     }
 
-    #[deprecated]
     #[inline]
     pub fn unmap(&mut self) {
         if self.map_ptr.is_none() {
@@ -201,7 +156,6 @@ impl Buffer {
     }
 
     /// 通过 mem map 的方式将 data 传入到 buffer 中
-    #[deprecated]
     pub fn transfer_data_by_mmap<T>(&mut self, data: &[T])
     where
         T: Sized + Copy,
@@ -224,7 +178,6 @@ impl Buffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    #[deprecated]
     pub fn transfer_data_sync(&mut self, data: &[impl Sized + Copy]) {
         let mut stage_buffer =
             Self::new_stage_buffer(size_of_val(data) as vk::DeviceSize, format!("{}-stage-buffer", self.debug_name));
@@ -255,7 +208,6 @@ impl Buffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    #[deprecated]
     pub fn transfer_data_sync2(&mut self, total_size: vk::DeviceSize, do_with_stage_buffer: impl FnOnce(&mut Buffer)) {
         let mut stage_buffer = Self::new_stage_buffer(total_size, format!("{}-stage-buffer", self.debug_name));
 

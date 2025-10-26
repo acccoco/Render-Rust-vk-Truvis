@@ -3,6 +3,7 @@ use ash::vk;
 use ash::vk::DeviceSize;
 use std::mem::offset_of;
 use truvis_rhi::render_context::RenderContext;
+use truvis_rhi::resources::special_buffers::index_buffer::Index32Buffer;
 use truvis_rhi::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
 use truvis_rhi::resources_new::buffers::index_buffer::{Index32BufferHandle, IndexBufferHandle};
 
@@ -65,35 +66,24 @@ impl VertexLayoutAoSPosColor {
     pub fn triangle() -> Geometry<Self> {
         let vertex_buffer = Self::create_vertex_buffer2(&shape::TRIANGLE_VERTEX_DATA, "triangle-vertex-buffer");
 
-        let mut index_buffer =
-            Index32BufferHandle::new_managed(shape::TRIANGLE_INDEX_DATA.len(), "triangle-index-buffer");
+        let mut index_buffer = Index32Buffer::new(shape::TRIANGLE_INDEX_DATA.len(), "triangle-index-buffer");
         index_buffer.transfer_data_sync(&shape::TRIANGLE_INDEX_DATA);
-        let index_buffer_handle = IndexBufferHandle::new_with_buffer(
-            &mut RenderContext::get().resource_mgr_mut(),
-            shape::TRIANGLE_INDEX_DATA.len(),
-            index_buffer,
-        );
 
         Geometry {
             vertex_buffer,
-            index_buffer: index_buffer_handle,
+            index_buffer,
         }
     }
 
     pub fn rectangle() -> Geometry<Self> {
         let vertex_buffer = Self::create_vertex_buffer2(&shape::RECTANGLE_VERTEX_DATA, "rectangle-vertex-buffer");
 
-        let index_buffer =
-            Index32BufferHandle::new_managed(shape::RECTANGLE_INDEX_DATA.len(), "rectangle-index-buffer");
-        let index_buffer_handle = IndexBufferHandle::new_with_buffer(
-            &mut RenderContext::get().resource_mgr_mut(),
-            shape::RECTANGLE_INDEX_DATA.len(),
-            index_buffer,
-        );
+        let mut index_buffer = Index32Buffer::new(shape::RECTANGLE_INDEX_DATA.len(), "rectangle-index-buffer");
+        index_buffer.transfer_data_sync(&shape::RECTANGLE_INDEX_DATA);
 
         Geometry {
             vertex_buffer,
-            index_buffer: index_buffer_handle,
+            index_buffer,
         }
     }
 }

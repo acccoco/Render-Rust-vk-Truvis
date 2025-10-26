@@ -53,12 +53,14 @@ impl<L: VertexLayout> VertexBuffer<L> {
     #[deprecated]
     pub fn new(vertex_cnt: usize, debug_name: impl AsRef<str>) -> Self {
         let buffer_size = L::buffer_size(vertex_cnt);
-        let buffer = Buffer::new_device_buffer(
+        let buffer = Buffer::new(
             buffer_size as vk::DeviceSize,
             vk::BufferUsageFlags::VERTEX_BUFFER
                 | vk::BufferUsageFlags::TRANSFER_DST
                 | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
+            None,
+            false,
             debug_name,
         );
 

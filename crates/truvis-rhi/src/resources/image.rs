@@ -114,7 +114,7 @@ impl Image2D {
                 });
             command_buffer.cmd_copy_buffer_to_image(
                 &vk::CopyBufferToImageInfo2::default()
-                    .src_buffer(stage_buffer.handle())
+                    .src_buffer(stage_buffer.vk_buffer())
                     .dst_image(self.handle)
                     .dst_image_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
                     .regions(std::slice::from_ref(&buffer_image_copy)),

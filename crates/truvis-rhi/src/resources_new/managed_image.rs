@@ -136,20 +136,8 @@ impl Image2 {
         let pixels_cnt = self.width * self.height;
         assert_eq!(data.len(), VulkanFormatUtils::pixel_size_in_bytes(self.format) * pixels_cnt as usize);
 
-        let mut stage_buffer = Buffer::new(
-            // TODO 使用新的 Buffer 创建方式来优化这个代码
-            std::rc::Rc::new(crate::resources::buffer_creator::BufferCreateInfo::new(
-                size_of_val(data) as vk::DeviceSize,
-                vk::BufferUsageFlags::TRANSFER_SRC,
-            )),
-            std::rc::Rc::new(vk_mem::AllocationCreateInfo {
-                usage: vk_mem::MemoryUsage::Auto,
-                flags: vk_mem::AllocationCreateFlags::HOST_ACCESS_RANDOM,
-                ..Default::default()
-            }),
-            None,
-            format!("{}-stage-buffer", self.name),
-        );
+        let mut stage_buffer =
+            Buffer::new_stage_buffer(size_of_val(data) as vk::DeviceSize, format!("{}-stage-buffer", self.name));
         stage_buffer.transfer_data_by_mmap(data);
 
         // 1. transition the image layout
@@ -182,7 +170,7 @@ impl Image2 {
                 });
             cmd.cmd_copy_buffer_to_image(
                 &vk::CopyBufferToImageInfo2::default()
-                    .src_buffer(stage_buffer.handle())
+                    .src_buffer(stage_buffer.vk_buffer())
                     .dst_image(self.handle)
                     .dst_image_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
                     .regions(std::slice::from_ref(&buffer_image_copy)),

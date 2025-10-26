@@ -159,7 +159,7 @@ impl GuiPass {
             bytemuck::bytes_of(&push_constant),
         );
 
-        cmd.cmd_bind_index_buffer2(&mesh.index_buffer, 0);
+        cmd.cmd_bind_index_buffer1(&mesh.index_buffer, 0);
         cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&mesh.vertex_buffer), &[0]);
 
         let mut index_offset = 0;
