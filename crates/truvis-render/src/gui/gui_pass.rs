@@ -1,10 +1,8 @@
 use std::{mem::offset_of, rc::Rc};
 
-use crate::gui::imgui_vertex_layout::{ImGuiVertex, ImGuiVertexLayoutAoS};
-use crate::renderer::frame_context::FrameContext;
-use crate::{gui::gui::Gui, pipeline_settings::FrameLabel};
 use ash::vk;
 use itertools::Itertools;
+
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_rhi::{
@@ -15,6 +13,10 @@ use truvis_rhi::{
     },
 };
 use truvis_shader_binding::{shader, shader::TextureHandle};
+
+use crate::gui::imgui_vertex_layout::ImGuiVertexLayoutAoS;
+use crate::renderer::frame_context::FrameContext;
+use crate::{gui::gui::Gui, pipeline_settings::FrameLabel};
 
 const_map!(ShaderStage<ShaderStageInfo>: {
     Vertex: ShaderStageInfo {

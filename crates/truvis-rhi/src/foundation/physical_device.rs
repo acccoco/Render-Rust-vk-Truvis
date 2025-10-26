@@ -10,10 +10,10 @@ pub struct PhysicalDevice {
     pub(crate) vk_handle: vk::PhysicalDevice,
 
     /// 当前 gpu 支持的 features
-    pub(crate) features: vk::PhysicalDeviceFeatures,
+    pub(crate) _features: vk::PhysicalDeviceFeatures,
 
     /// 当前 gpu 支持的 device extensions
-    pub(crate) device_extensions: Vec<vk::ExtensionProperties>,
+    pub(crate) _device_extensions: Vec<vk::ExtensionProperties>,
 
     /// 当前 gpu 的基础属性
     pub(crate) basic_props: vk::PhysicalDeviceProperties,
@@ -22,9 +22,9 @@ pub struct PhysicalDevice {
     pub(crate) rt_pipeline_props: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>,
 
     /// 当前 gpu 的加速结构属性
-    pub(crate) acc_struct_props: vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'static>,
+    pub(crate) _acc_struct_props: vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'static>,
 
-    pub(crate) mem_props: vk::PhysicalDeviceMemoryProperties,
+    pub(crate) _mem_props: vk::PhysicalDeviceMemoryProperties,
 
     pub(crate) graphics_queue_family: QueueFamily,
     pub(crate) compute_queue_family: QueueFamily,
@@ -139,16 +139,16 @@ impl PhysicalDevice {
                 .unwrap();
 
             Self {
-                mem_props: instance.get_physical_device_memory_properties(pdevice),
-                features: instance.get_physical_device_features(pdevice),
+                _mem_props: instance.get_physical_device_memory_properties(pdevice),
+                _features: instance.get_physical_device_features(pdevice),
                 vk_handle: pdevice,
                 basic_props,
                 rt_pipeline_props: rt_props,
-                acc_struct_props: acc_props,
+                _acc_struct_props: acc_props,
                 graphics_queue_family,
                 compute_queue_family,
                 transfer_queue_family,
-                device_extensions,
+                _device_extensions: device_extensions,
             }
         }
     }

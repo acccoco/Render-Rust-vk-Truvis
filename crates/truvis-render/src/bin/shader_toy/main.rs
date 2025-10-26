@@ -1,16 +1,13 @@
-#[macro_use]
-extern crate truvis_crate_tools;
-
-mod shader_toy_pass;
-mod shader_toy_pipeline;
-
 use imgui::Ui;
-use model_manager::components::geometry::Geometry;
-use model_manager::vertex::aos_pos_color::{VertexLayoutAoSPosColor, VertexPosColor};
+use truvis_model_manager::components::geometry::Geometry;
+use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
 use truvis_render::{
     app::TruvisApp, outer_app::OuterApp, platform::camera::Camera, render_pipeline::pipeline_context::PipelineContext,
     renderer::renderer::Renderer,
 };
+
+mod shader_toy_pass;
+mod shader_toy_pipeline;
 
 use crate::shader_toy_pipeline::ShaderToyPipeline;
 

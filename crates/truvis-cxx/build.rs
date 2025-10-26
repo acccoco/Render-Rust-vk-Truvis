@@ -111,6 +111,7 @@ fn gen_rust_binding() {
         .header("cxx/truvixx-interface/include/TruvixxInterface/lib.hpp")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
+        .raw_line("#![allow(clippy::all)]")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()
         .expect("Unable to generate bindings");

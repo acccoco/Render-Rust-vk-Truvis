@@ -1,5 +1,5 @@
 use imgui::Ui;
-use shader_binding::shader;
+
 use truvis_render::{
     app::TruvisApp,
     outer_app::OuterApp,
@@ -7,6 +7,7 @@ use truvis_render::{
     render_pipeline::{pipeline_context::PipelineContext, rt_pipeline::RtPipeline},
     renderer::renderer::Renderer,
 };
+use truvis_shader_binding::shader;
 
 struct RtApp {
     rt_pipeline: RtPipeline,

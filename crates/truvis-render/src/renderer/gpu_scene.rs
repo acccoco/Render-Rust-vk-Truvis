@@ -344,10 +344,6 @@ impl GpuScene {
         let crt_geometry_indirect_stage_buffer = &mut crt_gpu_buffers.geometry_indirect_stage_buffer;
         let crt_material_indirect_stage_buffer = &mut crt_gpu_buffers.material_indirect_stage_buffer;
 
-        crt_instance_stage_buffer.map();
-        crt_geometry_indirect_stage_buffer.map();
-        crt_material_indirect_stage_buffer.map();
-
         let instance_buffer_slices = crt_instance_stage_buffer.mapped_slice();
         let material_indirect_buffer_slices = crt_material_indirect_stage_buffer.mapped_slice();
         let geometry_indirect_buffer_slices = crt_geometry_indirect_stage_buffer.mapped_slice();
@@ -426,7 +422,6 @@ impl GpuScene {
     ) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let crt_material_stage_buffer = &mut crt_gpu_buffers.material_stage_buffer;
-        crt_material_stage_buffer.map();
         let material_buffer_slices = crt_material_stage_buffer.mapped_slice();
         if material_buffer_slices.len() < self.flatten_materials.len() {
             panic!("material cnt can not be larger than buffer");
@@ -461,7 +456,6 @@ impl GpuScene {
     fn upload_light_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let crt_light_stage_buffer = &mut crt_gpu_buffers.light_stage_buffer;
-        crt_light_stage_buffer.map();
         let light_buffer_slices = crt_light_stage_buffer.mapped_slice();
         if light_buffer_slices.len() < scene_mgr.point_light_map().len() {
             panic!("light cnt can not be larger than buffer");
@@ -484,7 +478,6 @@ impl GpuScene {
     fn upload_mesh_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager) {
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*self.frame_ctrl.frame_label()];
         let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
-        crt_geometry_stage_buffer.map();
         // let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         let geometry_buffer_slices = crt_geometry_stage_buffer.mapped_slice();
 
@@ -589,7 +582,6 @@ mod helper {
         let buffer_size = stage_buffer.size();
         {
             stage_buffer.flush(0, buffer_size);
-            stage_buffer.unmap();
         }
         cmd.cmd_copy_buffer(
             stage_buffer,

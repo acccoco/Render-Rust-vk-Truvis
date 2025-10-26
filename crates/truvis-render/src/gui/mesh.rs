@@ -76,7 +76,7 @@ impl GuiMesh {
         cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
         {
             cmd.cmd_copy_buffer(
-                &stage_buffer,
+                stage_buffer,
                 &mut vertex_buffer,
                 &[vk::BufferCopy {
                     size: vertices_size as vk::DeviceSize,
@@ -96,7 +96,7 @@ impl GuiMesh {
         frame_name: &str,
         cmd: &CommandBuffer,
         draw_data: &imgui::DrawData,
-    ) -> (IndexBuffer<imgui::DrawIdx>) {
+    ) -> IndexBuffer<imgui::DrawIdx> {
         let index_count = draw_data.total_idx_count as usize;
         let mut indices = Vec::with_capacity(index_count);
         for draw_list in draw_data.draw_lists() {

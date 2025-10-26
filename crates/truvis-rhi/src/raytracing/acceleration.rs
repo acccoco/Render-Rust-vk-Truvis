@@ -6,10 +6,7 @@ use itertools::Itertools;
 use crate::resources::special_buffers::acceleration_buffer::{
     AccelerationInstanceBuffer, AccelerationScratchBuffer, AccelerationStructureBuffer,
 };
-use crate::{
-    foundation::debug_messenger::DebugType, query::query_pool::QueryPool, render_context::RenderContext,
-    resources::buffer::Buffer,
-};
+use crate::{foundation::debug_messenger::DebugType, query::query_pool::QueryPool, render_context::RenderContext};
 
 pub struct Acceleration {
     /// 加速结构的核心对象

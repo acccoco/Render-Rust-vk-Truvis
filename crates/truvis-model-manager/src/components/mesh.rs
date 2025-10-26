@@ -1,8 +1,9 @@
-use crate::components::geometry::{Geometry, GeometryAoS3D, GeometrySoA3D};
-use crate::vertex::aos_3d::VertexLayoutAoS3D;
 use ash::vk;
 use itertools::Itertools;
+
 use truvis_rhi::raytracing::acceleration::Acceleration;
+
+use crate::components::geometry::GeometrySoA3D;
 
 /// CPU 侧的 Mesh 数据
 pub struct Mesh {

@@ -1,8 +1,8 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{pipeline_settings::FrameLabel, render_resource::ImageLoader, renderer::frame_controller::FrameController};
 use ash::vk;
 use itertools::Itertools;
+
 use truvis_rhi::descriptors::descriptor_pool::DescriptorPoolCreateInfo;
 use truvis_rhi::{
     descriptors::{
@@ -18,6 +18,8 @@ use truvis_rhi::{
 };
 use truvis_shader_binding::shader;
 use truvis_shader_layout_macro::ShaderLayout;
+
+use crate::{pipeline_settings::FrameLabel, render_resource::ImageLoader, renderer::frame_controller::FrameController};
 
 #[derive(ShaderLayout)]
 pub struct BindlessDescriptorBinding {
@@ -38,7 +40,7 @@ pub struct BindlessDescriptorBinding {
 
 // TODO: 将 RefCell 移动到 BindlessManager 内部，粒度更细
 pub struct BindlessManager {
-    descriptor_pool: DescriptorPool,
+    _descriptor_pool: DescriptorPool,
 
     pub bindless_descriptor_layout: DescriptorSetLayout<BindlessDescriptorBinding>,
 
@@ -79,7 +81,7 @@ impl BindlessManager {
             .collect_vec();
 
         Self {
-            descriptor_pool,
+            _descriptor_pool: descriptor_pool,
 
             bindless_descriptor_layout: bindless_layout,
             bindless_descriptor_sets,

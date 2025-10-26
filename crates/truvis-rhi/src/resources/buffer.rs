@@ -1,11 +1,9 @@
-use std::{ffi::c_void, ptr, rc::Rc};
-
 use ash::vk;
+use std::ptr;
+
 use vk_mem::Alloc;
 
-use crate::{
-    foundation::debug_messenger::DebugType, render_context::RenderContext, resources::buffer_creator::BufferCreateInfo,
-};
+use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
 
 pub struct Buffer {
     pub handle: vk::Buffer,
@@ -34,12 +32,16 @@ impl Drop for Buffer {
     fn drop(&mut self) {
         let allocator = RenderContext::get().allocator();
         unsafe {
+            if self.map_ptr.is_some() {
+                allocator.unmap_memory(&mut self.allocation);
+            }
+
             allocator.destroy_buffer(self.handle, &mut self.allocation);
         }
     }
 }
 
-// constructor & getter & builder
+// init & destroy
 impl Buffer {
     /// - align: 当 buffer 处于一个大的 memory block 中时，align 用来指定 buffer 的起始 offset,
     /// 其实地址的内存对齐，默认对齐到 8 字节
@@ -63,9 +65,17 @@ impl Buffer {
         };
 
         let align = align.unwrap_or(8);
-        let (buffer, alloc) = unsafe {
+        let (buffer, mut alloc) = unsafe {
             RenderContext::get().allocator.create_buffer_with_alignment(&buffer_ci, &alloc_ci, align).unwrap()
         };
+
+        let mut mapped_ptr = None;
+        if mem_map {
+            unsafe {
+                let allocator = RenderContext::get().allocator();
+                mapped_ptr = Some(allocator.map_memory(&mut alloc).unwrap());
+            }
+        }
 
         let mut device_addr = None;
         if buffer_usage.contains(vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS) {
@@ -82,7 +92,7 @@ impl Buffer {
             handle: buffer,
             allocation: alloc,
             size: buffer_size,
-            map_ptr: None,
+            map_ptr: mapped_ptr,
             device_addr,
             debug_name: name.as_ref().to_string(),
         }
@@ -121,38 +131,13 @@ impl Buffer {
 impl Buffer {
     #[inline]
     pub fn mapped_ptr(&self) -> *mut u8 {
-        self.map_ptr.unwrap_or_else(|| {
-            panic!("Buffer is not mapped, please call map() before using mapped_ptr()");
-        })
+        self.map_ptr.expect("Buffer is not mapped, please call map() before using mapped_ptr()")
     }
 
     #[inline]
-    pub fn map(&mut self) {
-        if self.map_ptr.is_some() {
-            return;
-        }
-        unsafe {
-            let allocator = RenderContext::get().allocator();
-            self.map_ptr = Some(allocator.map_memory(&mut self.allocation).unwrap());
-        }
-    }
-
-    #[inline]
-    pub fn flush(&mut self, offset: vk::DeviceSize, size: vk::DeviceSize) {
+    pub fn flush(&self, offset: vk::DeviceSize, size: vk::DeviceSize) {
         let allocator = RenderContext::get().allocator();
         allocator.flush_allocation(&self.allocation, offset, size).unwrap();
-    }
-
-    #[inline]
-    pub fn unmap(&mut self) {
-        if self.map_ptr.is_none() {
-            return;
-        }
-        unsafe {
-            let allocator = RenderContext::get().allocator();
-            allocator.unmap_memory(&mut self.allocation);
-            self.map_ptr = None;
-        }
     }
 
     /// 通过 mem map 的方式将 data 传入到 buffer 中
@@ -160,14 +145,12 @@ impl Buffer {
     where
         T: Sized + Copy,
     {
-        self.map();
         unsafe {
             ptr::copy_nonoverlapping(data.as_ptr() as *const u8, self.mapped_ptr(), size_of_val(data));
 
             let allocator = RenderContext::get().allocator();
             allocator.flush_allocation(&self.allocation, 0, size_of_val(data) as vk::DeviceSize).unwrap();
         }
-        self.unmap();
     }
 
     /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到

@@ -1,14 +1,10 @@
+use std::cell::{Ref, RefCell, RefMut};
+use std::rc::Rc;
+
 use crate::renderer::bindless::BindlessManager;
 use crate::renderer::cmd_allocator::CmdAllocator;
 use crate::renderer::frame_controller::FrameController;
 use crate::renderer::stage_buffer_manager::StageBufferManager;
-use ash::vk;
-use std::cell::{Ref, RefCell, RefMut};
-use std::rc::Rc;
-use truvis_rhi::commands::command_buffer::CommandBuffer;
-use truvis_rhi::commands::command_pool::CommandPool;
-use truvis_rhi::commands::submit_info::SubmitInfo;
-use truvis_rhi::render_context::RenderContext;
 
 pub struct FrameContext {
     pub frame_ctrl: Rc<FrameController>,
@@ -55,7 +51,7 @@ impl FrameContext {
         unsafe {
             // 使用 addr_of_mut! 避免直接对 static mut 创建可变引用
             let ptr = std::ptr::addr_of_mut!(FRAME_CONTEXT);
-            let mut context = (*ptr).take().expect("FrameContext not initialized");
+            let context = (*ptr).take().expect("FrameContext not initialized");
             drop(context.upload_buffer_mgr);
             drop(context.cmd_allocator);
             drop(context.bindless_mgr);

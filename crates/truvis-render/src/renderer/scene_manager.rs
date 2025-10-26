@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use truvis_cxx::AssimpSceneLoader;
 use truvis_model_manager::components::instance::Instance;
@@ -6,9 +6,7 @@ use truvis_model_manager::components::material::Material;
 use truvis_model_manager::components::mesh::Mesh;
 use truvis_model_manager::guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid};
 use truvis_shader_binding::shader;
-use truvis_shader_binding::shader::Scene;
 
-use crate::renderer::bindless::BindlessManager;
 use crate::renderer::frame_context::FrameContext;
 
 /// 在 CPU 侧管理场景数据
@@ -75,7 +73,7 @@ impl SceneManager {
     }
 
     /// 向世界中添加一个外部场景
-    pub fn load_scene(&mut self, model_path: &std::path::Path, transform: &glam::Mat4) -> Vec<InsGuid> {
+    pub fn load_scene(&mut self, model_path: &std::path::Path, _transform: &glam::Mat4) -> Vec<InsGuid> {
         AssimpSceneLoader::load_scene(
             model_path,
             |ins| {

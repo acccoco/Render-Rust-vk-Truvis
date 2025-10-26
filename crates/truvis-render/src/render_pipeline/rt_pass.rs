@@ -1,5 +1,6 @@
 use ash::vk;
 use itertools::Itertools;
+
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
@@ -12,7 +13,7 @@ use truvis_shader_binding::{shader, shader::ImageHandle};
 use crate::renderer::frame_context::FrameContext;
 use crate::{
     pipeline_settings::{FrameSettings, PipelineSettings},
-    renderer::{frame_controller::FrameController, gpu_scene::GpuScene},
+    renderer::gpu_scene::GpuScene,
 };
 
 pub struct RhiRtPipeline {
@@ -130,7 +131,7 @@ impl SBTRegions {
             rt_pipeline_props.shader_group_base_alignment,
         );
 
-        let mut sbt_buffer = SBTBuffer::new(
+        let sbt_buffer = SBTBuffer::new(
             (raygen_shader_group_region_size
                 + miss_shader_group_region_size
                 + hit_shader_group_region_size
@@ -197,7 +198,6 @@ impl SBTRegions {
             };
 
             let sbt_buffer_size = sbt_buffer.size();
-            sbt_buffer.map();
             let sbt_host_address = sbt_buffer.mapped_ptr();
 
             let sbt_host_addr_raygen = sbt_host_address;
@@ -228,7 +228,6 @@ impl SBTRegions {
             }
 
             sbt_buffer.flush(0, sbt_buffer_size);
-            sbt_buffer.unmap()
         }
 
         Self {

@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
-use model_manager::components::instance::Instance;
-use model_manager::components::material::Material;
-use model_manager::components::mesh::Mesh;
 use truvis_cxx::AssimpSceneLoader;
+use truvis_model_manager::components::instance::Instance;
+use truvis_model_manager::components::material::Material;
+use truvis_model_manager::components::mesh::Mesh;
+use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use truvis_rhi::render_context::RenderContext;
 
 fn main() {

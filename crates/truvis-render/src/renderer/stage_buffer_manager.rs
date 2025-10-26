@@ -2,9 +2,7 @@ use std::rc::Rc;
 
 use itertools::Itertools;
 
-use truvis_rhi::render_context::RenderContext;
 use truvis_rhi::resources::buffer::Buffer;
-use truvis_rhi::resources::special_buffers::stage_buffer::StageBuffer;
 
 use crate::renderer::frame_controller::FrameController;
 

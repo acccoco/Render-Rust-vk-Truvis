@@ -8,8 +8,10 @@ description = "简化 shader binding，通过属性宏来生成 descriptor bindi
 proc-macro = true
 
 [dependencies]
+# truvis
 truvis-shader-layout-trait = { workspace = true }
 
+# other
 syn = { workspace = true, features = ["full"] }
 quote = { workspace = true }
 proc-macro2 = { workspace = true }

@@ -1,10 +1,9 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use std::{cell::RefCell, rc::Rc};
+use std::rc::Rc;
 
-use crate::renderer::frame_context::FrameContext;
-use crate::{gui::mesh::GuiMesh, pipeline_settings::FrameLabel, renderer::bindless::BindlessManager};
 use ash::vk;
+
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_rhi::swapchain::render_swapchain::SwapchainImageInfo;
 use truvis_rhi::{
@@ -13,6 +12,9 @@ use truvis_rhi::{
     render_context::RenderContext,
     resources::{image::Image2D, texture::Texture2D},
 };
+
+use crate::renderer::frame_context::FrameContext;
+use crate::{gui::mesh::GuiMesh, pipeline_settings::FrameLabel, renderer::bindless::BindlessManager};
 
 pub struct Gui {
     pub imgui_ctx: imgui::Context,

@@ -99,31 +99,27 @@ impl VertexLayoutSoA3D {
         assert!(vertex_cnt == normals.len() && vertex_cnt == tangents.len() && vertex_cnt == uvs.len());
 
         let mut vertex_buffer = VertexBuffer::new(vertex_cnt, name.as_ref());
-        vertex_buffer.transfer_data_sync2(Self::buffer_size(vertex_cnt) as vk::DeviceSize, |stage_buffer| {
-            stage_buffer.map();
-            unsafe {
-                ptr::copy_nonoverlapping(
-                    positions.as_ptr() as *const u8,
-                    stage_buffer.mapped_ptr().add(Self::pos_offset(vertex_cnt) as usize),
-                    size_of_val(positions),
-                );
-                ptr::copy_nonoverlapping(
-                    normals.as_ptr() as *const u8,
-                    stage_buffer.mapped_ptr().add(Self::normal_offset(vertex_cnt) as usize),
-                    size_of_val(normals),
-                );
-                ptr::copy_nonoverlapping(
-                    tangents.as_ptr() as *const u8,
-                    stage_buffer.mapped_ptr().add(Self::tangent_offset(vertex_cnt) as usize),
-                    size_of_val(tangents),
-                );
-                ptr::copy_nonoverlapping(
-                    uvs.as_ptr() as *const u8,
-                    stage_buffer.mapped_ptr().add(Self::uv_offset(vertex_cnt) as usize),
-                    size_of_val(uvs),
-                );
-            }
-            stage_buffer.unmap();
+        vertex_buffer.transfer_data_sync2(Self::buffer_size(vertex_cnt) as vk::DeviceSize, |stage_buffer| unsafe {
+            ptr::copy_nonoverlapping(
+                positions.as_ptr() as *const u8,
+                stage_buffer.mapped_ptr().add(Self::pos_offset(vertex_cnt) as usize),
+                size_of_val(positions),
+            );
+            ptr::copy_nonoverlapping(
+                normals.as_ptr() as *const u8,
+                stage_buffer.mapped_ptr().add(Self::normal_offset(vertex_cnt) as usize),
+                size_of_val(normals),
+            );
+            ptr::copy_nonoverlapping(
+                tangents.as_ptr() as *const u8,
+                stage_buffer.mapped_ptr().add(Self::tangent_offset(vertex_cnt) as usize),
+                size_of_val(tangents),
+            );
+            ptr::copy_nonoverlapping(
+                uvs.as_ptr() as *const u8,
+                stage_buffer.mapped_ptr().add(Self::uv_offset(vertex_cnt) as usize),
+                size_of_val(uvs),
+            );
         });
 
         vertex_buffer

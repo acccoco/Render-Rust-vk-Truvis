@@ -1,16 +1,13 @@
 use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
-    rc::Rc,
 };
 
 use ash::{vk, vk::Handle};
 
 use crate::{
-    foundation::debug_messenger::DebugType,
-    impl_derive_buffer,
-    render_context::RenderContext,
-    resources::{buffer::Buffer, buffer_creator::BufferCreateInfo},
+    foundation::debug_messenger::DebugType, impl_derive_buffer, render_context::RenderContext,
+    resources::buffer::Buffer,
 };
 
 pub struct StageBuffer<T: bytemuck::Pod> {
@@ -34,7 +31,6 @@ impl<T: bytemuck::Pod> StageBuffer<T> {
 
     // BUG 可能需要考虑内存对齐
     pub fn transfer(&mut self, trans_func: &dyn Fn(&mut T)) {
-        self.inner.map();
         unsafe {
             let ptr = self.inner.map_ptr.unwrap() as *mut T;
 
@@ -42,7 +38,6 @@ impl<T: bytemuck::Pod> StageBuffer<T> {
         }
         let allocator = RenderContext::get().allocator();
         allocator.flush_allocation(&self.inner.allocation, 0, size_of::<T>() as vk::DeviceSize).unwrap();
-        self.inner.unmap();
     }
 }
 
