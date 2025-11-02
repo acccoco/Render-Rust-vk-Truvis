@@ -10,10 +10,8 @@ truvis-model-manager = { workspace = true }
 truvis-rhi = { workspace = true }
 
 itertools = { workspace = true }
-uuid = { workspace = true }
 glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
 
 
 [build-dependencies]
-cmake = { workspace = true }
 bindgen = { workspace = true }

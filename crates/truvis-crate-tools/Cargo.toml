@@ -10,3 +10,6 @@ log = { workspace = true }
 env_logger = { workspace = true }
 anstyle = { workspace = true }
 chrono = { workspace = true }
+
+rayon = { workspace = true }
+walkdir = { workspace = true }

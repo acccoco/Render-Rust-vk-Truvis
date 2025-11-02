@@ -13,12 +13,12 @@ cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_CONFIGURATION_TYPES="Debug;Relea
 对应的 cmake 命令为：
 
 ```shell
-cmake \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_MAKE_PROGRAM=C:/Users/bigso/AppData/Local/Microsoft/WinGet/Links/ninja.exe \
-  "-DCMAKE_C_COMPILER=C:/Program Files/LLVM/bin/clang-cl.exe" \
-  "-DCMAKE_CXX_COMPILER=C:/Program Files/LLVM/bin/clang-cl.exe" \
-  -G Ninja \
-  -S D:\code\Render-Rust-vk-Truvis\crates\truvis-cxx\cxx \
+cmake `
+  -DCMAKE_BUILD_TYPE=Debug `
+  -DCMAKE_MAKE_PROGRAM=C:/Users/bigso/AppData/Local/Microsoft/WinGet/Links/ninja.exe `
+  "-DCMAKE_C_COMPILER=C:/Program Files/LLVM/bin/clang-cl.exe" `
+  "-DCMAKE_CXX_COMPILER=C:/Program Files/LLVM/bin/clang-cl.exe" `
+  -G Ninja `
+  -S D:\code\Render-Rust-vk-Truvis\crates\truvis-cxx\cxx `
   -B D:\code\Render-Rust-vk-Truvis\crates\truvis-cxx\cxx\build-clang
 ```
