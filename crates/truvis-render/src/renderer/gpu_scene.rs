@@ -374,10 +374,10 @@ impl GpuScene {
             };
 
             // TODO 对于 mesh 来说，可能不需要间接的索引 buffer，因为 mesh 在 geometry
-            // buffer 中是连续的 首先将 instance 需要的 geometry
-            // 的实际索引，写入一个间接索引 buffer: geometry_indirect_buffer，
-            // 然后获得 instance 数据在间接索引 buffer 中的起始 idx 和长度，将这个值写入到
-            // shader::Instance 中
+            //  buffer 中是连续的 首先将 instance 需要的 geometry
+            //  的实际索引，写入一个间接索引 buffer: geometry_indirect_buffer，
+            //  然后获得 instance 数据在间接索引 buffer 中的起始 idx 和长度，将这个值写入到
+            //  shader::Instance 中
             let geometry_idx_start = self.mesh_geometry_map.get(&instance.mesh).unwrap();
             for submesh_idx in 0..instance.materials.len() {
                 let geometry_idx = geometry_idx_start + submesh_idx;

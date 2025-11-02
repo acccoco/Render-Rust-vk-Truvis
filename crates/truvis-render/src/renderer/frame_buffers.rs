@@ -2,7 +2,6 @@ use std::rc::Rc;
 
 use ash::vk;
 use itertools::Itertools;
-use truvis_shader_binding::shader;
 use truvis_rhi::{
     commands::barrier::ImageBarrier,
     render_context::RenderContext,
@@ -12,6 +11,7 @@ use truvis_rhi::{
         texture::Texture2D,
     },
 };
+use truvis_shader_binding::shader;
 
 use crate::renderer::frame_context::FrameContext;
 use crate::{
@@ -57,6 +57,7 @@ impl FrameBuffers {
         framebuffers
     }
 
+    /// Framebuffer 的尺寸发生变化时，需要重新创建 Framebuffer 相关的资源
     pub fn rebuild(&mut self, frame_settings: &FrameSettings) {
         self.unregister_bindless();
         *self = Self::new(frame_settings, self.frame_ctrl.clone());
@@ -64,21 +65,21 @@ impl FrameBuffers {
 
     fn register_bindless(&self) {
         let mut bindless_mgr = FrameContext::bindless_mgr_mut();
-        bindless_mgr.register_image_shared(self.color_image_view.clone());
 
+        bindless_mgr.register_image(&self.color_image_view);
         for (render_target, key) in self.render_targets.iter().zip(self.render_target_bindless_keys.iter()) {
             bindless_mgr.register_texture_shared(key.clone(), render_target.clone());
-            bindless_mgr.register_image_raw(render_target.image_view());
+            bindless_mgr.register_image(render_target.image_view());
         }
     }
 
     fn unregister_bindless(&self) {
         let mut bindless_mgr = FrameContext::bindless_mgr_mut();
-        bindless_mgr.unregister_image(&self.color_image_view.uuid());
 
+        bindless_mgr.unregister_image2(&self.color_image_view);
         for (render_target, key) in self.render_targets.iter().zip(self.render_target_bindless_keys.iter()) {
             bindless_mgr.unregister_texture(key);
-            bindless_mgr.unregister_image(&render_target.image_view().uuid())
+            bindless_mgr.unregister_image2(&render_target.image_view());
         }
     }
 
@@ -200,7 +201,7 @@ impl FrameBuffers {
     }
 
     pub fn color_image_bindless_handle(&self, bindless_mgr: &BindlessManager) -> shader::ImageHandle {
-        bindless_mgr.get_image_handle(&self.color_image_view.uuid()).unwrap()
+        bindless_mgr.get_image_handle(&self.color_image_view).unwrap()
     }
 
     #[inline]
@@ -218,7 +219,7 @@ impl FrameBuffers {
         bindless_mgr: &BindlessManager,
         frame_label: FrameLabel,
     ) -> shader::ImageHandle {
-        bindless_mgr.get_image_handle(&self.render_targets[frame_label as usize].image_view().uuid()).unwrap()
+        bindless_mgr.get_image_handle(&self.render_targets[frame_label as usize].image_view()).unwrap()
     }
 
     pub fn render_target_texture_bindless_handle(

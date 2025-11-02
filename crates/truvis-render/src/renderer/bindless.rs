@@ -1,7 +1,7 @@
-use std::{collections::HashMap, rc::Rc};
-
 use ash::vk;
 use itertools::Itertools;
+use std::collections::HashSet;
+use std::{collections::HashMap, rc::Rc};
 
 use truvis_rhi::descriptors::descriptor_pool::DescriptorPoolCreateInfo;
 use truvis_rhi::{
@@ -47,6 +47,7 @@ pub struct BindlessManager {
     /// 每一个 frame in flights 都有一个 descriptor set
     pub bindless_descriptor_sets: Vec<DescriptorSet<BindlessDescriptorBinding>>,
 
+    // TODO 这里不要使用 String 作为 key，这里不应该关心 Name
     /// 每一帧都需要重新构建的映射
     ///
     /// key: texture path
@@ -56,12 +57,12 @@ pub struct BindlessManager {
     textures: HashMap<String, Texture2DContainer>,
 
     /// 每一帧都需要重新构建的数据
-    bindless_images: HashMap<Image2DViewUUID, u32>,
-    images: HashMap<Image2DViewUUID, Image2DViewContainer>,
+    images: HashMap<vk::ImageView, shader::ImageHandle>,
 
     /// 当前 frame in flight 的标签，每帧更新
     frame_label: FrameLabel,
 }
+
 // init & destroy
 impl BindlessManager {
     pub fn new(frame_ctrl: Rc<FrameController>) -> Self {
@@ -89,66 +90,10 @@ impl BindlessManager {
             bindless_textures: HashMap::new(),
             textures: HashMap::new(),
 
-            bindless_images: HashMap::new(),
             images: HashMap::new(),
 
             frame_label: FrameLabel::A,
         }
-    }
-
-    /// getter
-    #[inline]
-    pub fn current_descriptor_set(&self) -> &DescriptorSet<BindlessDescriptorBinding> {
-        &self.bindless_descriptor_sets[*self.frame_label]
-    }
-
-    /// # Phase: Before Render
-    ///
-    /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
-    pub fn prepare_render_data(&mut self, frame_label: FrameLabel) {
-        self.frame_label = frame_label;
-
-        let mut texture_infos = Vec::with_capacity(self.textures.iter().len());
-        self.bindless_textures.clear();
-        for (tex_idx, (tex_name, tex)) in self.textures.iter().enumerate() {
-            texture_infos.push(tex.texture().descriptor_image_info(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL));
-            self.bindless_textures.insert(tex_name.clone(), tex_idx as u32);
-        }
-
-        let mut image_infos = Vec::with_capacity(self.images.iter().len());
-        self.bindless_images.clear();
-        for (image_idx, (image_key, image_view)) in self.images.iter().enumerate() {
-            image_infos.push(
-                vk::DescriptorImageInfo::default()
-                    .image_view(image_view.vk_image_view())
-                    .image_layout(vk::ImageLayout::GENERAL),
-            );
-            self.bindless_images.insert(*image_key, image_idx as u32);
-        }
-
-        let writes = [
-            BindlessDescriptorBinding::textures().write_image(
-                self.bindless_descriptor_sets[*frame_label].handle(),
-                0,
-                texture_infos,
-            ),
-            BindlessDescriptorBinding::images().write_image(
-                self.bindless_descriptor_sets[*frame_label].handle(),
-                0,
-                image_infos,
-            ),
-        ];
-        RenderContext::get().device_functions().write_descriptor_sets(&writes);
-    }
-
-    /// 获得纹理在当前帧的 bindless 索引
-    pub fn get_texture_handle(&self, texture_path: &str) -> Option<shader::TextureHandle> {
-        self.bindless_textures.get(texture_path).copied().map(|idx| shader::TextureHandle { index: idx as _ })
-    }
-
-    /// 获得图像在当前帧的 bindless 索引
-    pub fn get_image_handle(&self, image_uuid: &Image2DViewUUID) -> Option<shader::ImageHandle> {
-        self.bindless_images.get(image_uuid).copied().map(|idx| shader::ImageHandle { index: idx as _ })
     }
 
     const DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
@@ -196,17 +141,77 @@ impl BindlessManager {
         DescriptorPool::new(pool_ci, "renderer")
     }
 }
+
+// getters
+impl BindlessManager {
+    #[inline]
+    pub fn current_descriptor_set(&self) -> &DescriptorSet<BindlessDescriptorBinding> {
+        &self.bindless_descriptor_sets[*self.frame_label]
+    }
+}
+
+// tools
+impl BindlessManager {
+    /// # Phase: Before Render
+    ///
+    /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
+    pub fn prepare_render_data(&mut self, frame_label: FrameLabel) {
+        self.frame_label = frame_label;
+
+        let mut texture_infos = Vec::with_capacity(self.textures.len());
+        self.bindless_textures.clear();
+        for (tex_idx, (tex_name, tex)) in self.textures.iter().enumerate() {
+            texture_infos.push(tex.texture().descriptor_image_info(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL));
+            self.bindless_textures.insert(tex_name.clone(), tex_idx as u32);
+        }
+
+        // 生成 descriptor 信息，更新 ImageHandle
+        let mut image_infos = Vec::with_capacity(self.images.len());
+        for (image_idx, (image_view, handle)) in self.images.iter_mut().enumerate() {
+            image_infos.push(
+                vk::DescriptorImageInfo::default() //
+                    .image_view(*image_view)
+                    .image_layout(vk::ImageLayout::GENERAL),
+            );
+            handle.index = image_idx as i32;
+        }
+
+        // 将 images 和 textures 信息写入 descriptor set
+        let writes = [
+            BindlessDescriptorBinding::textures().write_image(
+                self.bindless_descriptor_sets[*frame_label].handle(),
+                0,
+                texture_infos,
+            ),
+            BindlessDescriptorBinding::images().write_image(
+                self.bindless_descriptor_sets[*frame_label].handle(),
+                0,
+                image_infos,
+            ),
+        ];
+        RenderContext::get().device_functions().write_descriptor_sets(&writes);
+    }
+
+    /// 获得纹理在当前帧的 bindless 索引
+    pub fn get_texture_handle(&self, texture_path: &str) -> Option<shader::TextureHandle> {
+        self.bindless_textures.get(texture_path).copied().map(|idx| shader::TextureHandle { index: idx as _ })
+    }
+
+    /// 获得图像在当前帧的 bindless 索引
+    pub fn get_image_handle(&self, image_view: &Image2DView) -> Option<shader::ImageHandle> {
+        self.images.get(&image_view.handle()).copied()
+    }
+}
+
 // register & unregister
 impl BindlessManager {
     pub fn register_texture_by_path(&mut self, texture_path: String) {
         let texture = ImageLoader::load_image(std::path::Path::new(&texture_path));
         self.register_texture(texture_path, Texture2DContainer::Owned(Box::new(texture)));
     }
-
     pub fn register_texture_owned(&mut self, key: String, texture: Texture2D) {
         self.register_texture(key, Texture2DContainer::Owned(Box::new(texture)));
     }
-
     pub fn register_texture_shared(&mut self, key: String, texture: Rc<Texture2D>) {
         self.register_texture(key, Texture2DContainer::Shared(texture));
     }
@@ -224,27 +229,20 @@ impl BindlessManager {
         self.textures.remove(key);
     }
 
-    pub fn register_image_shared(&mut self, image: Rc<Image2DView>) {
-        self.register_image(image.uuid(), Image2DViewContainer::Shared(image));
-    }
-
-    pub fn register_image_raw(&mut self, image: &Image2DView) {
-        self.register_image(image.uuid(), Image2DViewContainer::Raw(image.handle()));
-    }
-
-    #[inline]
-    fn register_image(&mut self, key: Image2DViewUUID, image: Image2DViewContainer) {
+    pub fn register_image(&mut self, image: &Image2DView) {
+        let key = image.handle();
         if self.images.contains_key(&key) {
-            log::error!("Image with UUID {} is already registered", key);
+            log::error!("Image {} has already been registered", image);
             return;
         }
-        self.images.insert(key, image);
+        self.images.insert(key, shader::ImageHandle { index: -1 });
     }
 
-    pub fn unregister_image(&mut self, key: &Image2DViewUUID) {
-        self.images.remove(key);
+    pub fn unregister_image2(&mut self, image: &Image2DView) {
+        self.images.remove(&image.handle()).unwrap();
     }
 }
+
 impl Drop for BindlessManager {
     fn drop(&mut self) {
         log::info!("Dropping BindlessManager");

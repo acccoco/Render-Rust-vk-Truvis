@@ -91,6 +91,12 @@ impl Image2DView {
     }
 }
 
+impl std::fmt::Display for Image2DView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Image2DView({}, {:?})", self._name, self.handle)
+    }
+}
+
 pub enum Image2DViewContainer {
     Own(Box<Image2DView>),
     Shared(Rc<Image2DView>),
