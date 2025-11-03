@@ -6,9 +6,12 @@ fn cmake_config(cmake_project: &std::path::Path) {
     let build_path = cmake_project.join("build");
     let vcpkg_root = std::env::var("VCPKG_ROOT").unwrap();
 
+    let mut tool_chain_file = std::path::PathBuf::from(vcpkg_root);
+    tool_chain_file.extend(["scripts", "buildsystems", "vcpkg.cmake"]);
+
     let args = [
         "-DCMAKE_CONFIGURATION_TYPES=Debug;Release",
-        &format!("-DCMAKE_TOOLCHAIN_FILE={}", vcpkg_root),
+        &format!("-DCMAKE_TOOLCHAIN_FILE={}", tool_chain_file.display()),
         "-Thost=x64",
         "-Ax64",
         "-G",
