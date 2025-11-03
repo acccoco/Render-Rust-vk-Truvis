@@ -1,9 +1,12 @@
 //! 将指定目录下的所有 shader 文件编译为 spv 文件，输出到同一目录下
 
-mod shader_build_config;
+mod glsl;
+mod hlsl;
+mod shader_build;
+mod slang;
 
 use rayon::prelude::*;
-use shader_build_config::EnvPath;
+use shader_build::EnvPath;
 use truvis_crate_tools::init_log::init_log;
 
 /// shader 的 stage
@@ -62,10 +65,11 @@ impl ShaderCompileTask {
         let shader_path = entry.path().to_str()?.replace("\\", "/");
         let shader_path = std::path::Path::new(&shader_path);
         // 相对于 shader 的路径
-        let relative_path = shader_path.strip_prefix(EnvPath::SHADER_SRC_DIR).unwrap();
+        let relative_path = shader_path.strip_prefix(EnvPath::shader_src_path()).unwrap();
         let shader_name = entry.file_name().to_str().unwrap();
 
-        let output_path = format!("{}/{}.spv", EnvPath::SHADER_BUILD_DIR, relative_path.to_str().unwrap());
+        let mut output_path = EnvPath::shader_build_path().join(relative_path);
+        output_path.set_extension("spv");
         let shader_stage = Self::get_shader_stage(shader_name)?;
         let shader_type = Self::select_shader_compiler(shader_name);
 
@@ -73,7 +77,7 @@ impl ShaderCompileTask {
             shader_path: shader_path.to_path_buf(),
             shader_type,
             shader_stage,
-            output_path: std::path::PathBuf::from(output_path),
+            output_path,
         })
     }
 
@@ -134,7 +138,7 @@ impl ShaderCompileTask {
     fn build_glsl(&self) {
         let output = std::process::Command::new("glslc")
             .args([
-                format!("-I{}", EnvPath::SHADER_INCLUDE_DIR).as_str(),
+                &format!("-I{:?}", EnvPath::shader_include_path()),
                 "-g",
                 "--target-env=vulkan1.2",
                 "--target-spv=spv1.4", // ray tracing 最低版本为 spv1.4
@@ -195,10 +199,10 @@ impl ShaderCompileTask {
 
     /// 使用 slangc 编译 slang 文件
     fn build_slang(&self) {
-        let output = std::process::Command::new(EnvPath::SLANGC_PATH)
+        let output = std::process::Command::new(EnvPath::slangc_path())
             .args([
                 "-I",
-                EnvPath::SHADER_INCLUDE_DIR,
+                EnvPath::shader_include_path().to_str().unwrap(),
                 "-g2",                         // 生成 debug info 默认是 g2
                 "-matrix-layout-column-major", // 列主序
                 "-fvk-use-entrypoint-name",    // 具有多个 entry 时，需要这个选项
@@ -218,10 +222,14 @@ impl ShaderCompileTask {
 fn main() {
     init_log();
 
+    log::info!("shader include path: {:?}", EnvPath::shader_include_path());
+    log::info!("shader src: {:?}", EnvPath::shader_src_path());
+    log::info!("shader build output: {:?}", EnvPath::shader_build_path());
+
     // 编译 shader 目录下的所有 shader 文件
     // 假定嵌套深度为 1
     // 以下 entry 都是相对于 workspace 的
-    walkdir::WalkDir::new(EnvPath::SHADER_SRC_DIR)
+    walkdir::WalkDir::new(EnvPath::shader_src_path())
         .into_iter()
         .map(|entry| entry.unwrap())
         .filter(|entry| entry.path().is_file())

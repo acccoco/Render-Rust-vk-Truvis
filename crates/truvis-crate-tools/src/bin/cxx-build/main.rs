@@ -1,12 +1,5 @@
 use truvis_crate_tools::init_log::init_log;
-
-/// 去掉 windows 路径前缀 `\\?\`
-///
-/// 经过 canionicalize 的路径会带上这个前缀
-fn path_without_win_prefix(p: &std::path::Path) -> &str {
-    // p.to_str().unwrap().strip_prefix(r"\\?\").unwrap()
-    p.to_str().unwrap()
-}
+use truvis_crate_tools::resource::TruvisPath;
 
 /// cmake generate
 fn cmake_config(cmake_project: &std::path::Path) {
@@ -21,9 +14,9 @@ fn cmake_config(cmake_project: &std::path::Path) {
         "-G",
         "Visual Studio 17 2022",
         "-S",
-        path_without_win_prefix(cmake_project),
+        cmake_project.to_str().unwrap(),
         "-B",
-        path_without_win_prefix(&build_path),
+        build_path.to_str().unwrap(),
     ];
 
     log::info!("cmake config: {:#?}", args);
@@ -55,7 +48,7 @@ fn cmake_build(cmake_project: &std::path::Path, build_type: BuildType) {
 
     let args = [
         "--build",
-        path_without_win_prefix(&build_path),
+        build_path.to_str().unwrap(),
         "--config",
         build_type.cmake_output_dir(),
         "--parallel",
@@ -96,13 +89,11 @@ fn copy_to_rust(cmake_project: &std::path::Path, cargo_target_dir: &std::path::P
 fn main() {
     init_log();
 
-    // {workspace}/crates/{current_crate}
-    let crate_dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let workspace_dir = crate_dir.parent().unwrap().parent().unwrap();
-    log::info!("workspace_dir: {}", path_without_win_prefix(&crate_dir));
-    log::info!("crate_dir: {}", path_without_win_prefix(workspace_dir));
+    let workspace_dir = TruvisPath::workspace_path();
+    log::info!("workspace_dir: {:?}", workspace_dir);
 
-    let cmake_project = workspace_dir.join("crates").join("truvis-cxx").join("cxx");
+    let mut cmake_project = workspace_dir.clone();
+    cmake_project.extend(["crates", "truvis-cxx", "cxx"]);
 
     cmake_config(&cmake_project);
 

@@ -23,7 +23,7 @@ impl TruvisPath {
         shader_path.to_str().unwrap().to_string()
     }
 
-    fn workspace_path() -> PathBuf {
+    pub fn workspace_path() -> PathBuf {
         // 从当前包的位置推导workspace目录
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent() // 从 crates/truvis-crate-tools 到 crates
