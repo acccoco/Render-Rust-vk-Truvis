@@ -1,31 +1,6 @@
 use truvis_crate_tools::init_log::init_log;
 use truvis_crate_tools::resource::TruvisPath;
 
-/// cmake generate
-fn cmake_config(cmake_project: &std::path::Path) {
-    let build_path = cmake_project.join("build");
-    let vcpkg_root = std::env::var("VCPKG_ROOT").unwrap();
-
-    let mut tool_chain_file = std::path::PathBuf::from(vcpkg_root);
-    tool_chain_file.extend(["scripts", "buildsystems", "vcpkg.cmake"]);
-
-    let args = [
-        "-DCMAKE_CONFIGURATION_TYPES=Debug;Release",
-        &format!("-DCMAKE_TOOLCHAIN_FILE={}", tool_chain_file.display()),
-        "-Thost=x64",
-        "-Ax64",
-        "-G",
-        "Visual Studio 17 2022",
-        "-S",
-        cmake_project.to_str().unwrap(),
-        "-B",
-        build_path.to_str().unwrap(),
-    ];
-
-    log::info!("cmake config: {:#?}", args);
-    std::process::Command::new("cmake").args(args).status().expect("Failed to run cmake");
-}
-
 enum BuildType {
     Debug,
     Release,
@@ -43,24 +18,6 @@ impl BuildType {
             BuildType::Release => "release",
         }
     }
-}
-
-/// cmake 编译整个项目
-fn cmake_build(cmake_project: &std::path::Path, build_type: BuildType) {
-    let build_path = cmake_project.join("build");
-
-    let args = [
-        "--build",
-        build_path.to_str().unwrap(),
-        "--config",
-        build_type.cmake_output_dir(),
-        "--parallel",
-        "--target",
-        "ALL_BUILD",
-    ];
-
-    log::info!("cmake build: {:#?}", args);
-    std::process::Command::new("cmake").args(args).status().expect("Failed to run cmake build");
 }
 
 /// 将 cxx 编译的结果 copy 到 rust
@@ -98,10 +55,22 @@ fn main() {
     let mut cmake_project = workspace_dir.clone();
     cmake_project.extend(["crates", "truvis-cxx", "cxx"]);
 
-    cmake_config(&cmake_project);
+    std::process::Command::new("cmake")
+        .current_dir(&cmake_project)
+        .args(["--preset", "vs2022"])
+        .status()
+        .expect("Failed to run cmake");
 
-    cmake_build(&cmake_project, BuildType::Debug);
-    cmake_build(&cmake_project, BuildType::Release);
+    std::process::Command::new("cmake")
+        .current_dir(&cmake_project)
+        .args(["--build", "--preset", "debug"])
+        .status()
+        .expect("Failed to run cmake build");
+    std::process::Command::new("cmake")
+        .current_dir(&cmake_project)
+        .args(["--build", "--preset", "release"])
+        .status()
+        .expect("Failed to run cmake build");
 
     copy_to_rust(&cmake_project, &workspace_dir.join("target"), BuildType::Debug);
     copy_to_rust(&cmake_project, &workspace_dir.join("target"), BuildType::Release);

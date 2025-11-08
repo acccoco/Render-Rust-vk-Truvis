@@ -1,7 +1,11 @@
 # 使用 VisualStudio 作为项目 generator
 
 ```shell
-cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_CONFIGURATION_TYPES="Debug;Release" ..
+cmake --presets vs2022
+# build debug
+cmake --build --preset debug
+# build release
+cmake --build --preset release
 ```
 
 # 使用 clang-cl 作为项目 generator
