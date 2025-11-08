@@ -7,7 +7,7 @@ use itertools::Itertools;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
-use truvis_rhi::{
+use truvis_gfx::{
     commands::{
         barrier::{BarrierMask, BufferBarrier},
         command_buffer::CommandBuffer,
@@ -562,7 +562,7 @@ impl GpuScene {
 
 mod helper {
     use ash::vk;
-    use truvis_rhi::{
+    use truvis_gfx::{
         commands::{
             barrier::{BarrierMask, BufferBarrier},
             command_buffer::CommandBuffer,

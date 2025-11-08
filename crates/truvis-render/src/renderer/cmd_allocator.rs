@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 use itertools::Itertools;
-use truvis_rhi::{
+use truvis_gfx::{
     commands::{command_buffer::CommandBuffer, command_pool::CommandPool},
     render_context::RenderContext,
 };
@@ -26,7 +26,7 @@ impl CmdAllocator {
         let graphics_command_pools = (0..frame_ctrl.fif_count())
             .map(|i| {
                 CommandPool::new(
-                    RenderContext::get().graphics_queue_family(),
+                    RenderContext::get().gfx_queue_family(),
                     vk::CommandPoolCreateFlags::TRANSIENT,
                     &format!("render_context_graphics_command_pool_{}", i),
                 )

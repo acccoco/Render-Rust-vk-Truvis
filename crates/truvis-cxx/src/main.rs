@@ -5,7 +5,7 @@ use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;
 use truvis_model_manager::components::mesh::Mesh;
 use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
-use truvis_rhi::render_context::RenderContext;
+use truvis_gfx::render_context::RenderContext;
 
 fn main() {
     RenderContext::init("test".to_string(), vec![]);

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-truvis-rhi = { workspace = true }
+truvis-gfx = { workspace = true }
 truvis-shader-layout-trait = { workspace = true }
 truvis-shader-layout-macro = { workspace = true }
 truvis-model-manager = { workspace = true }

@@ -1,7 +1,7 @@
 use ash::vk;
 
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::{
+use truvis_gfx::{
     commands::{barrier::ImageBarrier, submit_info::SubmitInfo},
     render_context::RenderContext,
 };
@@ -164,7 +164,7 @@ impl RtPipeline {
             submit_cmds.push(cmd);
         }
 
-        RenderContext::get().graphics_queue().submit(vec![SubmitInfo::new(&submit_cmds)], None);
+        RenderContext::get().gfx_queue().submit(vec![SubmitInfo::new(&submit_cmds)], None);
     }
 }
 impl Drop for RtPipeline {

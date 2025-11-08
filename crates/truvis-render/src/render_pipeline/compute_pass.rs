@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 
 use ash::vk;
-use truvis_rhi::{
+use truvis_gfx::{
     commands::command_buffer::CommandBuffer, pipelines::shader::ShaderModule, render_context::RenderContext,
 };
 

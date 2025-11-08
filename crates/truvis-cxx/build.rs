@@ -8,6 +8,7 @@ fn gen_rust_binding() {
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .raw_line("#![allow(clippy::all)]")
+        .raw_line("#![allow(warnings)]")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()
         .expect("Unable to generate bindings");

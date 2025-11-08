@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 use itertools::Itertools;
-use truvis_rhi::{
+use truvis_gfx::{
     commands::barrier::ImageBarrier,
     render_context::RenderContext,
     resources::{

@@ -10,7 +10,7 @@ use crate::{
 use ash::vk;
 use raw_window_handle::HasDisplayHandle;
 use truvis_crate_tools::init_log::init_log;
-use truvis_rhi::render_context::RenderContext;
+use truvis_gfx::render_context::RenderContext;
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
@@ -116,7 +116,7 @@ impl<T: OuterApp> TruvisApp<T> {
 
         // Update Gui ==================================
         {
-            tracy_client::span!("Update Gui");
+            let _span = tracy_client::span!("Update Gui");
             self.window_system.get_mut().unwrap().update_gui(elapsed, |ui| {
                 // camera info
                 {
@@ -148,7 +148,7 @@ impl<T: OuterApp> TruvisApp<T> {
 
         // Rendere Update ==================================
         {
-            tracy_client::span!("Renderer Update");
+            let _span = tracy_client::span!("Renderer Update");
             let extent = self.window_system.get().unwrap().get_render_extent();
 
             // Renderer: Resize Framebuffer

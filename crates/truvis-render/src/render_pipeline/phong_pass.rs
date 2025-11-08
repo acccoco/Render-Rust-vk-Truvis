@@ -8,8 +8,8 @@ use crate::{
 use ash::vk;
 use std::{cell::RefCell, mem::offset_of, rc::Rc};
 use truvis_model_manager::vertex::aos_3d::VertexLayoutAoS3D;
-use truvis_rhi::resources::special_buffers::vertex_buffer::VertexLayout;
-use truvis_rhi::{
+use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
+use truvis_gfx::{
     basic::color::LabelColor,
     commands::command_buffer::CommandBuffer,
     pipelines::{

@@ -266,13 +266,13 @@ impl RenderContext {
 
 ```bash
 # 移除结构体中的 device_functions 字段
-find crates/truvis-rhi/src -name "*.rs" -exec sed -i 's/device_functions: Rc<DeviceFunctions>,//g' {} \;
+find crates/truvis-gfx/src -name "*.rs" -exec sed -i 's/device_functions: Rc<DeviceFunctions>,//g' {} \;
 
 # 替换构造函数参数
-find crates/truvis-rhi/src -name "*.rs" -exec sed -i 's/device_functions: Rc<DeviceFunctions>, //g' {} \;
+find crates/truvis-gfx/src -name "*.rs" -exec sed -i 's/device_functions: Rc<DeviceFunctions>, //g' {} \;
 
 # 替换方法调用
-find crates/truvis-rhi/src -name "*.rs" -exec sed -i 's/self\.device_functions\./RenderContext::get().device_functions()./g' {} \;
+find crates/truvis-gfx/src -name "*.rs" -exec sed -i 's/self\.device_functions\./RenderContext::get().device_functions()./g' {} \;
 ```
 
 ## 验证清单

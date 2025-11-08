@@ -1,4 +1,4 @@
-use truvis_rhi::resources::special_buffers::structured_buffer::StructuredBuffer;
+use truvis_gfx::resources::special_buffers::structured_buffer::StructuredBuffer;
 use truvis_shader_binding::shader;
 
 use crate::renderer::frame_buffers::FrameBuffers;

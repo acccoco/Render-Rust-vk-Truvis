@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use itertools::Itertools;
 
-use truvis_rhi::resources::buffer::Buffer;
+use truvis_gfx::resources::buffer::Buffer;
 
 use crate::renderer::frame_controller::FrameController;
 

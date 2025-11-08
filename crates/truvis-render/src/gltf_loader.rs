@@ -11,7 +11,7 @@ use static_init::raw_static::Static;
 
 use crate::{
     resource::model::StaticMeshData,
-    rhi_type::{image::RhiImage2D, sampler::RhiSampler},
+    gfx_type::{image::GfxImage2D, sampler::GfxSampler},
 };
 
 
@@ -35,7 +35,7 @@ impl GltfLoader
     }
 
     /// 根据 gltf 文件创建 loader，使用 loader 来读取模型数据
-    fn from_file(core: Rc<HissRhiCore>, path: &std::path::Path) -> Self
+    fn from_file(core: Rc<HissGfxCore>, path: &std::path::Path) -> Self
     {
         let (doc, buffers, images) =
             gltf::import(path).unwrap_or_else(|_| panic!("failed to open gltf file: {:?}", path));
@@ -241,7 +241,7 @@ impl GltfLoader
         HissTexture::new(self.core.clone(), Rc::new(image), sampler)
     }
 
-    fn create_image(&self, image: &gltf::image::Data, s_rgb: bool) -> RhiImage2D
+    fn create_image(&self, image: &gltf::image::Data, s_rgb: bool) -> GfxImage2D
     {
         let image_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
@@ -260,10 +260,10 @@ impl GltfLoader
             ..Default::default()
         };
 
-        RhiImage2D::new(&image_info, &alloc_info)
+        GfxImage2D::new(&image_info, &alloc_info)
     }
 
-    fn create_sampler(&self, sampler: &gltf::texture::Sampler) -> RhiSampler
+    fn create_sampler(&self, sampler: &gltf::texture::Sampler) -> GfxSampler
     {
         let (min_filter, mipmap_mode) = Self::gltf_min_filter_to_vk(sampler.min_filter());
         let mag_filter = Self::gltf_mag_filter_to_vk(sampler.mag_filter());
@@ -276,7 +276,7 @@ impl GltfLoader
             .address_mode_v(Self::gltf_wrap_mode_to_vk(sampler.wrap_t()));
 
         unsafe {
-            Rhi::instance()
+            Gfx::instance()
                 .device()
                 .create_sampler(&sampler_info, None)
                 .expect("failed to create sampler for gltf")

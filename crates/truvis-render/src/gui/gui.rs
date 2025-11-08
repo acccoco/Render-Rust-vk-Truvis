@@ -5,8 +5,8 @@ use std::rc::Rc;
 use ash::vk;
 
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::swapchain::render_swapchain::SwapchainImageInfo;
-use truvis_rhi::{
+use truvis_gfx::swapchain::render_swapchain::SwapchainImageInfo;
+use truvis_gfx::{
     basic::color::LabelColor,
     commands::command_buffer::CommandBuffer,
     render_context::RenderContext,
@@ -68,7 +68,7 @@ impl Gui {
     /// 初始化的时候注册字体
     ///
     /// 1. 首先将字体数据放入 imgui 中，并建立起字体 atlas
-    /// 1. 然后将字体 atlas 转换为 RhiImage2D，并注册到 BindlessManager 中
+    /// 1. 然后将字体 atlas 转换为 GfxImage2D，并注册到 BindlessManager 中
     ///
     /// # Return
     /// ```
@@ -294,9 +294,9 @@ impl Gui {
             return None;
         }
 
-        RenderContext::get().graphics_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
+        RenderContext::get().gfx_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
         self.meshes[*frame_label].replace(GuiMesh::new(cmd, &format!("{frame_label}"), draw_data));
-        RenderContext::get().graphics_queue().end_label();
+        RenderContext::get().gfx_queue().end_label();
 
         Some((
             self.meshes[*frame_label].as_ref().unwrap(), //

@@ -50,6 +50,7 @@ fn gen_rust_binding() {
         .derive_default(false)
         // 禁用 clippy 的检查
         .raw_line("#![allow(clippy::all)]")
+        .raw_line("#![allow(warnings)]")
         .enable_cxx_namespaces()
         // 添加自定义回调
         .parse_callbacks(Box::new(ModifyAdder))

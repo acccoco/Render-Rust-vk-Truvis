@@ -4,8 +4,8 @@ use ash::vk;
 use itertools::Itertools;
 
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::resources::special_buffers::vertex_buffer::VertexLayout;
-use truvis_rhi::{
+use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
+use truvis_gfx::{
     commands::command_buffer::CommandBuffer,
     pipelines::{
         graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},

@@ -8,7 +8,7 @@ use ash::vk;
 use itertools::Itertools;
 use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::{
+use truvis_gfx::{
     commands::{barrier::ImageBarrier, semaphore::Semaphore, submit_info::SubmitInfo},
     render_context::RenderContext,
     swapchain::render_swapchain::RenderSwapchain,
@@ -173,7 +173,7 @@ impl MainWindow {
                 None,
             );
 
-        RenderContext::get().graphics_queue().submit(vec![submit_info], None);
+        RenderContext::get().gfx_queue().submit(vec![submit_info], None);
     }
 }
 
@@ -201,7 +201,7 @@ impl MainWindow {
     pub fn present_image(&self) {
         let swapchain = self.swapchain.as_ref().unwrap();
         swapchain.present_image(
-            RenderContext::get().graphics_queue(),
+            RenderContext::get().gfx_queue(),
             std::slice::from_ref(&self.render_complete_semaphores[swapchain.current_image_index()]),
         );
     }

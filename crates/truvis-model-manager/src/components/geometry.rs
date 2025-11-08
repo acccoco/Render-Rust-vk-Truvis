@@ -1,9 +1,9 @@
 use crate::vertex::aos_3d::VertexLayoutAoS3D;
 use crate::vertex::soa_3d::VertexLayoutSoA3D;
 use ash::vk;
-use truvis_rhi::raytracing::acceleration::BlasInputInfo;
-use truvis_rhi::resources::special_buffers::index_buffer::Index32Buffer;
-use truvis_rhi::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
+use truvis_gfx::raytracing::acceleration::BlasInputInfo;
+use truvis_gfx::resources::special_buffers::index_buffer::Index32Buffer;
+use truvis_gfx::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
 
 /// CPU 侧的几何体数据
 pub struct Geometry<L: VertexLayout> {

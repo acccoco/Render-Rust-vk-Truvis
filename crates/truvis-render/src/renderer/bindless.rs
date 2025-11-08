@@ -1,17 +1,16 @@
 use ash::vk;
 use itertools::Itertools;
-use std::collections::HashSet;
 use std::{collections::HashMap, rc::Rc};
 
-use truvis_rhi::descriptors::descriptor_pool::DescriptorPoolCreateInfo;
-use truvis_rhi::{
+use truvis_gfx::descriptors::descriptor_pool::DescriptorPoolCreateInfo;
+use truvis_gfx::{
     descriptors::{
         descriptor::{DescriptorSet, DescriptorSetLayout},
         descriptor_pool::DescriptorPool,
     },
     render_context::RenderContext,
     resources::{
-        image_view::{Image2DView, Image2DViewContainer, Image2DViewUUID},
+        image_view::Image2DView,
         texture::{Texture2D, Texture2DContainer},
     },
     utilities::shader_cursor::ShaderCursor,

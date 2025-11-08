@@ -2,7 +2,7 @@ use ash::vk;
 use itertools::Itertools;
 
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_rhi::{
+use truvis_gfx::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
     pipelines::shader::{ShaderGroupInfo, ShaderModuleCache, ShaderStageInfo},
     render_context::RenderContext,
@@ -16,11 +16,11 @@ use crate::{
     renderer::gpu_scene::GpuScene,
 };
 
-pub struct RhiRtPipeline {
+pub struct GfxRtPipeline {
     pub pipeline: vk::Pipeline,
     pub pipeline_layout: vk::PipelineLayout,
 }
-impl Drop for RhiRtPipeline {
+impl Drop for GfxRtPipeline {
     fn drop(&mut self) {
         let device_functions = RenderContext::get().device_functions();
         unsafe {
@@ -106,7 +106,7 @@ impl SBTRegions {
     const HIT_SBT_REGION: &'static [usize] = &[ShaderGroups::Hit.index()];
     const CALLABLE_SBT_REGION: &'static [usize] = &[ShaderGroups::DiffuseCall.index()];
 
-    pub fn create_sbt(pipeline: &RhiRtPipeline) -> Self {
+    pub fn create_sbt(pipeline: &GfxRtPipeline) -> Self {
         let rt_pipeline_props = RenderContext::get().rt_pipeline_props();
 
         // 因为不需要 user data，所以可以直接使用 shader group handle size
@@ -246,7 +246,7 @@ impl Drop for SBTRegions {
 }
 
 pub struct SimlpeRtPass {
-    pipeline: RhiRtPipeline,
+    pipeline: GfxRtPipeline,
 
     _sbt: SBTRegions,
 }
@@ -321,7 +321,7 @@ impl SimlpeRtPass {
 
         shader_module_cache.destroy();
 
-        let rt_pipeline = RhiRtPipeline {
+        let rt_pipeline = GfxRtPipeline {
             pipeline,
             pipeline_layout,
         };

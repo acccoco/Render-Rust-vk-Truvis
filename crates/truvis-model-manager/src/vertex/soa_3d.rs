@@ -1,6 +1,6 @@
 use ash::vk;
 use std::ptr;
-use truvis_rhi::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
+use truvis_gfx::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
 
 /// SoA 的顶点 buffer 布局，包含：Positions, Normals, Tangents, UVs
 pub struct VertexLayoutSoA3D;

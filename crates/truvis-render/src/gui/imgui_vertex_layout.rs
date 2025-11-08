@@ -1,6 +1,6 @@
 use ash::vk;
 use std::mem::offset_of;
-use truvis_rhi::resources::special_buffers::vertex_buffer::VertexLayout;
+use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
 
 /// AoS: Array of Structs
 pub struct ImGuiVertex {

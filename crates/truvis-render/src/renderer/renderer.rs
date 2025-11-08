@@ -10,7 +10,7 @@ use crate::{
 };
 use ash::vk;
 use std::{cell::RefCell, ffi::CStr, rc::Rc};
-use truvis_rhi::{
+use truvis_gfx::{
     commands::{
         barrier::{BarrierMask, BufferBarrier},
         semaphore::Semaphore,
@@ -68,7 +68,7 @@ pub struct Renderer {
 // 手动 drop
 impl Renderer {
     pub fn destroy(self) {
-        // 在 Renderer 被销毁时，等待 Rhi 设备空闲
+        // 在 Renderer 被销毁时，等待 Gfx 设备空闲
         self.wait_idle();
         self.render_timeline_semaphore.destroy();
     }
@@ -205,7 +205,7 @@ impl Renderer {
                 vk::PipelineStageFlags2::NONE,
                 Some(self.frame_ctrl.frame_id() as u64),
             );
-            RenderContext::get().graphics_queue().submit(vec![submit_info], None);
+            RenderContext::get().gfx_queue().submit(vec![submit_info], None);
         }
 
         self.frame_ctrl.end_frame();
@@ -313,6 +313,6 @@ impl Renderer {
                 .mask(transfer_barrier_mask)],
         );
         cmd.end();
-        RenderContext::get().graphics_queue().submit(vec![SubmitInfo::new(std::slice::from_ref(&cmd))], None);
+        RenderContext::get().gfx_queue().submit(vec![SubmitInfo::new(std::slice::from_ref(&cmd))], None);
     }
 }

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use truvis_rhi::resources::{image::Image2D, texture::Texture2D};
+use truvis_gfx::resources::{image::Image2D, texture::Texture2D};
 
 pub struct ImageLoader {}
 

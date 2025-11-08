@@ -6,7 +6,7 @@ description = "基础的模型管理，提供了模型的基础定义"
 
 
 [dependencies]
-truvis-rhi = { workspace = true }
+truvis-gfx = { workspace = true }
 
 ash = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }

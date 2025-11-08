@@ -12,8 +12,8 @@ use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
 use truvis_render::{
     pipeline_settings::FrameSettings, platform::timer::Timer, renderer::frame_controller::FrameController,
 };
-use truvis_rhi::resources::special_buffers::vertex_buffer::VertexLayout;
-use truvis_rhi::{
+use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
+use truvis_gfx::{
     commands::command_buffer::CommandBuffer,
     pipelines::{
         graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},

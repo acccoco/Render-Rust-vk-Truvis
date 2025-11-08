@@ -1,7 +1,7 @@
 use ash::vk;
 use itertools::Itertools;
 
-use truvis_rhi::raytracing::acceleration::Acceleration;
+use truvis_gfx::raytracing::acceleration::Acceleration;
 
 use crate::components::geometry::GeometrySoA3D;
 

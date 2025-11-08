@@ -1,9 +1,9 @@
 use ash::vk;
 
-use truvis_rhi::resources::buffer::Buffer;
-use truvis_rhi::resources::special_buffers::index_buffer::IndexBuffer;
-use truvis_rhi::resources::special_buffers::vertex_buffer::VertexBuffer;
-use truvis_rhi::{
+use truvis_gfx::resources::buffer::Buffer;
+use truvis_gfx::resources::special_buffers::index_buffer::IndexBuffer;
+use truvis_gfx::resources::special_buffers::vertex_buffer::VertexBuffer;
+use truvis_gfx::{
     basic::color::LabelColor,
     commands::{barrier::BufferBarrier, command_buffer::CommandBuffer},
 };

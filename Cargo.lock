@@ -2754,8 +2754,29 @@ dependencies = [
  "bindgen",
  "glam",
  "itertools 0.10.5",
+ "truvis-gfx",
  "truvis-model-manager",
- "truvis-rhi",
+]
+
+[[package]]
+name = "truvis-gfx"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "ash-window",
+ "bytemuck",
+ "cstr",
+ "derive-getters",
+ "glam",
+ "image",
+ "itertools 0.10.5",
+ "log",
+ "raw-window-handle",
+ "truvis-shader-layout-macro",
+ "truvis-shader-layout-trait",
+ "uuid",
+ "vk-mem",
+ "winit",
 ]
 
 [[package]]
@@ -2766,7 +2787,7 @@ dependencies = [
  "bytemuck",
  "glam",
  "itertools 0.10.5",
- "truvis-rhi",
+ "truvis-gfx",
  "uuid",
 ]
 
@@ -2809,30 +2830,9 @@ dependencies = [
  "tracy-client",
  "truvis-crate-tools",
  "truvis-cxx",
+ "truvis-gfx",
  "truvis-model-manager",
- "truvis-rhi",
  "truvis-shader-binding",
- "truvis-shader-layout-macro",
- "truvis-shader-layout-trait",
- "uuid",
- "vk-mem",
- "winit",
-]
-
-[[package]]
-name = "truvis-rhi"
-version = "0.1.0"
-dependencies = [
- "ash",
- "ash-window",
- "bytemuck",
- "cstr",
- "derive-getters",
- "glam",
- "image",
- "itertools 0.10.5",
- "log",
- "raw-window-handle",
  "truvis-shader-layout-macro",
  "truvis-shader-layout-trait",
  "uuid",

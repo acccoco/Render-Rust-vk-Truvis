@@ -4,7 +4,7 @@ use truvis_model_manager::components::geometry::Geometry;
 use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
 use truvis_render::render_pipeline::pipeline_context::PipelineContext;
 use truvis_render::renderer::frame_context::FrameContext;
-use truvis_rhi::{
+use truvis_gfx::{
     commands::{barrier::ImageBarrier, submit_info::SubmitInfo},
     render_context::RenderContext,
 };
@@ -73,7 +73,7 @@ impl ShaderToyPipeline {
             );
 
             cmd.end();
-            RenderContext::get().graphics_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
+            RenderContext::get().gfx_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
         }
     }
 }

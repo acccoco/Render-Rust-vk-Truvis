@@ -2,7 +2,7 @@
 members = [
     "crates/truvis-shader-layout-macro", # 用于生成 shader 布局的 macro
     "crates/truvis-shader-layout-trait", # 用于描述 shader 布局的 trait
-    "crates/truvis-rhi", # 渲染库
+    "crates/truvis-gfx", # 渲染库
     "crates/truvis-model-manager", # 场景管理
     "crates/truvis-shader-binding", # 将 shader 代码和 rust 代码绑定的库
     "crates/truvis-cxx", # 手动绑定 assmip
@@ -15,7 +15,7 @@ resolver = "2"
 [workspace.dependencies]
 truvis-shader-layout-macro = { path = "crates/truvis-shader-layout-macro" }
 truvis-shader-layout-trait = { path = "crates/truvis-shader-layout-trait" }
-truvis-rhi = { path = "crates/truvis-rhi" }
+truvis-gfx = { path = "crates/truvis-gfx" }
 truvis-model-manager = { path = "crates/truvis-model-manager" }
 truvis-cxx = { path = "crates/truvis-cxx" }
 truvis-render = { path = "crates/truvis-render" }
