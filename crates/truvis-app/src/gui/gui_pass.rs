@@ -1,8 +1,9 @@
 use std::{mem::offset_of, rc::Rc};
+use truvis_crate_tools::count_indexed_array;
 
 use ash::vk;
 use itertools::Itertools;
-
+use truvis_crate_tools::const_map;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_gfx::{
@@ -12,21 +13,22 @@ use truvis_gfx::{
         shader::ShaderStageInfo,
     },
 };
+use truvis_render::pipeline_settings::FrameLabel;
+use truvis_render::renderer::frame_context::FrameContext;
 use truvis_shader_binding::{shader, shader::TextureHandle};
 
+use crate::gui::gui::Gui;
 use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
-use crate::renderer::frame_context::FrameContext;
-use crate::{gui::gui::Gui, pipeline_settings::FrameLabel};
 
 const_map!(ShaderStage<ShaderStageInfo>: {
     Vertex: ShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
-        entry_point: cstr::cstr!("vsmain"),
+        entry_point: c"vsmain",
         path: TruvisPath::shader_path("imgui/imgui.slang.spv"),
     },
     Fragment: ShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
-        entry_point: cstr::cstr!("psmain"),
+        entry_point: c"psmain",
         path: TruvisPath::shader_path("imgui/imgui.slang.spv"),
     },
 });

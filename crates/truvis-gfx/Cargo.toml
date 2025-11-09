@@ -22,7 +22,6 @@ uuid = { workspace = true, features = ["v4"] }
 # bytemuck：可以转换为 bytes slices
 glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
 itertools = { workspace = true }
-cstr = { workspace = true }
 vk-mem = { workspace = true }
 log = { workspace = true }
 image = { workspace = true }

@@ -24,12 +24,12 @@ use truvis_render::renderer::frame_context::FrameContext;
 const_map!(ShaderStage<ShaderStageInfo>:{
     Vertex: ShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
-        entry_point: cstr::cstr!("main"),
+        entry_point: c"main",
         path: TruvisPath::shader_path("shadertoy-glsl/shadertoy.vert.spv"),
     },
     Fragment: ShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
-        entry_point: cstr::cstr!("main"),
+        entry_point: c"main",
         path: TruvisPath::shader_path("shadertoy-glsl/shadertoy.frag.spv"),
     },
 });

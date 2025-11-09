@@ -9,18 +9,15 @@ use winit::{
     window::WindowId,
 };
 
+use crate::outer_app::OuterApp;
+use crate::platform::camera_controller::CameraController;
+use crate::window_system::main_window::{MainWindow, PresentData};
 use truvis_crate_tools::init_log::init_log;
 use truvis_gfx::commands::barrier::BarrierMask;
 use truvis_gfx::gfx::Gfx;
-
-use crate::renderer::frame_context::FrameContext;
-use crate::renderer::renderer::PresentData;
-use crate::{
-    outer_app::OuterApp,
-    platform::{camera_controller::CameraController, input_manager::InputManager},
-    renderer::renderer::Renderer,
-    window_system::main_window::MainWindow,
-};
+use truvis_render::platform::input_manager::InputManager;
+use truvis_render::renderer::frame_context::FrameContext;
+use truvis_render::renderer::renderer::Renderer;
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     log::error!("{}", info);

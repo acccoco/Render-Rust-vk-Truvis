@@ -1,6 +1,7 @@
 use ash::vk;
 use itertools::Itertools;
-
+use truvis_crate_tools::const_map;
+use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
@@ -30,32 +31,32 @@ impl Drop for GfxRtPipeline {
 const_map!(ShaderStage<ShaderStageInfo>: {
     RayGen: ShaderStageInfo {
         stage: vk::ShaderStageFlags::RAYGEN_KHR,
-        entry_point: cstr::cstr!("main_ray_gen"),
+        entry_point: c"main_ray_gen",
         path: TruvisPath::shader_path("rt/rt.slang.spv"),
     },
     SkyMiss: ShaderStageInfo {
         stage: vk::ShaderStageFlags::MISS_KHR,
-        entry_point: cstr::cstr!("sky_miss"),
+        entry_point: c"sky_miss",
         path: TruvisPath::shader_path("rt/rt.slang.spv"),
     },
     ShadowMiss: ShaderStageInfo {
         stage: vk::ShaderStageFlags::MISS_KHR,
-        entry_point: cstr::cstr!("shadow_miss"),
+        entry_point: c"shadow_miss",
         path: TruvisPath::shader_path("rt/rt.slang.spv"),
     },
     ClosestHit: ShaderStageInfo {
         stage: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
-        entry_point: cstr::cstr!("main_closest_hit"),
+        entry_point: c"main_closest_hit",
         path: TruvisPath::shader_path("rt/rt.slang.spv"),
     },
     TransAny: ShaderStageInfo {
         stage: vk::ShaderStageFlags::ANY_HIT_KHR,
-        entry_point: cstr::cstr!("trans_any"),
+        entry_point: c"trans_any",
         path: TruvisPath::shader_path("rt/rt.slang.spv"),
     },
     DiffuseCall: ShaderStageInfo {
         stage: vk::ShaderStageFlags::CALLABLE_KHR,
-        entry_point: cstr::cstr!("diffuse_callable"),
+        entry_point: c"diffuse_callable",
         path: TruvisPath::shader_path("rt/rt.slang.spv"),
     },
 });

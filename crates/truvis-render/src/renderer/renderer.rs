@@ -1,5 +1,4 @@
 use std::ffi::CStr;
-use std::rc::Weak;
 
 use ash::vk;
 
@@ -9,33 +8,11 @@ use truvis_gfx::{
         submit_info::SubmitInfo,
     },
     gfx::Gfx,
-    resources::texture::Texture2D,
 };
 use truvis_shader_binding::shader;
 
 use crate::platform::{camera::Camera, input_manager::InputState};
 use crate::renderer::frame_context::FrameContext;
-
-/// 渲染演示数据结构
-///
-/// 包含了向演示窗口提交渲染结果所需的所有数据和资源。
-/// 这个结构体作为渲染器内部状态与外部演示系统之间的桥梁。
-pub struct PresentData {
-    /// 当前帧的渲染目标纹理
-    ///
-    /// 包含了最终的渲染结果，将被复制或演示到屏幕上
-    pub render_target: Weak<Texture2D>,
-
-    /// 渲染目标在 Bindless 系统中的唯一标识符
-    ///
-    /// 用于在着色器中通过 Bindless 方式访问渲染目标纹理
-    pub render_target_bindless_key: String,
-
-    /// 渲染目标的内存屏障配置
-    ///
-    /// 定义了渲染目标纹理的同步需求，确保在读取前所有写入操作已完成
-    pub render_target_barrier: BarrierMask,
-}
 
 /// 表示整个渲染器进程，需要考虑 platform, render, render_context, log 之类的各种模块
 pub struct Renderer {}

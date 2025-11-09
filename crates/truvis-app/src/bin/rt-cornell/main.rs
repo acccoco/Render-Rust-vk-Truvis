@@ -1,10 +1,8 @@
 use imgui::Ui;
-
+use truvis_app::app::TruvisApp;
+use truvis_app::outer_app::OuterApp;
 use truvis_render::renderer::frame_context::FrameContext;
-use truvis_render::{
-    app::TruvisApp, outer_app::OuterApp, platform::camera::Camera, render_pipeline::rt_pipeline::RtPipeline,
-    renderer::renderer::Renderer,
-};
+use truvis_render::{platform::camera::Camera, render_pipeline::rt_pipeline::RtPipeline, renderer::renderer::Renderer};
 use truvis_shader_binding::shader;
 
 struct PhongApp {

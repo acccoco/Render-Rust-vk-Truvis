@@ -25,12 +25,12 @@ use truvis_render::{
 const_map!(ShaderStage<ShaderStageInfo>: {
     Vertex: ShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
-        entry_point: cstr::cstr!("vsmain"),
+        entry_point: c"vsmain",
         path: TruvisPath::shader_path("hello_triangle/triangle.slang.spv"),
     },
     Fragment: ShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
-        entry_point: cstr::cstr!("psmain"),
+        entry_point: c"psmain",
         path: TruvisPath::shader_path("hello_triangle/triangle.slang.spv"),
     },
 });

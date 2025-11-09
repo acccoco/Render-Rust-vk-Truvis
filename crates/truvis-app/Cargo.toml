@@ -1,10 +1,13 @@
 [package]
-name = "truvis-render"
+name = "truvis-app"
 version = "0.1.0"
 edition = "2024"
+description = "app"
+
 
 [dependencies]
 truvis-gfx = { workspace = true }
+truvis-render = { workspace = true }
 truvis-shader-layout-trait = { workspace = true }
 truvis-shader-layout-macro = { workspace = true }
 truvis-model-manager = { workspace = true }
@@ -12,16 +15,18 @@ truvis-cxx = { workspace = true }
 truvis-shader-binding = { workspace = true }
 truvis-crate-tools = { workspace = true }
 
-# 默认 features：
-# - debug 表示 vulkan 结构体实现了 Debut Trait
-# - loader 表示在运行时动态搜索 vulkan，体现在 Entry 对象的创建上
-ash = { workspace = true, features = ["debug"] }
-winit = { workspace = true }
-# graphics math
-# bytemuck：可以转换为 bytes slices
+log = { workspace = true }
+ash = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
 bytemuck = { workspace = true, features = ["derive"] }
 itertools = { workspace = true }
-vk-mem = { workspace = true }
-log = { workspace = true }
+ash-window = { workspace = true }
+winit = { workspace = true }
+imgui = { workspace = true }
+imgui-winit-support = { workspace = true }
+raw-window-handle = { workspace = true }
+tracy-client = { workspace = true }
 image = { workspace = true }
+
+

@@ -1,6 +1,6 @@
+use truvis_render::platform::camera::Camera;
+use truvis_render::platform::input_manager::InputManager;
 use winit::keyboard::KeyCode;
-
-use crate::platform::{camera::Camera, input_manager::InputManager};
 
 pub struct CameraController {
     camera: Camera,

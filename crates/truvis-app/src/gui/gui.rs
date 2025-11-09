@@ -12,9 +12,11 @@ use truvis_gfx::{
     gfx::Gfx,
     resources::{image::Image2D, texture::Texture2D},
 };
+use truvis_render::pipeline_settings::FrameLabel;
+use truvis_render::renderer::bindless::BindlessManager;
+use truvis_render::renderer::frame_context::FrameContext;
 
-use crate::renderer::frame_context::FrameContext;
-use crate::{gui::gui_mesh::GuiMesh, pipeline_settings::FrameLabel, renderer::bindless::BindlessManager};
+use crate::gui::gui_mesh::GuiMesh;
 
 pub struct Gui {
     pub imgui_ctx: imgui::Context,

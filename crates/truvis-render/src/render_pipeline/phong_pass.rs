@@ -29,8 +29,8 @@ impl PhongPass {
         bindless_manager: Rc<RefCell<BindlessManager>>,
     ) -> Self {
         let mut ci = GraphicsPipelineCreateInfo::default();
-        ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv", cstr::cstr!("main"));
-        ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv", cstr::cstr!("main"));
+        ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv", c"main");
+        ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv", c"main");
 
         ci.vertex_binding(VertexLayoutAoS3D::vertex_input_bindings());
         ci.vertex_attribute(VertexLayoutAoS3D::vertex_input_attributes());
