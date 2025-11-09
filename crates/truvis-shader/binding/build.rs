@@ -46,7 +46,7 @@ fn gen_rust_binding() {
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
         .header("ffi/rust_ffi.hpp")
-        .clang_arg("-I../../shader/include")
+        .clang_arg("-I../../../shader/include")
         .derive_default(false)
         // 禁用 clippy 的检查
         .raw_line("#![allow(clippy::all)]")

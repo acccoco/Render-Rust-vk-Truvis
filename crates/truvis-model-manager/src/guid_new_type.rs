@@ -75,3 +75,4 @@ uuid_new_type!(pub MeshGuid);
 uuid_new_type!(pub MatGuid);
 uuid_new_type!(pub InsGuid);
 uuid_new_type!(pub LightGuid);
+uuid_new_type!(pub TexGuid);

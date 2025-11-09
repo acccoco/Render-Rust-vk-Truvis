@@ -1,9 +1,7 @@
 use ash::vk;
 
 use crate::commands::command_buffer::CommandBuffer;
-use crate::{
-    commands::command_queue::QueueFamily, foundation::debug_messenger::DebugType, render_context::RenderContext,
-};
+use crate::{commands::command_queue::QueueFamily, foundation::debug_messenger::DebugType, gfx::Gfx};
 
 /// command pool 是和 queue family 绑定的，而不是和 queue 绑定的
 pub struct CommandPool {
@@ -18,9 +16,9 @@ impl CommandPool {
     // TODO 使用 new_internal 简化
     #[inline]
     pub fn new(queue_family: QueueFamily, flags: vk::CommandPoolCreateFlags, debug_name: &str) -> Self {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         let pool = unsafe {
-            device_functions
+            gfx_device
                 .create_command_pool(
                     &vk::CommandPoolCreateInfo::default()
                         .queue_family_index(queue_family.queue_family_index)
@@ -36,7 +34,7 @@ impl CommandPool {
             _debug_name: debug_name.to_string(),
             valid: true,
         };
-        device_functions.set_debug_name(&command_pool, debug_name);
+        gfx_device.set_debug_name(&command_pool, debug_name);
         command_pool
     }
 
@@ -44,13 +42,13 @@ impl CommandPool {
     /// 因为在 RenderContext 初始化过程中，单例还没有准备好
     #[inline]
     pub(crate) fn new_internal(
-        device_functions: std::rc::Rc<crate::foundation::device::GfxDevice>,
+        gfx_device: std::rc::Rc<crate::foundation::device::GfxDevice>,
         queue_family: QueueFamily,
         flags: vk::CommandPoolCreateFlags,
         debug_name: &str,
     ) -> Self {
         let pool = unsafe {
-            device_functions
+            gfx_device
                 .create_command_pool(
                     &vk::CommandPoolCreateInfo::default()
                         .queue_family_index(queue_family.queue_family_index)
@@ -66,21 +64,21 @@ impl CommandPool {
             _debug_name: debug_name.to_string(),
             valid: true,
         };
-        device_functions.set_debug_name(&command_pool, debug_name);
+        gfx_device.set_debug_name(&command_pool, debug_name);
         command_pool
     }
 
     pub fn destroy(&mut self) {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         unsafe {
-            device_functions.destroy_command_pool(self.handle, None);
+            gfx_device.destroy_command_pool(self.handle, None);
         }
         self.valid = false;
     }
 
-    pub fn destroy_internal(mut self, device_functions: &crate::foundation::device::GfxDevice) {
+    pub fn destroy_internal(mut self, gfx_device: &crate::foundation::device::GfxDevice) {
         unsafe {
-            device_functions.destroy_command_pool(self.handle, None);
+            gfx_device.destroy_command_pool(self.handle, None);
         }
         self.valid = false;
     }
@@ -100,9 +98,9 @@ impl CommandPool {
     ///
     /// reset 之后，pool 内的 command buffer 又可以重新录制命令
     pub fn reset_all_buffers(&self) {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         unsafe {
-            device_functions.reset_command_pool(self.handle, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();
+            gfx_device.reset_command_pool(self.handle, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();
         }
     }
 
@@ -113,7 +111,7 @@ impl CommandPool {
         let command_buffer_handles: Vec<vk::CommandBuffer> =
             command_buffers.iter().map(|cmd| cmd.vk_handle()).collect();
         unsafe {
-            RenderContext::get().device_functions().free_command_buffers(self.handle, &command_buffer_handles);
+            Gfx::get().gfx_device().free_command_buffers(self.handle, &command_buffer_handles);
         }
     }
 }

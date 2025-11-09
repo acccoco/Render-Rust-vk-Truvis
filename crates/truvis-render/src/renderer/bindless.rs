@@ -1,6 +1,7 @@
+use std::{collections::HashMap, rc::Rc};
+
 use ash::vk;
 use itertools::Itertools;
-use std::{collections::HashMap, rc::Rc};
 
 use truvis_gfx::descriptors::descriptor_pool::DescriptorPoolCreateInfo;
 use truvis_gfx::{
@@ -8,7 +9,7 @@ use truvis_gfx::{
         descriptor::{DescriptorSet, DescriptorSetLayout},
         descriptor_pool::DescriptorPool,
     },
-    render_context::RenderContext,
+    gfx::Gfx,
     resources::{
         image_view::Image2DView,
         texture::{Texture2D, Texture2DContainer},
@@ -18,7 +19,7 @@ use truvis_gfx::{
 use truvis_shader_binding::shader;
 use truvis_shader_layout_macro::ShaderLayout;
 
-use crate::{pipeline_settings::FrameLabel, render_resource::ImageLoader, renderer::frame_controller::FrameController};
+use crate::{pipeline_settings::FrameLabel, render_resource::ImageLoader};
 
 #[derive(ShaderLayout)]
 pub struct BindlessDescriptorBinding {
@@ -64,13 +65,13 @@ pub struct BindlessManager {
 
 // init & destroy
 impl BindlessManager {
-    pub fn new(frame_ctrl: Rc<FrameController>) -> Self {
+    pub fn new(fif_count: usize) -> Self {
         let descriptor_pool = Self::init_descriptor_pool();
         let bindless_layout = DescriptorSetLayout::<BindlessDescriptorBinding>::new(
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
             "bindless-layout",
         );
-        let bindless_descriptor_sets = (0..frame_ctrl.fif_count())
+        let bindless_descriptor_sets = (0..fif_count)
             .map(|idx| {
                 DescriptorSet::<BindlessDescriptorBinding>::new(
                     &descriptor_pool,
@@ -188,7 +189,7 @@ impl BindlessManager {
                 image_infos,
             ),
         ];
-        RenderContext::get().device_functions().write_descriptor_sets(&writes);
+        Gfx::get().gfx_device().write_descriptor_sets(&writes);
     }
 
     /// 获得纹理在当前帧的 bindless 索引

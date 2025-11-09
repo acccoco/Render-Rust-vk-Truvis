@@ -34,7 +34,7 @@ impl Surface {
             pf: surface_pf,
             capabilities: surface_capabilities,
         };
-        vk_core.device_functions.set_debug_name(&surface, "main");
+        vk_core.gfx_device.set_debug_name(&surface, "main");
 
         surface
     }

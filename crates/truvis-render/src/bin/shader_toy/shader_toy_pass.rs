@@ -1,17 +1,12 @@
 use std::rc::Rc;
-use truvis_crate_tools::count_indexed_array;
 
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
 
 use truvis_crate_tools::const_map;
+use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_model_manager::components::geometry::Geometry;
-use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
-use truvis_render::{
-    pipeline_settings::FrameSettings, platform::timer::Timer, renderer::frame_controller::FrameController,
-};
 use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_gfx::{
     commands::command_buffer::CommandBuffer,
@@ -21,6 +16,10 @@ use truvis_gfx::{
         shader::ShaderStageInfo,
     },
 };
+use truvis_model_manager::components::geometry::Geometry;
+use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
+use truvis_render::pipeline_settings::FrameSettings;
+use truvis_render::renderer::frame_context::FrameContext;
 
 const_map!(ShaderStage<ShaderStageInfo>:{
     Vertex: ShaderStageInfo {
@@ -94,18 +93,18 @@ impl ShaderToyPass {
     pub fn draw(
         &self,
         cmd: &CommandBuffer,
-        frame_ctrl: &FrameController,
         frame_settings: &FrameSettings,
         render_target: vk::ImageView,
-        timer: &Timer,
         rect: &Geometry<VertexLayoutAoSPosColor>,
     ) {
         let viewport_extent = frame_settings.frame_extent;
 
+        let timer = FrameContext::get().timer.borrow();
+
         let push_constants = PushConstants {
             time: timer.total_time.as_secs_f32(),
             delta_time: timer.delta_time_s(),
-            frame: frame_ctrl.frame_id() as i32,
+            frame: FrameContext::frame_id() as i32,
             frame_rate: 1.0 / timer.delta_time_s(),
             resolution: glam::Vec2::new(viewport_extent.width as f32, viewport_extent.height as f32),
             mouse: glam::Vec4::new(

@@ -8,7 +8,7 @@ use truvis_gfx::{
     commands::{barrier::BufferBarrier, command_buffer::CommandBuffer},
 };
 
-use crate::gui::imgui_vertex_layout::ImGuiVertexLayoutAoS;
+use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
 use crate::renderer::frame_context::FrameContext;
 
 /// imgui 绘制所需的 vertex buffer 和 index buffer

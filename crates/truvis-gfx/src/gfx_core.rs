@@ -26,7 +26,7 @@ pub struct GfxCore {
     /// 3. 设备生命周期需要精确控制，Rc 确保在所有引用者销毁前设备不被销毁
     ///
     /// 使用 Rc<> 的时机：在 RenderContext 内部的对象，可以通过 Rc 去访问 DevcesFunctions
-    pub(crate) device_functions: Rc<GfxDevice>,
+    pub(crate) gfx_device: Rc<GfxDevice>,
 
     pub(crate) debug_utils: DebugMsger,
 
@@ -52,7 +52,7 @@ impl GfxCore {
         let gfx_queue = CommandQueue {
             vk_queue: unsafe { device.get_device_queue(physical_device.gfx_queue_family.queue_family_index, 0) },
             queue_family: physical_device.gfx_queue_family.clone(),
-            device_functions: device.clone(),
+            gfx_device: device.clone(),
         };
 
         let debug_utils = DebugMsger::new(&vk_pf, &instance.ash_instance);
@@ -72,7 +72,7 @@ impl GfxCore {
             vk_entry: vk_pf,
             instance,
             physical_device,
-            device_functions: device,
+            gfx_device: device,
             debug_utils,
             gfx_queue,
         }
@@ -80,7 +80,7 @@ impl GfxCore {
 
     pub fn destroy(self) {
         self.debug_utils.destroy();
-        self.device_functions.destroy();
+        self.gfx_device.destroy();
         self.physical_device.destroy();
         self.instance.destroy();
     }

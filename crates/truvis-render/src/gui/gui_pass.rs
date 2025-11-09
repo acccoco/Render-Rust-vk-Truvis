@@ -14,7 +14,7 @@ use truvis_gfx::{
 };
 use truvis_shader_binding::{shader, shader::TextureHandle};
 
-use crate::gui::imgui_vertex_layout::ImGuiVertexLayoutAoS;
+use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
 use crate::renderer::frame_context::FrameContext;
 use crate::{gui::gui::Gui, pipeline_settings::FrameLabel};
 

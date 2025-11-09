@@ -5,10 +5,7 @@ use std::{
 
 use ash::{vk, vk::Handle};
 
-use crate::{
-    foundation::debug_messenger::DebugType, impl_derive_buffer, render_context::RenderContext,
-    resources::buffer::Buffer,
-};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::Buffer};
 
 pub struct StageBuffer<T: bytemuck::Pod> {
     inner: Buffer,
@@ -24,8 +21,8 @@ impl<T: bytemuck::Pod> StageBuffer<T> {
             inner,
             _phantom: PhantomData,
         };
-        let device_functions = RenderContext::get().device_functions();
-        device_functions.set_debug_name(&buffer, &buffer.inner.debug_name);
+        let gfx_device = Gfx::get().gfx_device();
+        gfx_device.set_debug_name(&buffer, &buffer.inner.debug_name);
         buffer
     }
 
@@ -36,7 +33,7 @@ impl<T: bytemuck::Pod> StageBuffer<T> {
 
             trans_func(&mut *ptr);
         }
-        let allocator = RenderContext::get().allocator();
+        let allocator = Gfx::get().allocator();
         allocator.flush_allocation(&self.inner.allocation, 0, size_of::<T>() as vk::DeviceSize).unwrap();
     }
 }

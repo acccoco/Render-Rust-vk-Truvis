@@ -11,20 +11,20 @@ use crate::{
         submit_info::SubmitInfo,
     },
     foundation::{
-        device::GfxDevice, instance::GfxInstance, mem_allocator::MemAllocator, physical_device::GfxPhysicalDevice,
+        device::GfxDevice, instance::GfxInstance, physical_device::GfxPhysicalDevice, vmem_allocator::VMemAllocator,
     },
 };
 
-pub struct RenderContext {
-    pub(crate) vk_core: GfxCore,
-    pub(crate) allocator: MemAllocator,
+pub struct Gfx {
+    pub(crate) gfx_core: GfxCore,
+    pub(crate) vm_allocator: VMemAllocator,
 
     /// 临时的 graphics command pool，主要用于临时的命令缓冲区
     pub(crate) temp_graphics_command_pool: CommandPool,
 }
 
 // 创建与销毁
-impl RenderContext {
+impl Gfx {
     // region init 相关
     const ENGINE_NAME: &'static str = "DruvisIII";
 
@@ -34,34 +34,31 @@ impl RenderContext {
         // 注意：在初始化过程中，我们需要使用传统的参数传递方式
         // 因为 RenderContext 单例还没有被初始化
         let gfx_command_pool = CommandPool::new_internal(
-            vk_ctx.device_functions.clone(),
+            vk_ctx.gfx_device.clone(),
             vk_ctx.physical_device.gfx_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),
             "render_context-graphics",
         );
 
-        let allocator = MemAllocator::new(
-            &vk_ctx.instance.ash_instance,
-            vk_ctx.physical_device.vk_handle,
-            &vk_ctx.device_functions,
-        );
+        let allocator =
+            VMemAllocator::new(&vk_ctx.instance.ash_instance, vk_ctx.physical_device.vk_handle, &vk_ctx.gfx_device);
 
         Self {
-            vk_core: vk_ctx,
-            allocator,
+            gfx_core: vk_ctx,
+            vm_allocator: allocator,
             temp_graphics_command_pool: gfx_command_pool,
         }
     }
 }
 
 // 注意：此静态变量仅用于单线程环境，符合项目要求
-static mut RENDER_CONTEXT: Option<RenderContext> = None;
+static mut G_GFX: Option<Gfx> = None;
 
 // 单例模式
 // - RenderContext 自身的生命周期管理比较简单，因此适合使用单例模式
 // - 让代码变得简单，不再需要考虑复杂的借用规则
 // - 其他类的类型签名也会变得更简单
-impl RenderContext {
+impl Gfx {
     /// 获取单例实例
     ///
     /// # Panics
@@ -70,10 +67,10 @@ impl RenderContext {
     /// # Safety
     /// 此方法仅在单线程环境下安全
     #[inline]
-    pub fn get() -> &'static RenderContext {
+    pub fn get() -> &'static Gfx {
         unsafe {
             // 使用 addr_of! 避免直接对 static mut 创建引用，编译器不允许这种行为
-            let ptr = std::ptr::addr_of!(RENDER_CONTEXT);
+            let ptr = std::ptr::addr_of!(G_GFX);
             (*ptr).as_ref().expect("RenderContext not initialized. Call RenderContext::init() first.")
         }
     }
@@ -92,7 +89,7 @@ impl RenderContext {
     pub fn init(app_name: String, instance_extra_exts: Vec<&'static CStr>) {
         unsafe {
             // 使用 addr_of_mut! 避免直接对 static mut 创建可变引用
-            let ptr = std::ptr::addr_of_mut!(RENDER_CONTEXT);
+            let ptr = std::ptr::addr_of_mut!(G_GFX);
             assert!((*ptr).is_none(), "RenderContext already initialized");
             *ptr = Some(Self::new(app_name, instance_extra_exts));
         }
@@ -106,61 +103,61 @@ impl RenderContext {
     pub fn destroy() {
         unsafe {
             // 使用 addr_of_mut! 避免直接对 static mut 创建可变引用
-            let ptr = std::ptr::addr_of_mut!(RENDER_CONTEXT);
+            let ptr = std::ptr::addr_of_mut!(G_GFX);
             let context = (*ptr).take().expect("RenderContext not initialized");
 
-            context.allocator.destroy();
-            context.temp_graphics_command_pool.destroy_internal(&context.vk_core.device_functions);
-            context.vk_core.destroy();
+            context.vm_allocator.destroy();
+            context.temp_graphics_command_pool.destroy_internal(&context.gfx_core.gfx_device);
+            context.gfx_core.destroy();
         }
     }
 }
 
 // getter
-impl RenderContext {
+impl Gfx {
     #[inline]
     pub fn vk_core(&self) -> &GfxCore {
-        &self.vk_core
+        &self.gfx_core
     }
 
     #[inline]
     pub fn instance(&self) -> &GfxInstance {
-        &self.vk_core.instance
+        &self.gfx_core.instance
     }
 
     #[inline]
-    pub fn device_functions(&self) -> &GfxDevice {
-        &self.vk_core.device_functions
+    pub fn gfx_device(&self) -> &GfxDevice {
+        &self.gfx_core.gfx_device
     }
 
     #[inline]
-    pub fn allocator(&self) -> &MemAllocator {
-        &self.allocator
+    pub fn allocator(&self) -> &VMemAllocator {
+        &self.vm_allocator
     }
 
     #[inline]
     pub fn physical_device(&self) -> &GfxPhysicalDevice {
-        &self.vk_core.physical_device
+        &self.gfx_core.physical_device
     }
 
     #[inline]
     pub fn gfx_queue_family(&self) -> QueueFamily {
-        self.vk_core.physical_device.gfx_queue_family.clone()
+        self.gfx_core.physical_device.gfx_queue_family.clone()
     }
 
     #[inline]
     pub fn compute_queue_family(&self) -> QueueFamily {
-        self.vk_core.physical_device.compute_queue_family.as_ref().unwrap().clone()
+        self.gfx_core.physical_device.compute_queue_family.as_ref().unwrap().clone()
     }
 
     #[inline]
     pub fn transfer_queue_family(&self) -> QueueFamily {
-        self.vk_core.physical_device.transfer_queue_family.as_ref().unwrap().clone()
+        self.gfx_core.physical_device.transfer_queue_family.as_ref().unwrap().clone()
     }
 
     #[inline]
     pub fn gfx_queue(&self) -> &CommandQueue {
-        &self.vk_core.gfx_queue
+        &self.gfx_core.gfx_queue
     }
 
     /// 当 uniform buffer 的 descriptor 在更新时，其 offset 必须是这个值的整数倍
@@ -168,17 +165,17 @@ impl RenderContext {
     /// 注：这个值一定是 power of 2
     #[inline]
     pub fn min_ubo_offset_align(&self) -> vk::DeviceSize {
-        self.vk_core.physical_device.basic_props.limits.min_uniform_buffer_offset_alignment
+        self.gfx_core.physical_device.basic_props.limits.min_uniform_buffer_offset_alignment
     }
 
     #[inline]
     pub fn rt_pipeline_props(&self) -> &vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'_> {
-        &self.vk_core.physical_device.rt_pipeline_props
+        &self.gfx_core.physical_device.rt_pipeline_props
     }
 }
 
 // tools
-impl RenderContext {
+impl Gfx {
     /// 根据给定的格式，返回支持的格式
     pub fn find_supported_format(
         &self,
@@ -220,10 +217,16 @@ impl RenderContext {
         self.gfx_queue().submit(vec![SubmitInfo::new(&[command_buffer_clone])], None);
         self.gfx_queue().wait_idle();
         unsafe {
-            self.device_functions()
+            self.gfx_device()
                 .free_command_buffers(self.temp_graphics_command_pool.handle(), &[command_buffer.vk_handle()]);
         }
 
         result
+    }
+
+    pub fn wait_idel(&self) {
+        unsafe {
+            self.gfx_device().device_wait_idle().unwrap();
+        }
     }
 }

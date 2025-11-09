@@ -22,7 +22,7 @@ pub struct QueueFamily {
 pub struct CommandQueue {
     pub(crate) vk_queue: vk::Queue,
     pub(crate) queue_family: QueueFamily,
-    pub(crate) device_functions: Rc<GfxDevice>,
+    pub(crate) gfx_device: Rc<GfxDevice>,
 }
 impl DebugType for CommandQueue {
     fn debug_type_name() -> &'static str {
@@ -52,7 +52,7 @@ impl CommandQueue {
         unsafe {
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = batches.iter().map(|b| b.submit_info()).collect_vec();
-            self.device_functions
+            self.gfx_device
                 .device
                 .queue_submit2(self.vk_queue, &batches, fence.map_or(vk::Fence::null(), |f| f.handle()))
                 .unwrap()
@@ -62,7 +62,7 @@ impl CommandQueue {
     /// 根据 specification，vkQueueWaitIdle 应该和 Fence 效率相同
     #[inline]
     pub fn wait_idle(&self) {
-        unsafe { self.device_functions.device.queue_wait_idle(self.vk_queue).unwrap() }
+        unsafe { self.gfx_device.device.queue_wait_idle(self.vk_queue).unwrap() }
     }
 }
 
@@ -75,7 +75,7 @@ impl CommandQueue {
     {
         let name = std::ffi::CString::new(label_name.as_ref()).unwrap();
         unsafe {
-            self.device_functions.debug_utils.queue_begin_debug_utils_label(
+            self.gfx_device.debug_utils.queue_begin_debug_utils_label(
                 self.vk_queue,
                 &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(label_color.into()),
             );
@@ -85,7 +85,7 @@ impl CommandQueue {
     #[inline]
     pub fn end_label(&self) {
         unsafe {
-            self.device_functions.debug_utils.queue_end_debug_utils_label(self.vk_queue);
+            self.gfx_device.debug_utils.queue_end_debug_utils_label(self.vk_queue);
         }
     }
 
@@ -96,7 +96,7 @@ impl CommandQueue {
     {
         let name = std::ffi::CString::new(label_name.as_ref()).unwrap();
         unsafe {
-            self.device_functions.debug_utils.queue_insert_debug_utils_label(
+            self.gfx_device.debug_utils.queue_insert_debug_utils_label(
                 self.vk_queue,
                 &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(label_color.into()),
             );

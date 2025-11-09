@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 
 impl ImageViewCreateInfo {
     #[inline]
@@ -48,8 +48,8 @@ pub struct Image2DView {
 impl Drop for Image2DView {
     fn drop(&mut self) {
         unsafe {
-            let device_functions = RenderContext::get().device_functions();
-            device_functions.destroy_image_view(self.handle, None);
+            let gfx_device = Gfx::get().gfx_device();
+            gfx_device.destroy_image_view(self.handle, None);
         }
     }
 }
@@ -66,16 +66,16 @@ impl DebugType for Image2DView {
 
 impl Image2DView {
     pub fn new(image: vk::Image, mut info: ImageViewCreateInfo, name: impl AsRef<str>) -> Self {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         info.inner.image = image;
-        let handle = unsafe { device_functions.create_image_view(&info.inner, None).unwrap() };
+        let handle = unsafe { gfx_device.create_image_view(&info.inner, None).unwrap() };
         let image_view = Self {
             handle,
             uuid: Image2DViewUUID(uuid::Uuid::new_v4()),
             _info: Rc::new(info),
             _name: name.as_ref().to_string(),
         };
-        device_functions.set_debug_name(&image_view, &name);
+        gfx_device.set_debug_name(&image_view, &name);
         image_view
     }
 

@@ -1,13 +1,12 @@
-use std::rc::Rc;
-
 use ash::vk;
 use itertools::Itertools;
+
 use truvis_gfx::{
     commands::{command_buffer::CommandBuffer, command_pool::CommandPool},
-    render_context::RenderContext,
+    gfx::Gfx,
 };
 
-use crate::renderer::frame_controller::FrameController;
+use crate::renderer::frame_context::FrameContext;
 
 pub struct CmdAllocator {
     /// 为每个 frame 分配一个 command pool
@@ -16,17 +15,15 @@ pub struct CmdAllocator {
     /// 每个 command pool 已经分配出去的 command buffer，用于集中 free
     /// 或其他操作
     allocated_command_buffers: Vec<Vec<CommandBuffer>>,
-
-    frame_ctrl: Rc<FrameController>,
 }
 
 // init & desotry
 impl CmdAllocator {
-    pub fn new(frame_ctrl: Rc<FrameController>) -> Self {
-        let graphics_command_pools = (0..frame_ctrl.fif_count())
+    pub fn new(fif_count: usize) -> Self {
+        let graphics_command_pools = (0..fif_count)
             .map(|i| {
                 CommandPool::new(
-                    RenderContext::get().gfx_queue_family(),
+                    Gfx::get().gfx_queue_family(),
                     vk::CommandPoolCreateFlags::TRANSIENT,
                     &format!("render_context_graphics_command_pool_{}", i),
                 )
@@ -35,8 +32,7 @@ impl CmdAllocator {
 
         Self {
             graphics_command_pools,
-            allocated_command_buffers: vec![Vec::new(); frame_ctrl.fif_count()],
-            frame_ctrl,
+            allocated_command_buffers: vec![Vec::new(); fif_count],
         }
     }
 }
@@ -45,19 +41,19 @@ impl CmdAllocator {
 impl CmdAllocator {
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer(&mut self, debug_name: &str) -> CommandBuffer {
-        let name = format!("[{}]{}", self.frame_ctrl.frame_name(), debug_name);
-        let cmd = CommandBuffer::new(&self.graphics_command_pools[*self.frame_ctrl.frame_label()], &name);
+        let name = format!("[{}]{}", FrameContext::frame_name(), debug_name);
+        let cmd = CommandBuffer::new(&self.graphics_command_pools[*FrameContext::frame_label()], &name);
 
-        self.allocated_command_buffers[*self.frame_ctrl.frame_label()].push(cmd.clone());
+        self.allocated_command_buffers[*FrameContext::frame_label()].push(cmd.clone());
         cmd
     }
 
     pub fn free_frame_commands(&mut self) {
-        self.free_frame_commands_internal(*self.frame_ctrl.frame_label());
+        self.free_frame_commands_internal(*FrameContext::frame_label());
     }
 
     pub fn free_all(&mut self) {
-        for i in 0..self.frame_ctrl.fif_count() {
+        for i in 0..FrameContext::fif_count() {
             self.free_frame_commands_internal(i);
         }
     }

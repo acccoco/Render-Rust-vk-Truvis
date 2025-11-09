@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use truvis_cxx::AssimpSceneLoader;
+use truvis_gfx::gfx::Gfx;
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;
 use truvis_model_manager::components::mesh::Mesh;
 use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
-use truvis_gfx::render_context::RenderContext;
 
 fn main() {
-    RenderContext::init("test".to_string(), vec![]);
+    Gfx::init("test".to_string(), vec![]);
 
     let mut mesh_map: HashMap<MeshGuid, Mesh> = HashMap::new();
     let mut mat_map: HashMap<MatGuid, Material> = HashMap::new();

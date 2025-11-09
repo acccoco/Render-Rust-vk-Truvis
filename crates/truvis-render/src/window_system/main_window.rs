@@ -1,19 +1,20 @@
+use ash::vk;
+use itertools::Itertools;
+use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
+
+use truvis_crate_tools::resource::TruvisPath;
+use truvis_gfx::{
+    commands::{barrier::ImageBarrier, semaphore::Semaphore, submit_info::SubmitInfo},
+    gfx::Gfx,
+    swapchain::render_swapchain::RenderSwapchain,
+};
+
 use crate::renderer::frame_context::FrameContext;
 use crate::{
     gui::{gui::Gui, gui_pass::GuiPass},
     pipeline_settings::{DefaultRendererSettings, FrameLabel},
-    renderer::{frame_controller::FrameController, renderer::PresentData},
+    renderer::renderer::PresentData,
 };
-use ash::vk;
-use itertools::Itertools;
-use std::rc::Rc;
-use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::{
-    commands::{barrier::ImageBarrier, semaphore::Semaphore, submit_info::SubmitInfo},
-    render_context::RenderContext,
-    swapchain::render_swapchain::RenderSwapchain,
-};
-use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
 mod helper {
     pub fn load_icon(bytes: &[u8]) -> winit::window::Icon {
@@ -34,8 +35,6 @@ pub struct MainWindow {
     gui: Gui,
     gui_pass: GuiPass,
 
-    frame_ctrl: Rc<FrameController>,
-
     /// 数量和 fif num 相同
     present_complete_semaphores: Vec<Semaphore>,
 
@@ -52,12 +51,7 @@ pub struct MainWindow {
 
 // ctor
 impl MainWindow {
-    pub fn new(
-        event_loop: &ActiveEventLoop,
-        frame_ctrl: Rc<FrameController>,
-        window_title: String,
-        window_extent: vk::Extent2D,
-    ) -> Self {
+    pub fn new(event_loop: &ActiveEventLoop, window_title: String, window_extent: vk::Extent2D) -> Self {
         let icon_data = std::fs::read(TruvisPath::resources_path("DruvisIII.png")).expect("Failed to read icon file");
         let icon = helper::load_icon(icon_data.as_ref());
         let window_attr = Window::default_attributes()
@@ -69,7 +63,7 @@ impl MainWindow {
 
         let window = event_loop.create_window(window_attr).unwrap();
         let swapchain = RenderSwapchain::new(
-            RenderContext::get().vk_core(),
+            Gfx::get().vk_core(),
             &window,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
@@ -77,10 +71,10 @@ impl MainWindow {
 
         let swapchain_image_infos = swapchain.image_infos();
 
-        let gui = Gui::new(&window, frame_ctrl.fif_count(), &swapchain_image_infos);
+        let gui = Gui::new(&window, FrameContext::fif_count(), &swapchain_image_infos);
         let gui_pass = GuiPass::new(swapchain_image_infos.image_format);
 
-        let present_complete_semaphores = (0..frame_ctrl.fif_count())
+        let present_complete_semaphores = (0..FrameContext::fif_count())
             .map(|i| Semaphore::new(&format!("window-present-complete-{}", i)))
             .collect_vec();
         let render_complete_semaphores = (0..swapchain_image_infos.image_cnt)
@@ -92,7 +86,6 @@ impl MainWindow {
             swapchain: Some(swapchain),
             present_complete_semaphores,
             render_complete_semaphores,
-            frame_ctrl,
             gui,
             gui_pass,
         }
@@ -105,8 +98,8 @@ impl MainWindow {
 
     fn draw(&mut self, renderer_data: PresentData) {
         let swapchain = self.swapchain.as_ref().unwrap();
-        let canvas_idx = swapchain.current_image_index();
-        let frame_label = self.frame_ctrl.frame_label();
+        let swapchain_image_idx = swapchain.current_image_index();
+        let frame_label = FrameContext::frame_label();
 
         let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("window-present");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
@@ -125,7 +118,7 @@ impl MainWindow {
                 );
 
             let render_target_barrier = ImageBarrier::new()
-                .image(renderer_data.render_target.image())
+                .image(renderer_data.render_target.upgrade().unwrap().image())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(renderer_data.render_target_barrier.src_stage, renderer_data.render_target_barrier.src_access)
                 .dst_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ);
@@ -168,12 +161,12 @@ impl MainWindow {
                 None,
             )
             .signal(
-                &self.render_complete_semaphores[canvas_idx],
+                &self.render_complete_semaphores[swapchain_image_idx],
                 vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
                 None,
             );
 
-        RenderContext::get().gfx_queue().submit(vec![submit_info], None);
+        Gfx::get().gfx_queue().submit(vec![submit_info], None);
     }
 }
 
@@ -201,7 +194,7 @@ impl MainWindow {
     pub fn present_image(&self) {
         let swapchain = self.swapchain.as_ref().unwrap();
         swapchain.present_image(
-            RenderContext::get().gfx_queue(),
+            Gfx::get().gfx_queue(),
             std::slice::from_ref(&self.render_complete_semaphores[swapchain.current_image_index()]),
         );
     }
@@ -236,12 +229,12 @@ impl MainWindow {
 
     pub fn rebuild_after_resized(&mut self) {
         unsafe {
-            RenderContext::get().device_functions().device_wait_idle().unwrap();
+            Gfx::get().gfx_device().device_wait_idle().unwrap();
         }
 
         self.swapchain = None;
         self.swapchain = Some(RenderSwapchain::new(
-            RenderContext::get().vk_core(),
+            Gfx::get().vk_core(),
             &self.winit_window,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,

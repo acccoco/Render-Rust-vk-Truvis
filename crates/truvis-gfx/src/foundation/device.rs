@@ -232,7 +232,7 @@ impl Deref for GfxDevice {
 impl Drop for GfxDevice {
     fn drop(&mut self) {
         #[cfg(debug_assertions)]
-        debug_assert!(self.destroyed.get(), "DeviceFunctions must be destroyed before being dropped.");
+        debug_assert!(self.destroyed.get(), "GfxDevice must be destroyed before being dropped.");
     }
 }
 impl DebugType for GfxDevice {

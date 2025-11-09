@@ -1,13 +1,12 @@
 use ash::vk;
 
-use truvis_model_manager::components::geometry::Geometry;
-use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
-use truvis_render::render_pipeline::pipeline_context::PipelineContext;
-use truvis_render::renderer::frame_context::FrameContext;
 use truvis_gfx::{
     commands::{barrier::ImageBarrier, submit_info::SubmitInfo},
-    render_context::RenderContext,
+    gfx::Gfx,
 };
+use truvis_model_manager::components::geometry::Geometry;
+use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
+use truvis_render::renderer::frame_context::FrameContext;
 
 use crate::shader_toy_pass::ShaderToyPass;
 
@@ -20,19 +19,13 @@ impl ShaderToyPipeline {
         Self { shader_toy_pass }
     }
 
-    pub fn render(&self, ctx: PipelineContext, shape: &Geometry<VertexLayoutAoSPosColor>) {
-        let PipelineContext {
-            gpu_scene: _,
-            timer,
-            per_frame_data: _,
-            frame_settings,
-            pipeline_settings: _,
-            frame_buffers,
-        } = ctx;
-        let frame_ctrl = FrameContext::get().frame_ctrl.clone();
-        let frame_label = frame_ctrl.frame_label();
-        let render_target = frame_buffers.render_target_image(frame_label);
-        let render_target_view = frame_buffers.render_target_image_view(frame_label);
+    pub fn render(&self, shape: &Geometry<VertexLayoutAoSPosColor>) {
+        let fif_buffers = FrameContext::get().fif_buffers.borrow();
+
+        let frame_label = FrameContext::frame_label();
+        let render_target = fif_buffers.render_target_image(frame_label);
+        let render_target_view = fif_buffers.render_target_image_view(frame_label);
+        let frame_settings = FrameContext::get().frame_settings();
 
         // render shader toy
         {
@@ -56,7 +49,7 @@ impl ShaderToyPipeline {
                     )],
             );
 
-            self.shader_toy_pass.draw(&cmd, &frame_ctrl, frame_settings, render_target_view.handle(), timer, shape);
+            self.shader_toy_pass.draw(&cmd, &frame_settings, render_target_view.handle(), shape);
 
             // 将 render target 从 color attachment -> general
             cmd.image_memory_barrier(
@@ -73,7 +66,7 @@ impl ShaderToyPipeline {
             );
 
             cmd.end();
-            RenderContext::get().gfx_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
+            Gfx::get().gfx_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
         }
     }
 }

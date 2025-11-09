@@ -3,11 +3,11 @@ use ash::vk;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
     commands::{barrier::ImageBarrier, submit_info::SubmitInfo},
-    render_context::RenderContext,
+    gfx::Gfx,
 };
 use truvis_shader_binding::shader;
 
-use crate::render_pipeline::{compute_pass::ComputePass, pipeline_context::PipelineContext, rt_pass::SimlpeRtPass};
+use crate::render_pipeline::{compute_pass::ComputePass, rt_pass::SimlpeRtPass};
 use crate::renderer::frame_context::FrameContext;
 
 /// 整个 RT 管线
@@ -38,22 +38,17 @@ impl RtPipeline {
         }
     }
 
-    pub fn render(&self, ctx: PipelineContext) {
-        let PipelineContext {
-            gpu_scene,
-            timer: _,
-            per_frame_data,
-            frame_settings,
-            pipeline_settings,
-            frame_buffers,
-        } = ctx;
-        let frame_label = FrameContext::get().frame_ctrl.frame_label();
+    pub fn render(&self) {
+        let frame_label = FrameContext::frame_label();
         let bindless_mgr = FrameContext::bindless_mgr();
+        let frame_settings = FrameContext::get().frame_settings();
 
-        let color_image = frame_buffers.color_image();
-        let color_image_handle = frame_buffers.color_image_bindless_handle(&bindless_mgr);
-        let render_target = frame_buffers.render_target_image(frame_label);
-        let render_target_handle = frame_buffers.render_target_image_bindless_handle(&bindless_mgr, frame_label);
+        let fif_buffers = FrameContext::get().fif_buffers.borrow();
+
+        let color_image = fif_buffers.color_image();
+        let color_image_handle = fif_buffers.color_image_bindless_handle(&bindless_mgr);
+        let render_target = fif_buffers.render_target_image(frame_label);
+        let render_target_handle = fif_buffers.render_target_image_bindless_handle(&bindless_mgr, frame_label);
 
         let mut submit_cmds = Vec::new();
         // ray tracing
@@ -76,12 +71,11 @@ impl RtPipeline {
 
             self.rt_pass.ray_trace(
                 &cmd,
-                frame_settings,
-                pipeline_settings,
+                &frame_settings,
+                &FrameContext::get().pipeline_settings(),
                 color_image.handle(),
                 color_image_handle,
-                per_frame_data,
-                gpu_scene,
+                &FrameContext::get().per_frame_data_buffers[*frame_label],
             );
 
             cmd.end();
@@ -150,7 +144,7 @@ impl RtPipeline {
                     dst_image: render_target_handle,
                     image_size: glam::uvec2(frame_settings.frame_extent.width, frame_settings.frame_extent.height)
                         .into(),
-                    channel: pipeline_settings.channel,
+                    channel: FrameContext::get().pipeline_settings().channel,
                     _padding_1: Default::default(),
                 },
                 glam::uvec3(
@@ -164,7 +158,7 @@ impl RtPipeline {
             submit_cmds.push(cmd);
         }
 
-        RenderContext::get().gfx_queue().submit(vec![SubmitInfo::new(&submit_cmds)], None);
+        Gfx::get().gfx_queue().submit(vec![SubmitInfo::new(&submit_cmds)], None);
     }
 }
 impl Drop for RtPipeline {

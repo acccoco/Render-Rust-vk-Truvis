@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 
 /// # Destroy
 /// 不应该实现 Fence，因为可以 Clone，需要手动 destroy
@@ -24,20 +24,20 @@ impl Fence {
     /// # param
     /// * signaled - 是否创建时就 signaled
     pub fn new(signaled: bool, debug_name: &str) -> Self {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         let fence_flags = if signaled { vk::FenceCreateFlags::SIGNALED } else { vk::FenceCreateFlags::empty() };
         let fence =
-            unsafe { device_functions.create_fence(&vk::FenceCreateInfo::default().flags(fence_flags), None).unwrap() };
+            unsafe { gfx_device.create_fence(&vk::FenceCreateInfo::default().flags(fence_flags), None).unwrap() };
 
         let fence = Self { fence };
-        device_functions.set_debug_name(&fence, debug_name);
+        gfx_device.set_debug_name(&fence, debug_name);
         fence
     }
     #[inline]
     pub fn destroy(self) {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         unsafe {
-            device_functions.destroy_fence(self.fence, None);
+            gfx_device.destroy_fence(self.fence, None);
         }
     }
 }
@@ -55,17 +55,17 @@ impl Fence {
     /// 阻塞等待 fence
     #[inline]
     pub fn wait(&self) {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         unsafe {
-            device_functions.wait_for_fences(std::slice::from_ref(&self.fence), true, u64::MAX).unwrap();
+            gfx_device.wait_for_fences(std::slice::from_ref(&self.fence), true, u64::MAX).unwrap();
         }
     }
 
     #[inline]
     pub fn reset(&self) {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         unsafe {
-            device_functions.reset_fences(std::slice::from_ref(&self.fence)).unwrap();
+            gfx_device.reset_fences(std::slice::from_ref(&self.fence)).unwrap();
         }
     }
 }

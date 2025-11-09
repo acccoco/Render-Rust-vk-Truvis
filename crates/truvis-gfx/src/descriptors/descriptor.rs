@@ -1,7 +1,7 @@
 use ash::vk;
 use truvis_shader_layout_trait::ShaderBindingLayout;
 
-use crate::render_context::RenderContext;
+use crate::gfx::Gfx;
 use crate::{descriptors::descriptor_pool::DescriptorPool, foundation::debug_messenger::DebugType};
 
 /// 描述符集布局
@@ -40,14 +40,14 @@ impl<T: ShaderBindingLayout> DescriptorSetLayout<T> {
             vk::DescriptorSetLayoutCreateInfo::default().flags(flags).bindings(&bindings).push_next(&mut bind_flags_ci);
         vk::DescriptorBindingFlags::empty();
 
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         // 创建 Vulkan 描述符集布局
-        let layout = unsafe { device_functions.create_descriptor_set_layout(&create_info, None).unwrap() };
+        let layout = unsafe { gfx_device.create_descriptor_set_layout(&create_info, None).unwrap() };
         let layout = Self {
             layout,
             phantom_data: std::marker::PhantomData,
         };
-        device_functions.set_debug_name(&layout, debug_name);
+        gfx_device.set_debug_name(&layout, debug_name);
         layout
     }
 
@@ -64,7 +64,7 @@ impl<T: ShaderBindingLayout> DescriptorSetLayout<T> {
 impl<T: ShaderBindingLayout> Drop for DescriptorSetLayout<T> {
     fn drop(&mut self) {
         unsafe {
-            RenderContext::get().device_functions().destroy_descriptor_set_layout(self.layout, None);
+            Gfx::get().gfx_device().destroy_descriptor_set_layout(self.layout, None);
         }
     }
 }
@@ -112,14 +112,14 @@ impl<T: ShaderBindingLayout> DescriptorSet<T> {
         let alloc_info = vk::DescriptorSetAllocateInfo::default()
             .descriptor_pool(descriptor_pool.handle())
             .set_layouts(std::slice::from_ref(&layout.layout));
-        let device_functions = RenderContext::get().device_functions();
-        let descriptor_set = unsafe { device_functions.allocate_descriptor_sets(&alloc_info).unwrap()[0] };
+        let gfx_device = Gfx::get().gfx_device();
+        let descriptor_set = unsafe { gfx_device.allocate_descriptor_sets(&alloc_info).unwrap()[0] };
         let set = Self {
             handle: descriptor_set,
             phantom_data: std::marker::PhantomData,
             _descriptor_pool: descriptor_pool.handle(),
         };
-        device_functions.set_debug_name(&set, debug_name);
+        gfx_device.set_debug_name(&set, debug_name);
         set
     }
 

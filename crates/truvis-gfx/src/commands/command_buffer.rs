@@ -1,7 +1,7 @@
 use ash::vk;
 use itertools::Itertools;
 
-use crate::render_context::RenderContext;
+use crate::gfx::Gfx;
 use crate::resources::special_buffers::index_buffer::{IndexBuffer, IndexType};
 use crate::{
     basic::color::LabelColor,
@@ -29,13 +29,12 @@ impl CommandBuffer {
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_buffer_count(1);
 
-        let command_buffer =
-            unsafe { RenderContext::get().device_functions().allocate_command_buffers(&info).unwrap()[0] };
+        let command_buffer = unsafe { Gfx::get().gfx_device().allocate_command_buffers(&info).unwrap()[0] };
         let cmd_buffer = CommandBuffer {
             vk_handle: command_buffer,
             _command_pool_handle: command_pool.handle(),
         };
-        RenderContext::get().device_functions().set_debug_name(&cmd_buffer, debug_name);
+        Gfx::get().gfx_device().set_debug_name(&cmd_buffer, debug_name);
         cmd_buffer
     }
 }
@@ -48,8 +47,8 @@ impl CommandBuffer {
     #[inline]
     pub fn begin(&self, usage_flag: vk::CommandBufferUsageFlags, debug_label_name: &str) {
         unsafe {
-            RenderContext::get()
-                .device_functions()
+            Gfx::get()
+                .gfx_device()
                 .begin_command_buffer(self.vk_handle, &vk::CommandBufferBeginInfo::default().flags(usage_flag))
                 .unwrap();
         }
@@ -62,7 +61,7 @@ impl CommandBuffer {
     #[inline]
     pub fn end(&self) {
         self.end_label();
-        unsafe { RenderContext::get().device_functions().end_command_buffer(self.vk_handle).unwrap() }
+        unsafe { Gfx::get().gfx_device().end_command_buffer(self.vk_handle).unwrap() }
     }
 }
 
@@ -82,12 +81,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_copy_buffer(&self, src: &Buffer, dst: &Buffer, regions: &[vk::BufferCopy]) {
         unsafe {
-            RenderContext::get().device_functions().cmd_copy_buffer(
-                self.vk_handle,
-                src.vk_buffer(),
-                dst.vk_buffer(),
-                regions,
-            );
+            Gfx::get().gfx_device().cmd_copy_buffer(self.vk_handle, src.vk_buffer(), dst.vk_buffer(), regions);
         }
     }
 
@@ -95,7 +89,7 @@ impl CommandBuffer {
     /// - 支持的 queue：transfer，graphics，compute
     #[inline]
     pub fn cmd_copy_buffer_to_image(&self, copy_info: &vk::CopyBufferToImageInfo2) {
-        unsafe { RenderContext::get().device_functions().cmd_copy_buffer_to_image2(self.vk_handle, copy_info) }
+        unsafe { Gfx::get().gfx_device().cmd_copy_buffer_to_image2(self.vk_handle, copy_info) }
     }
 
     /// 将 data 传输到 buffer 中，大小限制：65536Bytes=64KB
@@ -110,7 +104,7 @@ impl CommandBuffer {
     /// - supported queue types: transfer, graphics, compute
     #[inline]
     pub fn cmd_update_buffer(&self, buffer: vk::Buffer, offset: vk::DeviceSize, data: &[u8]) {
-        unsafe { RenderContext::get().device_functions().cmd_update_buffer(self.vk_handle, buffer, offset, data) }
+        unsafe { Gfx::get().gfx_device().cmd_update_buffer(self.vk_handle, buffer, offset, data) }
     }
 
     /// - command type: state
@@ -124,13 +118,7 @@ impl CommandBuffer {
         data: &[u8],
     ) {
         unsafe {
-            RenderContext::get().device_functions().cmd_push_constants(
-                self.vk_handle,
-                pipeline_layout,
-                stage,
-                offset,
-                data,
-            );
+            Gfx::get().gfx_device().cmd_push_constants(self.vk_handle, pipeline_layout, stage, offset, data);
         }
     }
 }
@@ -142,17 +130,14 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_begin_rendering(&self, render_info: &vk::RenderingInfo) {
         unsafe {
-            RenderContext::get().device_functions().dynamic_rendering.cmd_begin_rendering(self.vk_handle, render_info);
+            Gfx::get().gfx_device().dynamic_rendering.cmd_begin_rendering(self.vk_handle, render_info);
         }
     }
 
     pub fn cmd_begin_rendering2(&self, rendering_info: &RenderingInfo) {
         let rendering_info = rendering_info.rendering_info();
         unsafe {
-            RenderContext::get()
-                .device_functions()
-                .dynamic_rendering
-                .cmd_begin_rendering(self.vk_handle, &rendering_info);
+            Gfx::get().gfx_device().dynamic_rendering.cmd_begin_rendering(self.vk_handle, &rendering_info);
         }
     }
 
@@ -161,7 +146,7 @@ impl CommandBuffer {
     #[inline]
     pub fn end_rendering(&self) {
         unsafe {
-            RenderContext::get().device_functions().dynamic_rendering.cmd_end_rendering(self.vk_handle);
+            Gfx::get().gfx_device().dynamic_rendering.cmd_end_rendering(self.vk_handle);
         }
     }
 
@@ -177,7 +162,7 @@ impl CommandBuffer {
         vertex_offset: i32,
     ) {
         unsafe {
-            RenderContext::get().device_functions().cmd_draw_indexed(
+            Gfx::get().gfx_device().cmd_draw_indexed(
                 self.vk_handle,
                 index_cnt,
                 instance_cnt,
@@ -195,7 +180,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_draw(&self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) {
         unsafe {
-            RenderContext::get().device_functions().cmd_draw(
+            Gfx::get().gfx_device().cmd_draw(
                 self.vk_handle,
                 vertex_count,
                 instance_count,
@@ -217,7 +202,7 @@ impl CommandBuffer {
         dynamic_offsets: Option<&[u32]>,
     ) {
         unsafe {
-            RenderContext::get().device_functions().cmd_bind_descriptor_sets(
+            Gfx::get().gfx_device().cmd_bind_descriptor_sets(
                 self.vk_handle,
                 bind_point,
                 pipeline_layout,
@@ -233,7 +218,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_bind_pipeline(&self, bind_point: vk::PipelineBindPoint, pipeline: vk::Pipeline) {
         unsafe {
-            RenderContext::get().device_functions().cmd_bind_pipeline(self.vk_handle, bind_point, pipeline);
+            Gfx::get().gfx_device().cmd_bind_pipeline(self.vk_handle, bind_point, pipeline);
         }
     }
 
@@ -244,12 +229,7 @@ impl CommandBuffer {
     pub fn cmd_bind_vertex_buffers(&self, first_bind: u32, buffers: &[Buffer], offsets: &[vk::DeviceSize]) {
         unsafe {
             let buffers = buffers.iter().map(|b| b.vk_buffer()).collect_vec();
-            RenderContext::get().device_functions().cmd_bind_vertex_buffers(
-                self.vk_handle,
-                first_bind,
-                &buffers,
-                offsets,
-            );
+            Gfx::get().gfx_device().cmd_bind_vertex_buffers(self.vk_handle, first_bind, &buffers, offsets);
         }
     }
 
@@ -258,24 +238,14 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_bind_index_buffer(&self, buffer: &Buffer, offset: vk::DeviceSize, index_type: vk::IndexType) {
         unsafe {
-            RenderContext::get().device_functions().cmd_bind_index_buffer(
-                self.vk_handle,
-                buffer.vk_buffer(),
-                offset,
-                index_type,
-            );
+            Gfx::get().gfx_device().cmd_bind_index_buffer(self.vk_handle, buffer.vk_buffer(), offset, index_type);
         }
     }
 
     #[inline]
     pub fn cmd_bind_index_buffer1<T: IndexType>(&self, buffer: &IndexBuffer<T>, offset: vk::DeviceSize) {
         unsafe {
-            RenderContext::get().device_functions().cmd_bind_index_buffer(
-                self.vk_handle,
-                buffer.vk_buffer(),
-                offset,
-                T::VK_INDEX_TYPE,
-            );
+            Gfx::get().gfx_device().cmd_bind_index_buffer(self.vk_handle, buffer.vk_buffer(), offset, T::VK_INDEX_TYPE);
         }
     }
 
@@ -284,7 +254,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_set_viewport(&self, first_viewport: u32, viewports: &[vk::Viewport]) {
         unsafe {
-            RenderContext::get().device_functions().cmd_set_viewport(self.vk_handle, first_viewport, viewports);
+            Gfx::get().gfx_device().cmd_set_viewport(self.vk_handle, first_viewport, viewports);
         }
     }
 
@@ -293,7 +263,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_set_scissor(&self, first_scissor: u32, scissors: &[vk::Rect2D]) {
         unsafe {
-            RenderContext::get().device_functions().cmd_set_scissor(self.vk_handle, first_scissor, scissors);
+            Gfx::get().gfx_device().cmd_set_scissor(self.vk_handle, first_scissor, scissors);
         }
     }
 }
@@ -305,10 +275,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_copy_acceleration_structure(&self, copy_info: &vk::CopyAccelerationStructureInfoKHR) {
         unsafe {
-            RenderContext::get()
-                .device_functions()
-                .acceleration_structure
-                .cmd_copy_acceleration_structure(self.vk_handle, copy_info);
+            Gfx::get().gfx_device().acceleration_structure.cmd_copy_acceleration_structure(self.vk_handle, copy_info);
         }
     }
 
@@ -322,7 +289,7 @@ impl CommandBuffer {
     ) {
         unsafe {
             // 该函数可以一次构建多个 AccelerationStructure，这里只构建了 1 个
-            RenderContext::get().device_functions().acceleration_structure.cmd_build_acceleration_structures(
+            Gfx::get().gfx_device().acceleration_structure.cmd_build_acceleration_structures(
                 self.vk_handle,
                 std::slice::from_ref(geometry),
                 &[ranges],
@@ -341,7 +308,7 @@ impl CommandBuffer {
         acceleration_structures: &[vk::AccelerationStructureKHR],
     ) {
         unsafe {
-            RenderContext::get().device_functions().acceleration_structure.cmd_write_acceleration_structures_properties(
+            Gfx::get().gfx_device().acceleration_structure.cmd_write_acceleration_structures_properties(
                 self.vk_handle,
                 acceleration_structures,
                 query_pool.query_type(),
@@ -364,7 +331,7 @@ impl CommandBuffer {
         thread_size: [u32; 3],
     ) {
         unsafe {
-            RenderContext::get().device_functions().ray_tracing_pipeline.cmd_trace_rays(
+            Gfx::get().gfx_device().ray_tracing_pipeline.cmd_trace_rays(
                 self.vk_handle,
                 raygen_table,
                 miss_table,
@@ -383,7 +350,7 @@ impl CommandBuffer {
     #[inline]
     pub fn cmd_dispatch(&self, group_cnt: glam::UVec3) {
         unsafe {
-            RenderContext::get().device_functions().cmd_dispatch(self.vk_handle, group_cnt.x, group_cnt.y, group_cnt.z);
+            Gfx::get().gfx_device().cmd_dispatch(self.vk_handle, group_cnt.x, group_cnt.y, group_cnt.z);
         }
     }
 }
@@ -396,7 +363,7 @@ impl CommandBuffer {
     pub fn memory_barrier(&self, barriers: &[vk::MemoryBarrier2]) {
         let dependency_info = vk::DependencyInfo::default().memory_barriers(barriers);
         unsafe {
-            RenderContext::get().device_functions().cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
+            Gfx::get().gfx_device().cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
         }
     }
 
@@ -408,7 +375,7 @@ impl CommandBuffer {
         let dependency_info =
             vk::DependencyInfo::default().image_memory_barriers(&barriers).dependency_flags(dependency_flags);
         unsafe {
-            RenderContext::get().device_functions().cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
+            Gfx::get().gfx_device().cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
         }
     }
 
@@ -420,7 +387,7 @@ impl CommandBuffer {
         let dependency_info =
             vk::DependencyInfo::default().buffer_memory_barriers(&barriers).dependency_flags(dependency_flags);
         unsafe {
-            RenderContext::get().device_functions().cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
+            Gfx::get().gfx_device().cmd_pipeline_barrier2(self.vk_handle, &dependency_info);
         }
     }
 }
@@ -433,7 +400,7 @@ impl CommandBuffer {
     pub fn begin_label(&self, label_name: &str, label_color: glam::Vec4) {
         let name = std::ffi::CString::new(label_name).unwrap();
         unsafe {
-            RenderContext::get().device_functions().debug_utils.cmd_begin_debug_utils_label(
+            Gfx::get().gfx_device().debug_utils.cmd_begin_debug_utils_label(
                 self.vk_handle,
                 &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(label_color.into()),
             );
@@ -445,7 +412,7 @@ impl CommandBuffer {
     #[inline]
     pub fn end_label(&self) {
         unsafe {
-            RenderContext::get().device_functions().debug_utils.cmd_end_debug_utils_label(self.vk_handle);
+            Gfx::get().gfx_device().debug_utils.cmd_end_debug_utils_label(self.vk_handle);
         }
     }
 
@@ -455,7 +422,7 @@ impl CommandBuffer {
     pub fn insert_label(&self, label_name: &str, label_color: glam::Vec4) {
         let name = std::ffi::CString::new(label_name).unwrap();
         unsafe {
-            RenderContext::get().device_functions().debug_utils.cmd_insert_debug_utils_label(
+            Gfx::get().gfx_device().debug_utils.cmd_insert_debug_utils_label(
                 self.vk_handle,
                 &vk::DebugUtilsLabelEXT::default().label_name(name.as_c_str()).color(label_color.into()),
             );

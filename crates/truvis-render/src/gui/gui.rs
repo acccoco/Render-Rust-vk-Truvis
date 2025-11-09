@@ -9,12 +9,12 @@ use truvis_gfx::swapchain::render_swapchain::SwapchainImageInfo;
 use truvis_gfx::{
     basic::color::LabelColor,
     commands::command_buffer::CommandBuffer,
-    render_context::RenderContext,
+    gfx::Gfx,
     resources::{image::Image2D, texture::Texture2D},
 };
 
 use crate::renderer::frame_context::FrameContext;
-use crate::{gui::mesh::GuiMesh, pipeline_settings::FrameLabel, renderer::bindless::BindlessManager};
+use crate::{gui::gui_mesh::GuiMesh, pipeline_settings::FrameLabel, renderer::bindless::BindlessManager};
 
 pub struct Gui {
     pub imgui_ctx: imgui::Context,
@@ -114,7 +114,7 @@ impl Gui {
                 atlas_texture.data,
                 "imgui-fonts",
             ));
-            Texture2D::new(image.clone(), "imgui-fonts")
+            Texture2D::new(image, "imgui-fonts")
         };
 
         let fonts_texture_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);
@@ -294,9 +294,9 @@ impl Gui {
             return None;
         }
 
-        RenderContext::get().gfx_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
+        Gfx::get().gfx_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
         self.meshes[*frame_label].replace(GuiMesh::new(cmd, &format!("{frame_label}"), draw_data));
-        RenderContext::get().gfx_queue().end_label();
+        Gfx::get().gfx_queue().end_label();
 
         Some((
             self.meshes[*frame_label].as_ref().unwrap(), //

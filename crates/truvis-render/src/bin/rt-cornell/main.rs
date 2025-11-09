@@ -1,8 +1,9 @@
 use imgui::Ui;
 
+use truvis_render::renderer::frame_context::FrameContext;
 use truvis_render::{
-    app::TruvisApp, outer_app::OuterApp, platform::camera::Camera, render_pipeline::pipeline_context::PipelineContext,
-    render_pipeline::rt_pipeline::RtPipeline, renderer::renderer::Renderer,
+    app::TruvisApp, outer_app::OuterApp, platform::camera::Camera, render_pipeline::rt_pipeline::RtPipeline,
+    renderer::renderer::Renderer,
 };
 use truvis_shader_binding::shader;
 
@@ -11,12 +12,12 @@ struct PhongApp {
 }
 
 impl PhongApp {
-    fn create_scene(renderer: &mut Renderer, camera: &mut Camera) {
+    fn create_scene(_renderer: &mut Renderer, camera: &mut Camera) {
         camera.position = glam::vec3(-400.0, 1000.0, 1000.0);
         camera.euler_yaw_deg = 330.0;
         camera.euler_pitch_deg = -27.0;
 
-        let mut scene_mgr = renderer.scene_mgr.borrow_mut();
+        let mut scene_mgr = FrameContext::scene_manager_mut();
 
         scene_mgr.register_point_light(shader::PointLight {
             pos: glam::vec3(-20.0, 40.0, 0.0).into(),
@@ -61,8 +62,8 @@ impl OuterApp for PhongApp {
 
     fn draw_ui(&mut self, _ui: &Ui) {}
 
-    fn draw(&self, pipeline_ctx: PipelineContext) {
-        self.rt_pipeline.render(pipeline_ctx);
+    fn draw(&self) {
+        self.rt_pipeline.render();
     }
 }
 

@@ -6,12 +6,6 @@ use itertools::Itertools;
 use truvis_crate_tools::const_map;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_model_manager::components::geometry::Geometry;
-use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
-use truvis_render::{
-    pipeline_settings::{FrameLabel, FrameSettings},
-    renderer::frame_buffers::FrameBuffers,
-};
 use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_gfx::{
     commands::command_buffer::CommandBuffer,
@@ -20,6 +14,12 @@ use truvis_gfx::{
         rendering_info::RenderingInfo,
         shader::ShaderStageInfo,
     },
+};
+use truvis_model_manager::components::geometry::Geometry;
+use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
+use truvis_render::{
+    pipeline_settings::{FrameLabel, FrameSettings},
+    renderer::fif_buffer::FifBuffers,
 };
 
 const_map!(ShaderStage<ShaderStageInfo>: {
@@ -68,13 +68,13 @@ impl TrianglePass {
         &self,
         cmd: &CommandBuffer,
         frame_label: FrameLabel,
-        framebuffers: &FrameBuffers,
+        fif_buffers: &FifBuffers,
         frame_settings: &FrameSettings,
         shape: &Geometry<VertexLayoutAoSPosColor>,
     ) {
         let viewport_extent = frame_settings.frame_extent;
         let rendering_info = RenderingInfo::new(
-            vec![framebuffers.render_target_image_view(frame_label).handle()],
+            vec![fif_buffers.render_target_image_view(frame_label).handle()],
             None,
             vk::Rect2D {
                 offset: vk::Offset2D::default(),

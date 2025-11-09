@@ -1,10 +1,9 @@
 pub mod bindless;
 pub mod cmd_allocator;
-pub mod frame_buffers;
+pub mod fif_buffer;
 pub mod frame_context;
-pub mod frame_controller;
 pub mod gpu_scene;
 pub mod renderer;
 pub mod scene_manager;
-pub mod subsystem;
 pub mod stage_buffer_manager;
+pub mod subsystem;

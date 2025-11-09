@@ -2,10 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use ash::{vk, vk::Handle};
 
-use crate::{
-    foundation::debug_messenger::DebugType, impl_derive_buffer, render_context::RenderContext,
-    resources::buffer::Buffer,
-};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::Buffer};
 
 pub trait IndexType: Sized + Copy {
     const VK_INDEX_TYPE: vk::IndexType;
@@ -56,8 +53,8 @@ impl<T: IndexType> IndexBuffer<T> {
             index_cnt,
             _phantom: std::marker::PhantomData,
         };
-        let device_functions = RenderContext::get().device_functions();
-        device_functions.set_debug_name(&buffer, &buffer.inner.debug_name);
+        let gfx_device = Gfx::get().gfx_device();
+        gfx_device.set_debug_name(&buffer, &buffer.inner.debug_name);
         buffer
     }
 

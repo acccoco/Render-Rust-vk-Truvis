@@ -6,7 +6,7 @@ use vk_mem::Alloc;
 use crate::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
     foundation::debug_messenger::DebugType,
-    render_context::RenderContext,
+    gfx::Gfx,
     resources::buffer::Buffer,
 };
 
@@ -82,8 +82,8 @@ impl Image2D {
 // 构建与销毁
 impl Image2D {
     pub fn new(image_info: Rc<ImageCreateInfo>, alloc_info: &vk_mem::AllocationCreateInfo, debug_name: &str) -> Self {
-        let allocator = RenderContext::get().allocator();
-        let device_functions = RenderContext::get().device_functions();
+        let allocator = Gfx::get().allocator();
+        let gfx_device = Gfx::get().gfx_device();
         let (image, alloc) = unsafe { allocator.create_image(&image_info.as_info(), alloc_info).unwrap() };
         let image = Self {
             _name: debug_name.to_string(),
@@ -93,7 +93,7 @@ impl Image2D {
 
             image_info,
         };
-        device_functions.set_debug_name(&image, debug_name);
+        gfx_device.set_debug_name(&image, debug_name);
         image
     }
     /// 根据 RGBA8_UNORM 的 data 创建 image
@@ -111,7 +111,7 @@ impl Image2D {
             name.as_ref(),
         );
 
-        RenderContext::get().one_time_exec(|cmd| image.transfer_data(cmd, data), name.as_ref());
+        Gfx::get().one_time_exec(|cmd| image.transfer_data(cmd, data), name.as_ref());
 
         image
     }
@@ -185,7 +185,7 @@ impl Image2D {
 
 impl Drop for Image2D {
     fn drop(&mut self) {
-        unsafe { RenderContext::get().allocator().destroy_image(self.handle, &mut self.allocation) }
+        unsafe { Gfx::get().allocator().destroy_image(self.handle, &mut self.allocation) }
     }
 }
 

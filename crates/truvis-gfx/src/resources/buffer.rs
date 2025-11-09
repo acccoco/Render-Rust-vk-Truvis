@@ -3,7 +3,7 @@ use std::ptr;
 
 use vk_mem::Alloc;
 
-use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 
 pub struct Buffer {
     pub handle: vk::Buffer,
@@ -30,7 +30,7 @@ impl DebugType for Buffer {
 
 impl Drop for Buffer {
     fn drop(&mut self) {
-        let allocator = RenderContext::get().allocator();
+        let allocator = Gfx::get().allocator();
         unsafe {
             if self.map_ptr.is_some() {
                 allocator.unmap_memory(&mut self.allocation);
@@ -44,7 +44,7 @@ impl Drop for Buffer {
 // init & destroy
 impl Buffer {
     /// - align: 当 buffer 处于一个大的 memory block 中时，align 用来指定 buffer 的起始 offset,
-    /// 其实地址的内存对齐，默认对齐到 8 字节
+    ///   其实地址的内存对齐，默认对齐到 8 字节
     /// - 优先使用 device memory
     pub fn new(
         buffer_size: vk::DeviceSize,
@@ -65,29 +65,27 @@ impl Buffer {
         };
 
         let align = align.unwrap_or(8);
-        let (buffer, mut alloc) = unsafe {
-            RenderContext::get().allocator.create_buffer_with_alignment(&buffer_ci, &alloc_ci, align).unwrap()
-        };
+        let (buffer, mut alloc) =
+            unsafe { Gfx::get().vm_allocator.create_buffer_with_alignment(&buffer_ci, &alloc_ci, align).unwrap() };
 
         let mut mapped_ptr = None;
         if mem_map {
             unsafe {
-                let allocator = RenderContext::get().allocator();
+                let allocator = Gfx::get().allocator();
                 mapped_ptr = Some(allocator.map_memory(&mut alloc).unwrap());
             }
         }
 
         let mut device_addr = None;
         if buffer_usage.contains(vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS) {
-            let device_functions = RenderContext::get().device_functions();
+            let gfx_device = Gfx::get().gfx_device();
             unsafe {
-                device_addr = Some(
-                    device_functions.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(buffer)),
-                );
+                device_addr =
+                    Some(gfx_device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(buffer)));
             }
         }
 
-        RenderContext::get().device_functions().set_object_debug_name(buffer, format!("Buffer::{}", name.as_ref()));
+        Gfx::get().gfx_device().set_object_debug_name(buffer, format!("Buffer::{}", name.as_ref()));
         Self {
             handle: buffer,
             allocation: alloc,
@@ -114,10 +112,8 @@ impl Buffer {
     #[inline]
     pub fn device_address(&self) -> vk::DeviceAddress {
         self.device_addr.unwrap_or_else(|| {
-            let device_functions = RenderContext::get().device_functions();
-            unsafe {
-                device_functions.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.handle))
-            }
+            let gfx_device = Gfx::get().gfx_device();
+            unsafe { gfx_device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.handle)) }
         })
     }
 
@@ -136,7 +132,7 @@ impl Buffer {
 
     #[inline]
     pub fn flush(&self, offset: vk::DeviceSize, size: vk::DeviceSize) {
-        let allocator = RenderContext::get().allocator();
+        let allocator = Gfx::get().allocator();
         allocator.flush_allocation(&self.allocation, offset, size).unwrap();
     }
 
@@ -148,7 +144,7 @@ impl Buffer {
         unsafe {
             ptr::copy_nonoverlapping(data.as_ptr() as *const u8, self.mapped_ptr(), size_of_val(data));
 
-            let allocator = RenderContext::get().allocator();
+            let allocator = Gfx::get().allocator();
             allocator.flush_allocation(&self.allocation, 0, size_of_val(data) as vk::DeviceSize).unwrap();
         }
     }
@@ -168,7 +164,7 @@ impl Buffer {
         stage_buffer.transfer_data_by_mmap(data);
 
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
-        RenderContext::get().one_time_exec(
+        Gfx::get().one_time_exec(
             |cmd| {
                 cmd.cmd_copy_buffer(
                     &stage_buffer,
@@ -197,7 +193,7 @@ impl Buffer {
         do_with_stage_buffer(&stage_buffer);
 
         let cmd_name = format!("{}-transfer-data", &self.debug_name);
-        RenderContext::get().one_time_exec(
+        Gfx::get().one_time_exec(
             |cmd| {
                 cmd.cmd_copy_buffer(
                     &stage_buffer,

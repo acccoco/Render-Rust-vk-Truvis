@@ -1,21 +1,25 @@
 use std::{cell::OnceCell, ffi::CStr, sync::OnceLock};
 
-use crate::renderer::frame_context::FrameContext;
-use crate::{
-    outer_app::OuterApp,
-    platform::{camera_controller::CameraController, input_manager::InputManager},
-    renderer::renderer::Renderer,
-    window_system::main_window::MainWindow,
-};
 use ash::vk;
 use raw_window_handle::HasDisplayHandle;
-use truvis_crate_tools::init_log::init_log;
-use truvis_gfx::render_context::RenderContext;
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
     event_loop::ActiveEventLoop,
     window::WindowId,
+};
+
+use truvis_crate_tools::init_log::init_log;
+use truvis_gfx::commands::barrier::BarrierMask;
+use truvis_gfx::gfx::Gfx;
+
+use crate::renderer::frame_context::FrameContext;
+use crate::renderer::renderer::PresentData;
+use crate::{
+    outer_app::OuterApp,
+    platform::{camera_controller::CameraController, input_manager::InputManager},
+    renderer::renderer::Renderer,
+    window_system::main_window::MainWindow,
 };
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
@@ -79,7 +83,7 @@ impl<T: OuterApp> TruvisApp<T> {
         app.destroy();
 
         FrameContext::destroy();
-        RenderContext::destroy();
+        Gfx::destroy();
     }
 }
 
@@ -88,7 +92,6 @@ impl<T: OuterApp> TruvisApp<T> {
     fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
         let window_system = MainWindow::new(
             event_loop,
-            self.renderer.frame_ctrl.clone(),
             "Truvis".to_string(),
             vk::Extent2D {
                 width: 1200,
@@ -109,8 +112,8 @@ impl<T: OuterApp> TruvisApp<T> {
         }
 
         self.renderer.begin_frame();
-        let frame_label = self.renderer.frame_controller().frame_label();
-        let elapsed = self.renderer.deltatime();
+        let frame_label = FrameContext::frame_label();
+        let elapsed = FrameContext::get().timer.borrow().delta_time;
 
         self.window_system.get_mut().unwrap().acquire_image(frame_label);
 
@@ -137,8 +140,12 @@ impl<T: OuterApp> TruvisApp<T> {
                     ));
                     ui.text(format!("CameraAspect: {:.2}", camera.asp));
                     ui.text(format!("CameraFov(Vertical): {:.2}°", camera.fov_deg_vertical));
-                    ui.slider("channel", 0, 3, &mut self.renderer.pipeline_settings().channel);
-                    ui.text(format!("Accum Frames: {}", self.renderer.accum_frames()));
+                    {
+                        let mut pipeline_settings = FrameContext::get().pipeline_settings();
+                        ui.slider("channel", 0, 3, &mut pipeline_settings.channel);
+                        FrameContext::get().set_pipeline_settings(pipeline_settings);
+                    }
+                    ui.text(format!("Accum Frames: {}", FrameContext::get().accum_data.get().accum_frames_num));
                     ui.new_line();
                 }
 
@@ -166,7 +173,7 @@ impl<T: OuterApp> TruvisApp<T> {
                 self.camera_controller.update(
                     &self.input_manager,
                     glam::vec2(extent.width as f32, extent.height as f32),
-                    self.renderer.deltatime(),
+                    FrameContext::get().timer.borrow().delta_time,
                 );
             }
 
@@ -180,14 +187,25 @@ impl<T: OuterApp> TruvisApp<T> {
         self.renderer.before_render(self.input_manager.state(), self.camera_controller.camera());
         {
             // 构建出 PipelineContext
-            let pipeline_ctx = self.renderer.collect_render_ctx();
-            self.outer_app.get_mut().unwrap().draw(pipeline_ctx);
+            self.outer_app.get_mut().unwrap().draw();
         }
-        self.renderer.after_render();
 
         // Window: Draw Gui ===============================
         {
-            let present_data = self.renderer.get_renderer_data();
+            let present_data = {
+                let (render_target, render_target_bindless_key) =
+                    FrameContext::get().fif_buffers.borrow().render_target_texture(frame_label);
+                PresentData {
+                    render_target,
+                    render_target_bindless_key,
+                    render_target_barrier: BarrierMask {
+                        src_stage: vk::PipelineStageFlags2::COMPUTE_SHADER,
+                        src_access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
+                        dst_stage: vk::PipelineStageFlags2::NONE,
+                        dst_access: vk::AccessFlags2::NONE,
+                    },
+                }
+            };
             self.window_system.get_mut().unwrap().draw_gui(present_data);
         }
 
@@ -211,7 +229,7 @@ impl<T: OuterApp> TruvisApp<T> {
 // 手动 drop
 impl<T: OuterApp> TruvisApp<T> {
     fn destroy(mut self) {
-        self.renderer.wait_idle();
+        Gfx::get().wait_idel();
 
         self.window_system.take().unwrap().destroy();
         self.renderer.destroy();
@@ -250,7 +268,7 @@ impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
 
         match event {
             WindowEvent::CloseRequested => {
-                self.renderer.wait_idle();
+                Gfx::get().wait_idel();
                 event_loop.exit();
             }
             WindowEvent::Resized(new_size) => {

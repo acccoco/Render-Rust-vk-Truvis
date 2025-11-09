@@ -6,7 +6,7 @@ use itertools::Itertools;
 use crate::resources::special_buffers::acceleration_buffer::{
     AccelerationInstanceBuffer, AccelerationScratchBuffer, AccelerationStructureBuffer,
 };
-use crate::{foundation::debug_messenger::DebugType, query::query_pool::QueryPool, render_context::RenderContext};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, query::query_pool::QueryPool};
 
 pub struct Acceleration {
     /// 加速结构的核心对象
@@ -56,7 +56,7 @@ impl Acceleration {
         // blas 所需的尺寸信息
         let size_info = unsafe {
             let mut size_info = vk::AccelerationStructureBuildSizesInfoKHR::default();
-            RenderContext::get().device_functions().acceleration_structure.get_acceleration_structure_build_sizes(
+            Gfx::get().gfx_device().acceleration_structure.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &build_geometry_info,
                 &max_primitives, // 每一个 geometry 里面的最大 primitive 数量
@@ -87,7 +87,7 @@ impl Acceleration {
         query_pool.reset(0, 1);
 
         // 等待初步 build 完成
-        RenderContext::get().one_time_exec(
+        Gfx::get().one_time_exec(
             |cmd| {
                 cmd.build_acceleration_structure(&build_geometry_info, &range_infos);
                 // 查询 compact size 属于 read 操作，需要同步
@@ -115,7 +115,7 @@ impl Acceleration {
             format!("{}-compact-blas", debug_name.as_ref()),
         );
 
-        RenderContext::get().one_time_exec(
+        Gfx::get().one_time_exec(
             |cmd| {
                 cmd.cmd_copy_acceleration_structure(
                     &vk::CopyAccelerationStructureInfoKHR::default()
@@ -173,7 +173,7 @@ impl Acceleration {
         // 获得 AccelerationStructure 所需的尺寸
         let size_info = unsafe {
             let mut size_info = vk::AccelerationStructureBuildSizesInfoKHR::default();
-            RenderContext::get().device_functions().acceleration_structure.get_acceleration_structure_build_sizes(
+            Gfx::get().gfx_device().acceleration_structure.get_acceleration_structure_build_sizes(
                 vk::AccelerationStructureBuildTypeKHR::DEVICE,
                 &build_geometry_info,
                 &[instances.len() as u32],
@@ -199,7 +199,7 @@ impl Acceleration {
         build_geometry_info.scratch_data.device_address = scratch_buffer.device_address();
 
         // 正式构建 TLAS
-        RenderContext::get().one_time_exec(
+        Gfx::get().one_time_exec(
             |cmd| {
                 cmd.build_acceleration_structure(&build_geometry_info, std::slice::from_ref(&range_info));
             },
@@ -218,16 +218,15 @@ impl Acceleration {
             .size(size)
             .buffer(buffer.vk_buffer());
 
-        let device_functions = RenderContext::get().device_functions();
-        let acceleration_structure = unsafe {
-            device_functions.acceleration_structure.create_acceleration_structure(&create_info, None).unwrap()
-        };
+        let gfx_device = Gfx::get().gfx_device();
+        let acceleration_structure =
+            unsafe { gfx_device.acceleration_structure.create_acceleration_structure(&create_info, None).unwrap() };
 
         let acc = Self {
             acceleration_handle: acceleration_structure,
             _buffer: buffer,
         };
-        device_functions.set_debug_name(&acc, debug_name);
+        gfx_device.set_debug_name(&acc, debug_name);
         acc
     }
 
@@ -246,7 +245,7 @@ impl Acceleration {
     #[inline]
     pub fn device_address(&self) -> vk::DeviceAddress {
         unsafe {
-            RenderContext::get().device_functions().acceleration_structure.get_acceleration_structure_device_address(
+            Gfx::get().gfx_device().acceleration_structure.get_acceleration_structure_device_address(
                 &vk::AccelerationStructureDeviceAddressInfoKHR::default()
                     .acceleration_structure(self.acceleration_handle),
             )
@@ -256,8 +255,8 @@ impl Acceleration {
 impl Drop for Acceleration {
     fn drop(&mut self) {
         unsafe {
-            RenderContext::get()
-                .device_functions()
+            Gfx::get()
+                .gfx_device()
                 .acceleration_structure
                 .destroy_acceleration_structure(self.acceleration_handle, None);
         }

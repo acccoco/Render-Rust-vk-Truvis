@@ -7,19 +7,19 @@
 ### 核心 Workspace 结构
 ```
 crates/
-├── truvis-rhi/           # Vulkan RHI 抽象（设备、命令、内存管理）
-├── truvis-render/        # 主渲染库和演示应用
-│   └── src/bin/          # triangle/, rt-sponza/, rt_cornell.rs, shader_toy/
-├── model-manager/        # 顶点数据和几何体管理
-├── truvis-cxx/          # C++ 库绑定（Assimp + CMake）
-├── shader-layout-*/     # 描述符布局宏和 trait
-└── truvis-crate-tools/  # 工作区路径工具
+├── truvis-gfx/              # Vulkan RHI 抽象（设备、命令、内存管理）
+├── truvis-render/           # 主渲染库和演示应用
+│   └── src/bin/            # triangle/, rt-sponza/, rt-cornell/, shader_toy/
+├── truvis-model-manager/   # 顶点数据和几何体管理
+├── truvis-cxx/            # C++ 库绑定（Assimp + CMake）
+├── truvis-shader-layout-*/ # 描述符布局宏和 trait
+├── truvis-shader-binding/ # 自动生成 Rust 绑定（bindgen）
+└── truvis-crate-tools/    # 工作区路径工具 + shader-build 二进制
 
 shader/
-├── src/                 # 按功能组织的 .slang/.glsl/.hlsl 源码
-├── include/            # 共享头文件（.slangi）
-├── shader-binding/     # 自动生成 Rust 绑定（bindgen）
-└── shader-build/       # 着色器编译工具
+├── src/                   # 按功能组织的 .slang/.glsl/.hlsl 源码
+├── include/              # 共享头文件（.slangi）
+└── .build/              # 编译输出的 .spv 文件
 ```
 
 ## 🚀 必需的构建流程
@@ -31,12 +31,12 @@ shader/
 cargo build --release
 
 # 2. 编译着色器（运行前必需！）
-cargo run --bin build_shader
+cargo run --bin shader-build
 
 # 3. 运行演示
 cargo run --bin triangle     # 基础三角形
 cargo run --bin rt-sponza   # 光线追踪 Sponza
-cargo run --bin rt_cornell  # Cornell Box
+cargo run --bin rt-cornell  # Cornell Box
 cargo run --bin shader_toy  # 着色器实验
 ```
 
@@ -52,17 +52,18 @@ cargo run --bin shader_toy  # 着色器实验
 ```rust
 // 文件: crates/truvis-render/src/bin/my_app/main.rs
 use truvis_render::outer_app::OuterApp;
+use truvis_model_manager::components::geometry::Geometry;
 
 struct MyApp {
     pipeline: MyPipeline,
-    geometry: DrsGeometry<VertexType>,
+    geometry: Geometry<VertexLayout>,
 }
 
 impl OuterApp for MyApp {
-    fn init(renderer: &mut Renderer, camera: &mut DrsCamera) -> Self {
+    fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self {
         Self {
-            pipeline: MyPipeline::new(&renderer.render_context, &renderer.frame_settings()),
-            geometry: VertexAosLayout::triangle(&renderer.render_context),
+            pipeline: MyPipeline::new(&renderer.frame_settings()),
+            geometry: VertexLayout::triangle(),
         }
     }
     
@@ -71,6 +72,8 @@ impl OuterApp for MyApp {
     }
     
     fn draw_ui(&mut self, ui: &imgui::Ui) { /* 可选 GUI */ }
+    fn update(&mut self, renderer: &mut Renderer) { /* 可选更新 */ }
+    fn rebuild(&mut self, renderer: &mut Renderer) { /* 可选重建 */ }
 }
 
 fn main() { TruvisApp::<MyApp>::run(); }
@@ -126,11 +129,11 @@ let shader = TruvisPath::shader_path("rt/raygen.slang.spv"); // shader/.build/rt
 
 ### 顶点数据创建（model-manager）
 ```rust
-use model_manager::vertex::vertex_pc::{VertexAosLayoutPosColor, VertexPosColor};
+use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
 
 // 内置几何体
-let triangle = VertexAosLayoutPosColor::triangle(&rhi);
-let quad = VertexAosLayoutPosColor::quad(&rhi);
+let triangle = VertexLayoutAoSPosColor::triangle();
+let quad = VertexLayoutAoSPosColor::quad();
 
 // 通过 truvis-cxx + Assimp 加载模型
 // DLL 自动复制到 target/ 目录
@@ -209,7 +212,7 @@ float4x4 → Float4x4
 cargo run --bin triangle  # ❌ 失败
 
 # 正确：必须先编译着色器
-cargo run --bin build_shader && cargo run --bin triangle  # ✅ 成功
+cargo run --bin shader-build && cargo run --bin triangle  # ✅ 成功
 ```
 
 ### 平台特定要求
@@ -326,7 +329,7 @@ pub struct Renderer {
 # 1. 在 shader/src/ 创建 .slang 文件
 # 2. 如需共享结构体，添加到 shader/include/*.slangi
 # 3. 重新编译着色器
-cargo run --bin build_shader
+cargo run --bin shader-build
 # 4. 使用自动生成的绑定
 use shader_binding::MyStruct;
 ```

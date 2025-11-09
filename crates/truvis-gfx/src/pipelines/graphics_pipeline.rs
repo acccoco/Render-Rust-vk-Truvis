@@ -3,8 +3,8 @@ use std::{convert::identity, ffi::CStr, rc::Rc};
 use ash::vk;
 use itertools::Itertools;
 
+use crate::gfx::Gfx;
 use crate::pipelines::shader::ShaderModuleCache;
-use crate::render_context::RenderContext;
 use crate::{foundation::debug_messenger::DebugType, pipelines::shader::ShaderStageInfo};
 
 pub struct PipelineLayout {
@@ -19,10 +19,10 @@ impl PipelineLayout {
         let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::default()
             .set_layouts(descriptor_set_layouts)
             .push_constant_ranges(push_constant_ranges);
-        let device_functions = RenderContext::get().device_functions();
-        let handle = unsafe { device_functions.create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() };
+        let gfx_device = Gfx::get().gfx_device();
+        let handle = unsafe { gfx_device.create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() };
         let layout = PipelineLayout { handle };
-        device_functions.set_debug_name(&layout, debug_name);
+        gfx_device.set_debug_name(&layout, debug_name);
         layout
     }
 
@@ -39,7 +39,7 @@ impl PipelineLayout {
 impl Drop for PipelineLayout {
     fn drop(&mut self) {
         unsafe {
-            RenderContext::get().device_functions().destroy_pipeline_layout(self.handle, None);
+            Gfx::get().gfx_device().destroy_pipeline_layout(self.handle, None);
         }
     }
 }
@@ -126,9 +126,9 @@ impl GraphicsPipeline {
             .dynamic_state(&dynamic_state_info)
             .push_next(&mut attach_info);
 
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         let pipeline = unsafe {
-            device_functions
+            gfx_device
                 .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
                 .unwrap()[0]
         };
@@ -137,7 +137,7 @@ impl GraphicsPipeline {
             pipeline_layout,
         };
 
-        device_functions.set_debug_name(&pipeline, debug_name);
+        gfx_device.set_debug_name(&pipeline, debug_name);
 
         shader_modules_cache.destroy();
 
@@ -162,7 +162,7 @@ impl GraphicsPipeline {
 impl Drop for GraphicsPipeline {
     fn drop(&mut self) {
         unsafe {
-            RenderContext::get().device_functions().destroy_pipeline(self.pipeline, None);
+            Gfx::get().gfx_device().destroy_pipeline(self.pipeline, None);
         }
     }
 }

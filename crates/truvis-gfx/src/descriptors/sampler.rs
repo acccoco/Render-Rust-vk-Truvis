@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 
 pub struct SamplerCreateInfo {
     inner: vk::SamplerCreateInfo<'static>,
@@ -55,9 +55,9 @@ impl DebugType for Sampler {
 }
 impl Drop for Sampler {
     fn drop(&mut self) {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         unsafe {
-            device_functions.destroy_sampler(self.handle, None);
+            gfx_device.destroy_sampler(self.handle, None);
         }
     }
 }
@@ -65,10 +65,10 @@ impl Drop for Sampler {
 impl Sampler {
     #[inline]
     pub fn new(info: Rc<SamplerCreateInfo>, debug_name: &str) -> Self {
-        let device_functions = RenderContext::get().device_functions();
-        let handle = unsafe { device_functions.create_sampler(&info.inner, None).unwrap() };
+        let gfx_device = Gfx::get().gfx_device();
+        let handle = unsafe { gfx_device.create_sampler(&info.inner, None).unwrap() };
         let sampler = Self { handle, _info: info };
-        device_functions.set_debug_name(&sampler, debug_name);
+        gfx_device.set_debug_name(&sampler, debug_name);
         sampler
     }
 

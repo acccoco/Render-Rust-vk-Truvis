@@ -1,13 +1,10 @@
+use crate::renderer::frame_context::FrameContext;
 use crate::{
     pipeline_settings::{FrameLabel, FrameSettings},
-    renderer::{
-        bindless::BindlessManager, frame_buffers::FrameBuffers, frame_controller::FrameController, gpu_scene::GpuScene,
-        scene_manager::SceneManager,
-    },
+    renderer::{bindless::BindlessManager, fif_buffer::FifBuffers, gpu_scene::GpuScene, scene_manager::SceneManager},
 };
 use ash::vk;
 use std::{cell::RefCell, mem::offset_of, rc::Rc};
-use truvis_model_manager::vertex::aos_3d::VertexLayoutAoS3D;
 use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_gfx::{
     basic::color::LabelColor,
@@ -18,6 +15,7 @@ use truvis_gfx::{
     },
     resources::special_buffers::structured_buffer::StructuredBuffer,
 };
+use truvis_model_manager::vertex::aos_3d::VertexLayoutAoS3D;
 use truvis_shader_binding::shader;
 
 pub struct PhongPass {
@@ -103,17 +101,16 @@ impl PhongPass {
     pub fn draw(
         &self,
         cmd: &CommandBuffer,
-        frame_ctx: &FrameController,
         per_frame_data: &StructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
         scene_mgr: &SceneManager,
-        frame_buffers: &FrameBuffers,
+        fif_buffers: &FifBuffers,
         frame_settings: &FrameSettings,
     ) {
-        let frame_label = frame_ctx.frame_label();
+        let frame_label = FrameContext::frame_label();
         let rendering_info = RenderingInfo::new(
-            vec![frame_buffers.render_target_image_view(frame_label).handle()],
-            Some(frame_buffers.depth_image_view().handle()),
+            vec![fif_buffers.render_target_image_view(frame_label).handle()],
+            Some(fif_buffers.depth_image_view().handle()),
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
                 extent: frame_settings.frame_extent,

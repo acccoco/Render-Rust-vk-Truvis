@@ -1,6 +1,4 @@
-use crate::{
-    platform::camera::Camera, render_pipeline::pipeline_context::PipelineContext, renderer::renderer::Renderer,
-};
+use crate::{platform::camera::Camera, renderer::renderer::Renderer};
 
 pub trait OuterApp {
     fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self;
@@ -10,7 +8,7 @@ pub trait OuterApp {
     fn update(&mut self, _renderer: &mut Renderer) {}
 
     /// 发生于 acquire_frame 之后，submit_frame 之前
-    fn draw(&self, _pipeline_ctx: PipelineContext) {}
+    fn draw(&self) {}
 
     /// window 发生改变后，重建
     fn rebuild(&mut self, _renderer: &mut Renderer) {}

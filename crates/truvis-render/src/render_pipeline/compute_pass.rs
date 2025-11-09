@@ -1,9 +1,7 @@
 use std::ffi::CStr;
 
 use ash::vk;
-use truvis_gfx::{
-    commands::command_buffer::CommandBuffer, pipelines::shader::ShaderModule, render_context::RenderContext,
-};
+use truvis_gfx::{commands::command_buffer::CommandBuffer, gfx::Gfx, pipelines::shader::ShaderModule};
 
 use crate::renderer::bindless::BindlessManager;
 
@@ -33,15 +31,13 @@ impl<P: bytemuck::Pod> ComputePass<P> {
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
 
-            unsafe {
-                RenderContext::get().device_functions().create_pipeline_layout(&pipeline_layout_ci, None).unwrap()
-            }
+            unsafe { Gfx::get().gfx_device().create_pipeline_layout(&pipeline_layout_ci, None).unwrap() }
         };
 
         let pipeline_ci = vk::ComputePipelineCreateInfo::default().stage(stage_info).layout(pipeline_layout);
         let pipeline = unsafe {
-            RenderContext::get()
-                .device_functions()
+            Gfx::get()
+                .gfx_device()
                 .create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_ci), None)
                 .unwrap()[0]
         };
@@ -78,10 +74,10 @@ impl<P: bytemuck::Pod> ComputePass<P> {
 }
 impl<P: bytemuck::Pod> Drop for ComputePass<P> {
     fn drop(&mut self) {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         unsafe {
-            device_functions.destroy_pipeline(self.pipeline, None);
-            device_functions.destroy_pipeline_layout(self.pipeline_layout, None);
+            gfx_device.destroy_pipeline(self.pipeline, None);
+            gfx_device.destroy_pipeline_layout(self.pipeline_layout, None);
         }
     }
 }

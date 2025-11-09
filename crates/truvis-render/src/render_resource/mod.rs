@@ -10,6 +10,6 @@ impl ImageLoader {
 
         let image = Rc::new(Image2D::from_rgba8(img.width(), img.height(), img.as_raw(), tex_path.to_str().unwrap()));
 
-        Texture2D::new(image.clone(), tex_path.to_str().unwrap())
+        Texture2D::new(image, tex_path.to_str().unwrap())
     }
 }

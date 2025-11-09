@@ -5,10 +5,7 @@ use std::{
 
 use ash::{vk, vk::Handle};
 
-use crate::{
-    foundation::debug_messenger::DebugType, impl_derive_buffer, render_context::RenderContext,
-    resources::buffer::Buffer,
-};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::Buffer};
 
 /// Vertex Buffer 中顶点布局的 trait 定义
 pub trait VertexLayout {
@@ -68,8 +65,8 @@ impl<L: VertexLayout> VertexBuffer<L> {
             vertex_cnt,
             _phantom: PhantomData,
         };
-        let device_functions = RenderContext::get().device_functions();
-        device_functions.set_debug_name(&buffer, &buffer.inner.debug_name);
+        let gfx_device = Gfx::get().gfx_device();
+        gfx_device.set_debug_name(&buffer, &buffer.inner.debug_name);
         buffer
     }
 

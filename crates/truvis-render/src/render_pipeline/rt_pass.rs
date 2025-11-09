@@ -4,17 +4,14 @@ use itertools::Itertools;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
     commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
+    gfx::Gfx,
     pipelines::shader::{ShaderGroupInfo, ShaderModuleCache, ShaderStageInfo},
-    render_context::RenderContext,
     resources::special_buffers::{sbt_buffer::SBTBuffer, structured_buffer::StructuredBuffer},
 };
 use truvis_shader_binding::{shader, shader::ImageHandle};
 
+use crate::pipeline_settings::{FrameSettings, PipelineSettings};
 use crate::renderer::frame_context::FrameContext;
-use crate::{
-    pipeline_settings::{FrameSettings, PipelineSettings},
-    renderer::gpu_scene::GpuScene,
-};
 
 pub struct GfxRtPipeline {
     pub pipeline: vk::Pipeline,
@@ -22,10 +19,10 @@ pub struct GfxRtPipeline {
 }
 impl Drop for GfxRtPipeline {
     fn drop(&mut self) {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         unsafe {
-            device_functions.destroy_pipeline(self.pipeline, None);
-            device_functions.destroy_pipeline_layout(self.pipeline_layout, None);
+            gfx_device.destroy_pipeline(self.pipeline, None);
+            gfx_device.destroy_pipeline_layout(self.pipeline_layout, None);
         }
     }
 }
@@ -107,7 +104,7 @@ impl SBTRegions {
     const CALLABLE_SBT_REGION: &'static [usize] = &[ShaderGroups::DiffuseCall.index()];
 
     pub fn create_sbt(pipeline: &GfxRtPipeline) -> Self {
-        let rt_pipeline_props = RenderContext::get().rt_pipeline_props();
+        let rt_pipeline_props = Gfx::get().rt_pipeline_props();
 
         // 因为不需要 user data，所以可以直接使用 shader group handle size
         let aligned_shader_group_handle_size = helper::align_up(
@@ -173,8 +170,8 @@ impl SBTRegions {
         // binding table 中
         {
             let shader_group_handle_data = unsafe {
-                RenderContext::get()
-                    .device_functions()
+                Gfx::get()
+                    .gfx_device()
                     .ray_tracing_pipeline()
                     .get_ray_tracing_shader_group_handles(
                         pipeline.pipeline,
@@ -294,9 +291,7 @@ impl SimlpeRtPass {
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
 
-            unsafe {
-                RenderContext::get().device_functions().create_pipeline_layout(&pipeline_layout_ci, None).unwrap()
-            }
+            unsafe { Gfx::get().gfx_device().create_pipeline_layout(&pipeline_layout_ci, None).unwrap() }
         };
         let pipeline_ci = vk::RayTracingPipelineCreateInfoKHR::default()
             .stages(&stage_infos)
@@ -307,8 +302,8 @@ impl SimlpeRtPass {
             .max_pipeline_ray_recursion_depth(2);
 
         let pipeline = unsafe {
-            RenderContext::get()
-                .device_functions()
+            Gfx::get()
+                .gfx_device()
                 .ray_tracing_pipeline()
                 .create_ray_tracing_pipelines(
                     vk::DeferredOperationKHR::null(),
@@ -340,9 +335,8 @@ impl SimlpeRtPass {
         rt_image: vk::Image,
         rt_handle: ImageHandle,
         per_frame_data: &StructuredBuffer<shader::PerFrameData>,
-        gpu_scene: &GpuScene,
     ) {
-        let frame_label = FrameContext::get().frame_ctrl.frame_label();
+        let frame_label = FrameContext::frame_label();
 
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
@@ -358,7 +352,7 @@ impl SimlpeRtPass {
         let spp = 4;
         let mut push_constant = shader::rt::PushConstants {
             frame_data: per_frame_data.device_address(),
-            scene: gpu_scene.scene_device_address(frame_label),
+            scene: FrameContext::gpu_scene().scene_device_address(frame_label),
             rt_render_target: rt_handle,
             spp,
             spp_idx: 0,

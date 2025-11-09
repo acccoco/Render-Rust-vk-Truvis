@@ -3,7 +3,7 @@ use std::ffi::CStr;
 
 use ash::vk;
 
-use crate::{foundation::debug_messenger::DebugType, render_context::RenderContext};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 
 /// # Destroy
 ///
@@ -18,21 +18,21 @@ impl ShaderModule {
     /// # param
     /// * path - spv shader 文件路径
     pub fn new(path: &std::path::Path) -> Self {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         let mut file = std::fs::File::open(path).unwrap();
         let shader_code = ash::util::read_spv(&mut file).unwrap();
 
         let shader_module_info = vk::ShaderModuleCreateInfo::default().code(&shader_code);
 
         unsafe {
-            let shader_module = device_functions.create_shader_module(&shader_module_info, None).unwrap();
+            let shader_module = gfx_device.create_shader_module(&shader_module_info, None).unwrap();
             let shader_module = Self {
                 handle: shader_module,
 
                 #[cfg(debug_assertions)]
                 destroyed: false,
             };
-            device_functions.set_debug_name(&shader_module, path.to_str().unwrap());
+            gfx_device.set_debug_name(&shader_module, path.to_str().unwrap());
             shader_module
         }
     }
@@ -44,9 +44,9 @@ impl ShaderModule {
 
     #[inline]
     pub fn destroy(mut self) {
-        let device_functions = RenderContext::get().device_functions();
+        let gfx_device = Gfx::get().gfx_device();
         unsafe {
-            device_functions.destroy_shader_module(self.handle, None);
+            gfx_device.destroy_shader_module(self.handle, None);
         }
         #[cfg(debug_assertions)]
         {

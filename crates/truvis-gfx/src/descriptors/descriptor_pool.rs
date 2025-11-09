@@ -3,7 +3,7 @@ use std::rc::Rc;
 use ash::vk;
 
 use crate::foundation::debug_messenger::DebugType;
-use crate::render_context::RenderContext;
+use crate::gfx::Gfx;
 
 /// 描述符池
 ///
@@ -29,14 +29,14 @@ impl DescriptorPool {
     /// 新的描述符池实例
     #[inline]
     pub fn new(ci: Rc<DescriptorPoolCreateInfo>, name: &str) -> Self {
-        let device_functions = RenderContext::get().device_functions();
-        let pool = unsafe { device_functions.create_descriptor_pool(&ci.inner, None).unwrap() };
+        let gfx_device = Gfx::get().gfx_device();
+        let pool = unsafe { gfx_device.create_descriptor_pool(&ci.inner, None).unwrap() };
         let pool = Self {
             handle: pool,
             _info: ci,
             _name: name.to_string(),
         };
-        device_functions.set_debug_name(&pool, name);
+        gfx_device.set_debug_name(&pool, name);
         pool
     }
 
@@ -57,7 +57,7 @@ impl DescriptorPool {
 impl Drop for DescriptorPool {
     /// 释放 Vulkan 描述符池
     fn drop(&mut self) {
-        unsafe { RenderContext::get().device_functions().destroy_descriptor_pool(self.handle, None) };
+        unsafe { Gfx::get().gfx_device().destroy_descriptor_pool(self.handle, None) };
     }
 }
 impl DebugType for DescriptorPool {
