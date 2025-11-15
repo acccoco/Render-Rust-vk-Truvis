@@ -7,6 +7,9 @@ use crate::gfx::Gfx;
 use crate::pipelines::shader::ShaderModuleCache;
 use crate::{foundation::debug_messenger::DebugType, pipelines::shader::ShaderStageInfo};
 
+/// 管线布局封装
+///
+/// 包含描述符集布局和 Push Constants 范围定义。
 pub struct PipelineLayout {
     handle: vk::PipelineLayout,
 }

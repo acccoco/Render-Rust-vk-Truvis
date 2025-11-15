@@ -14,7 +14,19 @@ use truvis_shader_binding::shader;
 use crate::core::frame_context::FrameContext;
 use crate::platform::{camera::Camera, input_manager::InputState};
 
-/// 表示整个渲染器进程，需要考虑 platform, render, render_context, log 之类的各种模块
+/// 渲染器核心
+///
+/// 管理整个渲染流程，包括帧同步、资源更新、GPU 场景同步等。
+/// 与 [`FrameContext`] 配合工作，提供帧级生命周期管理。
+///
+/// # 渲染流程
+/// ```ignore
+/// renderer.begin_frame();        // 等待 GPU、清理资源
+/// // OuterApp::update() / OuterApp::draw()
+/// renderer.before_render();      // 更新相机、输入状态
+/// // 录制命令...
+/// renderer.end_frame();          // 提交命令、推进帧计数
+/// ```
 pub struct Renderer {}
 
 // 手动 drop

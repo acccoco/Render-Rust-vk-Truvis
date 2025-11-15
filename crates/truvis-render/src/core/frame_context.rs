@@ -15,7 +15,33 @@ use crate::subsystems::gpu_scene::GpuScene;
 use crate::subsystems::scene_manager::SceneManager;
 use crate::subsystems::stage_buffer_manager::StageBufferManager;
 
-// TODO 重新规划字段的粒度，减少 RefCell 的使用
+/// 帧上下文单例
+///
+/// 管理渲染所需的所有帧级资源和子系统，包括命令分配器、Bindless 管理器、GPU 场景等。
+/// 采用单例模式简化参数传递，通过 `RefCell` 实现内部可变性。
+///
+/// # Frames in Flight
+/// - 固定 3 帧并行 (A/B/C)
+/// - Timeline Semaphore 同步 GPU 进度
+/// - 每帧独立的命令缓冲池、描述符池、Render Target
+///
+/// # 使用示例
+/// ```ignore
+/// let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("my-pass");
+/// let frame_label = FrameContext::get().frame_label();
+/// ```
+///
+/// # 注意
+/// 避免同时持有多个 `RefCell` 引用，否则会 panic：
+/// ```ignore
+/// // ❌ 错误
+/// let cmd = FrameContext::cmd_allocator_mut();
+/// let bindless = FrameContext::bindless_mgr_mut(); // panic!
+///
+/// // ✅ 正确
+/// { let cmd = FrameContext::cmd_allocator_mut(); /* ... */ }
+/// { let bindless = FrameContext::bindless_mgr_mut(); /* ... */ }
+/// ```
 pub struct FrameContext {
     pub upload_buffer_manager: RefCell<StageBufferManager>,
     pub bindless_manager: RefCell<BindlessManager>,

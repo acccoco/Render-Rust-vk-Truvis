@@ -15,6 +15,19 @@ use crate::{
     resources::buffer::Buffer,
 };
 
+/// 命令缓冲封装
+///
+/// 封装 Vulkan CommandBuffer，提供类型安全的命令录制接口。
+/// 支持图形、计算、光线追踪、屏障、调试标签等功能。
+///
+/// # 使用示例
+/// ```ignore
+/// let cmd = CommandBuffer::new(&pool, "my-pass");
+/// cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "my-pass");
+/// cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, pipeline);
+/// // 绘制命令...
+/// cmd.end();
+/// ```
 #[derive(Clone)]
 pub struct CommandBuffer {
     vk_handle: vk::CommandBuffer,

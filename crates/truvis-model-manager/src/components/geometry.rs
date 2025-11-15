@@ -5,7 +5,14 @@ use truvis_gfx::raytracing::acceleration::BlasInputInfo;
 use truvis_gfx::resources::special_buffers::index_buffer::Index32Buffer;
 use truvis_gfx::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
 
-/// CPU 侧的几何体数据
+/// 几何体数据（包含顶点和索引缓冲）
+///
+/// 封装 GPU 顶点缓冲和索引缓冲，支持泛型顶点布局。
+/// 可用于光栅化渲染和光线追踪加速结构构建。
+///
+/// # 类型别名
+/// - `GeometryAoS3D`: AoS 3D 顶点布局（Position + Normal + TexCoord）
+/// - `GeometrySoA3D`: SoA 3D 顶点布局（分离存储）
 pub struct Geometry<L: VertexLayout> {
     pub vertex_buffer: VertexBuffer<L>,
     pub index_buffer: Index32Buffer,

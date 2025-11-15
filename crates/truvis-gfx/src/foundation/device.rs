@@ -8,10 +8,17 @@ use std::{
 
 use crate::{foundation::debug_messenger::DebugType, utilities::shader_cursor::WriteDescriptorSet};
 
-/// Vulkan 设备函数指针的集合
+/// Vulkan 逻辑设备封装
 ///
-/// 包含了核心设备 API 以及各种扩展的函数指针。
-/// 这些函数指针在整个应用生命周期中保持不变，可以安全共享。
+/// 包含核心设备 API 以及各种扩展的函数指针（如动态渲染、光线追踪、调试工具等）。
+/// 这些函数指针在应用生命周期中保持不变，可以安全共享。
+///
+/// # 扩展支持
+/// - Dynamic Rendering (KHR)
+/// - Acceleration Structure (KHR)
+/// - Ray Tracing Pipeline (KHR)
+/// - Debug Utils (EXT)
+/// - Swapchain (KHR)
 pub struct GfxDevice {
     /// 核心 Vulkan 设备 API
     pub(crate) device: ash::Device,

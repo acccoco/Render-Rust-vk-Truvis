@@ -1,3 +1,11 @@
+//! C++ 互操作层
+//!
+//! 通过 CMake + bindgen 集成 C++ 库（如 Assimp），提供 Rust 安全封装。
+//! `build.rs` 自动处理 CMake 构建和 DLL 复制。
+//!
+//! # Assimp 模型加载
+//! 通过 [`AssimpSceneLoader`] 加载 FBX/GLTF/OBJ 等格式，自动转换为 Rust 数据结构。
+
 use std::{ffi::c_void, mem::offset_of};
 
 use itertools::Itertools;
@@ -27,6 +35,19 @@ fn validate_vertex_memory_layout() {
     debug_assert!(size_of::<glam::Mat4>() == size_of::<CxxMat4f>());
 }
 
+/// Assimp 场景加载器
+///
+/// 封装 Assimp 库，提供场景加载功能。支持多种 3D 模型格式（FBX、GLTF、OBJ 等）。
+///
+/// # 使用示例
+/// ```ignore
+/// let instances = AssimpSceneLoader::load_scene(
+///     Path::new("model.fbx"),
+///     |ins| scene_manager.register_instance(ins),
+///     |mesh| scene_manager.register_mesh(mesh),
+///     |mat| scene_manager.register_material(mat),
+/// );
+/// ```
 pub struct AssimpSceneLoader {
     loader: *mut c_void,
     model_name: String,

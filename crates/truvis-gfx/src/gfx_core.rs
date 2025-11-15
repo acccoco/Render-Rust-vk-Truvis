@@ -9,23 +9,25 @@ use crate::{
     },
 };
 
+/// Vulkan 核心组件集合
+///
+/// 包含 Entry、Instance、PhysicalDevice、Device、Queue 等 Vulkan 基础对象。
+/// 不包含内存分配器等高层抽象，仅提供 Vulkan 原生功能。
 pub struct GfxCore {
-    /// vk 基础函数的接口
+    /// Vulkan 库入口（加载 vulkan-1.dll）
     ///
-    /// 在 drop 之后，会卸载 dll，因此需要确保该字段最后 drop
+    /// 在 drop 之后会卸载 DLL，需要确保该字段最后 drop
     pub(crate) vk_entry: ash::Entry,
 
     pub(crate) instance: GfxInstance,
     pub(crate) physical_device: GfxPhysicalDevice,
 
-    /// Vulkan 设备函数指针集合
+    /// Vulkan 设备函数指针集合（Rc 共享）
     ///
-    /// 使用 Rc 是合理的，因为：
-    /// 1. 多个组件需要共享相同的设备函数指针（GfxQueue、GfxCommandBuffer 等）
-    /// 2. 函数指针本身很轻量，共享比传递更高效
-    /// 3. 设备生命周期需要精确控制，Rc 确保在所有引用者销毁前设备不被销毁
-    ///
-    /// 使用 Rc<> 的时机：在 RenderContext 内部的对象，可以通过 Rc 去访问 DevcesFunctions
+    /// 使用 `Rc` 的原因：
+    /// 1. 多个组件需要共享相同的设备函数指针（Queue、CommandBuffer 等）
+    /// 2. 函数指针本身轻量，共享比传递更高效
+    /// 3. 设备生命周期需要精确控制，`Rc` 确保在所有引用者销毁前设备不被销毁
     pub(crate) gfx_device: Rc<GfxDevice>,
 
     pub(crate) debug_utils: DebugMsger,

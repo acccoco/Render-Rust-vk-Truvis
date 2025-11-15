@@ -39,7 +39,21 @@ pub struct BindlessDescriptorBinding {
     _images: (),
 }
 
-// TODO: 将 RefCell 移动到 BindlessManager 内部，粒度更细
+/// Bindless 描述符管理器
+///
+/// 管理 Bindless 纹理和存储图像，通过数组索引访问资源。
+/// 每帧独立的描述符集，支持 UPDATE_AFTER_BIND 和 PARTIALLY_BOUND。
+///
+/// # Bindless 架构
+/// - Binding 0: 纹理数组（COMBINED_IMAGE_SAMPLER，最多 128 个）
+/// - Binding 1: 存储图像数组（STORAGE_IMAGE，最多 128 个）
+/// - 着色器通过索引访问：`textures[index]`
+///
+/// # 使用示例
+/// ```ignore
+/// let key = FrameContext::bindless_manager_mut().register_texture("albedo", texture);
+/// // 在着色器中: textures[key]
+/// ```
 pub struct BindlessManager {
     _descriptor_pool: DescriptorPool,
 

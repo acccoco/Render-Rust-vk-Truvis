@@ -2,6 +2,7 @@ use std::{fmt::Display, ops::Deref};
 
 use ash::vk;
 
+/// 渲染器默认配置
 pub struct DefaultRendererSettings;
 impl DefaultRendererSettings {
     pub const DEFAULT_SURFACE_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
@@ -18,6 +19,7 @@ impl DefaultRendererSettings {
     ];
 }
 
+/// 帧级渲染配置
 #[derive(Copy, Clone, Default)]
 pub struct FrameSettings {
     pub color_format: vk::Format,
@@ -25,12 +27,14 @@ pub struct FrameSettings {
     pub frame_extent: vk::Extent2D,
 }
 
+/// 管线级配置
 #[derive(Copy, Clone, Default)]
 pub struct PipelineSettings {
     /// 0 表示 RT，1 表示 normal
     pub channel: u32,
 }
 
+/// 呈现配置
 #[derive(Copy, Clone)]
 pub struct PresentSettings {
     pub canvas_extent: vk::Extent2D,
@@ -39,6 +43,10 @@ pub struct PresentSettings {
     pub color_format: vk::Format,
 }
 
+/// 帧标签（A/B/C）
+///
+/// 表示当前处于 Frames in Flight 的哪一帧。
+/// 通过 `Deref` 转换为索引 0/1/2。
 #[derive(Debug, Clone, Copy)]
 pub enum FrameLabel {
     A,

@@ -8,6 +8,15 @@ use truvis_gfx::{
     gfx::Gfx,
 };
 
+/// 命令缓冲分配器
+///
+/// 为每帧管理独立的命令池和命令缓冲，支持帧内批量分配和帧间自动回收。
+/// 采用 TRANSIENT 标志优化临时命令的分配性能。
+///
+/// # Frames in Flight
+/// - 每帧独立的 CommandPool（避免同步冲突）
+/// - 帧结束时统一释放命令缓冲
+/// - 命令缓冲自动添加帧标签：`[F42A]my-pass`
 pub struct CmdAllocator {
     /// 为每个 frame 分配一个 command pool
     graphics_command_pools: Vec<CommandPool>,

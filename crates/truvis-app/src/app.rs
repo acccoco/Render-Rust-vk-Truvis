@@ -26,6 +26,13 @@ pub fn panic_handler(info: &std::panic::PanicHookInfo) {
 
 pub struct UserEvent;
 
+/// Truvis 应用主结构
+///
+/// 封装了完整的渲染应用框架，包括窗口系统、渲染器、输入管理、相机控制等。
+/// 通过泛型参数 `T: OuterApp` 集成用户自定义应用逻辑。
+///
+/// # Frames in Flight
+/// 采用 3 帧并行渲染（A/B/C），通过 timeline semaphore 同步 GPU 进度。
 pub struct TruvisApp<T: OuterApp> {
     renderer: Renderer,
 

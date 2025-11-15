@@ -15,6 +15,18 @@ use crate::{
     },
 };
 
+/// Vulkan 图形上下文单例
+///
+/// 管理所有 Vulkan 核心资源，包括实例、设备、队列、内存分配器等。
+/// 采用单例模式简化参数传递和生命周期管理，仅适用于单线程环境。
+///
+/// # 初始化流程
+/// ```ignore
+/// Gfx::init("MyApp".to_string(), extra_extensions);
+/// let device = Gfx::get().gfx_device();
+/// // 使用...
+/// Gfx::destroy();
+/// ```
 pub struct Gfx {
     pub(crate) gfx_core: GfxCore,
     pub(crate) vm_allocator: VMemAllocator,
