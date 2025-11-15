@@ -13,8 +13,8 @@ use truvis_gfx::{
         shader::ShaderStageInfo,
     },
 };
+use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::FrameLabel;
-use truvis_render::renderer::frame_context::FrameContext;
 use truvis_shader_binding::{shader, shader::TextureHandle};
 
 use crate::gui::gui::Gui;
@@ -39,9 +39,9 @@ pub struct GuiPass {
 }
 impl GuiPass {
     pub fn new(color_format: vk::Format) -> Self {
-        let bindless_mgr = FrameContext::bindless_mgr();
+        let bindless_manager = FrameContext::bindless_manager();
         let pipeline_layout = Rc::new(PipelineLayout::new(
-            &[bindless_mgr.bindless_descriptor_layout.handle()],
+            &[bindless_manager.bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 offset: 0,
@@ -147,12 +147,12 @@ impl GuiPass {
             _padding_0: 0,
         };
 
-        let bindless_mgr = FrameContext::bindless_mgr();
+        let bindless_manager = FrameContext::bindless_manager();
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),
             0,
-            &[bindless_mgr.bindless_descriptor_sets[*frame_label].handle()],
+            &[bindless_manager.bindless_descriptor_sets[*frame_label].handle()],
             None,
         );
 
@@ -208,7 +208,7 @@ impl GuiPass {
                         // 不是同一个，则需要重新加载
                         if Some(texture_id) != last_texture_id {
                             let texture_key = get_texture_key(texture_id);
-                            let texture_handle = bindless_mgr
+                            let texture_handle = bindless_manager
                                 .get_texture_handle(&texture_key)
                                 .unwrap_or_else(|| panic!("Texture not found: {}", texture_key));
 

@@ -14,8 +14,8 @@ use truvis_gfx::{
     gfx::Gfx,
     swapchain::render_swapchain::RenderSwapchain,
 };
+use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::{DefaultRendererSettings, FrameLabel};
-use truvis_render::renderer::frame_context::FrameContext;
 
 /// 渲染演示数据结构
 ///
@@ -93,10 +93,10 @@ impl MainWindow {
 
         let swapchain_image_infos = swapchain.image_infos();
 
-        let gui = Gui::new(&window, FrameContext::fif_count(), &swapchain_image_infos);
+        let gui = Gui::new(&window, FrameContext::get().fif_count(), &swapchain_image_infos);
         let gui_pass = GuiPass::new(swapchain_image_infos.image_format);
 
-        let present_complete_semaphores = (0..FrameContext::fif_count())
+        let present_complete_semaphores = (0..FrameContext::get().fif_count())
             .map(|i| Semaphore::new(&format!("window-present-complete-{}", i)))
             .collect_vec();
         let render_complete_semaphores = (0..swapchain_image_infos.image_cnt)
@@ -121,7 +121,7 @@ impl MainWindow {
     fn draw(&mut self, renderer_data: PresentData) {
         let swapchain = self.swapchain.as_ref().unwrap();
         let swapchain_image_idx = swapchain.current_image_index();
-        let frame_label = FrameContext::frame_label();
+        let frame_label = FrameContext::get().frame_label();
 
         let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("window-present");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");

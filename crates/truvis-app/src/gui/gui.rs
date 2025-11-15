@@ -12,9 +12,9 @@ use truvis_gfx::{
     gfx::Gfx,
     resources::{image::Image2D, texture::Texture2D},
 };
+use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::FrameLabel;
-use truvis_render::renderer::bindless::BindlessManager;
-use truvis_render::renderer::frame_context::FrameContext;
+use truvis_render::subsystems::bindless_manager::BindlessManager;
 
 use crate::gui::gui_mesh::GuiMesh;
 
@@ -50,8 +50,8 @@ impl Gui {
         let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui_ctx);
         platform.attach_window(imgui_ctx.io_mut(), window, imgui_winit_support::HiDpiMode::Rounded);
 
-        let mut bindless_mgr = FrameContext::bindless_mgr_mut();
-        Self::init_fonts(&mut imgui_ctx, &platform, &mut bindless_mgr);
+        let mut bindless_manager = FrameContext::bindless_manager_mut();
+        Self::init_fonts(&mut imgui_ctx, &platform, &mut bindless_manager);
 
         Self {
             imgui_ctx,
@@ -79,7 +79,7 @@ impl Gui {
     fn init_fonts(
         imgui_ctx: &mut imgui::Context,
         platform: &imgui_winit_support::WinitPlatform,
-        bindless_mgr: &mut BindlessManager,
+        bindless_manager: &mut BindlessManager,
     ) {
         let hidpi_factor = platform.hidpi_factor();
         let font_size = (13.0 * hidpi_factor) as f32;
@@ -120,7 +120,7 @@ impl Gui {
         };
 
         let fonts_texture_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);
-        bindless_mgr.register_texture_owned(Self::FONT_TEXTURE_KEY.to_string(), fonts_texture);
+        bindless_manager.register_texture_owned(Self::FONT_TEXTURE_KEY.to_string(), fonts_texture);
         imgui_ctx.fonts().tex_id = fonts_texture_id;
     }
 }

@@ -8,20 +8,20 @@ use truvis_shader_binding::shader;
 
 use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings};
 use crate::platform::timer::Timer;
-use crate::renderer::bindless::BindlessManager;
-use crate::renderer::cmd_allocator::CmdAllocator;
-use crate::renderer::fif_buffer::FifBuffers;
-use crate::renderer::gpu_scene::GpuScene;
-use crate::renderer::scene_manager::SceneManager;
-use crate::renderer::stage_buffer_manager::StageBufferManager;
+use crate::resources::fif_buffer::FifBuffers;
+use crate::subsystems::bindless_manager::BindlessManager;
+use crate::subsystems::cmd_allocator::CmdAllocator;
+use crate::subsystems::gpu_scene::GpuScene;
+use crate::subsystems::scene_manager::SceneManager;
+use crate::subsystems::stage_buffer_manager::StageBufferManager;
 
 // TODO 重新规划字段的粒度，减少 RefCell 的使用
 pub struct FrameContext {
-    pub upload_buffer_mgr: RefCell<StageBufferManager>,
-    pub bindless_mgr: RefCell<BindlessManager>,
+    pub upload_buffer_manager: RefCell<StageBufferManager>,
+    pub bindless_manager: RefCell<BindlessManager>,
     pub cmd_allocator: RefCell<CmdAllocator>,
     pub gpu_scene: RefCell<GpuScene>,
-    pub scene_mgr: RefCell<SceneManager>,
+    pub scene_manager: RefCell<SceneManager>,
 
     pub per_frame_data_buffers: Vec<StructuredBuffer<shader::PerFrameData>>,
 
@@ -60,11 +60,11 @@ impl FrameContext {
 
         let fif_timeline_semaphore = Semaphore::new_timeline(0, "render-timeline");
 
-        let upload_buffer_mgr = RefCell::new(StageBufferManager::new(fif_count));
-        let bindless_mgr = RefCell::new(BindlessManager::new(fif_count));
+        let upload_buffer_manager = RefCell::new(StageBufferManager::new(fif_count));
+        let bindless_manager = RefCell::new(BindlessManager::new(fif_count));
         let cmd_allocator = RefCell::new(CmdAllocator::new(fif_count));
         let gpu_scene = RefCell::new(GpuScene::new(fif_count));
-        let scene_mgr = RefCell::new(SceneManager::new());
+        let scene_manager = RefCell::new(SceneManager::new());
 
         let frame_settings = FrameSettings {
             color_format: vk::Format::R32G32B32A32_SFLOAT,
@@ -75,7 +75,7 @@ impl FrameContext {
             },
         };
 
-        let fif_buffers = FifBuffers::new(&frame_settings, &mut bindless_mgr.borrow_mut(), fif_count);
+        let fif_buffers = FifBuffers::new(&frame_settings, &mut bindless_manager.borrow_mut(), fif_count);
         let per_frame_data_buffers = (0..fif_count)
             .map(|idx| StructuredBuffer::<shader::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{idx}")))
             .collect();
@@ -96,11 +96,11 @@ impl FrameContext {
             frame_settings: Cell::new(frame_settings),
             pipeline_settings: Cell::new(PipelineSettings::default()),
 
-            upload_buffer_mgr,
-            bindless_mgr,
+            upload_buffer_manager,
+            bindless_manager,
             cmd_allocator,
             gpu_scene,
-            scene_mgr,
+            scene_manager,
         }
     }
 
@@ -130,11 +130,11 @@ impl FrameContext {
 
             context.fif_timeline_semaphore.destroy();
 
-            drop(context.upload_buffer_mgr);
+            drop(context.upload_buffer_manager);
             drop(context.cmd_allocator);
-            drop(context.bindless_mgr);
+            drop(context.bindless_manager);
             drop(context.gpu_scene);
-            drop(context.scene_mgr);
+            drop(context.scene_manager);
         }
     }
 
@@ -155,38 +155,34 @@ impl FrameContext {
 // getter
 impl FrameContext {
     #[inline]
-    pub fn frame_label() -> FrameLabel {
-        let context = Self::get();
-        context.frame_label.get()
+    pub fn frame_label(&self) -> FrameLabel {
+        self.frame_label.get()
     }
 
     #[inline]
-    pub fn frame_id() -> usize {
-        let context = Self::get();
-        context.frame_id.get()
+    pub fn frame_id(&self) -> usize {
+        self.frame_id.get()
     }
 
     #[inline]
-    pub fn frame_name() -> String {
-        let context = Self::get();
-        format!("[F{}{}]", context.frame_id.get(), context.frame_label.get())
+    pub fn frame_name(&self) -> String {
+        format!("[F{}{}]", self.frame_id.get(), self.frame_label.get())
     }
 
     #[inline]
-    pub fn fif_count() -> usize {
-        let context = Self::get();
-        context.fif_count
+    pub fn fif_count(&self) -> usize {
+        self.fif_count
     }
 
     #[inline]
-    pub fn bindless_mgr_mut() -> RefMut<'static, BindlessManager> {
+    pub fn bindless_manager_mut() -> RefMut<'static, BindlessManager> {
         let context = Self::get();
-        context.bindless_mgr.borrow_mut()
+        context.bindless_manager.borrow_mut()
     }
     #[inline]
-    pub fn bindless_mgr() -> Ref<'static, BindlessManager> {
+    pub fn bindless_manager() -> Ref<'static, BindlessManager> {
         let context = Self::get();
-        context.bindless_mgr.borrow()
+        context.bindless_manager.borrow()
     }
 
     #[inline]
@@ -209,18 +205,18 @@ impl FrameContext {
     #[inline]
     pub fn scene_manager_mut() -> RefMut<'static, SceneManager> {
         let context = Self::get();
-        context.scene_mgr.borrow_mut()
+        context.scene_manager.borrow_mut()
     }
     #[inline]
     pub fn scene_manager() -> Ref<'static, SceneManager> {
         let context = Self::get();
-        context.scene_mgr.borrow()
+        context.scene_manager.borrow()
     }
 
     #[inline]
     pub fn stage_buffer_manager() -> RefMut<'static, StageBufferManager> {
         let context = Self::get();
-        context.upload_buffer_mgr.borrow_mut()
+        context.upload_buffer_manager.borrow_mut()
     }
 
     #[inline]

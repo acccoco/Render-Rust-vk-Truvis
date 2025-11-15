@@ -1,7 +1,8 @@
 pub mod pipeline_settings;
 pub mod platform;
 pub mod render_pipeline;
-pub mod render_resource;
-pub mod renderer;
+pub mod resources;
+pub mod subsystems;
 
-pub mod subsystem;
+pub mod apis;
+pub mod core;

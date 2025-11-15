@@ -17,10 +17,11 @@ use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use truvis_shader_binding::shader;
 
-use crate::renderer::frame_context::FrameContext;
+use crate::core::frame_context::FrameContext;
+use crate::subsystems::subsystem::Subsystem;
 use crate::{
     pipeline_settings::FrameLabel,
-    renderer::{bindless::BindlessManager, scene_manager::SceneManager},
+    subsystems::{bindless_manager::BindlessManager, scene_manager::SceneManager},
 };
 
 /// 数据以顺序的方式存储，同时查找时间为 O(1)
@@ -201,50 +202,55 @@ impl GpuScene {
         }
     }
 }
+
+impl Subsystem for GpuScene {
+    fn before_render(&mut self) {}
+}
+
 // tools
 impl GpuScene {
     /// 注册 GpuScene 使用的默认纹理
     pub fn register_default_textures(&self) {
-        let mut bindless_mgr = FrameContext::bindless_mgr_mut();
-        bindless_mgr.register_texture_by_path(self.resources.sky.clone());
-        bindless_mgr.register_texture_by_path(self.resources.uv_checker.clone());
+        let mut bindless_manager = FrameContext::bindless_manager_mut();
+        bindless_manager.register_texture_by_path(self.resources.sky.clone());
+        bindless_manager.register_texture_by_path(self.resources.uv_checker.clone());
     }
 
     /// # Phase: Before Render
     ///
     /// 在每一帧开始时调用，将场景数据转换为 GPU 可读的形式
-    pub fn prepare_render_data(&mut self, scene_mgr: &SceneManager) {
-        let mut bindless_mgr = FrameContext::bindless_mgr_mut();
-        bindless_mgr.prepare_render_data(FrameContext::frame_label());
+    pub fn prepare_render_data(&mut self, scene_manager: &SceneManager) {
+        let mut bindless_manager = FrameContext::bindless_manager_mut();
+        bindless_manager.prepare_render_data(FrameContext::get().frame_label());
 
-        self.flatten_material_data(scene_mgr);
-        self.flatten_mesh_data(scene_mgr);
-        self.flatten_instance_data(scene_mgr);
+        self.flatten_material_data(scene_manager);
+        self.flatten_mesh_data(scene_manager);
+        self.flatten_instance_data(scene_manager);
     }
 
     /// # Phase: Before Render
     ///
     /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
-    pub fn upload_to_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager) {
-        let bindless_mgr = FrameContext::bindless_mgr();
-        self.upload_mesh_buffer(cmd, barrier_mask, scene_mgr);
-        self.upload_instance_buffer(cmd, barrier_mask, scene_mgr);
-        self.upload_material_buffer(cmd, barrier_mask, scene_mgr, &bindless_mgr);
-        self.upload_light_buffer(cmd, barrier_mask, scene_mgr);
+    pub fn upload_to_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_manager: &SceneManager) {
+        let bindless_manager = FrameContext::bindless_manager();
+        self.upload_mesh_buffer(cmd, barrier_mask, scene_manager);
+        self.upload_instance_buffer(cmd, barrier_mask, scene_manager);
+        self.upload_material_buffer(cmd, barrier_mask, scene_manager, &bindless_manager);
+        self.upload_light_buffer(cmd, barrier_mask, scene_manager);
 
         // 需要确保 instance 先与 tlas 构建
-        self.build_tlas(scene_mgr);
+        self.build_tlas(scene_manager);
 
-        self.upload_scene_buffer(cmd, barrier_mask, scene_mgr, &bindless_mgr);
+        self.upload_scene_buffer(cmd, barrier_mask, scene_manager, &bindless_manager);
     }
 
     /// 绘制场景中的所有实例
     ///
     /// before_draw(instance_idx, submesh_idx)
-    pub fn draw(&self, cmd: &CommandBuffer, scene_mgr: &SceneManager, mut before_draw: impl FnMut(u32, u32)) {
+    pub fn draw(&self, cmd: &CommandBuffer, scene_manager: &SceneManager, mut before_draw: impl FnMut(u32, u32)) {
         for (instance_idx, instance_uuid) in self.flatten_instances.iter().enumerate() {
-            let instance = scene_mgr.get_instance(instance_uuid).unwrap();
-            let mesh = scene_mgr.get_mesh(&instance.mesh).unwrap();
+            let instance = scene_manager.get_instance(instance_uuid).unwrap();
+            let mesh = scene_manager.get_mesh(&instance.mesh).unwrap();
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
                 cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&geometry.vertex_buffer), &[0]);
                 cmd.cmd_bind_index_buffer1(&geometry.index_buffer, 0);
@@ -260,11 +266,11 @@ impl GpuScene {
     /// # 注
     ///
     /// 后续绘制时，也会使用 instance vector 中的顺序和 index
-    fn flatten_instance_data(&mut self, scene_mgr: &SceneManager) {
+    fn flatten_instance_data(&mut self, scene_manager: &SceneManager) {
         self.flatten_instances.clear();
-        self.flatten_instances.reserve(scene_mgr.instance_map().len());
+        self.flatten_instances.reserve(scene_manager.instance_map().len());
 
-        for (instance_uuid, _) in scene_mgr.instance_map().iter() {
+        for (instance_uuid, _) in scene_manager.instance_map().iter() {
             self.flatten_instances.push(*instance_uuid);
         }
     }
@@ -272,13 +278,13 @@ impl GpuScene {
     /// 在每一帧绘制之前，将所有的 mesh 转换为 Vector，准备上传到 GPU
     ///
     /// 记录每个 mesh 在 geometry buffer 中的起始 idx 和长度
-    fn flatten_mesh_data(&mut self, scene_mgr: &SceneManager) {
+    fn flatten_mesh_data(&mut self, scene_manager: &SceneManager) {
         self.mesh_geometry_map.clear();
         self.flatten_meshes.clear();
-        self.flatten_meshes.reserve(scene_mgr.mesh_map().len());
+        self.flatten_meshes.reserve(scene_manager.mesh_map().len());
 
         let mut geometry_idx = 0;
-        for (mesh_id, mesh) in scene_mgr.mesh_map().iter() {
+        for (mesh_id, mesh) in scene_manager.mesh_map().iter() {
             self.flatten_meshes.insert(*mesh_id);
             self.mesh_geometry_map.insert(*mesh_id, geometry_idx);
             geometry_idx += mesh.geometries.len();
@@ -286,11 +292,11 @@ impl GpuScene {
     }
 
     /// 在每一帧的绘制之前，将所有的材质转换为 Vector，准备上传到 GPU
-    fn flatten_material_data(&mut self, scene_mgr: &SceneManager) {
+    fn flatten_material_data(&mut self, scene_manager: &SceneManager) {
         self.flatten_materials.clear();
-        self.flatten_materials.reserve(scene_mgr.mat_map().len());
+        self.flatten_materials.reserve(scene_manager.mat_map().len());
 
-        for (mat_id, _) in scene_mgr.mat_map().iter() {
+        for (mat_id, _) in scene_manager.mat_map().iter() {
             self.flatten_materials.insert(*mat_id);
         }
     }
@@ -300,10 +306,10 @@ impl GpuScene {
         &mut self,
         cmd: &CommandBuffer,
         barrier_mask: BarrierMask,
-        scene_mgr: &SceneManager,
-        bindless_mgr: &BindlessManager,
+        scene_manager: &SceneManager,
+        bindless_manager: &BindlessManager,
     ) {
-        let crt_gpu_buffers = &self.gpu_scene_buffers[*FrameContext::frame_label()];
+        let crt_gpu_buffers = &self.gpu_scene_buffers[*FrameContext::get().frame_label()];
         let scene_data = shader::Scene {
             all_instances: crt_gpu_buffers.instance_buffer.device_address(),
             all_mats: crt_gpu_buffers.material_buffer.device_address(),
@@ -312,12 +318,12 @@ impl GpuScene {
             instance_geometry_map: crt_gpu_buffers.geometry_indirect_buffer.device_address(),
             point_lights: crt_gpu_buffers.light_buffer.device_address(),
             spot_lights: 0, // TODO 暂时无用
-            point_light_count: scene_mgr.point_light_map().len() as u32,
+            point_light_count: scene_manager.point_light_map().len() as u32,
             spot_light_count: 0, // TODO 暂时无用
             tlas: crt_gpu_buffers.tlas.as_ref().map_or(vk::DeviceAddress::default(), |tlas| tlas.device_address()),
 
-            sky: bindless_mgr.get_texture_handle(&self.resources.sky).unwrap(),
-            uv_checker: bindless_mgr.get_texture_handle(&self.resources.uv_checker).unwrap(),
+            sky: bindless_manager.get_texture_handle(&self.resources.sky).unwrap(),
+            uv_checker: bindless_manager.get_texture_handle(&self.resources.uv_checker).unwrap(),
         };
 
         cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.vk_buffer(), 0, bytemuck::bytes_of(&scene_data));
@@ -334,8 +340,8 @@ impl GpuScene {
     /// 将数据转换为 shader 中的实例数据
     ///
     /// 其中 buffer 可以是 stage buffer 的内存映射
-    fn upload_instance_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager) {
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::frame_label()];
+    fn upload_instance_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_manager: &SceneManager) {
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
 
         let crt_instance_stage_buffer = &mut crt_gpu_buffers.instance_stage_buffer;
         let crt_geometry_indirect_stage_buffer = &mut crt_gpu_buffers.geometry_indirect_stage_buffer;
@@ -352,7 +358,7 @@ impl GpuScene {
         let mut crt_geometry_indirect_idx = 0;
         let mut crt_material_indirect_idx = 0;
         for (instance_idx, instance_uuid) in self.flatten_instances.iter().enumerate() {
-            let instance = scene_mgr.get_instance(instance_uuid).unwrap();
+            let instance = scene_manager.get_instance(instance_uuid).unwrap();
             let submesh_cnt = instance.materials.len();
             if geometry_indirect_buffer_slices.len() < crt_geometry_indirect_idx + submesh_cnt {
                 panic!("instance geometry cnt can not be larger than buffer");
@@ -414,10 +420,10 @@ impl GpuScene {
         &mut self,
         cmd: &CommandBuffer,
         barrier_mask: BarrierMask,
-        scene_mgr: &SceneManager,
-        bindless_mgr: &BindlessManager,
+        scene_manager: &SceneManager,
+        bindless_manager: &BindlessManager,
     ) {
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::frame_label()];
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
         let crt_material_stage_buffer = &mut crt_gpu_buffers.material_stage_buffer;
         let material_buffer_slices = crt_material_stage_buffer.mapped_slice();
         if material_buffer_slices.len() < self.flatten_materials.len() {
@@ -425,16 +431,16 @@ impl GpuScene {
         }
 
         for (mat_idx, mat_uuid) in self.flatten_materials.iter().enumerate() {
-            let mat = scene_mgr.mat_map().get(mat_uuid).unwrap();
+            let mat = scene_manager.mat_map().get(mat_uuid).unwrap();
             material_buffer_slices[mat_idx] = shader::PBRMaterial {
                 base_color: mat.base_color.xyz().into(),
                 emissive: mat.emissive.xyz().into(),
                 metallic: mat.metallic,
                 roughness: mat.roughness,
-                diffuse_map: bindless_mgr.get_texture_handle(&mat.diffuse_map).unwrap_or(shader::TextureHandle {
+                diffuse_map: bindless_manager.get_texture_handle(&mat.diffuse_map).unwrap_or(shader::TextureHandle {
                     index: shader::INVALID_TEX_ID,
                 }),
-                normal_map: bindless_mgr.get_texture_handle(&mat.normal_map).unwrap_or(shader::TextureHandle {
+                normal_map: bindless_manager.get_texture_handle(&mat.normal_map).unwrap_or(shader::TextureHandle {
                     index: shader::INVALID_TEX_ID,
                 }),
                 opaque: mat.opaque,
@@ -450,15 +456,15 @@ impl GpuScene {
         );
     }
 
-    fn upload_light_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager) {
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::frame_label()];
+    fn upload_light_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_manager: &SceneManager) {
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
         let crt_light_stage_buffer = &mut crt_gpu_buffers.light_stage_buffer;
         let light_buffer_slices = crt_light_stage_buffer.mapped_slice();
-        if light_buffer_slices.len() < scene_mgr.point_light_map().len() {
+        if light_buffer_slices.len() < scene_manager.point_light_map().len() {
             panic!("light cnt can not be larger than buffer");
         }
 
-        for (light_idx, (_, point_light)) in scene_mgr.point_light_map().iter().enumerate() {
+        for (light_idx, (_, point_light)) in scene_manager.point_light_map().iter().enumerate() {
             light_buffer_slices[light_idx] = shader::PointLight {
                 pos: point_light.pos,
                 color: point_light.color,
@@ -472,15 +478,15 @@ impl GpuScene {
     }
 
     /// 将 mesh 数据以 geometry 的形式上传到 GPU
-    fn upload_mesh_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_mgr: &SceneManager) {
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::frame_label()];
+    fn upload_mesh_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_manager: &SceneManager) {
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
         let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         // let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         let geometry_buffer_slices = crt_geometry_stage_buffer.mapped_slice();
 
         let mut crt_geometry_idx = 0;
         for mesh_uuid in self.flatten_meshes.iter() {
-            let mesh = scene_mgr.mesh_map().get(mesh_uuid).unwrap();
+            let mesh = scene_manager.mesh_map().get(mesh_uuid).unwrap();
             if geometry_buffer_slices.len() < crt_geometry_idx + mesh.geometries.len() {
                 panic!("geometry cnt can not be larger than buffer");
             }
@@ -511,9 +517,9 @@ impl GpuScene {
         &self,
         instance: &Instance,
         custom_idx: u32,
-        scene_mgr: &SceneManager,
+        scene_manager: &SceneManager,
     ) -> vk::AccelerationStructureInstanceKHR {
-        let mesh = scene_mgr.get_mesh(&instance.mesh).expect("Mesh not found");
+        let mesh = scene_manager.get_mesh(&instance.mesh).expect("Mesh not found");
         vk::AccelerationStructureInstanceKHR {
             // 3x4 row-major matrix
             transform: helper::get_rt_matrix(&instance.transform),
@@ -528,13 +534,13 @@ impl GpuScene {
         }
     }
 
-    fn build_tlas(&mut self, scene_mgr: &SceneManager) {
+    fn build_tlas(&mut self, scene_manager: &SceneManager) {
         if self.flatten_instances.is_empty() {
             // 没有实例数据，直接返回
             return;
         }
 
-        if self.gpu_scene_buffers[*FrameContext::frame_label()].tlas.is_some() {
+        if self.gpu_scene_buffers[*FrameContext::get().frame_label()].tlas.is_some() {
             // 已经构建过 tlas，直接返回
             return;
         }
@@ -542,10 +548,10 @@ impl GpuScene {
         let instance_infos = self
             .flatten_instances
             .iter()
-            .map(|ins_uuid| scene_mgr.get_instance(ins_uuid).unwrap())
+            .map(|ins_uuid| scene_manager.get_instance(ins_uuid).unwrap())
             .enumerate()
             // TODO 这里暂时将 instance 的 index 作为 custom index
-            .map(|(ins_idx, ins)| self.get_as_instance_info(ins, ins_idx as u32, scene_mgr))
+            .map(|(ins_idx, ins)| self.get_as_instance_info(ins, ins_idx as u32, scene_manager))
             .collect_vec();
         let tlas = Acceleration::build_tlas_sync(
             &instance_infos,
@@ -553,7 +559,7 @@ impl GpuScene {
             "scene tlas",
         );
 
-        self.gpu_scene_buffers[*FrameContext::frame_label()].tlas = Some(tlas);
+        self.gpu_scene_buffers[*FrameContext::get().frame_label()].tlas = Some(tlas);
     }
 }
 

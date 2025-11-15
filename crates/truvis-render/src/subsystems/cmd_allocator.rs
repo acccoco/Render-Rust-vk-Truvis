@@ -1,12 +1,12 @@
 use ash::vk;
 use itertools::Itertools;
 
+use crate::core::frame_context::FrameContext;
+use crate::subsystems::subsystem::Subsystem;
 use truvis_gfx::{
     commands::{command_buffer::CommandBuffer, command_pool::CommandPool},
     gfx::Gfx,
 };
-
-use crate::renderer::frame_context::FrameContext;
 
 pub struct CmdAllocator {
     /// 为每个 frame 分配一个 command pool
@@ -37,23 +37,27 @@ impl CmdAllocator {
     }
 }
 
+impl Subsystem for CmdAllocator {
+    fn before_render(&mut self) {}
+}
+
 // tools
 impl CmdAllocator {
     /// 分配 command buffer，在当前 frame 使用
     pub fn alloc_command_buffer(&mut self, debug_name: &str) -> CommandBuffer {
-        let name = format!("[{}]{}", FrameContext::frame_name(), debug_name);
-        let cmd = CommandBuffer::new(&self.graphics_command_pools[*FrameContext::frame_label()], &name);
+        let name = format!("[{}]{}", FrameContext::get().frame_name(), debug_name);
+        let cmd = CommandBuffer::new(&self.graphics_command_pools[*FrameContext::get().frame_label()], &name);
 
-        self.allocated_command_buffers[*FrameContext::frame_label()].push(cmd.clone());
+        self.allocated_command_buffers[*FrameContext::get().frame_label()].push(cmd.clone());
         cmd
     }
 
     pub fn free_frame_commands(&mut self) {
-        self.free_frame_commands_internal(*FrameContext::frame_label());
+        self.free_frame_commands_internal(*FrameContext::get().frame_label());
     }
 
     pub fn free_all(&mut self) {
-        for i in 0..FrameContext::fif_count() {
+        for i in 0..FrameContext::get().fif_count() {
             self.free_frame_commands_internal(i);
         }
     }

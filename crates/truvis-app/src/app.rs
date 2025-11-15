@@ -15,9 +15,9 @@ use crate::window_system::main_window::{MainWindow, PresentData};
 use truvis_crate_tools::init_log::init_log;
 use truvis_gfx::commands::barrier::BarrierMask;
 use truvis_gfx::gfx::Gfx;
+use truvis_render::core::frame_context::FrameContext;
+use truvis_render::core::renderer::Renderer;
 use truvis_render::platform::input_manager::InputManager;
-use truvis_render::renderer::frame_context::FrameContext;
-use truvis_render::renderer::renderer::Renderer;
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     log::error!("{}", info);
@@ -109,7 +109,7 @@ impl<T: OuterApp> TruvisApp<T> {
         }
 
         self.renderer.begin_frame();
-        let frame_label = FrameContext::frame_label();
+        let frame_label = FrameContext::get().frame_label();
         let elapsed = FrameContext::get().timer.borrow().delta_time;
 
         self.window_system.get_mut().unwrap().acquire_image(frame_label);

@@ -7,7 +7,7 @@ use truvis_gfx::{
     basic::color::LabelColor,
     commands::{barrier::BufferBarrier, command_buffer::CommandBuffer},
 };
-use truvis_render::renderer::frame_context::FrameContext;
+use truvis_render::core::frame_context::FrameContext;
 
 use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
 
@@ -68,8 +68,8 @@ impl GuiMesh {
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
         let mut vertex_buffer =
             VertexBuffer::<ImGuiVertexLayoutAoS>::new(vertex_count, format!("{}-imgui-vertex", frame_name));
-        let mut upload_buffer_mgr = FrameContext::stage_buffer_manager();
-        let stage_buffer = upload_buffer_mgr
+        let mut upload_buffer_manager = FrameContext::stage_buffer_manager();
+        let stage_buffer = upload_buffer_manager
             .alloc_buffer(vertices_size as vk::DeviceSize, &format!("{}-imgui-vertex-stage", frame_name));
         stage_buffer.transfer_data_by_mmap(&vertices);
 

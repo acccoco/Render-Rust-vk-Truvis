@@ -19,7 +19,8 @@ use truvis_gfx::{
 use truvis_shader_binding::shader;
 use truvis_shader_layout_macro::ShaderLayout;
 
-use crate::{pipeline_settings::FrameLabel, render_resource::ImageLoader};
+use crate::subsystems::subsystem::Subsystem;
+use crate::{pipeline_settings::FrameLabel, resources::ImageLoader};
 
 #[derive(ShaderLayout)]
 pub struct BindlessDescriptorBinding {
@@ -140,6 +141,10 @@ impl BindlessManager {
 
         DescriptorPool::new(pool_ci, "renderer")
     }
+}
+
+impl Subsystem for BindlessManager {
+    fn before_render(&mut self) {}
 }
 
 // getters

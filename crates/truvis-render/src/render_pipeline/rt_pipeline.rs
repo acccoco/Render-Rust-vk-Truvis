@@ -1,5 +1,8 @@
 use ash::vk;
 
+use crate::apis::render_pass::RenderPass;
+use crate::render_pipeline::{compute_pass::ComputeSubpass, simple_rt_subpass::SimpleRtSubpass};
+use crate::renderer::frame_context::FrameContext;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
     commands::{barrier::ImageBarrier, submit_info::SubmitInfo},
@@ -7,26 +10,23 @@ use truvis_gfx::{
 };
 use truvis_shader_binding::shader;
 
-use crate::render_pipeline::{compute_pass::ComputePass, rt_pass::SimlpeRtPass};
-use crate::renderer::frame_context::FrameContext;
-
 /// 整个 RT 管线
-pub struct RtPipeline {
-    rt_pass: SimlpeRtPass,
-    blit_pass: ComputePass<shader::blit::PushConstant>,
-    sdr_pass: ComputePass<shader::sdr::PushConstant>,
+pub struct RtRenderPass {
+    rt_pass: SimpleRtSubpass,
+    blit_pass: ComputeSubpass<shader::blit::PushConstant>,
+    sdr_pass: ComputeSubpass<shader::sdr::PushConstant>,
 }
-impl RtPipeline {
+impl RtRenderPass {
     pub fn new() -> Self {
-        let rt_pass = SimlpeRtPass::new();
-        let bindless_mgr = FrameContext::bindless_mgr();
-        let blit_pass = ComputePass::<shader::blit::PushConstant>::new(
-            &bindless_mgr,
+        let rt_pass = SimpleRtSubpass::new();
+        let bindless_manager = FrameContext::bindless_manager();
+        let blit_pass = ComputeSubpass::<shader::blit::PushConstant>::new(
+            &bindless_manager,
             c"main",
             TruvisPath::shader_path("imgui/blit.slang.spv").as_str(),
         );
-        let sdr_pass = ComputePass::<shader::sdr::PushConstant>::new(
-            &bindless_mgr,
+        let sdr_pass = ComputeSubpass::<shader::sdr::PushConstant>::new(
+            &bindless_manager,
             c"main",
             TruvisPath::shader_path("pass/pp/sdr.slang.spv").as_str(),
         );
@@ -39,16 +39,16 @@ impl RtPipeline {
     }
 
     pub fn render(&self) {
-        let frame_label = FrameContext::frame_label();
-        let bindless_mgr = FrameContext::bindless_mgr();
+        let frame_label = FrameContext::get().frame_label();
+        let bindless_manager = FrameContext::bindless_manager();
         let frame_settings = FrameContext::get().frame_settings();
 
         let fif_buffers = FrameContext::get().fif_buffers.borrow();
 
         let color_image = fif_buffers.color_image();
-        let color_image_handle = fif_buffers.color_image_bindless_handle(&bindless_mgr);
+        let color_image_handle = fif_buffers.color_image_bindless_handle(&bindless_manager);
         let render_target = fif_buffers.render_target_image(frame_label);
-        let render_target_handle = fif_buffers.render_target_image_bindless_handle(&bindless_mgr, frame_label);
+        let render_target_handle = fif_buffers.render_target_image_bindless_handle(&bindless_manager, frame_label);
 
         let mut submit_cmds = Vec::new();
         // ray tracing
@@ -98,7 +98,7 @@ impl RtPipeline {
 
             self.blit_pass.exec(
                 &cmd,
-                &bindless_mgr,
+                &bindless_manager,
                 &shader::blit::PushConstant {
                     src_image: color_image_handle,
                     dst_image: render_target_handle,
@@ -138,7 +138,7 @@ impl RtPipeline {
 
             self.sdr_pass.exec(
                 &cmd,
-                &bindless_mgr,
+                &bindless_manager,
                 &shader::sdr::PushConstant {
                     src_image: color_image_handle,
                     dst_image: render_target_handle,
@@ -161,7 +161,8 @@ impl RtPipeline {
         Gfx::get().gfx_queue().submit(vec![SubmitInfo::new(&submit_cmds)], None);
     }
 }
-impl Drop for RtPipeline {
+impl RenderPass for RtRenderPass {}
+impl Drop for RtRenderPass {
     fn drop(&mut self) {
         log::info!("RtPipeline drop");
     }

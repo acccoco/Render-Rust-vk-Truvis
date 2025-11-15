@@ -1,19 +1,19 @@
 use std::ffi::CStr;
 
+use crate::apis::render_pass::RenderSubpass;
+use crate::subsystems::bindless_manager::BindlessManager;
 use ash::vk;
 use truvis_gfx::{commands::command_buffer::CommandBuffer, gfx::Gfx, pipelines::shader::ShaderModule};
 
-use crate::renderer::bindless::BindlessManager;
-
 /// 泛型参数 P 表示 compute shader 的参数，以 push constant 的形式传入 shader
-pub struct ComputePass<P: bytemuck::Pod> {
+pub struct ComputeSubpass<P: bytemuck::Pod> {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
 
     _phantom: std::marker::PhantomData<P>,
 }
-impl<P: bytemuck::Pod> ComputePass<P> {
-    pub fn new(bindless_mgr: &BindlessManager, entry_point: &CStr, shader_path: &str) -> Self {
+impl<P: bytemuck::Pod> ComputeSubpass<P> {
+    pub fn new(bindless_manager: &BindlessManager, entry_point: &CStr, shader_path: &str) -> Self {
         let shader_module = ShaderModule::new(std::path::Path::new(shader_path));
         let stage_info = vk::PipelineShaderStageCreateInfo::default()
             .module(shader_module.handle())
@@ -26,7 +26,7 @@ impl<P: bytemuck::Pod> ComputePass<P> {
                 .offset(0)
                 .size(size_of::<P>() as u32);
 
-            let descriptor_sets = [bindless_mgr.bindless_descriptor_layout.handle()];
+            let descriptor_sets = [bindless_manager.bindless_descriptor_layout.handle()];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
@@ -52,7 +52,7 @@ impl<P: bytemuck::Pod> ComputePass<P> {
         }
     }
 
-    pub fn exec(&self, cmd: &CommandBuffer, bindless_mgr: &BindlessManager, params: &P, group_cnt: glam::UVec3) {
+    pub fn exec(&self, cmd: &CommandBuffer, bindless_manager: &BindlessManager, params: &P, group_cnt: glam::UVec3) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::COMPUTE, self.pipeline);
 
         cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::COMPUTE, 0, bytemuck::bytes_of(params));
@@ -60,7 +60,7 @@ impl<P: bytemuck::Pod> ComputePass<P> {
             vk::PipelineBindPoint::COMPUTE,
             self.pipeline_layout,
             0,
-            &[bindless_mgr.current_descriptor_set().handle()],
+            &[bindless_manager.current_descriptor_set().handle()],
             None,
         );
 
@@ -72,7 +72,8 @@ impl<P: bytemuck::Pod> ComputePass<P> {
         // drop
     }
 }
-impl<P: bytemuck::Pod> Drop for ComputePass<P> {
+impl<P: bytemuck::Pod> RenderSubpass for ComputeSubpass<P> {}
+impl<P: bytemuck::Pod> Drop for ComputeSubpass<P> {
     fn drop(&mut self) {
         let gfx_device = Gfx::get().gfx_device();
         unsafe {

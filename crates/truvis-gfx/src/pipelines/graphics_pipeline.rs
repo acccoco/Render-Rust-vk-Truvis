@@ -265,7 +265,7 @@ impl GraphicsPipelineCreateInfo {
 
     /// builder
     #[inline]
-    pub fn vertex_shader_stage(&mut self, path: &'static str, entry_point: &'static CStr) -> &mut Self {
+    pub fn vertex_shader_stage(&mut self, path: &str, entry_point: &'static CStr) -> &mut Self {
         self.shader_stages.push(ShaderStageInfo {
             stage: vk::ShaderStageFlags::VERTEX,
             entry_point,
@@ -276,7 +276,7 @@ impl GraphicsPipelineCreateInfo {
 
     /// builder
     #[inline]
-    pub fn fragment_shader_stage(&mut self, path: &'static str, entry_point: &'static CStr) -> &mut Self {
+    pub fn fragment_shader_stage(&mut self, path: &str, entry_point: &'static CStr) -> &mut Self {
         self.shader_stages.push(ShaderStageInfo {
             stage: vk::ShaderStageFlags::FRAGMENT,
             entry_point,

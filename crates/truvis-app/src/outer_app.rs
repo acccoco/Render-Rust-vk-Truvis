@@ -1,5 +1,5 @@
+use truvis_render::core::renderer::Renderer;
 use truvis_render::platform::camera::Camera;
-use truvis_render::renderer::renderer::Renderer;
 
 pub trait OuterApp {
     fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self;

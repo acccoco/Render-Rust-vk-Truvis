@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
+use crate::core::frame_context::FrameContext;
+use crate::subsystems::subsystem::Subsystem;
 use truvis_cxx::AssimpSceneLoader;
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;
 use truvis_model_manager::components::mesh::Mesh;
 use truvis_model_manager::guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid};
 use truvis_shader_binding::shader;
-
-use crate::renderer::frame_context::FrameContext;
 
 /// 在 CPU 侧管理场景数据
 #[derive(Default)]
@@ -52,6 +52,11 @@ impl SceneManager {
         Self::default()
     }
 }
+
+impl Subsystem for SceneManager {
+    fn before_render(&mut self) {}
+}
+
 // tools
 impl SceneManager {
     #[inline]
@@ -90,9 +95,9 @@ impl SceneManager {
                 let guid = MatGuid::new();
 
                 // 注册纹理
-                let mut bindless_mgr = FrameContext::get().bindless_mgr.borrow_mut();
+                let mut bindless_manager = FrameContext::get().bindless_manager.borrow_mut();
                 if !mat.diffuse_map.is_empty() {
-                    bindless_mgr.register_texture_by_path(mat.diffuse_map.clone());
+                    bindless_manager.register_texture_by_path(mat.diffuse_map.clone());
                 }
 
                 self.all_mats.insert(guid, mat);

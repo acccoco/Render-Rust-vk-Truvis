@@ -11,8 +11,8 @@ use truvis_gfx::{
 };
 use truvis_shader_binding::shader;
 
+use crate::core::frame_context::FrameContext;
 use crate::platform::{camera::Camera, input_manager::InputState};
-use crate::renderer::frame_context::FrameContext;
 
 /// 表示整个渲染器进程，需要考虑 platform, render, render_context, log 之类的各种模块
 pub struct Renderer {}
@@ -47,7 +47,7 @@ impl Renderer {
     pub fn begin_frame(&mut self) {
         // 等待 fif 的同一帧渲染完成
         {
-            let frame_id = FrameContext::frame_id();
+            let frame_id = FrameContext::get().frame_id();
             let wait_frame = if frame_id > 3 { frame_id as u64 - 3 } else { 0 };
             let wait_timeline_value = if wait_frame == 0 { 0 } else { wait_frame };
             let timeout_ns = 30 * 1000 * 1000 * 1000;
@@ -65,7 +65,7 @@ impl Renderer {
             let submit_info = SubmitInfo::new(&[]).signal(
                 &FrameContext::get().fif_timeline_semaphore,
                 vk::PipelineStageFlags2::NONE,
-                Some(FrameContext::frame_id() as u64),
+                Some(FrameContext::get().frame_id() as u64),
             );
             Gfx::get().gfx_queue().submit(vec![submit_info], None);
         }
@@ -102,7 +102,7 @@ impl Renderer {
 
     fn update_gpu_scene(&mut self, input_state: &InputState, camera: &Camera) {
         let frame_extent = FrameContext::get().frame_settings().frame_extent;
-        let crt_frame_label = FrameContext::frame_label();
+        let crt_frame_label = FrameContext::get().frame_label();
 
         // 将数据上传到 gpu buffer 中
         let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("update-draw-buffer");
@@ -137,7 +137,7 @@ impl Renderer {
                 camera_forward: camera.camera_forward().into(),
                 time_ms: FrameContext::get().timer.borrow().total_time.as_micros() as f32 / 1000.0,
                 delta_time_ms: FrameContext::get().timer.borrow().delte_time_ms(),
-                frame_id: FrameContext::frame_id() as u64,
+                frame_id: FrameContext::get().frame_id() as u64,
                 mouse_pos: shader::Float2 {
                     x: mouse_pos.x as f32,
                     y: mouse_pos.y as f32,

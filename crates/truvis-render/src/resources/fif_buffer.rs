@@ -14,10 +14,10 @@ use truvis_gfx::{
 };
 use truvis_shader_binding::shader;
 
-use crate::renderer::frame_context::FrameContext;
+use crate::core::frame_context::FrameContext;
 use crate::{
     pipeline_settings::{FrameLabel, FrameSettings},
-    renderer::bindless::BindlessManager,
+    subsystems::bindless_manager::BindlessManager,
 };
 
 /// 所有帧会用到的 buffers
@@ -34,7 +34,7 @@ pub struct FifBuffers {
     off_screen_target_bindless_keys: Vec<String>,
 }
 impl FifBuffers {
-    pub fn new(frame_settigns: &FrameSettings, bindless_mgr: &mut BindlessManager, fif_count: usize) -> Self {
+    pub fn new(frame_settigns: &FrameSettings, bindless_manager: &mut BindlessManager, fif_count: usize) -> Self {
         let (color_image, color_image_view) = Self::create_color_image(frame_settigns);
         let (depth_image, depth_image_view) = Self::create_depth_image(frame_settigns);
         let render_targets = Self::create_render_targets(frame_settigns, fif_count);
@@ -52,31 +52,31 @@ impl FifBuffers {
             off_screen_targets: render_targets,
             off_screen_target_bindless_keys: render_target_bindless_keys,
         };
-        fif_buffers.register_bindless(bindless_mgr);
+        fif_buffers.register_bindless(bindless_manager);
         fif_buffers
     }
 
     /// 尺寸发生变化时，需要重新创建相关的资源
     pub fn rebuild(&mut self, frame_settings: &FrameSettings) {
         self.unregister_bindless();
-        *self = Self::new(frame_settings, &mut FrameContext::bindless_mgr_mut(), FrameContext::fif_count());
+        *self = Self::new(frame_settings, &mut FrameContext::bindless_manager_mut(), FrameContext::get().fif_count());
     }
 
-    fn register_bindless(&self, bindless_mgr: &mut BindlessManager) {
-        bindless_mgr.register_image(&self.accum_image_view);
+    fn register_bindless(&self, bindless_manager: &mut BindlessManager) {
+        bindless_manager.register_image(&self.accum_image_view);
         for (render_target, key) in self.off_screen_targets.iter().zip(self.off_screen_target_bindless_keys.iter()) {
-            bindless_mgr.register_texture_shared(key.clone(), render_target.clone());
-            bindless_mgr.register_image(render_target.image_view());
+            bindless_manager.register_texture_shared(key.clone(), render_target.clone());
+            bindless_manager.register_image(render_target.image_view());
         }
     }
 
     fn unregister_bindless(&self) {
-        let mut bindless_mgr = FrameContext::bindless_mgr_mut();
+        let mut bindless_manager = FrameContext::bindless_manager_mut();
 
-        bindless_mgr.unregister_image2(&self.accum_image_view);
+        bindless_manager.unregister_image2(&self.accum_image_view);
         for (render_target, key) in self.off_screen_targets.iter().zip(self.off_screen_target_bindless_keys.iter()) {
-            bindless_mgr.unregister_texture(key);
-            bindless_mgr.unregister_image2(&render_target.image_view());
+            bindless_manager.unregister_texture(key);
+            bindless_manager.unregister_image2(render_target.image_view());
         }
     }
 
@@ -197,8 +197,8 @@ impl FifBuffers {
         self.off_screen_targets[frame_label as usize].image_view()
     }
 
-    pub fn color_image_bindless_handle(&self, bindless_mgr: &BindlessManager) -> shader::ImageHandle {
-        bindless_mgr.get_image_handle(&self.accum_image_view).unwrap()
+    pub fn color_image_bindless_handle(&self, bindless_manager: &BindlessManager) -> shader::ImageHandle {
+        bindless_manager.get_image_handle(&self.accum_image_view).unwrap()
     }
 
     #[inline]
@@ -213,18 +213,18 @@ impl FifBuffers {
 
     pub fn render_target_image_bindless_handle(
         &self,
-        bindless_mgr: &BindlessManager,
+        bindless_manager: &BindlessManager,
         frame_label: FrameLabel,
     ) -> shader::ImageHandle {
-        bindless_mgr.get_image_handle(&self.off_screen_targets[frame_label as usize].image_view()).unwrap()
+        bindless_manager.get_image_handle(self.off_screen_targets[frame_label as usize].image_view()).unwrap()
     }
 
     pub fn render_target_texture_bindless_handle(
         &self,
-        bindless_mgr: &BindlessManager,
+        bindless_manager: &BindlessManager,
         frame_label: FrameLabel,
     ) -> shader::TextureHandle {
-        bindless_mgr.get_texture_handle(&self.off_screen_target_bindless_keys[frame_label as usize]).unwrap()
+        bindless_manager.get_texture_handle(&self.off_screen_target_bindless_keys[frame_label as usize]).unwrap()
     }
 }
 impl Drop for FifBuffers {

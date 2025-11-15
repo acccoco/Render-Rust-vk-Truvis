@@ -7,6 +7,9 @@ use itertools::Itertools;
 use truvis_crate_tools::const_map;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_gfx::commands::barrier::ImageBarrier;
+use truvis_gfx::commands::submit_info::SubmitInfo;
+use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_gfx::{
     commands::command_buffer::CommandBuffer,
@@ -18,8 +21,9 @@ use truvis_gfx::{
 };
 use truvis_model_manager::components::geometry::Geometry;
 use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
+use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
+use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::FrameSettings;
-use truvis_render::renderer::frame_context::FrameContext;
 
 const_map!(ShaderStage<ShaderStageInfo>:{
     Vertex: ShaderStageInfo {
@@ -53,11 +57,12 @@ pub struct PushConstants {
     __padding__: [f32; 2],
 }
 
-pub struct ShaderToyPass {
+pub struct ShaderToySubpass {
     pipeline: GraphicsPipeline,
     _pipeline_layout: Rc<PipelineLayout>,
 }
-impl ShaderToyPass {
+impl RenderSubpass for ShaderToySubpass {}
+impl ShaderToySubpass {
     pub fn new(color_format: vk::Format) -> Self {
         let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
@@ -104,7 +109,7 @@ impl ShaderToyPass {
         let push_constants = PushConstants {
             time: timer.total_time.as_secs_f32(),
             delta_time: timer.delta_time_s(),
-            frame: FrameContext::frame_id() as i32,
+            frame: FrameContext::get().frame_id() as i32,
             frame_rate: 1.0 / timer.delta_time_s(),
             resolution: glam::Vec2::new(viewport_extent.width as f32, viewport_extent.height as f32),
             mouse: glam::Vec4::new(
@@ -159,6 +164,70 @@ impl ShaderToyPass {
             cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&rect.vertex_buffer), &[0]);
             cmd.draw_indexed(rect.index_cnt(), 0, 1, 0, 0);
             cmd.end_rendering();
+        }
+    }
+}
+
+pub struct ShaderToyPass {
+    shader_toy_pass: ShaderToySubpass,
+}
+
+impl RenderPass for ShaderToyPass {}
+
+impl ShaderToyPass {
+    pub fn new(color_format: vk::Format) -> Self {
+        let shader_toy_pass = ShaderToySubpass::new(color_format);
+        Self { shader_toy_pass }
+    }
+
+    pub fn render(&self, shape: &Geometry<VertexLayoutAoSPosColor>) {
+        let fif_buffers = FrameContext::get().fif_buffers.borrow();
+
+        let frame_label = FrameContext::get().frame_label();
+        let render_target = fif_buffers.render_target_image(frame_label);
+        let render_target_view = fif_buffers.render_target_image_view(frame_label);
+        let frame_settings = FrameContext::get().frame_settings();
+
+        // render shader toy
+        {
+            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("shader-toy");
+            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "shader-toy");
+
+            // 将 render target 从 general -> color attachment
+            cmd.image_memory_barrier(
+                vk::DependencyFlags::empty(),
+                &[ImageBarrier::new()
+                    .image(render_target)
+                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .src_mask(
+                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                        vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                    )
+                    .dst_mask(
+                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                        vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                    )],
+            );
+
+            self.shader_toy_pass.draw(&cmd, &frame_settings, render_target_view.handle(), shape);
+
+            // 将 render target 从 color attachment -> general
+            cmd.image_memory_barrier(
+                vk::DependencyFlags::empty(),
+                &[ImageBarrier::new()
+                    .image(render_target)
+                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
+                    .src_mask(
+                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                        vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                    )
+                    .dst_mask(vk::PipelineStageFlags2::NONE, vk::AccessFlags2::NONE)],
+            );
+
+            cmd.end();
+            Gfx::get().gfx_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
         }
     }
 }

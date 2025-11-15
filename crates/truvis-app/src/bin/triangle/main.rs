@@ -3,16 +3,16 @@ use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
 use truvis_model_manager::components::geometry::Geometry;
 use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
-use truvis_render::renderer::frame_context::FrameContext;
-use truvis_render::{platform::camera::Camera, renderer::renderer::Renderer};
+use truvis_render::core::frame_context::FrameContext;
+use truvis_render::platform::camera::Camera;
 
 mod triangle_pass;
-mod triangle_pipeline;
 
-use crate::triangle_pipeline::TrianglePipeline;
+use triangle_pass::TrianglePass;
+use truvis_render::core::renderer::Renderer;
 
 struct HelloTriangle {
-    triangle_pipeline: TrianglePipeline,
+    triangle_pipeline: TrianglePass,
     triangle: Geometry<VertexLayoutAoSPosColor>,
 }
 impl OuterApp for HelloTriangle {
@@ -20,7 +20,7 @@ impl OuterApp for HelloTriangle {
         log::info!("hello triangle init.");
 
         Self {
-            triangle_pipeline: TrianglePipeline::new(&FrameContext::get().frame_settings()),
+            triangle_pipeline: TrianglePass::new(&FrameContext::get().frame_settings()),
             triangle: VertexLayoutAoSPosColor::triangle(),
         }
     }

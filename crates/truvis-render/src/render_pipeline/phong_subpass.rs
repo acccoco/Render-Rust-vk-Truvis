@@ -1,10 +1,12 @@
-use crate::renderer::frame_context::FrameContext;
+use crate::core::frame_context::FrameContext;
+use crate::resources::fif_buffer::FifBuffers;
 use crate::{
     pipeline_settings::{FrameLabel, FrameSettings},
-    renderer::{bindless::BindlessManager, fif_buffer::FifBuffers, gpu_scene::GpuScene, scene_manager::SceneManager},
+    subsystems::{bindless_manager::BindlessManager, gpu_scene::GpuScene, scene_manager::SceneManager},
 };
 use ash::vk;
 use std::{cell::RefCell, mem::offset_of, rc::Rc};
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_gfx::{
     basic::color::LabelColor,
@@ -29,8 +31,8 @@ impl PhongPass {
         bindless_manager: Rc<RefCell<BindlessManager>>,
     ) -> Self {
         let mut ci = GraphicsPipelineCreateInfo::default();
-        ci.vertex_shader_stage("shader/build/phong/phong3d.vs.slang.spv", c"main");
-        ci.fragment_shader_stage("shader/build/phong/phong.ps.slang.spv", c"main");
+        ci.vertex_shader_stage(&TruvisPath::shader_path("phong/phong3d.vs.slang.spv"), c"main");
+        ci.fragment_shader_stage(&TruvisPath::shader_path("phong/phong.ps.slang.spv"), c"main");
 
         ci.vertex_binding(VertexLayoutAoS3D::vertex_input_bindings());
         ci.vertex_attribute(VertexLayoutAoS3D::vertex_input_attributes());
@@ -103,11 +105,11 @@ impl PhongPass {
         cmd: &CommandBuffer,
         per_frame_data: &StructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
-        scene_mgr: &SceneManager,
+        scene_manager: &SceneManager,
         fif_buffers: &FifBuffers,
         frame_settings: &FrameSettings,
     ) {
-        let frame_label = FrameContext::frame_label();
+        let frame_label = FrameContext::get().frame_label();
         let rendering_info = RenderingInfo::new(
             vec![fif_buffers.render_target_image_view(frame_label).handle()],
             Some(fif_buffers.depth_image_view().handle()),
@@ -135,7 +137,7 @@ impl PhongPass {
             },
             frame_label,
         );
-        gpu_scene.draw(cmd, scene_mgr, &mut |ins_idx, submesh_idx| {
+        gpu_scene.draw(cmd, scene_manager, &mut |ins_idx, submesh_idx| {
             // NOTE 这个数据和 PushConstant 中的内存布局是一致的
             let data = [ins_idx, submesh_idx];
             cmd.cmd_push_constants(

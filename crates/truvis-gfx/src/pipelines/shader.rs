@@ -76,6 +76,12 @@ pub struct ShaderModuleCache {
     #[cfg(debug_assertions)]
     destroyed: bool,
 }
+impl Default for ShaderModuleCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ShaderModuleCache {
     pub fn new() -> Self {
         Self {

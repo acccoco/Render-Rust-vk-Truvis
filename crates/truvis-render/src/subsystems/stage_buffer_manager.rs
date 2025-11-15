@@ -1,6 +1,7 @@
 use itertools::Itertools;
 
-use crate::renderer::frame_context::FrameContext;
+use crate::core::frame_context::FrameContext;
+use crate::subsystems::subsystem::Subsystem;
 use truvis_gfx::resources::buffer::Buffer;
 
 pub struct StageBufferManager {
@@ -14,23 +15,26 @@ impl StageBufferManager {
         Self { buffers }
     }
 }
+impl Subsystem for StageBufferManager {
+    fn before_render(&mut self) {}
+}
 
 // tools
 impl StageBufferManager {
     pub fn alloc_buffer(&mut self, size: u64, debug_name: &str) -> &mut Buffer {
         let buffer = Buffer::new_stage_buffer(size, debug_name);
-        let frame_idx = *FrameContext::frame_label();
+        let frame_idx = *FrameContext::get().frame_label();
         self.buffers[frame_idx].push(buffer);
         self.buffers[frame_idx].last_mut().unwrap()
     }
 
     pub fn register_stage_buffer(&mut self, stage_buffer: Buffer) {
-        let frame_idx = *FrameContext::frame_label();
+        let frame_idx = *FrameContext::get().frame_label();
         self.buffers[frame_idx].push(stage_buffer);
     }
 
     pub fn clear_fif_buffers(&mut self) {
-        let frame_idx = *FrameContext::frame_label();
+        let frame_idx = *FrameContext::get().frame_label();
 
         self.buffers[frame_idx].clear();
     }

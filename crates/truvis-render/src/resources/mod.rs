@@ -2,6 +2,8 @@ use std::rc::Rc;
 
 use truvis_gfx::resources::{image::Image2D, texture::Texture2D};
 
+pub mod fif_buffer;
+
 pub struct ImageLoader {}
 
 impl ImageLoader {

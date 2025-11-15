@@ -6,6 +6,9 @@ use itertools::Itertools;
 use truvis_crate_tools::const_map;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_gfx::commands::barrier::ImageBarrier;
+use truvis_gfx::commands::submit_info::SubmitInfo;
+use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
 use truvis_gfx::{
     commands::command_buffer::CommandBuffer,
@@ -17,10 +20,10 @@ use truvis_gfx::{
 };
 use truvis_model_manager::components::geometry::Geometry;
 use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
-use truvis_render::{
-    pipeline_settings::{FrameLabel, FrameSettings},
-    renderer::fif_buffer::FifBuffers,
-};
+use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
+use truvis_render::core::frame_context::FrameContext;
+use truvis_render::pipeline_settings::{FrameLabel, FrameSettings};
+use truvis_render::resources::fif_buffer::FifBuffers;
 
 const_map!(ShaderStage<ShaderStageInfo>: {
     Vertex: ShaderStageInfo {
@@ -35,11 +38,12 @@ const_map!(ShaderStage<ShaderStageInfo>: {
     },
 });
 
-pub struct TrianglePass {
+pub struct TriangleSubpass {
     pipeline: GraphicsPipeline,
     _pipeline_layout: Rc<PipelineLayout>,
 }
-impl TrianglePass {
+impl RenderSubpass for TriangleSubpass {}
+impl TriangleSubpass {
     pub fn new(frame_settings: &FrameSettings) -> Self {
         let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
@@ -109,6 +113,69 @@ impl TrianglePass {
             cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&shape.vertex_buffer), &[0]);
             cmd.draw_indexed(shape.index_cnt(), 0, 1, 0, 0);
             cmd.end_rendering();
+        }
+    }
+}
+
+pub struct TrianglePass {
+    triangle_pass: TriangleSubpass,
+}
+
+impl RenderPass for TrianglePass {}
+
+impl TrianglePass {
+    pub fn new(frame_settings: &FrameSettings) -> Self {
+        let triangle_pass = TriangleSubpass::new(frame_settings);
+        Self { triangle_pass }
+    }
+
+    pub fn render(&self, shape: &Geometry<VertexLayoutAoSPosColor>) {
+        let fif_buffers = FrameContext::get().fif_buffers.borrow();
+
+        let frame_label = FrameContext::get().frame_label();
+        let render_target = fif_buffers.render_target_image(frame_label);
+        let frame_settings = FrameContext::get().frame_settings();
+
+        // render triangle
+        {
+            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("triangle");
+            cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "triangle");
+
+            // 将 render target 从 general -> color attachment
+            cmd.image_memory_barrier(
+                vk::DependencyFlags::empty(),
+                &[ImageBarrier::new()
+                    .image(render_target)
+                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .src_mask(
+                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                        vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                    )
+                    .dst_mask(
+                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                        vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                    )],
+            );
+
+            self.triangle_pass.draw(&cmd, frame_label, &fif_buffers, &frame_settings, shape);
+
+            // 将 render target 从 color attachment -> general
+            cmd.image_memory_barrier(
+                vk::DependencyFlags::empty(),
+                &[ImageBarrier::new()
+                    .image(render_target)
+                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
+                    .src_mask(
+                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                        vk::AccessFlags2::COLOR_ATTACHMENT_READ | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                    )
+                    .dst_mask(vk::PipelineStageFlags2::NONE, vk::AccessFlags2::NONE)],
+            );
+
+            cmd.end();
+            Gfx::get().gfx_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
         }
     }
 }
