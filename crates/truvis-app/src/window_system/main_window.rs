@@ -4,7 +4,7 @@ use ash::vk;
 use itertools::Itertools;
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
-use crate::gui::gui::Gui;
+use crate::gui::core::Gui;
 use crate::gui::gui_pass::GuiPass;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::BarrierMask;

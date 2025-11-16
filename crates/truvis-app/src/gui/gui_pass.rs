@@ -17,7 +17,7 @@ use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::FrameLabel;
 use truvis_shader_binding::{shader, shader::TextureHandle};
 
-use crate::gui::gui::Gui;
+use crate::gui::core::Gui;
 use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
 
 const_map!(ShaderStage<ShaderStageInfo>: {

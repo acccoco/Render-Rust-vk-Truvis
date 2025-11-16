@@ -11,11 +11,6 @@ pub struct VertexPosNormalUv {
     pub normal: [f32; 3],
     pub uv: [f32; 2],
 }
-impl VertexPosNormalUv {
-    const fn new(pos: [f32; 3], normal: [f32; 3], uv: [f32; 2]) -> Self {
-        Self { pos, normal, uv }
-    }
-}
 
 pub struct VertexLayoutAoSPosNormalUv;
 
