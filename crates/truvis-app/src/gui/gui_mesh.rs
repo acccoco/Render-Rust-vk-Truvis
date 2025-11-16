@@ -66,7 +66,7 @@ impl GuiMesh {
         }
 
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
-        let mut vertex_buffer =
+        let vertex_buffer =
             VertexBuffer::<ImGuiVertexLayoutAoS>::new(vertex_count, format!("{}-imgui-vertex", frame_name));
         let mut upload_buffer_manager = FrameContext::stage_buffer_manager();
         let stage_buffer = upload_buffer_manager
@@ -77,7 +77,7 @@ impl GuiMesh {
         {
             cmd.cmd_copy_buffer(
                 stage_buffer,
-                &mut vertex_buffer,
+                &vertex_buffer,
                 &[vk::BufferCopy {
                     size: vertices_size as vk::DeviceSize,
                     ..Default::default()

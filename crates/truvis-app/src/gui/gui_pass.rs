@@ -24,12 +24,12 @@ const_map!(ShaderStage<ShaderStageInfo>: {
     Vertex: ShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: c"vsmain",
-        path: TruvisPath::shader_path("imgui/imgui.slang.spv"),
+        path: TruvisPath::shader_path("imgui/imgui.slang"),
     },
     Fragment: ShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: c"psmain",
-        path: TruvisPath::shader_path("imgui/imgui.slang.spv"),
+        path: TruvisPath::shader_path("imgui/imgui.slang"),
     },
 });
 
@@ -163,8 +163,8 @@ impl GuiPass {
             bytemuck::bytes_of(&push_constant),
         );
 
-        cmd.cmd_bind_index_buffer1(&mesh.index_buffer, 0);
-        cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&mesh.vertex_buffer), &[0]);
+        cmd.cmd_bind_index_buffer(&mesh.index_buffer, 0);
+        cmd.cmd_bind_vertex_buffers(0, &[mesh.vertex_buffer.vk_buffer()], &[0]);
 
         let mut index_offset = 0;
         let mut vertex_offset = 0;

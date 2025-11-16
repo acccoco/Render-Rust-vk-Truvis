@@ -12,7 +12,7 @@ use std::{
 /// ```ignore
 /// let model = TruvisPath::assets_path("sponza.fbx");           // assets/sponza.fbx
 /// let texture = TruvisPath::resources_path("uv_checker.png");  // resources/uv_checker.png
-/// let shader = TruvisPath::shader_path("rt/raygen.slang.spv"); // shader/.build/rt/raygen.slang.spv
+/// let shader = TruvisPath::shader_path("rt/raygen.slang"); // shader/.build/rt/raygen.slang
 /// ```
 pub struct TruvisPath {}
 impl TruvisPath {
@@ -34,7 +34,9 @@ impl TruvisPath {
     pub fn shader_path(filename: &str) -> String {
         let workspace_dir = Self::workspace_path();
         let shader_path = workspace_dir.join("shader").join(".build").join(filename);
-        shader_path.to_str().unwrap().to_string()
+        let mut shader_build_path = shader_path.to_str().unwrap().to_string();
+        shader_build_path.push_str(".spv");
+        shader_build_path
     }
 
     /// 获取工作区根目录

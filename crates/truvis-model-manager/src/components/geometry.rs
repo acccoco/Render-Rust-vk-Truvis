@@ -1,6 +1,6 @@
-use crate::vertex::aos_3d::VertexLayoutAoS3D;
 use crate::vertex::soa_3d::VertexLayoutSoA3D;
 use ash::vk;
+use truvis_gfx::commands::command_buffer::CommandBuffer;
 use truvis_gfx::raytracing::acceleration::BlasInputInfo;
 use truvis_gfx::resources::special_buffers::index_buffer::Index32Buffer;
 use truvis_gfx::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
@@ -17,7 +17,6 @@ pub struct Geometry<L: VertexLayout> {
     pub vertex_buffer: VertexBuffer<L>,
     pub index_buffer: Index32Buffer,
 }
-pub type GeometryAoS3D = Geometry<VertexLayoutAoS3D>;
 pub type GeometrySoA3D = Geometry<VertexLayoutSoA3D>;
 
 // getters
@@ -73,5 +72,27 @@ impl<L: VertexLayout> Geometry<L> {
                 transform_offset: 0,
             },
         }
+    }
+}
+
+impl GeometrySoA3D {
+    #[inline]
+    pub fn cmd_bind_index_buffer(&self, cmd: &CommandBuffer) {
+        cmd.cmd_bind_index_buffer(&self.index_buffer, 0)
+    }
+
+    #[inline]
+    pub fn cmd_bind_vertex_buffers(&self, cmd: &CommandBuffer) {
+        let vertex_cnt = self.vertex_buffer.vertex_cnt();
+        cmd.cmd_bind_vertex_buffers(
+            0,
+            &[self.vertex_buffer.vk_buffer(); 4],
+            &[
+                VertexLayoutSoA3D::pos_offset(vertex_cnt),
+                VertexLayoutSoA3D::normal_offset(vertex_cnt),
+                VertexLayoutSoA3D::tangent_offset(vertex_cnt),
+                VertexLayoutSoA3D::uv_offset(vertex_cnt),
+            ],
+        );
     }
 }

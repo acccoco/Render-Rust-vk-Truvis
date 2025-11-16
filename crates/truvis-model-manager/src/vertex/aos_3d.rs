@@ -14,6 +14,7 @@ pub struct Vertex3D {
 
 /// AoS 的顶点 buffer 布局，包含：Positions, Normals, Tangents, UVs
 pub struct VertexLayoutAoS3D;
+
 impl VertexLayout for VertexLayoutAoS3D {
     fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription> {
         vec![vk::VertexInputBindingDescription {
@@ -77,6 +78,7 @@ impl VertexLayout for VertexLayoutAoS3D {
 }
 
 impl VertexLayoutAoS3D {
+    #[deprecated]
     pub fn create_vertex_buffer(data: &[Vertex3D], name: impl AsRef<str>) -> VertexBuffer<Self> {
         let vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(data);

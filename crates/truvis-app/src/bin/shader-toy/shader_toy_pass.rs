@@ -19,8 +19,8 @@ use truvis_gfx::{
         shader::ShaderStageInfo,
     },
 };
-use truvis_model_manager::components::geometry::Geometry;
-use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
+use truvis_model_manager::components::geometry::GeometrySoA3D;
+use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::FrameSettings;
@@ -29,12 +29,12 @@ const_map!(ShaderStage<ShaderStageInfo>:{
     Vertex: ShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: c"main",
-        path: TruvisPath::shader_path("shadertoy-glsl/shadertoy.vert.spv"),
+        path: TruvisPath::shader_path("shadertoy-glsl/shadertoy.vert"),
     },
     Fragment: ShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: c"main",
-        path: TruvisPath::shader_path("shadertoy-glsl/shadertoy.frag.spv"),
+        path: TruvisPath::shader_path("shadertoy-glsl/shadertoy.frag"),
     },
 });
 
@@ -67,8 +67,8 @@ impl ShaderToySubpass {
         let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![color_format], None, Some(vk::Format::UNDEFINED));
-        pipeline_ci.vertex_binding(VertexLayoutAoSPosColor::vertex_input_bindings());
-        pipeline_ci.vertex_attribute(VertexLayoutAoSPosColor::vertex_input_attributes());
+        pipeline_ci.vertex_binding(VertexLayoutSoA3D::vertex_input_bindings());
+        pipeline_ci.vertex_attribute(VertexLayoutSoA3D::vertex_input_attributes());
         pipeline_ci.color_blend(
             vec![
                 vk::PipelineColorBlendAttachmentState::default()
@@ -100,7 +100,7 @@ impl ShaderToySubpass {
         cmd: &CommandBuffer,
         frame_settings: &FrameSettings,
         render_target: vk::ImageView,
-        rect: &Geometry<VertexLayoutAoSPosColor>,
+        rect: &GeometrySoA3D,
     ) {
         let viewport_extent = frame_settings.frame_extent;
 
@@ -160,8 +160,8 @@ impl ShaderToySubpass {
                 }],
             );
 
-            cmd.cmd_bind_index_buffer(&rect.index_buffer, 0, vk::IndexType::UINT32);
-            cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&rect.vertex_buffer), &[0]);
+            rect.cmd_bind_index_buffer(cmd);
+            rect.cmd_bind_vertex_buffers(cmd);
             cmd.draw_indexed(rect.index_cnt(), 0, 1, 0, 0);
             cmd.end_rendering();
         }
@@ -180,7 +180,7 @@ impl ShaderToyPass {
         Self { shader_toy_pass }
     }
 
-    pub fn render(&self, shape: &Geometry<VertexLayoutAoSPosColor>) {
+    pub fn render(&self, shape: &GeometrySoA3D) {
         let fif_buffers = FrameContext::get().fif_buffers.borrow();
 
         let frame_label = FrameContext::get().frame_label();

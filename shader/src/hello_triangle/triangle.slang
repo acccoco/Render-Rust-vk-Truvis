@@ -1,48 +1,22 @@
-struct VsInput
-{
-    [[vk::location(0)]]
-    float4 Position : POSITION;
-
-    [[vk::location(1)]]
-    float4 Color : COLOR0;
-};
-
-struct CoarseVertex
-{
-    [[vk::location(0)]]
-    float4 Color : COLOR0;
-
-    [[vk::location(1)]]
-    float2 UV : TEXCOORD0;
-};
-
-struct VsOutput
-{
-    float4 Pos : SV_POSITION;
-
-    CoarseVertex coarse_vertex : CoarseVertex;
-};
+#include "vertex_attribute.slangi"
 
 [shader("vertex")]
-VsOutput vsmain(VsInput input, uint VertexIndex: SV_VertexID)
+soa::VsOutput vsmain(soa::VsInput input, uint VertexIndex: SV_VertexID)
 {
-    VsOutput output = (VsOutput)0;
-    output.coarse_vertex.Color = input.Color;
-    output.coarse_vertex.UV = input.Position.xy * 0.5 + 0.5;
-    output.Pos = input.Position;
+    soa::VsOutput output = (soa::VsOutput)0;
+    output.coarse_vertex.UV = input.UV;
+    output.coarse_vertex.Normal = input.Normal;
+    output.coarse_vertex.Tangent = input.Tangent;
+    output.Pos = float4(input.Position, 1.0);
     return output;
 }
 
-struct PS_OUTPUT
-{
-    [[vk::location(0)]]
-    float4 Color : SV_TARGET0;
-};
-
 [shader("pixel")]
-PS_OUTPUT psmain(CoarseVertex input)
+soa::PS_OUTPUT psmain(soa::CoarseVertex input)
 {
-    PS_OUTPUT output = (PS_OUTPUT)0;
-    output.Color = input.Color;
+    soa::PS_OUTPUT output = (soa::PS_OUTPUT)0;
+    output.Color = float4(
+        float3(input.UV, 0.0) * 0.7 + input.Normal * 0.15 + input.Tangent * 0.15,
+        1.0);
     return output;
 }

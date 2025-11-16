@@ -252,8 +252,8 @@ impl GpuScene {
             let instance = scene_manager.get_instance(instance_uuid).unwrap();
             let mesh = scene_manager.get_mesh(&instance.mesh).unwrap();
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
-                cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&geometry.vertex_buffer), &[0]);
-                cmd.cmd_bind_index_buffer1(&geometry.index_buffer, 0);
+                geometry.cmd_bind_index_buffer(cmd);
+                geometry.cmd_bind_vertex_buffers(cmd);
 
                 before_draw(instance_idx as u32, submesh_idx as u32);
                 cmd.draw_indexed(geometry.index_cnt(), 0, 1, 0, 0);

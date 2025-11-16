@@ -205,6 +205,7 @@ let quad = VertexAosLayoutPosColor::quad(&rhi);
 - **视图**: 右手，Y-Up，相机朝向 -Z
 - **NDC**: 左手，Y-Up  
 - **帧缓冲**: 原点左上角，视口 `height < 0`
+- 三角形绕序：CCW，符合右手定则
 
 ![](./resources/coords.png)
 

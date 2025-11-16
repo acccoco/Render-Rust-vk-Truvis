@@ -17,25 +17,25 @@ use truvis_gfx::{
     },
     resources::special_buffers::structured_buffer::StructuredBuffer,
 };
-use truvis_model_manager::vertex::aos_3d::VertexLayoutAoS3D;
+use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_shader_binding::shader;
 
-pub struct PhongPass {
+pub struct PhongSubpass {
     pipeline: GraphicsPipeline,
     bindless_manager: Rc<RefCell<BindlessManager>>,
 }
-impl PhongPass {
+impl PhongSubpass {
     pub fn new(
         color_format: vk::Format,
         depth_format: vk::Format,
         bindless_manager: Rc<RefCell<BindlessManager>>,
     ) -> Self {
         let mut ci = GraphicsPipelineCreateInfo::default();
-        ci.vertex_shader_stage(&TruvisPath::shader_path("phong/phong3d.vs.slang.spv"), c"main");
-        ci.fragment_shader_stage(&TruvisPath::shader_path("phong/phong.ps.slang.spv"), c"main");
+        ci.vertex_shader_stage(&TruvisPath::shader_path("phong/phong3d.vs.slang"), c"main");
+        ci.fragment_shader_stage(&TruvisPath::shader_path("phong/phong.ps.slang"), c"main");
 
-        ci.vertex_binding(VertexLayoutAoS3D::vertex_input_bindings());
-        ci.vertex_attribute(VertexLayoutAoS3D::vertex_input_attributes());
+        ci.vertex_binding(VertexLayoutSoA3D::vertex_input_bindings());
+        ci.vertex_attribute(VertexLayoutSoA3D::vertex_input_attributes());
 
         ci.attach_info(vec![color_format], Some(depth_format), None);
         ci.color_blend(

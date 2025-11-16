@@ -69,7 +69,9 @@ impl ShaderCompileTask {
         let shader_name = entry.file_name().to_str().unwrap();
 
         let mut output_path = EnvPath::shader_build_path().join(relative_path);
-        output_path.set_extension("spv");
+        let mut new_ext = output_path.extension().unwrap().to_os_string();
+        new_ext.push(".spv");
+        output_path.set_extension(new_ext);
         let shader_stage = Self::get_shader_stage(shader_name)?;
         let shader_type = Self::select_shader_compiler(shader_name);
 

@@ -29,12 +29,12 @@ impl RtRenderPass {
         let blit_pass = ComputeSubpass::<shader::blit::PushConstant>::new(
             &bindless_manager,
             c"main",
-            TruvisPath::shader_path("imgui/blit.slang.spv").as_str(),
+            TruvisPath::shader_path("imgui/blit.slang").as_str(),
         );
         let sdr_pass = ComputeSubpass::<shader::sdr::PushConstant>::new(
             &bindless_manager,
             c"main",
-            TruvisPath::shader_path("pass/pp/sdr.slang.spv").as_str(),
+            TruvisPath::shader_path("pass/pp/sdr.slang").as_str(),
         );
 
         Self {

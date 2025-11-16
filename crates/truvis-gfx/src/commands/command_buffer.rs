@@ -239,24 +239,16 @@ impl CommandBuffer {
     /// - command type: state
     /// - supported queue types: graphics
     #[inline]
-    pub fn cmd_bind_vertex_buffers(&self, first_bind: u32, buffers: &[Buffer], offsets: &[vk::DeviceSize]) {
+    pub fn cmd_bind_vertex_buffers(&self, first_bind: u32, buffers: &[vk::Buffer], offsets: &[vk::DeviceSize]) {
         unsafe {
-            let buffers = buffers.iter().map(|b| b.vk_buffer()).collect_vec();
-            Gfx::get().gfx_device().cmd_bind_vertex_buffers(self.vk_handle, first_bind, &buffers, offsets);
+            Gfx::get().gfx_device().cmd_bind_vertex_buffers(self.vk_handle, first_bind, buffers, offsets);
         }
     }
 
     /// - command type: state
     /// - supported queue types: graphics
     #[inline]
-    pub fn cmd_bind_index_buffer(&self, buffer: &Buffer, offset: vk::DeviceSize, index_type: vk::IndexType) {
-        unsafe {
-            Gfx::get().gfx_device().cmd_bind_index_buffer(self.vk_handle, buffer.vk_buffer(), offset, index_type);
-        }
-    }
-
-    #[inline]
-    pub fn cmd_bind_index_buffer1<T: IndexType>(&self, buffer: &IndexBuffer<T>, offset: vk::DeviceSize) {
+    pub fn cmd_bind_index_buffer<T: IndexType>(&self, buffer: &IndexBuffer<T>, offset: vk::DeviceSize) {
         unsafe {
             Gfx::get().gfx_device().cmd_bind_index_buffer(self.vk_handle, buffer.vk_buffer(), offset, T::VK_INDEX_TYPE);
         }

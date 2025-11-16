@@ -18,8 +18,8 @@ use truvis_gfx::{
         shader::ShaderStageInfo,
     },
 };
-use truvis_model_manager::components::geometry::Geometry;
-use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
+use truvis_model_manager::components::geometry::GeometrySoA3D;
+use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::{FrameLabel, FrameSettings};
@@ -29,12 +29,12 @@ const_map!(ShaderStage<ShaderStageInfo>: {
     Vertex: ShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: c"vsmain",
-        path: TruvisPath::shader_path("hello_triangle/triangle.slang.spv"),
+        path: TruvisPath::shader_path("hello_triangle/triangle.slang"),
     },
     Fragment: ShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: c"psmain",
-        path: TruvisPath::shader_path("hello_triangle/triangle.slang.spv"),
+        path: TruvisPath::shader_path("hello_triangle/triangle.slang"),
     },
 });
 
@@ -48,8 +48,8 @@ impl TriangleSubpass {
         let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![frame_settings.color_format], None, Some(vk::Format::UNDEFINED));
-        pipeline_ci.vertex_binding(VertexLayoutAoSPosColor::vertex_input_bindings());
-        pipeline_ci.vertex_attribute(VertexLayoutAoSPosColor::vertex_input_attributes());
+        pipeline_ci.vertex_binding(VertexLayoutSoA3D::vertex_input_bindings());
+        pipeline_ci.vertex_attribute(VertexLayoutSoA3D::vertex_input_attributes());
         pipeline_ci.color_blend(
             vec![
                 vk::PipelineColorBlendAttachmentState::default()
@@ -74,7 +74,7 @@ impl TriangleSubpass {
         frame_label: FrameLabel,
         fif_buffers: &FifBuffers,
         frame_settings: &FrameSettings,
-        shape: &Geometry<VertexLayoutAoSPosColor>,
+        shape: &GeometrySoA3D,
     ) {
         let viewport_extent = frame_settings.frame_extent;
         let rendering_info = RenderingInfo::new(
@@ -109,8 +109,8 @@ impl TriangleSubpass {
                 }],
             );
 
-            cmd.cmd_bind_index_buffer(&shape.index_buffer, 0, vk::IndexType::UINT32);
-            cmd.cmd_bind_vertex_buffers(0, std::slice::from_ref(&shape.vertex_buffer), &[0]);
+            shape.cmd_bind_index_buffer(cmd);
+            shape.cmd_bind_vertex_buffers(cmd);
             cmd.draw_indexed(shape.index_cnt(), 0, 1, 0, 0);
             cmd.end_rendering();
         }
@@ -129,7 +129,7 @@ impl TrianglePass {
         Self { triangle_pass }
     }
 
-    pub fn render(&self, shape: &Geometry<VertexLayoutAoSPosColor>) {
+    pub fn render(&self, shape: &GeometrySoA3D) {
         let fif_buffers = FrameContext::get().fif_buffers.borrow();
 
         let frame_label = FrameContext::get().frame_label();
