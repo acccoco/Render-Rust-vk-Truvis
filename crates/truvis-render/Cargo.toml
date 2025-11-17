@@ -25,3 +25,4 @@ itertools = { workspace = true }
 vk-mem = { workspace = true }
 log = { workspace = true }
 image = { workspace = true }
+tracy-client = { workspace = true }

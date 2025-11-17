@@ -175,6 +175,7 @@ impl BindlessManager {
     ///
     /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
     pub fn prepare_render_data(&mut self, frame_label: FrameLabel) {
+        let _span = tracy_client::span!("BindlessManager::prepare_render_data");
         self.frame_label = frame_label;
 
         let mut texture_infos = Vec::with_capacity(self.textures.len());
@@ -225,6 +226,7 @@ impl BindlessManager {
 // register & unregister
 impl BindlessManager {
     pub fn register_texture_by_path(&mut self, texture_path: String) {
+        let _span = tracy_client::span!("register_texture");
         let texture = ImageLoader::load_image(std::path::Path::new(&texture_path));
         self.register_texture(texture_path, Texture2DContainer::Owned(Box::new(texture)));
     }

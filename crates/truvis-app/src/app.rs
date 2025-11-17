@@ -119,7 +119,10 @@ impl<T: OuterApp> TruvisApp<T> {
         let frame_label = FrameContext::get().frame_label();
         let elapsed = FrameContext::get().timer.borrow().delta_time;
 
-        self.window_system.get_mut().unwrap().acquire_image(frame_label);
+            {
+                let _span = tracy_client::span!("Acquire Image");
+                self.window_system.get_mut().unwrap().acquire_image(frame_label);
+            }
 
         // Update Gui ==================================
         {
@@ -190,12 +193,14 @@ impl<T: OuterApp> TruvisApp<T> {
         // Renderer: Render ================================
         self.renderer.before_render(self.input_manager.state(), self.camera_controller.camera());
         {
+            let _span = tracy_client::span!("OuterApp::draw");
             // 构建出 PipelineContext
             self.outer_app.get_mut().unwrap().draw();
         }
 
         // Window: Draw Gui ===============================
         {
+            let _span = tracy_client::span!("Present GUI");
             let present_data = {
                 let (render_target, render_target_bindless_key) =
                     FrameContext::get().fif_buffers.borrow().render_target_texture(frame_label);

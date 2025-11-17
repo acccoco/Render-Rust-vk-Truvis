@@ -11,6 +11,7 @@ truvis-gfx = { workspace = true }
 
 itertools = { workspace = true }
 glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
+tracy-client = { workspace = true }
 
 
 [build-dependencies]

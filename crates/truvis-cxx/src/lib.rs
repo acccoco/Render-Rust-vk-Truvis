@@ -66,6 +66,7 @@ impl AssimpSceneLoader {
         mesh_register: impl FnMut(Mesh) -> MeshGuid,
         mat_register: impl FnMut(Material) -> MatGuid,
     ) -> Vec<InsGuid> {
+        let _span = tracy_client::span!("AssimpSceneLoader::load_scene");
         validate_vertex_memory_layout();
 
         let model_file = model_file.to_str().unwrap();
@@ -95,6 +96,7 @@ impl AssimpSceneLoader {
 
     /// 加载场景中基础的几何体
     fn load_mesh(&mut self, mut mesh_register: impl FnMut(Mesh) -> MeshGuid) {
+        let _span = tracy_client::span!("load_mesh");
         let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
@@ -150,6 +152,7 @@ impl AssimpSceneLoader {
 
     /// 加载场景中的所有材质
     fn load_mats(&mut self, mut mat_register: impl FnMut(Material) -> MatGuid) {
+        let _span = tracy_client::span!("load_mats");
         let mat_cnt = unsafe { get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)
@@ -180,6 +183,7 @@ impl AssimpSceneLoader {
     /// 因此将 Assimp 中的一个 Instance 拆分为多个 Instance，将其 geometry
     /// 提升为 mesh
     fn load_instance(&mut self, mut instance_register: impl FnMut(Instance) -> InsGuid) {
+        let _span = tracy_client::span!("load_instance");
         let instance_cnt = unsafe { get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)
             .filter_map(|instance_idx| unsafe {

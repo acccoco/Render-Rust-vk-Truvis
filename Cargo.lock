@@ -2391,6 +2391,7 @@ dependencies = [
  "bindgen",
  "glam",
  "itertools 0.10.5",
+ "tracy-client",
  "truvis-gfx",
  "truvis-model-manager",
 ]
@@ -2437,6 +2438,7 @@ dependencies = [
  "image",
  "itertools 0.10.5",
  "log",
+ "tracy-client",
  "truvis-crate-tools",
  "truvis-cxx",
  "truvis-gfx",

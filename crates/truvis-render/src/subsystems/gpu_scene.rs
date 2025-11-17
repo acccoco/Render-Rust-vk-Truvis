@@ -220,6 +220,7 @@ impl GpuScene {
     ///
     /// 在每一帧开始时调用，将场景数据转换为 GPU 可读的形式
     pub fn prepare_render_data(&mut self, scene_manager: &SceneManager) {
+        let _span = tracy_client::span!("GpuScene::prepare_render_data");
         let mut bindless_manager = FrameContext::bindless_manager_mut();
         bindless_manager.prepare_render_data(FrameContext::get().frame_label());
 
@@ -232,6 +233,7 @@ impl GpuScene {
     ///
     /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
     pub fn upload_to_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_manager: &SceneManager) {
+        let _span = tracy_client::span!("GpuScene::upload_to_buffer");
         let bindless_manager = FrameContext::bindless_manager();
         self.upload_mesh_buffer(cmd, barrier_mask, scene_manager);
         self.upload_instance_buffer(cmd, barrier_mask, scene_manager);
@@ -248,6 +250,7 @@ impl GpuScene {
     ///
     /// before_draw(instance_idx, submesh_idx)
     pub fn draw(&self, cmd: &CommandBuffer, scene_manager: &SceneManager, mut before_draw: impl FnMut(u32, u32)) {
+        let _span = tracy_client::span!("GpuScene::draw");
         for (instance_idx, instance_uuid) in self.flatten_instances.iter().enumerate() {
             let instance = scene_manager.get_instance(instance_uuid).unwrap();
             let mesh = scene_manager.get_mesh(&instance.mesh).unwrap();
@@ -341,6 +344,7 @@ impl GpuScene {
     ///
     /// 其中 buffer 可以是 stage buffer 的内存映射
     fn upload_instance_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_manager: &SceneManager) {
+        let _span = tracy_client::span!("upload_instance_buffer");
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
 
         let crt_instance_stage_buffer = &mut crt_gpu_buffers.instance_stage_buffer;
@@ -423,6 +427,7 @@ impl GpuScene {
         scene_manager: &SceneManager,
         bindless_manager: &BindlessManager,
     ) {
+        let _span = tracy_client::span!("upload_material_buffer");
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
         let crt_material_stage_buffer = &mut crt_gpu_buffers.material_stage_buffer;
         let material_buffer_slices = crt_material_stage_buffer.mapped_slice();
@@ -457,6 +462,7 @@ impl GpuScene {
     }
 
     fn upload_light_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_manager: &SceneManager) {
+        let _span = tracy_client::span!("upload_light_buffer");
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
         let crt_light_stage_buffer = &mut crt_gpu_buffers.light_stage_buffer;
         let light_buffer_slices = crt_light_stage_buffer.mapped_slice();
@@ -479,6 +485,7 @@ impl GpuScene {
 
     /// 将 mesh 数据以 geometry 的形式上传到 GPU
     fn upload_mesh_buffer(&mut self, cmd: &CommandBuffer, barrier_mask: BarrierMask, scene_manager: &SceneManager) {
+        let _span = tracy_client::span!("upload_mesh_buffer");
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
         let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         // let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
@@ -535,6 +542,7 @@ impl GpuScene {
     }
 
     fn build_tlas(&mut self, scene_manager: &SceneManager) {
+        let _span = tracy_client::span!("build_tlas");
         if self.flatten_instances.is_empty() {
             // 没有实例数据，直接返回
             return;

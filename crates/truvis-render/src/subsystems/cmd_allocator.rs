@@ -62,6 +62,7 @@ impl CmdAllocator {
     }
 
     pub fn free_frame_commands(&mut self) {
+        let _span = tracy_client::span!("free_frame_commands");
         self.free_frame_commands_internal(*FrameContext::get().frame_label());
     }
 

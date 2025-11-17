@@ -57,8 +57,10 @@ impl Renderer {
 // phase call
 impl Renderer {
     pub fn begin_frame(&mut self) {
+        let _span = tracy_client::span!("Renderer::begin_frame");
         // 等待 fif 的同一帧渲染完成
         {
+            let _span = tracy_client::span!("wait fif timeline");
             let frame_id = FrameContext::get().frame_id();
             let wait_frame = if frame_id > 3 { frame_id as u64 - 3 } else { 0 };
             let wait_timeline_value = if wait_frame == 0 { 0 } else { wait_frame };
@@ -72,6 +74,7 @@ impl Renderer {
     }
 
     pub fn end_frame(&mut self) {
+        let _span = tracy_client::span!("Renderer::end_frame");
         // 设置当前帧结束的 semaphore，用于保护当前帧的资源
         {
             let submit_info = SubmitInfo::new(&[]).signal(
@@ -91,6 +94,7 @@ impl Renderer {
     }
 
     pub fn before_render(&mut self, input_state: &InputState, camera: &Camera) {
+        let _span = tracy_client::span!("Renderer::before_render");
         let current_camera_dir = glam::vec3(camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg);
 
         let mut accum_data = FrameContext::get().accum_data.get();
@@ -113,6 +117,7 @@ impl Renderer {
     }
 
     fn update_gpu_scene(&mut self, input_state: &InputState, camera: &Camera) {
+        let _span = tracy_client::span!("update_gpu_scene");
         let frame_extent = FrameContext::get().frame_settings().frame_extent;
         let crt_frame_label = FrameContext::get().frame_label();
 
