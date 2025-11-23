@@ -199,7 +199,7 @@ impl BindlessManager {
             let resource = asset_hub.get_texture(handle);
             let info = vk::DescriptorImageInfo::default()
                 .image_view(resource.view.handle())
-                .sampler(resource.sampler.handle())
+                .sampler(resource.sampler)
                 .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
 
             let idx = texture_infos.len() as u32;

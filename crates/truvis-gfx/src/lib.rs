@@ -13,5 +13,6 @@ pub mod pipelines;
 pub mod query;
 pub mod raytracing;
 pub mod resources;
+pub mod sampler_manager;
 pub mod swapchain;
 pub mod utilities;

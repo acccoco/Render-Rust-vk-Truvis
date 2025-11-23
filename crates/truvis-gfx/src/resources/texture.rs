@@ -2,21 +2,20 @@ use std::rc::Rc;
 
 use ash::vk;
 
-use crate::{
-    descriptors::sampler::{GfxSampler, GfxSamplerCreateInfo},
-    resources::{
-        image::{GfxImage2D, ImageContainer},
-        image_view::{GfxImage2DView, GfxImageViewCreateInfo},
-    },
+use crate::gfx::Gfx;
+use crate::resources::{
+    image::{GfxImage2D, ImageContainer},
+    image_view::{GfxImage2DView, GfxImageViewCreateInfo},
 };
+use crate::sampler_manager::GfxSamplerDesc;
 
 #[derive(PartialOrd, PartialEq, Hash, Copy, Clone, Ord, Eq)]
 pub struct GfxTexture2DUUID(pub uuid::Uuid);
 
 pub struct GfxTexture2D {
     image: ImageContainer,
-    sampler: GfxSampler,
     image_view: GfxImage2DView,
+    sampler: vk::Sampler,
 
     // FIXME 将 uuid 使用起来
     _uuid: GfxTexture2DUUID,
@@ -25,7 +24,7 @@ pub struct GfxTexture2D {
 impl GfxTexture2D {
     #[inline]
     pub fn new(image: Rc<GfxImage2D>, name: &str) -> Self {
-        let sampler = GfxSampler::new(Rc::new(GfxSamplerCreateInfo::new()), name);
+        let sampler = Gfx::get().sampler_manager().get_sampler(&GfxSamplerDesc::default());
 
         let image_view = GfxImage2DView::new(
             image.handle(),
@@ -35,7 +34,7 @@ impl GfxTexture2D {
 
         Self {
             image: ImageContainer::Shared(image),
-            sampler,
+            sampler: sampler,
             image_view,
 
             _uuid: GfxTexture2DUUID(uuid::Uuid::new_v4()),
@@ -43,8 +42,8 @@ impl GfxTexture2D {
     }
 
     #[inline]
-    pub fn sampler(&self) -> &GfxSampler {
-        &self.sampler
+    pub fn sampler(&self) -> vk::Sampler {
+        self.sampler
     }
 
     #[inline]
@@ -60,7 +59,7 @@ impl GfxTexture2D {
     #[inline]
     pub fn descriptor_image_info(&self, layout: vk::ImageLayout) -> vk::DescriptorImageInfo {
         vk::DescriptorImageInfo::default()
-            .sampler(self.sampler().handle())
+            .sampler(self.sampler())
             .image_view(self.image_view().handle())
             .image_layout(layout)
     }

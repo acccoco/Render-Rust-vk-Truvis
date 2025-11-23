@@ -5,11 +5,11 @@ use ash::vk;
 use slotmap::{SecondaryMap, SlotMap};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::Arc;
-use truvis_gfx::descriptors::sampler::{GfxSampler, GfxSamplerCreateInfo};
+use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::image::GfxImage2D;
 use truvis_gfx::resources::image_view::{GfxImage2DView, GfxImageViewCreateInfo};
+use truvis_gfx::sampler_manager::GfxSamplerDesc;
 
 /// 纹理资源 (RAII)
 /// 包含 Image, Allocation, ImageView, Sampler
@@ -17,7 +17,7 @@ use truvis_gfx::resources::image_view::{GfxImage2DView, GfxImageViewCreateInfo};
 pub struct TextureResource {
     pub image: GfxImage2D,
     pub view: GfxImage2DView,
-    pub sampler: GfxSampler,
+    pub sampler: vk::Sampler,
 }
 
 /// 资产中心 (Facade)
@@ -74,7 +74,7 @@ impl AssetHub {
         );
 
         // Create Sampler
-        let sampler = GfxSampler::new(Rc::new(GfxSamplerCreateInfo::new()), "FallbackSampler");
+        let sampler = Gfx::get().sampler_manager().get_sampler(&GfxSamplerDesc::default());
 
         Arc::new(TextureResource { image, view, sampler })
     }
@@ -173,7 +173,7 @@ impl AssetHub {
             );
 
             // Create Sampler (TODO: Use params from load request)
-            let sampler = GfxSampler::new(Rc::new(GfxSamplerCreateInfo::new()), "TextureSampler");
+            let sampler = Gfx::get().sampler_manager().get_sampler(&GfxSamplerDesc::default());
 
             let resource = Arc::new(TextureResource { image, view, sampler });
 
