@@ -3,6 +3,8 @@ use std::{collections::HashMap, rc::Rc};
 use ash::vk;
 use itertools::Itertools;
 
+use slotmap::SecondaryMap;
+use truvis_asset::handle::TextureHandle;
 use truvis_gfx::descriptors::descriptor_pool::DescriptorPoolCreateInfo;
 use truvis_gfx::{
     descriptors::{
@@ -19,6 +21,7 @@ use truvis_gfx::{
 use truvis_shader_binding::shader;
 use truvis_shader_layout_macro::ShaderLayout;
 
+use crate::core::frame_context::FrameContext;
 use crate::subsystems::subsystem::Subsystem;
 use crate::{pipeline_settings::FrameLabel, resources::ImageLoader};
 
@@ -71,6 +74,9 @@ pub struct BindlessManager {
     bindless_textures: HashMap<String, u32>,
     textures: HashMap<String, Texture2DContainer>,
 
+    /// AssetHub 纹理索引映射
+    asset_texture_indices: SecondaryMap<TextureHandle, u32>,
+
     /// 每一帧都需要重新构建的数据
     images: HashMap<vk::ImageView, shader::ImageHandle>,
 
@@ -104,6 +110,7 @@ impl BindlessManager {
 
             bindless_textures: HashMap::new(),
             textures: HashMap::new(),
+            asset_texture_indices: SecondaryMap::new(),
 
             images: HashMap::new(),
 
@@ -185,6 +192,21 @@ impl BindlessManager {
             self.bindless_textures.insert(tex_name.clone(), tex_idx as u32);
         }
 
+        // Sync with AssetHub
+        let asset_hub = FrameContext::asset_hub();
+        self.asset_texture_indices.clear();
+        for handle in asset_hub.iter_handles() {
+            let resource = asset_hub.get_texture(handle);
+            let info = vk::DescriptorImageInfo::default()
+                .image_view(resource.view.handle())
+                .sampler(resource.sampler.handle())
+                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+
+            let idx = texture_infos.len() as u32;
+            texture_infos.push(info);
+            self.asset_texture_indices.insert(handle, idx);
+        }
+
         // 生成 descriptor 信息，更新 ImageHandle
         let mut image_infos = Vec::with_capacity(self.images.len());
         for (image_idx, (image_view, handle)) in self.images.iter_mut().enumerate() {
@@ -215,6 +237,11 @@ impl BindlessManager {
     /// 获得纹理在当前帧的 bindless 索引
     pub fn get_texture_handle(&self, texture_path: &str) -> Option<shader::TextureHandle> {
         self.bindless_textures.get(texture_path).copied().map(|idx| shader::TextureHandle { index: idx as _ })
+    }
+
+    /// 获得 AssetHub 纹理在当前帧的 bindless 索引
+    pub fn get_asset_texture_handle(&self, handle: TextureHandle) -> Option<shader::TextureHandle> {
+        self.asset_texture_indices.get(handle).copied().map(|idx| shader::TextureHandle { index: idx as _ })
     }
 
     /// 获得图像在当前帧的 bindless 索引

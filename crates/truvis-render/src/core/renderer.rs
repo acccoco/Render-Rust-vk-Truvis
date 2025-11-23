@@ -58,6 +58,10 @@ impl Renderer {
 impl Renderer {
     pub fn begin_frame(&mut self) {
         let _span = tracy_client::span!("Renderer::begin_frame");
+
+        // Update AssetHub
+        FrameContext::asset_hub_mut().update();
+
         // 等待 fif 的同一帧渲染完成
         {
             let _span = tracy_client::span!("wait fif timeline");

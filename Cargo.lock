@@ -565,6 +565,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-channel"
+version = "0.5.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82b8f8f868b36967f9606790d1903570de9ceaf870a7bf9fbbd3016d636a2cb2"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2090,6 +2099,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "slotmap"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbff4acf519f630b3a3ddcfaea6c06b42174d9a44bc70c620e9ed1649d58b82a"
+dependencies = [
+ "version_check",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2326,9 +2344,9 @@ dependencies = [
 
 [[package]]
 name = "tracy-client"
-version = "0.18.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef54005d3d760186fd662dad4b7bb27ecd5531cdef54d1573ebd3f20a9205ed7"
+checksum = "91d722a05fe49b31fef971c4732a7d4aa6a18283d9ba46abddab35f484872947"
 dependencies = [
  "loom",
  "once_cell",
@@ -2360,6 +2378,7 @@ dependencies = [
  "log",
  "raw-window-handle",
  "tracy-client",
+ "truvis-asset",
  "truvis-crate-tools",
  "truvis-cxx",
  "truvis-gfx",
@@ -2370,6 +2389,24 @@ dependencies = [
  "truvis-shader-layout-trait",
  "uuid",
  "winit",
+]
+
+[[package]]
+name = "truvis-asset"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ash",
+ "crossbeam-channel",
+ "crossbeam-utils",
+ "image",
+ "log",
+ "rayon",
+ "slotmap",
+ "tracy-client",
+ "truvis-crate-tools",
+ "truvis-gfx",
+ "vk-mem",
 ]
 
 [[package]]
@@ -2438,7 +2475,9 @@ dependencies = [
  "image",
  "itertools 0.10.5",
  "log",
+ "slotmap",
  "tracy-client",
+ "truvis-asset",
  "truvis-crate-tools",
  "truvis-cxx",
  "truvis-gfx",

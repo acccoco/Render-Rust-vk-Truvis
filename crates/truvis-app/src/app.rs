@@ -119,10 +119,10 @@ impl<T: OuterApp> TruvisApp<T> {
         let frame_label = FrameContext::get().frame_label();
         let elapsed = FrameContext::get().timer.borrow().delta_time;
 
-            {
-                let _span = tracy_client::span!("Acquire Image");
-                self.window_system.get_mut().unwrap().acquire_image(frame_label);
-            }
+        {
+            let _span = tracy_client::span!("Acquire Image");
+            self.window_system.get_mut().unwrap().acquire_image(frame_label);
+        }
 
         // Update Gui ==================================
         {

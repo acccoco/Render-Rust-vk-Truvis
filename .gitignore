@@ -5,6 +5,7 @@
 # resource
 assets
 tools/slang
+tools/tracy
 
 # operating system
 .DS_Store

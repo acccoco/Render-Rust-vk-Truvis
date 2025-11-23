@@ -11,6 +11,8 @@ truvis-model-manager = { workspace = true }
 truvis-cxx = { workspace = true }
 truvis-shader-binding = { workspace = true }
 truvis-crate-tools = { workspace = true }
+truvis-asset = { workspace = true }
+slotmap = "1.0"
 
 # 默认 features：
 # - debug 表示 vulkan 结构体实现了 Debut Trait

@@ -1,6 +1,7 @@
 use std::cell::{Cell, Ref, RefCell, RefMut};
 
 use ash::vk;
+use truvis_asset::asset_hub::AssetHub;
 use truvis_gfx::commands::semaphore::Semaphore;
 use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::special_buffers::structured_buffer::StructuredBuffer;
@@ -48,6 +49,7 @@ pub struct FrameContext {
     pub cmd_allocator: RefCell<CmdAllocator>,
     pub gpu_scene: RefCell<GpuScene>,
     pub scene_manager: RefCell<SceneManager>,
+    pub asset_hub: RefCell<AssetHub>,
 
     pub per_frame_data_buffers: Vec<StructuredBuffer<shader::PerFrameData>>,
 
@@ -91,6 +93,7 @@ impl FrameContext {
         let cmd_allocator = RefCell::new(CmdAllocator::new(fif_count));
         let gpu_scene = RefCell::new(GpuScene::new(fif_count));
         let scene_manager = RefCell::new(SceneManager::new());
+        let asset_hub = RefCell::new(AssetHub::new());
 
         let frame_settings = FrameSettings {
             color_format: vk::Format::R32G32B32A32_SFLOAT,
@@ -127,6 +130,7 @@ impl FrameContext {
             cmd_allocator,
             gpu_scene,
             scene_manager,
+            asset_hub,
         }
     }
 
@@ -161,6 +165,7 @@ impl FrameContext {
             drop(context.bindless_manager);
             drop(context.gpu_scene);
             drop(context.scene_manager);
+            drop(context.asset_hub);
         }
     }
 
@@ -237,6 +242,17 @@ impl FrameContext {
     pub fn scene_manager() -> Ref<'static, SceneManager> {
         let context = Self::get();
         context.scene_manager.borrow()
+    }
+
+    #[inline]
+    pub fn asset_hub_mut() -> RefMut<'static, AssetHub> {
+        let context = Self::get();
+        context.asset_hub.borrow_mut()
+    }
+    #[inline]
+    pub fn asset_hub() -> Ref<'static, AssetHub> {
+        let context = Self::get();
+        context.asset_hub.borrow()
     }
 
     #[inline]
