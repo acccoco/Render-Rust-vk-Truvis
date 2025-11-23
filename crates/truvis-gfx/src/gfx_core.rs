@@ -33,6 +33,7 @@ pub struct GfxCore {
     pub(crate) debug_utils: DebugMsger,
 
     pub(crate) gfx_queue: CommandQueue,
+    pub(crate) transfer_queue: CommandQueue,
 }
 
 // 创建与销毁
@@ -46,13 +47,34 @@ impl GfxCore {
         // Graphics 和 Compute 会争夺 SM，L2 以及显存
         // 驱动层给出了专用的 compute queue family，但是底层硬件资源依然是共享的
         // Transfer(DMA) 可以做到部分并行，不过为了简化设计，仍然然使用同一个 queue family
-        let queue_create_infos = [vk::DeviceQueueCreateInfo::default()
-            .queue_family_index(physical_device.gfx_queue_family.queue_family_index)
-            .queue_priorities(&[1.0])];
+
+        // 尝试从 Graphics Queue Family 中申请两个队列，一个用于 Graphics，一个用于 Transfer
+        let gfx_family_idx = physical_device.gfx_queue_family.queue_family_index;
+        let max_queues = physical_device.gfx_queue_family.queue_count;
+
+        if max_queues < 2 {
+            panic!(
+                "Graphics queue family has {} queues, but at least 2 are required for separate Graphics and Transfer queues.",
+                max_queues
+            );
+        }
+
+        let request_queue_count = 2;
+        let priorities = vec![1.0; request_queue_count as usize];
+
+        let queue_create_infos =
+            [vk::DeviceQueueCreateInfo::default().queue_family_index(gfx_family_idx).queue_priorities(&priorities)];
 
         let device = Rc::new(GfxDevice::new(&instance.ash_instance, physical_device.vk_handle, &queue_create_infos));
+
         let gfx_queue = CommandQueue {
-            vk_queue: unsafe { device.get_device_queue(physical_device.gfx_queue_family.queue_family_index, 0) },
+            vk_queue: unsafe { device.get_device_queue(gfx_family_idx, 0) },
+            queue_family: physical_device.gfx_queue_family.clone(),
+            gfx_device: device.clone(),
+        };
+
+        let transfer_queue = CommandQueue {
+            vk_queue: unsafe { device.get_device_queue(gfx_family_idx, 1) },
             queue_family: physical_device.gfx_queue_family.clone(),
             gfx_device: device.clone(),
         };
@@ -60,6 +82,7 @@ impl GfxCore {
         let debug_utils = DebugMsger::new(&vk_pf, &instance.ash_instance);
 
         log::info!("gfx queue's queue family:\n{:#?}", gfx_queue.queue_family);
+        log::info!("transfer queue's queue family:\n{:#?}", transfer_queue.queue_family);
 
         // 在 device 以及 debug_utils 之前创建的 vk::Handle
         {
@@ -68,6 +91,7 @@ impl GfxCore {
 
             device.set_object_debug_name(device.vk_handle(), "GfxDevice");
             device.set_object_debug_name(gfx_queue.vk_queue, "CommandQueue-gfx");
+            device.set_object_debug_name(transfer_queue.vk_queue, "CommandQueue-transfer");
         }
 
         Self {
@@ -77,6 +101,7 @@ impl GfxCore {
             gfx_device: device,
             debug_utils,
             gfx_queue,
+            transfer_queue,
         }
     }
 

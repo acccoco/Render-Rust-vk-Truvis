@@ -172,6 +172,11 @@ impl Gfx {
         &self.gfx_core.gfx_queue
     }
 
+    #[inline]
+    pub fn transfer_queue(&self) -> &CommandQueue {
+        &self.gfx_core.transfer_queue
+    }
+
     /// 当 uniform buffer 的 descriptor 在更新时，其 offset 必须是这个值的整数倍
     ///
     /// 注：这个值一定是 power of 2
