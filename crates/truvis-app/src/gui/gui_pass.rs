@@ -5,12 +5,12 @@ use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::const_map;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
+use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
 use truvis_gfx::{
-    commands::command_buffer::CommandBuffer,
+    commands::command_buffer::GfxCommandBuffer,
     pipelines::{
-        graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},
-        shader::ShaderStageInfo,
+        graphics_pipeline::{GfxGraphicsPipeline, GfxGraphicsPipelineCreateInfo, GfxPipelineLayout},
+        shader::GfxShaderStageInfo,
     },
 };
 use truvis_render::core::frame_context::FrameContext;
@@ -20,13 +20,13 @@ use truvis_shader_binding::{shader, shader::TextureHandle};
 use crate::gui::core::Gui;
 use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
 
-const_map!(ShaderStage<ShaderStageInfo>: {
-    Vertex: ShaderStageInfo {
+const_map!(ShaderStage<GfxShaderStageInfo>: {
+    Vertex: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: c"vsmain",
         path: TruvisPath::shader_path("imgui/imgui.slang"),
     },
-    Fragment: ShaderStageInfo {
+    Fragment: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: c"psmain",
         path: TruvisPath::shader_path("imgui/imgui.slang"),
@@ -34,13 +34,13 @@ const_map!(ShaderStage<ShaderStageInfo>: {
 });
 
 pub struct GuiPass {
-    pipeline: GraphicsPipeline,
-    pipeline_layout: Rc<PipelineLayout>,
+    pipeline: GfxGraphicsPipeline,
+    pipeline_layout: Rc<GfxPipelineLayout>,
 }
 impl GuiPass {
     pub fn new(color_format: vk::Format) -> Self {
         let bindless_manager = FrameContext::bindless_manager();
-        let pipeline_layout = Rc::new(PipelineLayout::new(
+        let pipeline_layout = Rc::new(GfxPipelineLayout::new(
             &[bindless_manager.bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
@@ -67,7 +67,7 @@ impl GuiPass {
                 .alpha_blend_op(vk::BlendOp::ADD),
         ];
 
-        let mut create_info = GraphicsPipelineCreateInfo::default();
+        let mut create_info = GfxGraphicsPipelineCreateInfo::default();
         create_info
             .shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec())
             .vertex_attribute(ImGuiVertexLayoutAoS::vertex_input_attributes())
@@ -78,7 +78,7 @@ impl GuiPass {
             // TODO 这里不应该由 depth
             .attach_info(vec![color_format], None, None);
 
-        let pipeline = GraphicsPipeline::new(&create_info, pipeline_layout.clone(), "uipass");
+        let pipeline = GfxGraphicsPipeline::new(&create_info, pipeline_layout.clone(), "uipass");
 
         Self {
             pipeline,
@@ -91,7 +91,7 @@ impl GuiPass {
 
         canvas_color_view: vk::ImageView,
         canvas_extent: vk::Extent2D,
-        cmd: &CommandBuffer,
+        cmd: &GfxCommandBuffer,
         gui: &mut Gui,
         frame_label: FrameLabel,
     ) {

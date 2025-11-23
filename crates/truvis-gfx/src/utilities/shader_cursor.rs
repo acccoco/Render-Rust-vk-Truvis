@@ -1,7 +1,7 @@
 use ash::vk;
 use truvis_shader_layout_trait::ShaderBindingItem;
 
-pub struct WriteDescriptorSet {
+pub struct GfxWriteDescriptorSet {
     pub dst_set: vk::DescriptorSet,
     pub dst_binding: u32,
     pub dst_array_element: u32,
@@ -11,7 +11,7 @@ pub struct WriteDescriptorSet {
     pub images: Vec<vk::DescriptorImageInfo>,
 }
 
-impl WriteDescriptorSet {
+impl GfxWriteDescriptorSet {
     pub fn to_vk_type(&self) -> vk::WriteDescriptorSet<'_> {
         vk::WriteDescriptorSet {
             dst_set: self.dst_set,
@@ -28,7 +28,7 @@ impl WriteDescriptorSet {
 }
 
 /// 用于通过 DescriptorBinding Item 来操作对应 descriptor set 的对应 binding
-pub trait ShaderCursor {
+pub trait GfxShaderCursor {
     fn get_binding(&self) -> &ShaderBindingItem;
 
     /// 确保当前 descriptor 是 buffer
@@ -37,9 +37,9 @@ pub trait ShaderCursor {
         dst_set: vk::DescriptorSet,
         start_array: u32,
         buffers: Vec<vk::DescriptorBufferInfo>,
-    ) -> WriteDescriptorSet {
+    ) -> GfxWriteDescriptorSet {
         let item = self.get_binding();
-        WriteDescriptorSet {
+        GfxWriteDescriptorSet {
             dst_set,
             dst_binding: item.binding,
             dst_array_element: start_array,
@@ -55,9 +55,9 @@ pub trait ShaderCursor {
         dst_set: vk::DescriptorSet,
         start_array: u32,
         images: Vec<vk::DescriptorImageInfo>,
-    ) -> WriteDescriptorSet {
+    ) -> GfxWriteDescriptorSet {
         let item = self.get_binding();
-        WriteDescriptorSet {
+        GfxWriteDescriptorSet {
             dst_set,
             dst_binding: item.binding,
             dst_array_element: start_array,
@@ -68,7 +68,7 @@ pub trait ShaderCursor {
     }
 }
 
-impl ShaderCursor for ShaderBindingItem {
+impl GfxShaderCursor for ShaderBindingItem {
     fn get_binding(&self) -> &ShaderBindingItem {
         self
     }

@@ -4,8 +4,8 @@ use ash::vk;
 
 use truvis_gfx::{
     commands::{
-        barrier::{BarrierMask, BufferBarrier},
-        submit_info::SubmitInfo,
+        barrier::{GfxBarrierMask, GfxBufferBarrier},
+        submit_info::GfxSubmitInfo,
     },
     gfx::Gfx,
 };
@@ -81,7 +81,7 @@ impl Renderer {
         let _span = tracy_client::span!("Renderer::end_frame");
         // 设置当前帧结束的 semaphore，用于保护当前帧的资源
         {
-            let submit_info = SubmitInfo::new(&[]).signal(
+            let submit_info = GfxSubmitInfo::new(&[]).signal(
                 &FrameContext::get().fif_timeline_semaphore,
                 vk::PipelineStageFlags2::NONE,
                 Some(FrameContext::get().frame_id() as u64),
@@ -129,7 +129,7 @@ impl Renderer {
         let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("update-draw-buffer");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
 
-        let transfer_barrier_mask = BarrierMask {
+        let transfer_barrier_mask = GfxBarrierMask {
             src_stage: vk::PipelineStageFlags2::TRANSFER,
             src_access: vk::AccessFlags2::TRANSFER_WRITE,
             dst_stage: vk::PipelineStageFlags2::VERTEX_SHADER
@@ -175,11 +175,11 @@ impl Renderer {
         cmd.cmd_update_buffer(crt_frame_data_buffer.vk_buffer(), 0, bytemuck::bytes_of(&per_frame_data));
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
-            &[BufferBarrier::default()
+            &[GfxBufferBarrier::default()
                 .buffer(crt_frame_data_buffer.vk_buffer(), 0, vk::WHOLE_SIZE)
                 .mask(transfer_barrier_mask)],
         );
         cmd.end();
-        Gfx::get().gfx_queue().submit(vec![SubmitInfo::new(std::slice::from_ref(&cmd))], None);
+        Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(std::slice::from_ref(&cmd))], None);
     }
 }

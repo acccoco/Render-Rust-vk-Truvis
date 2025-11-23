@@ -1,20 +1,20 @@
-use crate::commands::command_queue::CommandQueue;
-use crate::commands::fence::Fence;
-use crate::commands::semaphore::Semaphore;
+use crate::commands::command_queue::GfxCommandQueue;
+use crate::commands::fence::GfxFence;
+use crate::commands::semaphore::GfxSemaphore;
 use crate::gfx::Gfx;
 use crate::gfx_core::GfxCore;
-use crate::resources::image_view::{Image2DView, ImageViewCreateInfo};
-use crate::swapchain::surface::Surface;
+use crate::resources::image_view::{GfxImage2DView, GfxImageViewCreateInfo};
+use crate::swapchain::surface::GfxSurface;
 use ash::vk;
 use itertools::Itertools;
 
-pub struct RenderSwapchain {
-    _surface: Surface,
+pub struct GfxRenderSwapchain {
+    _surface: GfxSurface,
     swapchain_handle: vk::SwapchainKHR,
 
     /// 这里的 image 并非手动创建的，因此无法使用 GfxImage 类型
     swapchain_images: Vec<vk::Image>,
-    swapchain_image_views: Vec<Image2DView>,
+    swapchain_image_views: Vec<GfxImage2DView>,
     swapchain_image_index: usize,
 
     color_format: vk::Format,
@@ -22,14 +22,14 @@ pub struct RenderSwapchain {
 }
 
 // 构建过程
-impl RenderSwapchain {
+impl GfxRenderSwapchain {
     pub fn new(
         vk_core: &GfxCore,
         window: &winit::window::Window,
         present_mode: vk::PresentModeKHR,
         surface_format: vk::SurfaceFormatKHR,
     ) -> Self {
-        let surface = Surface::new(vk_core, window);
+        let surface = GfxSurface::new(vk_core, window);
         let extent = surface.capabilities.current_extent;
 
         let swapchain_handle =
@@ -43,9 +43,9 @@ impl RenderSwapchain {
             .iter()
             .enumerate()
             .map(|(idx, img)| {
-                Image2DView::new(
+                GfxImage2DView::new(
                     *img,
-                    ImageViewCreateInfo::new_image_view_2d_info(surface_format.format, vk::ImageAspectFlags::COLOR),
+                    GfxImageViewCreateInfo::new_image_view_2d_info(surface_format.format, vk::ImageAspectFlags::COLOR),
                     format!("swapchain-{}", idx),
                 )
             })
@@ -63,7 +63,7 @@ impl RenderSwapchain {
     }
 
     fn create_swapchain(
-        surface: &Surface,
+        surface: &GfxSurface,
         format: vk::Format,
         color_space: vk::ColorSpaceKHR,
         extent: vk::Extent2D,
@@ -106,14 +106,14 @@ impl RenderSwapchain {
     }
 }
 
-pub struct SwapchainImageInfo {
+pub struct GfxSwapchainImageInfo {
     pub image_extent: vk::Extent2D,
     pub image_cnt: usize,
     pub image_format: vk::Format,
 }
 
 // getters
-impl RenderSwapchain {
+impl GfxRenderSwapchain {
     #[inline]
     pub fn present_images(&self) -> Vec<vk::Image> {
         self.swapchain_images.clone()
@@ -135,13 +135,13 @@ impl RenderSwapchain {
     }
 
     #[inline]
-    pub fn current_image_view(&self) -> &Image2DView {
+    pub fn current_image_view(&self) -> &GfxImage2DView {
         &self.swapchain_image_views[self.swapchain_image_index]
     }
 
     #[inline]
-    pub fn image_infos(&self) -> SwapchainImageInfo {
-        SwapchainImageInfo {
+    pub fn image_infos(&self) -> GfxSwapchainImageInfo {
+        GfxSwapchainImageInfo {
             image_extent: self.swapchain_extent,
             image_cnt: self.swapchain_images.len(),
             image_format: self.color_format,
@@ -150,10 +150,10 @@ impl RenderSwapchain {
 }
 
 // tools
-impl RenderSwapchain {
+impl GfxRenderSwapchain {
     /// timeout: nano seconds
     #[inline]
-    pub fn acquire_next_image(&mut self, semaphore: Option<&Semaphore>, fence: Option<&Fence>, timeout: u64) {
+    pub fn acquire_next_image(&mut self, semaphore: Option<&GfxSemaphore>, fence: Option<&GfxFence>, timeout: u64) {
         let (image_index, is_optimal) = unsafe {
             Gfx::get()
                 .gfx_device()
@@ -177,7 +177,7 @@ impl RenderSwapchain {
     }
 
     #[inline]
-    pub fn present_image(&self, queue: &CommandQueue, wait_semaphores: &[Semaphore]) {
+    pub fn present_image(&self, queue: &GfxCommandQueue, wait_semaphores: &[GfxSemaphore]) {
         let wait_semaphores = wait_semaphores.iter().map(|s| s.handle()).collect_vec();
         let image_indices = [self.swapchain_image_index as u32];
         let present_info = vk::PresentInfoKHR::default()
@@ -189,7 +189,7 @@ impl RenderSwapchain {
     }
 }
 
-impl Drop for RenderSwapchain {
+impl Drop for GfxRenderSwapchain {
     fn drop(&mut self) {
         unsafe {
             Gfx::get().gfx_device().swapchain.destroy_swapchain(self.swapchain_handle, None);

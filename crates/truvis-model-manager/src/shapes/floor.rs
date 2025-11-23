@@ -1,6 +1,6 @@
 use crate::components::geometry::GeometrySoA3D;
 use crate::vertex::soa_3d::VertexLayoutSoA3D;
-use truvis_gfx::resources::special_buffers::index_buffer::Index32Buffer;
+use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 
 /// 坐标系：RightHandle, X-Right, Y-Up
 ///
@@ -52,7 +52,7 @@ impl FloorSoA {
             "floor-vertex-buffer",
         );
 
-        let index_buffer = Index32Buffer::new(Self::INDICES.len(), "floor-index-buffer");
+        let index_buffer = GfxIndex32Buffer::new(Self::INDICES.len(), "floor-index-buffer");
         index_buffer.transfer_data_sync(&Self::INDICES);
 
         GeometrySoA3D {

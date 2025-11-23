@@ -5,10 +5,10 @@ use std::{
 
 use ash::{vk, vk::Handle};
 
-use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::Buffer};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::GfxBuffer};
 
 /// Vertex Buffer 中顶点布局的 trait 定义
-pub trait VertexLayout {
+pub trait GfxVertexLayout {
     fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription>;
 
     fn vertex_input_attributes() -> Vec<vk::VertexInputAttributeDescription>;
@@ -39,17 +39,17 @@ pub trait VertexLayout {
     }
 }
 
-pub struct VertexBuffer<L: VertexLayout> {
-    inner: Buffer,
+pub struct GfxVertexBuffer<L: GfxVertexLayout> {
+    inner: GfxBuffer,
     /// 顶点数量
     vertex_cnt: usize,
     _phantom: PhantomData<L>,
 }
-impl_derive_buffer!(VertexBuffer<L: VertexLayout>, Buffer, inner);
-impl<L: VertexLayout> VertexBuffer<L> {
+impl_derive_buffer!(GfxVertexBuffer<L: GfxVertexLayout>, GfxBuffer, inner);
+impl<L: GfxVertexLayout> GfxVertexBuffer<L> {
     pub fn new(vertex_cnt: usize, debug_name: impl AsRef<str>) -> Self {
         let buffer_size = L::buffer_size(vertex_cnt);
-        let buffer = Buffer::new(
+        let buffer = GfxBuffer::new(
             buffer_size as vk::DeviceSize,
             vk::BufferUsageFlags::VERTEX_BUFFER
                 | vk::BufferUsageFlags::TRANSFER_DST
@@ -96,7 +96,7 @@ impl<L: VertexLayout> VertexBuffer<L> {
     }
 }
 
-impl<L: VertexLayout> DebugType for VertexBuffer<L> {
+impl<L: GfxVertexLayout> DebugType for GfxVertexBuffer<L> {
     fn debug_type_name() -> &'static str {
         "VertexBuffer"
     }

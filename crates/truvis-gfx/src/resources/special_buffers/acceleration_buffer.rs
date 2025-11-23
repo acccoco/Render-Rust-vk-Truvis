@@ -4,15 +4,15 @@ use std::ops::DerefMut;
 use ash::vk;
 
 use crate::impl_derive_buffer;
-use crate::resources::buffer::Buffer;
+use crate::resources::buffer::GfxBuffer;
 
-pub struct AccelerationScratchBuffer {
-    inner: Buffer,
+pub struct GfxAccelerationScratchBuffer {
+    inner: GfxBuffer,
 }
-impl_derive_buffer!(AccelerationScratchBuffer, Buffer, inner);
-impl AccelerationScratchBuffer {
+impl_derive_buffer!(GfxAccelerationScratchBuffer, GfxBuffer, inner);
+impl GfxAccelerationScratchBuffer {
     pub fn new(size: vk::DeviceSize, name: impl AsRef<str>) -> Self {
-        let buffer = Buffer::new(
+        let buffer = GfxBuffer::new(
             size,
             vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
             None,
@@ -24,13 +24,13 @@ impl AccelerationScratchBuffer {
     }
 }
 
-pub struct AccelerationStructureBuffer {
-    inner: Buffer,
+pub struct GfxAccelerationStructureBuffer {
+    inner: GfxBuffer,
 }
-impl_derive_buffer!(AccelerationStructureBuffer, Buffer, inner);
-impl AccelerationStructureBuffer {
+impl_derive_buffer!(GfxAccelerationStructureBuffer, GfxBuffer, inner);
+impl GfxAccelerationStructureBuffer {
     pub fn new(size: vk::DeviceSize, name: impl AsRef<str>) -> Self {
-        let buffer = Buffer::new(
+        let buffer = GfxBuffer::new(
             size,
             vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
             None,
@@ -42,13 +42,13 @@ impl AccelerationStructureBuffer {
     }
 }
 
-pub struct AccelerationInstanceBuffer {
-    inner: Buffer,
+pub struct GfxAccelerationInstanceBuffer {
+    inner: GfxBuffer,
 }
-impl_derive_buffer!(AccelerationInstanceBuffer, Buffer, inner);
-impl AccelerationInstanceBuffer {
+impl_derive_buffer!(GfxAccelerationInstanceBuffer, GfxBuffer, inner);
+impl GfxAccelerationInstanceBuffer {
     pub fn new(size: vk::DeviceSize, name: impl AsRef<str>) -> Self {
-        let buffer = Buffer::new(
+        let buffer = GfxBuffer::new(
             size,
             vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR

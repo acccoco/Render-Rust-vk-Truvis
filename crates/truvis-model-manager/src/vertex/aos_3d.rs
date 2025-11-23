@@ -1,6 +1,6 @@
 use ash::vk;
 use std::mem::offset_of;
-use truvis_gfx::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
+use truvis_gfx::resources::special_buffers::vertex_buffer::{GfxVertexBuffer, GfxVertexLayout};
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -15,7 +15,7 @@ pub struct Vertex3D {
 /// AoS 的顶点 buffer 布局，包含：Positions, Normals, Tangents, UVs
 pub struct VertexLayoutAoS3D;
 
-impl VertexLayout for VertexLayoutAoS3D {
+impl GfxVertexLayout for VertexLayoutAoS3D {
     fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription> {
         vec![vk::VertexInputBindingDescription {
             binding: 0,
@@ -79,8 +79,8 @@ impl VertexLayout for VertexLayoutAoS3D {
 
 impl VertexLayoutAoS3D {
     #[deprecated]
-    pub fn create_vertex_buffer(data: &[Vertex3D], name: impl AsRef<str>) -> VertexBuffer<Self> {
-        let vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
+    pub fn create_vertex_buffer(data: &[Vertex3D], name: impl AsRef<str>) -> GfxVertexBuffer<Self> {
+        let vertex_buffer = GfxVertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(data);
 
         vertex_buffer

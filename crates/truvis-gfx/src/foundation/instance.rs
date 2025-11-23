@@ -7,7 +7,7 @@ use std::{
 use ash::vk;
 use itertools::Itertools;
 
-use crate::foundation::debug_messenger::DebugMsger;
+use crate::foundation::debug_messenger::GfxDebugMsger;
 
 pub struct GfxInstance {
     /// 仅仅是函数指针，以及一个裸的 handle，可以随意 clone
@@ -54,7 +54,7 @@ impl GfxInstance {
             .enabled_layer_names(&enabled_layers);
 
         // 为 instance info 添加 debug messenger
-        let mut debug_utils_messenger_ci = DebugMsger::debug_utils_messenger_ci();
+        let mut debug_utils_messenger_ci = GfxDebugMsger::debug_utils_messenger_ci();
         instance_ci = instance_ci.push_next(&mut debug_utils_messenger_ci);
 
         let handle = unsafe { vk_entry.create_instance(&instance_ci, None).unwrap() };

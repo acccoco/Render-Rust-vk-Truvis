@@ -1,9 +1,9 @@
 use crate::vertex::soa_3d::VertexLayoutSoA3D;
 use ash::vk;
-use truvis_gfx::commands::command_buffer::CommandBuffer;
-use truvis_gfx::raytracing::acceleration::BlasInputInfo;
-use truvis_gfx::resources::special_buffers::index_buffer::Index32Buffer;
-use truvis_gfx::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
+use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
+use truvis_gfx::raytracing::acceleration::GfxBlasInputInfo;
+use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
+use truvis_gfx::resources::special_buffers::vertex_buffer::{GfxVertexBuffer, GfxVertexLayout};
 
 /// 几何体数据（包含顶点和索引缓冲）
 ///
@@ -13,14 +13,14 @@ use truvis_gfx::resources::special_buffers::vertex_buffer::{VertexBuffer, Vertex
 /// # 类型别名
 /// - `GeometryAoS3D`: AoS 3D 顶点布局（Position + Normal + TexCoord）
 /// - `GeometrySoA3D`: SoA 3D 顶点布局（分离存储）
-pub struct Geometry<L: VertexLayout> {
-    pub vertex_buffer: VertexBuffer<L>,
-    pub index_buffer: Index32Buffer,
+pub struct Geometry<L: GfxVertexLayout> {
+    pub vertex_buffer: GfxVertexBuffer<L>,
+    pub index_buffer: GfxIndex32Buffer,
 }
 pub type GeometrySoA3D = Geometry<VertexLayoutSoA3D>;
 
 // getters
-impl<L: VertexLayout> Geometry<L> {
+impl<L: GfxVertexLayout> Geometry<L> {
     #[inline]
     pub fn index_type() -> vk::IndexType {
         vk::IndexType::UINT32
@@ -33,8 +33,8 @@ impl<L: VertexLayout> Geometry<L> {
 }
 
 // tools
-impl<L: VertexLayout> Geometry<L> {
-    pub fn get_blas_geometry_info(&self) -> BlasInputInfo<'_> {
+impl<L: GfxVertexLayout> Geometry<L> {
+    pub fn get_blas_geometry_info(&self) -> GfxBlasInputInfo<'_> {
         let geometry_triangle = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
             vertex_data: vk::DeviceOrHostAddressConstKHR {
@@ -54,7 +54,7 @@ impl<L: VertexLayout> Geometry<L> {
             ..Default::default()
         };
 
-        BlasInputInfo {
+        GfxBlasInputInfo {
             geometry: vk::AccelerationStructureGeometryKHR::default()
                 .geometry_type(vk::GeometryTypeKHR::TRIANGLES)
                 // OPAQUE 表示永远不会调用 anyhit shader
@@ -77,12 +77,12 @@ impl<L: VertexLayout> Geometry<L> {
 
 impl GeometrySoA3D {
     #[inline]
-    pub fn cmd_bind_index_buffer(&self, cmd: &CommandBuffer) {
+    pub fn cmd_bind_index_buffer(&self, cmd: &GfxCommandBuffer) {
         cmd.cmd_bind_index_buffer(&self.index_buffer, 0)
     }
 
     #[inline]
-    pub fn cmd_bind_vertex_buffers(&self, cmd: &CommandBuffer) {
+    pub fn cmd_bind_vertex_buffers(&self, cmd: &GfxCommandBuffer) {
         let vertex_cnt = self.vertex_buffer.vertex_cnt();
         cmd.cmd_bind_vertex_buffers(
             0,

@@ -3,20 +3,20 @@ use crate::loader::RawAssetData;
 use ash::vk;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use truvis_gfx::commands::command_buffer::CommandBuffer;
-use truvis_gfx::commands::command_pool::CommandPool;
-use truvis_gfx::commands::semaphore::Semaphore;
-use truvis_gfx::commands::submit_info::SubmitInfo;
+use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
+use truvis_gfx::commands::command_pool::GfxCommandPool;
+use truvis_gfx::commands::semaphore::GfxSemaphore;
+use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
-use truvis_gfx::resources::buffer::Buffer;
-use truvis_gfx::resources::image::{Image2D, ImageCreateInfo};
+use truvis_gfx::resources::buffer::GfxBuffer;
+use truvis_gfx::resources::image::{GfxImage2D, GfxImageCreateInfo};
 
 struct PendingUpload {
     target_value: u64,
-    _staging_buffer: Buffer,
-    command_buffer: CommandBuffer,
+    _staging_buffer: GfxBuffer,
+    command_buffer: GfxCommandBuffer,
     handle: TextureHandle,
-    image: Image2D,
+    image: GfxImage2D,
 }
 
 /// 传输管理器
@@ -28,8 +28,8 @@ struct PendingUpload {
 /// 3. 自动处理 Staging Buffer 的创建和销毁。
 /// 4. 处理 Image Layout 转换 (Undefined -> TransferDst -> ShaderReadOnly)。
 pub struct AssetTransferManager {
-    command_pool: CommandPool,
-    timeline_semaphore: Semaphore,
+    command_pool: GfxCommandPool,
+    timeline_semaphore: GfxSemaphore,
     next_timeline_value: u64,
 
     pending_uploads: VecDeque<PendingUpload>,
@@ -41,14 +41,14 @@ impl AssetTransferManager {
         let transfer_queue = gfx.transfer_queue();
 
         // 1. 创建 Command Pool
-        let command_pool = CommandPool::new(
+        let command_pool = GfxCommandPool::new(
             transfer_queue.queue_family().clone(),
             vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
             "AssetTransferPool",
         );
 
         // 2. 创建 Timeline Semaphore
-        let timeline_semaphore = Semaphore::new_timeline(0, "AssetTransferTimeline");
+        let timeline_semaphore = GfxSemaphore::new_timeline(0, "AssetTransferTimeline");
 
         Self {
             command_pool,
@@ -73,7 +73,7 @@ impl AssetTransferManager {
         let gfx = Gfx::get();
 
         // 1. 创建目标 Image
-        let image_info = Rc::new(ImageCreateInfo::new_image_2d_info(
+        let image_info = Rc::new(GfxImageCreateInfo::new_image_2d_info(
             vk::Extent2D {
                 width: data.extent.width,
                 height: data.extent.height,
@@ -82,7 +82,7 @@ impl AssetTransferManager {
             vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
         ));
 
-        let image = Image2D::new(
+        let image = GfxImage2D::new(
             image_info,
             &vk_mem::AllocationCreateInfo {
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
@@ -92,7 +92,7 @@ impl AssetTransferManager {
         );
 
         // 2. 分配 Command Buffer
-        let command_buffer = CommandBuffer::new(&self.command_pool, "AssetUploadCmd");
+        let command_buffer = GfxCommandBuffer::new(&self.command_pool, "AssetUploadCmd");
 
         // 3. 录制命令
         command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "AssetUpload");
@@ -107,7 +107,7 @@ impl AssetTransferManager {
         let target_value = self.next_timeline_value;
         self.next_timeline_value += 1;
 
-        let submit_info = SubmitInfo::new(&[command_buffer.clone()]).signal(
+        let submit_info = GfxSubmitInfo::new(&[command_buffer.clone()]).signal(
             &self.timeline_semaphore,
             vk::PipelineStageFlags2::ALL_COMMANDS,
             Some(target_value),
@@ -132,7 +132,7 @@ impl AssetTransferManager {
     /// 必须每帧调用。
     /// 返回已完成上传的资源列表 (Handle + Image)。
     /// 同时负责回收 Staging Buffer 和 Command Buffer。
-    pub fn update(&mut self) -> Vec<(TextureHandle, Image2D)> {
+    pub fn update(&mut self) -> Vec<(TextureHandle, GfxImage2D)> {
         let _span = tracy_client::span!("TransferManager::update");
         let gfx = Gfx::get();
         let device = gfx.gfx_device();

@@ -2,14 +2,14 @@ use ash::vk;
 
 use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 
-pub struct QueryPool {
+pub struct GfxQueryPool {
     handle: vk::QueryPool,
     query_type: vk::QueryType,
 
     /// pool 的容量
     _cnt: u32,
 }
-impl DebugType for QueryPool {
+impl DebugType for GfxQueryPool {
     fn debug_type_name() -> &'static str {
         "GfxQueryPool"
     }
@@ -18,7 +18,7 @@ impl DebugType for QueryPool {
         self.handle
     }
 }
-impl Drop for QueryPool {
+impl Drop for GfxQueryPool {
     fn drop(&mut self) {
         let gfx_device = Gfx::get().gfx_device();
         unsafe {
@@ -26,7 +26,7 @@ impl Drop for QueryPool {
         }
     }
 }
-impl QueryPool {
+impl GfxQueryPool {
     #[inline]
     pub fn new(ty: vk::QueryType, cnt: u32, debug_name: &str) -> Self {
         let gfx_device = Gfx::get().gfx_device();

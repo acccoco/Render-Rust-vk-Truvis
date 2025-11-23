@@ -1,21 +1,21 @@
 use ash::vk;
 
-use crate::commands::command_buffer::CommandBuffer;
-use crate::{commands::command_queue::QueueFamily, foundation::debug_messenger::DebugType, gfx::Gfx};
+use crate::commands::command_buffer::GfxCommandBuffer;
+use crate::{commands::command_queue::GfxQueueFamily, foundation::debug_messenger::DebugType, gfx::Gfx};
 
 /// command pool 是和 queue family 绑定的，而不是和 queue 绑定的
-pub struct CommandPool {
+pub struct GfxCommandPool {
     handle: vk::CommandPool,
-    _queue_family: QueueFamily,
+    _queue_family: GfxQueueFamily,
 
     _debug_name: String,
     valid: bool,
 }
 // init & destory
-impl CommandPool {
+impl GfxCommandPool {
     // TODO 使用 new_internal 简化
     #[inline]
-    pub fn new(queue_family: QueueFamily, flags: vk::CommandPoolCreateFlags, debug_name: &str) -> Self {
+    pub fn new(queue_family: GfxQueueFamily, flags: vk::CommandPoolCreateFlags, debug_name: &str) -> Self {
         let gfx_device = Gfx::get().gfx_device();
         let pool = unsafe {
             gfx_device
@@ -43,7 +43,7 @@ impl CommandPool {
     #[inline]
     pub(crate) fn new_internal(
         gfx_device: std::rc::Rc<crate::foundation::device::GfxDevice>,
-        queue_family: QueueFamily,
+        queue_family: GfxQueueFamily,
         flags: vk::CommandPoolCreateFlags,
         debug_name: &str,
     ) -> Self {
@@ -85,7 +85,7 @@ impl CommandPool {
 }
 
 // getters
-impl CommandPool {
+impl GfxCommandPool {
     /// getter
     #[inline]
     pub fn handle(&self) -> vk::CommandPool {
@@ -93,7 +93,7 @@ impl CommandPool {
     }
 }
 // tools
-impl CommandPool {
+impl GfxCommandPool {
     /// 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
     ///
     /// reset 之后，pool 内的 command buffer 又可以重新录制命令
@@ -107,7 +107,7 @@ impl CommandPool {
     /// 释放 command buffer
     ///
     /// 释放之后，command buffer 不能再被使用
-    pub fn free_command_buffers(&self, command_buffers: Vec<CommandBuffer>) {
+    pub fn free_command_buffers(&self, command_buffers: Vec<GfxCommandBuffer>) {
         let command_buffer_handles: Vec<vk::CommandBuffer> =
             command_buffers.iter().map(|cmd| cmd.vk_handle()).collect();
         unsafe {
@@ -116,7 +116,7 @@ impl CommandPool {
     }
 }
 
-impl DebugType for CommandPool {
+impl DebugType for GfxCommandPool {
     fn debug_type_name() -> &'static str {
         "GfxCommandPool"
     }
@@ -126,7 +126,7 @@ impl DebugType for CommandPool {
     }
 }
 
-impl Drop for CommandPool {
+impl Drop for GfxCommandPool {
     fn drop(&mut self) {
         assert!(!self.valid, "CommandPool must be destroyed manually.");
         log::info!("Dropping CommandPool: {}", self._debug_name);

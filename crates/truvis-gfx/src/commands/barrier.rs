@@ -2,7 +2,7 @@ use ash::vk;
 
 /// barrier 使用的 src 和 dst 访问 mask
 #[derive(Copy, Clone)]
-pub struct BarrierMask {
+pub struct GfxBarrierMask {
     pub src_stage: vk::PipelineStageFlags2,
     pub dst_stage: vk::PipelineStageFlags2,
     pub src_access: vk::AccessFlags2,
@@ -10,11 +10,11 @@ pub struct BarrierMask {
 }
 
 /// 便捷创建 image memory barrier 的结构体
-pub struct ImageBarrier {
+pub struct GfxImageBarrier {
     inner: vk::ImageMemoryBarrier2<'static>,
 }
 
-impl Default for ImageBarrier {
+impl Default for GfxImageBarrier {
     fn default() -> Self {
         Self {
             inner: vk::ImageMemoryBarrier2 {
@@ -35,7 +35,7 @@ impl Default for ImageBarrier {
     }
 }
 
-impl ImageBarrier {
+impl GfxImageBarrier {
     pub fn new() -> Self {
         Self::default()
     }
@@ -93,11 +93,11 @@ impl ImageBarrier {
     }
 }
 
-pub struct BufferBarrier {
+pub struct GfxBufferBarrier {
     inner: vk::BufferMemoryBarrier2<'static>,
 }
 
-impl Default for BufferBarrier {
+impl Default for GfxBufferBarrier {
     fn default() -> Self {
         Self {
             inner: vk::BufferMemoryBarrier2 {
@@ -109,7 +109,7 @@ impl Default for BufferBarrier {
     }
 }
 
-impl BufferBarrier {
+impl GfxBufferBarrier {
     pub fn new() -> Self {
         Self::default()
     }
@@ -134,7 +134,7 @@ impl BufferBarrier {
     }
 
     #[inline]
-    pub fn mask(mut self, mask: BarrierMask) -> Self {
+    pub fn mask(mut self, mask: GfxBarrierMask) -> Self {
         self.inner.src_stage_mask = mask.src_stage;
         self.inner.dst_stage_mask = mask.dst_stage;
         self.inner.src_access_mask = mask.src_access;

@@ -6,16 +6,16 @@ use itertools::Itertools;
 use truvis_crate_tools::const_map;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::commands::barrier::ImageBarrier;
-use truvis_gfx::commands::submit_info::SubmitInfo;
+use truvis_gfx::commands::barrier::GfxImageBarrier;
+use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
-use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
+use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
 use truvis_gfx::{
-    commands::command_buffer::CommandBuffer,
+    commands::command_buffer::GfxCommandBuffer,
     pipelines::{
-        graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},
-        rendering_info::RenderingInfo,
-        shader::ShaderStageInfo,
+        graphics_pipeline::{GfxGraphicsPipeline, GfxGraphicsPipelineCreateInfo, GfxPipelineLayout},
+        rendering_info::GfxRenderingInfo,
+        shader::GfxShaderStageInfo,
     },
 };
 use truvis_model_manager::components::geometry::GeometrySoA3D;
@@ -25,13 +25,13 @@ use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_render::resources::fif_buffer::FifBuffers;
 
-const_map!(ShaderStage<ShaderStageInfo>: {
-    Vertex: ShaderStageInfo {
+const_map!(ShaderStage<GfxShaderStageInfo>: {
+    Vertex: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: c"vsmain",
         path: TruvisPath::shader_path("hello_triangle/triangle.slang"),
     },
-    Fragment: ShaderStageInfo {
+    Fragment: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: c"psmain",
         path: TruvisPath::shader_path("hello_triangle/triangle.slang"),
@@ -39,13 +39,13 @@ const_map!(ShaderStage<ShaderStageInfo>: {
 });
 
 pub struct TriangleSubpass {
-    pipeline: GraphicsPipeline,
-    _pipeline_layout: Rc<PipelineLayout>,
+    pipeline: GfxGraphicsPipeline,
+    _pipeline_layout: Rc<GfxPipelineLayout>,
 }
 impl RenderSubpass for TriangleSubpass {}
 impl TriangleSubpass {
     pub fn new(frame_settings: &FrameSettings) -> Self {
-        let mut pipeline_ci = GraphicsPipelineCreateInfo::default();
+        let mut pipeline_ci = GfxGraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![frame_settings.color_format], None, Some(vk::Format::UNDEFINED));
         pipeline_ci.vertex_binding(VertexLayoutSoA3D::vertex_input_bindings());
@@ -59,8 +59,8 @@ impl TriangleSubpass {
             [0.0; 4],
         );
 
-        let pipeline_layout = Rc::new(PipelineLayout::new(&[], &[], "hello-triangle"));
-        let pipeline = GraphicsPipeline::new(&pipeline_ci, pipeline_layout.clone(), "hello-triangle-pipeline");
+        let pipeline_layout = Rc::new(GfxPipelineLayout::new(&[], &[], "hello-triangle"));
+        let pipeline = GfxGraphicsPipeline::new(&pipeline_ci, pipeline_layout.clone(), "hello-triangle-pipeline");
 
         Self {
             _pipeline_layout: pipeline_layout,
@@ -70,14 +70,14 @@ impl TriangleSubpass {
 
     pub fn draw(
         &self,
-        cmd: &CommandBuffer,
+        cmd: &GfxCommandBuffer,
         frame_label: FrameLabel,
         fif_buffers: &FifBuffers,
         frame_settings: &FrameSettings,
         shape: &GeometrySoA3D,
     ) {
         let viewport_extent = frame_settings.frame_extent;
-        let rendering_info = RenderingInfo::new(
+        let rendering_info = GfxRenderingInfo::new(
             vec![fif_buffers.render_target_image_view(frame_label).handle()],
             None,
             vk::Rect2D {
@@ -144,7 +144,7 @@ impl TrianglePass {
             // 将 render target 从 general -> color attachment
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[ImageBarrier::new()
+                &[GfxImageBarrier::new()
                     .image(render_target)
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
@@ -163,7 +163,7 @@ impl TrianglePass {
             // 将 render target 从 color attachment -> general
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[ImageBarrier::new()
+                &[GfxImageBarrier::new()
                     .image(render_target)
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
@@ -175,7 +175,7 @@ impl TrianglePass {
             );
 
             cmd.end();
-            Gfx::get().gfx_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
+            Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(&[cmd])], None);
         }
     }
 }

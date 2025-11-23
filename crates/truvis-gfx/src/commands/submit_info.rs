@@ -1,11 +1,11 @@
 use ash::vk;
 use itertools::Itertools;
 
-use crate::commands::{command_buffer::CommandBuffer, semaphore::Semaphore};
+use crate::commands::{command_buffer::GfxCommandBuffer, semaphore::GfxSemaphore};
 
 /// Gfx 关于 submitInfo 的封装，更易用
 #[derive(Default)]
-pub struct SubmitInfo {
+pub struct GfxSubmitInfo {
     inner: vk::SubmitInfo2<'static>,
 
     _command_buffers: Vec<vk::CommandBufferSubmitInfo<'static>>,
@@ -13,8 +13,8 @@ pub struct SubmitInfo {
     signal_infos: Vec<vk::SemaphoreSubmitInfo<'static>>,
 }
 
-impl SubmitInfo {
-    pub fn new(commands: &[CommandBuffer]) -> Self {
+impl GfxSubmitInfo {
+    pub fn new(commands: &[GfxCommandBuffer]) -> Self {
         let command_buffers = commands
             .iter()
             .map(|cmd| vk::CommandBufferSubmitInfo::default().command_buffer(cmd.vk_handle()))
@@ -46,7 +46,7 @@ impl SubmitInfo {
     }
 
     #[inline]
-    pub fn wait(mut self, semaphore: &Semaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
+    pub fn wait(mut self, semaphore: &GfxSemaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
         self.wait_infos.push(
             vk::SemaphoreSubmitInfo::default()
                 .semaphore(semaphore.handle())
@@ -57,7 +57,7 @@ impl SubmitInfo {
     }
 
     #[inline]
-    pub fn signal(mut self, semaphore: &Semaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
+    pub fn signal(mut self, semaphore: &GfxSemaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
         self.signal_infos.push(
             vk::SemaphoreSubmitInfo::default()
                 .semaphore(semaphore.handle())

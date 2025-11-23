@@ -4,7 +4,7 @@ use ash::vk;
 
 use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 
-impl ImageViewCreateInfo {
+impl GfxImageViewCreateInfo {
     #[inline]
     pub fn new_image_view_2d_info(format: vk::Format, aspect: vk::ImageAspectFlags) -> Self {
         Self {
@@ -29,23 +29,23 @@ impl ImageViewCreateInfo {
 }
 
 #[derive(PartialOrd, PartialEq, Hash, Copy, Clone, Ord, Eq, Debug)]
-pub struct Image2DViewUUID(pub uuid::Uuid);
+pub struct GfxImage2DViewUUID(pub uuid::Uuid);
 
-impl std::fmt::Display for Image2DViewUUID {
+impl std::fmt::Display for GfxImage2DViewUUID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "image2d-view-uuid-{}", self.0)
     }
 }
 
-pub struct Image2DView {
+pub struct GfxImage2DView {
     handle: vk::ImageView,
-    uuid: Image2DViewUUID,
+    uuid: GfxImage2DViewUUID,
 
-    _info: Rc<ImageViewCreateInfo>,
+    _info: Rc<GfxImageViewCreateInfo>,
     _name: String,
 }
 
-impl Drop for Image2DView {
+impl Drop for GfxImage2DView {
     fn drop(&mut self) {
         unsafe {
             let gfx_device = Gfx::get().gfx_device();
@@ -54,7 +54,7 @@ impl Drop for Image2DView {
     }
 }
 
-impl DebugType for Image2DView {
+impl DebugType for GfxImage2DView {
     fn debug_type_name() -> &'static str {
         "GfxImage2DView"
     }
@@ -64,14 +64,14 @@ impl DebugType for Image2DView {
     }
 }
 
-impl Image2DView {
-    pub fn new(image: vk::Image, mut info: ImageViewCreateInfo, name: impl AsRef<str>) -> Self {
+impl GfxImage2DView {
+    pub fn new(image: vk::Image, mut info: GfxImageViewCreateInfo, name: impl AsRef<str>) -> Self {
         let gfx_device = Gfx::get().gfx_device();
         info.inner.image = image;
         let handle = unsafe { gfx_device.create_image_view(&info.inner, None).unwrap() };
         let image_view = Self {
             handle,
-            uuid: Image2DViewUUID(uuid::Uuid::new_v4()),
+            uuid: GfxImage2DViewUUID(uuid::Uuid::new_v4()),
             _info: Rc::new(info),
             _name: name.as_ref().to_string(),
         };
@@ -86,34 +86,34 @@ impl Image2DView {
     }
 
     #[inline]
-    pub fn uuid(&self) -> Image2DViewUUID {
+    pub fn uuid(&self) -> GfxImage2DViewUUID {
         self.uuid
     }
 }
 
-impl std::fmt::Display for Image2DView {
+impl std::fmt::Display for GfxImage2DView {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Image2DView({}, {:?})", self._name, self.handle)
     }
 }
 
-pub enum Image2DViewContainer {
-    Own(Box<Image2DView>),
-    Shared(Rc<Image2DView>),
+pub enum GfxImage2DViewContainer {
+    Own(Box<GfxImage2DView>),
+    Shared(Rc<GfxImage2DView>),
     Raw(vk::ImageView),
 }
 
-impl Image2DViewContainer {
+impl GfxImage2DViewContainer {
     #[inline]
     pub fn vk_image_view(&self) -> vk::ImageView {
         match self {
-            Image2DViewContainer::Own(view) => view.handle(),
-            Image2DViewContainer::Shared(view) => view.handle(),
-            Image2DViewContainer::Raw(view) => *view,
+            GfxImage2DViewContainer::Own(view) => view.handle(),
+            GfxImage2DViewContainer::Shared(view) => view.handle(),
+            GfxImage2DViewContainer::Raw(view) => *view,
         }
     }
 }
 
-pub struct ImageViewCreateInfo {
+pub struct GfxImageViewCreateInfo {
     inner: vk::ImageViewCreateInfo<'static>,
 }

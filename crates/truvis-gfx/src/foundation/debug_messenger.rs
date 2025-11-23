@@ -2,12 +2,12 @@ use std::ffi::CStr;
 
 use ash::vk;
 
-pub struct DebugMsger {
+pub struct GfxDebugMsger {
     pub vk_debug_utils_instance: ash::ext::debug_utils::Instance,
     pub vk_debug_utils_messenger: vk::DebugUtilsMessengerEXT,
 }
 
-impl DebugMsger {
+impl GfxDebugMsger {
     pub fn new(vk_pf: &ash::Entry, instance: &ash::Instance) -> Self {
         let loader = ash::ext::debug_utils::Instance::new(vk_pf, instance);
 
@@ -25,7 +25,7 @@ impl DebugMsger {
     }
 }
 
-impl Drop for DebugMsger {
+impl Drop for GfxDebugMsger {
     fn drop(&mut self) {
         unsafe {
             log::info!("Destroying GfxDebugUtils");
@@ -70,7 +70,7 @@ unsafe extern "system" fn vk_debug_callback(
 }
 
 // 构造过程辅助函数
-impl DebugMsger {
+impl GfxDebugMsger {
     /// 存放 msg 参数，用于初始化 debug messenger
     pub fn debug_msg_type() -> vk::DebugUtilsMessageTypeFlagsEXT {
         static mut DEBUG_MSG_TYPE: vk::DebugUtilsMessageTypeFlagsEXT = vk::DebugUtilsMessageTypeFlagsEXT::empty();

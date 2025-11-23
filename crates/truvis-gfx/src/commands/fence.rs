@@ -5,11 +5,11 @@ use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 /// # Destroy
 /// 不应该实现 Fence，因为可以 Clone，需要手动 destroy
 #[derive(Clone)]
-pub struct Fence {
+pub struct GfxFence {
     fence: vk::Fence,
 }
 
-impl DebugType for Fence {
+impl DebugType for GfxFence {
     fn debug_type_name() -> &'static str {
         "GfxFence"
     }
@@ -20,7 +20,7 @@ impl DebugType for Fence {
 }
 
 // 创建与销毁
-impl Fence {
+impl GfxFence {
     /// # param
     /// * signaled - 是否创建时就 signaled
     pub fn new(signaled: bool, debug_name: &str) -> Self {
@@ -43,7 +43,7 @@ impl Fence {
 }
 
 // getters
-impl Fence {
+impl GfxFence {
     #[inline]
     pub fn handle(&self) -> vk::Fence {
         self.fence
@@ -51,7 +51,7 @@ impl Fence {
 }
 
 // tools
-impl Fence {
+impl GfxFence {
     /// 阻塞等待 fence
     #[inline]
     pub fn wait(&self) {

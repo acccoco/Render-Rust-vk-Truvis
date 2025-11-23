@@ -4,12 +4,12 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::{
-    commands::{fence::Fence, submit_info::SubmitInfo},
+    commands::{fence::GfxFence, submit_info::GfxSubmitInfo},
     foundation::{debug_messenger::DebugType, device::GfxDevice},
 };
 
 #[derive(Clone, Debug)]
-pub struct QueueFamily {
+pub struct GfxQueueFamily {
     pub name: String,
     pub queue_family_index: u32,
     pub queue_flags: vk::QueueFlags,
@@ -19,12 +19,12 @@ pub struct QueueFamily {
 /// # destroy
 ///
 /// GfxQueueFamily 在 GfxDevice 销毁时会被销毁
-pub struct CommandQueue {
+pub struct GfxCommandQueue {
     pub(crate) vk_queue: vk::Queue,
-    pub(crate) queue_family: QueueFamily,
+    pub(crate) queue_family: GfxQueueFamily,
     pub(crate) gfx_device: Rc<GfxDevice>,
 }
-impl DebugType for CommandQueue {
+impl DebugType for GfxCommandQueue {
     fn debug_type_name() -> &'static str {
         "GfxQueue"
     }
@@ -34,9 +34,9 @@ impl DebugType for CommandQueue {
 }
 
 // getter
-impl CommandQueue {
+impl GfxCommandQueue {
     #[inline]
-    pub fn queue_family(&self) -> &QueueFamily {
+    pub fn queue_family(&self) -> &GfxQueueFamily {
         &self.queue_family
     }
 
@@ -47,8 +47,8 @@ impl CommandQueue {
 }
 
 // tools
-impl CommandQueue {
-    pub fn submit(&self, batches: Vec<SubmitInfo>, fence: Option<Fence>) {
+impl GfxCommandQueue {
+    pub fn submit(&self, batches: Vec<GfxSubmitInfo>, fence: Option<GfxFence>) {
         unsafe {
             // batches 的存在是有必要的，submit_infos 引用的 batches 的内存
             let batches = batches.iter().map(|b| b.submit_info()).collect_vec();
@@ -67,7 +67,7 @@ impl CommandQueue {
 }
 
 // debug 相关命令
-impl CommandQueue {
+impl GfxCommandQueue {
     #[inline]
     pub fn begin_label<S>(&self, label_name: S, label_color: glam::Vec4)
     where

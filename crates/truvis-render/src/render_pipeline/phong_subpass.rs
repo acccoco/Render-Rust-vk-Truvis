@@ -7,21 +7,21 @@ use crate::{
 use ash::vk;
 use std::{cell::RefCell, mem::offset_of, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
+use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
 use truvis_gfx::{
     basic::color::LabelColor,
-    commands::command_buffer::CommandBuffer,
+    commands::command_buffer::GfxCommandBuffer,
     pipelines::{
-        graphics_pipeline::{GraphicsPipeline, GraphicsPipelineCreateInfo, PipelineLayout},
-        rendering_info::RenderingInfo,
+        graphics_pipeline::{GfxGraphicsPipeline, GfxGraphicsPipelineCreateInfo, GfxPipelineLayout},
+        rendering_info::GfxRenderingInfo,
     },
-    resources::special_buffers::structured_buffer::StructuredBuffer,
+    resources::special_buffers::structured_buffer::GfxStructuredBuffer,
 };
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_shader_binding::shader;
 
 pub struct PhongSubpass {
-    pipeline: GraphicsPipeline,
+    pipeline: GfxGraphicsPipeline,
     bindless_manager: Rc<RefCell<BindlessManager>>,
 }
 impl PhongSubpass {
@@ -30,7 +30,7 @@ impl PhongSubpass {
         depth_format: vk::Format,
         bindless_manager: Rc<RefCell<BindlessManager>>,
     ) -> Self {
-        let mut ci = GraphicsPipelineCreateInfo::default();
+        let mut ci = GfxGraphicsPipelineCreateInfo::default();
         ci.vertex_shader_stage(&TruvisPath::shader_path("phong/phong3d.vs.slang"), c"main");
         ci.fragment_shader_stage(&TruvisPath::shader_path("phong/phong.ps.slang"), c"main");
 
@@ -47,7 +47,7 @@ impl PhongSubpass {
             [0.0; 4],
         );
 
-        let pipeline_layout = Rc::new(PipelineLayout::new(
+        let pipeline_layout = Rc::new(GfxPipelineLayout::new(
             &[bindless_manager.borrow().bindless_descriptor_layout.handle()],
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
@@ -56,7 +56,7 @@ impl PhongSubpass {
             "phong-pass",
         ));
 
-        let d3_pipe = GraphicsPipeline::new(&ci, pipeline_layout, "phong-d3-pipe");
+        let d3_pipe = GfxGraphicsPipeline::new(&ci, pipeline_layout, "phong-d3-pipe");
 
         Self {
             pipeline: d3_pipe,
@@ -66,7 +66,7 @@ impl PhongSubpass {
 
     fn bind(
         &self,
-        cmd: &CommandBuffer,
+        cmd: &GfxCommandBuffer,
         viewport: &vk::Rect2D,
         push_constant: &shader::raster::PushConstants,
         frame_idx: FrameLabel,
@@ -102,15 +102,15 @@ impl PhongSubpass {
 
     pub fn draw(
         &self,
-        cmd: &CommandBuffer,
-        per_frame_data: &StructuredBuffer<shader::PerFrameData>,
+        cmd: &GfxCommandBuffer,
+        per_frame_data: &GfxStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
         scene_manager: &SceneManager,
         fif_buffers: &FifBuffers,
         frame_settings: &FrameSettings,
     ) {
         let frame_label = FrameContext::get().frame_label();
-        let rendering_info = RenderingInfo::new(
+        let rendering_info = GfxRenderingInfo::new(
             vec![fif_buffers.render_target_image_view(frame_label).handle()],
             Some(fif_buffers.depth_image_view().handle()),
             vk::Rect2D {

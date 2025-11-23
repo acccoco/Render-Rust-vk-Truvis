@@ -4,16 +4,16 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::gfx::Gfx;
-use crate::pipelines::shader::ShaderModuleCache;
-use crate::{foundation::debug_messenger::DebugType, pipelines::shader::ShaderStageInfo};
+use crate::pipelines::shader::GfxShaderModuleCache;
+use crate::{foundation::debug_messenger::DebugType, pipelines::shader::GfxShaderStageInfo};
 
 /// 管线布局封装
 ///
 /// 包含描述符集布局和 Push Constants 范围定义。
-pub struct PipelineLayout {
+pub struct GfxPipelineLayout {
     handle: vk::PipelineLayout,
 }
-impl PipelineLayout {
+impl GfxPipelineLayout {
     pub fn new(
         descriptor_set_layouts: &[vk::DescriptorSetLayout],
         push_constant_ranges: &[vk::PushConstantRange],
@@ -24,7 +24,7 @@ impl PipelineLayout {
             .push_constant_ranges(push_constant_ranges);
         let gfx_device = Gfx::get().gfx_device();
         let handle = unsafe { gfx_device.create_pipeline_layout(&pipeline_layout_create_info, None).unwrap() };
-        let layout = PipelineLayout { handle };
+        let layout = GfxPipelineLayout { handle };
         gfx_device.set_debug_name(&layout, debug_name);
         layout
     }
@@ -39,14 +39,14 @@ impl PipelineLayout {
         // drop
     }
 }
-impl Drop for PipelineLayout {
+impl Drop for GfxPipelineLayout {
     fn drop(&mut self) {
         unsafe {
             Gfx::get().gfx_device().destroy_pipeline_layout(self.handle, None);
         }
     }
 }
-impl DebugType for PipelineLayout {
+impl DebugType for GfxPipelineLayout {
     fn debug_type_name() -> &'static str {
         "GfxPipelineLayouer"
     }
@@ -56,16 +56,16 @@ impl DebugType for PipelineLayout {
     }
 }
 
-pub struct GraphicsPipeline {
+pub struct GfxGraphicsPipeline {
     pipeline: vk::Pipeline,
 
     /// 因为多个 pipeline 可以使用同一个 pipeline layout，所以这里使用 Rc
-    pipeline_layout: Rc<PipelineLayout>,
+    pipeline_layout: Rc<GfxPipelineLayout>,
 }
-impl GraphicsPipeline {
+impl GfxGraphicsPipeline {
     pub fn new(
-        create_info: &GraphicsPipelineCreateInfo,
-        pipeline_layout: Rc<PipelineLayout>,
+        create_info: &GfxGraphicsPipelineCreateInfo,
+        pipeline_layout: Rc<GfxPipelineLayout>,
         debug_name: &str,
     ) -> Self {
         // dynamic rendering 需要的 framebuffer 信息
@@ -74,7 +74,7 @@ impl GraphicsPipeline {
             .depth_attachment_format(create_info.depth_attach_format)
             .stencil_attachment_format(create_info.stencil_attach_format);
 
-        let mut shader_modules_cache = ShaderModuleCache::new();
+        let mut shader_modules_cache = GfxShaderModuleCache::new();
         let shader_stages_info = create_info
             .shader_stages
             .iter()
@@ -135,7 +135,7 @@ impl GraphicsPipeline {
                 .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pipeline_info), None)
                 .unwrap()[0]
         };
-        let pipeline = GraphicsPipeline {
+        let pipeline = GfxGraphicsPipeline {
             pipeline,
             pipeline_layout,
         };
@@ -162,14 +162,14 @@ impl GraphicsPipeline {
         // drop
     }
 }
-impl Drop for GraphicsPipeline {
+impl Drop for GfxGraphicsPipeline {
     fn drop(&mut self) {
         unsafe {
             Gfx::get().gfx_device().destroy_pipeline(self.pipeline, None);
         }
     }
 }
-impl DebugType for GraphicsPipeline {
+impl DebugType for GfxGraphicsPipeline {
     fn debug_type_name() -> &'static str {
         "GfxGraphicsPipeline"
     }
@@ -179,7 +179,7 @@ impl DebugType for GraphicsPipeline {
     }
 }
 
-pub struct GraphicsPipelineCreateInfo {
+pub struct GfxGraphicsPipelineCreateInfo {
     /// dynamic render 需要的 framebuffer 信息
     color_attach_formats: Vec<vk::Format>,
     /// dynamic render 需要的 framebuffer 信息
@@ -187,7 +187,7 @@ pub struct GraphicsPipelineCreateInfo {
     /// dynamic render 需要的 framebuffer 信息
     stencil_attach_format: vk::Format,
 
-    shader_stages: Vec<ShaderStageInfo>,
+    shader_stages: Vec<GfxShaderStageInfo>,
 
     vertex_binding_desc: Vec<vk::VertexInputBindingDescription>,
     vertex_attribute_desec: Vec<vk::VertexInputAttributeDescription>,
@@ -206,7 +206,7 @@ pub struct GraphicsPipelineCreateInfo {
 
     dynamic_states: Vec<vk::DynamicState>,
 }
-impl Default for GraphicsPipelineCreateInfo {
+impl Default for GfxGraphicsPipelineCreateInfo {
     fn default() -> Self {
         Self {
             color_attach_formats: vec![],
@@ -250,7 +250,7 @@ impl Default for GraphicsPipelineCreateInfo {
     }
 }
 // builder
-impl GraphicsPipelineCreateInfo {
+impl GfxGraphicsPipelineCreateInfo {
     /// builder
     #[inline]
     pub fn attach_info(
@@ -269,7 +269,7 @@ impl GraphicsPipelineCreateInfo {
     /// builder
     #[inline]
     pub fn vertex_shader_stage(&mut self, path: &str, entry_point: &'static CStr) -> &mut Self {
-        self.shader_stages.push(ShaderStageInfo {
+        self.shader_stages.push(GfxShaderStageInfo {
             stage: vk::ShaderStageFlags::VERTEX,
             entry_point,
             path: path.to_string(),
@@ -280,7 +280,7 @@ impl GraphicsPipelineCreateInfo {
     /// builder
     #[inline]
     pub fn fragment_shader_stage(&mut self, path: &str, entry_point: &'static CStr) -> &mut Self {
-        self.shader_stages.push(ShaderStageInfo {
+        self.shader_stages.push(GfxShaderStageInfo {
             stage: vk::ShaderStageFlags::FRAGMENT,
             entry_point,
             path: path.to_string(),
@@ -289,7 +289,7 @@ impl GraphicsPipelineCreateInfo {
     }
 
     #[inline]
-    pub fn shader_stages(&mut self, stages: Vec<ShaderStageInfo>) -> &mut Self {
+    pub fn shader_stages(&mut self, stages: Vec<GfxShaderStageInfo>) -> &mut Self {
         self.shader_stages = stages;
         self
     }

@@ -1,7 +1,7 @@
 use ash::vk;
 use itertools::Itertools;
 
-use truvis_gfx::raytracing::acceleration::Acceleration;
+use truvis_gfx::raytracing::acceleration::GfxAcceleration;
 
 use crate::components::geometry::GeometrySoA3D;
 
@@ -9,7 +9,7 @@ use crate::components::geometry::GeometrySoA3D;
 pub struct Mesh {
     pub geometries: Vec<GeometrySoA3D>,
 
-    pub blas: Option<Acceleration>,
+    pub blas: Option<GfxAcceleration>,
     pub name: String,
     pub blas_device_address: Option<vk::DeviceAddress>,
 }
@@ -21,7 +21,7 @@ impl Mesh {
         }
 
         let blas_infos = self.geometries.iter().map(|g| g.get_blas_geometry_info()).collect_vec();
-        let blas = Acceleration::build_blas_sync(
+        let blas = GfxAcceleration::build_blas_sync(
             &blas_infos,
             vk::BuildAccelerationStructureFlagsKHR::empty(),
             format!("{}-Blas", self.name),

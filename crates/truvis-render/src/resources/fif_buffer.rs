@@ -4,12 +4,12 @@ use ash::vk;
 use itertools::Itertools;
 
 use truvis_gfx::{
-    commands::barrier::ImageBarrier,
+    commands::barrier::GfxImageBarrier,
     gfx::Gfx,
     resources::{
-        image::{Image2D, ImageCreateInfo},
-        image_view::{Image2DView, ImageViewCreateInfo},
-        texture::Texture2D,
+        image::{GfxImage2D, GfxImageCreateInfo},
+        image_view::{GfxImage2DView, GfxImageViewCreateInfo},
+        texture::GfxTexture2D,
     },
 };
 use truvis_shader_binding::shader;
@@ -23,14 +23,14 @@ use crate::{
 /// 所有帧会用到的 buffers
 pub struct FifBuffers {
     /// RT 计算的累积结果
-    accum_image: Rc<Image2D>,
-    accum_image_view: Rc<Image2DView>,
+    accum_image: Rc<GfxImage2D>,
+    accum_image_view: Rc<GfxImage2DView>,
 
-    _depth_image: Rc<Image2D>,
-    depth_image_view: Rc<Image2DView>,
+    _depth_image: Rc<GfxImage2D>,
+    depth_image_view: Rc<GfxImage2DView>,
 
     /// 离屏渲染的结果，数量和 fif 相同
-    off_screen_targets: Vec<Rc<Texture2D>>,
+    off_screen_targets: Vec<Rc<GfxTexture2D>>,
     off_screen_target_bindless_keys: Vec<String>,
 }
 impl FifBuffers {
@@ -81,9 +81,9 @@ impl FifBuffers {
     }
 
     /// 创建 RayTracing 需要的 image
-    fn create_color_image(frame_settings: &FrameSettings) -> (Rc<Image2D>, Rc<Image2DView>) {
-        let color_image = Rc::new(Image2D::new(
-            Rc::new(ImageCreateInfo::new_image_2d_info(
+    fn create_color_image(frame_settings: &FrameSettings) -> (Rc<GfxImage2D>, Rc<GfxImage2DView>) {
+        let color_image = Rc::new(GfxImage2D::new(
+            Rc::new(GfxImageCreateInfo::new_image_2d_info(
                 frame_settings.frame_extent,
                 frame_settings.color_format,
                 vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED,
@@ -95,9 +95,9 @@ impl FifBuffers {
             "fif-buffer-color",
         ));
 
-        let color_image_view = Rc::new(Image2DView::new(
+        let color_image_view = Rc::new(GfxImage2DView::new(
             color_image.handle(),
-            ImageViewCreateInfo::new_image_view_2d_info(frame_settings.color_format, vk::ImageAspectFlags::COLOR),
+            GfxImageViewCreateInfo::new_image_view_2d_info(frame_settings.color_format, vk::ImageAspectFlags::COLOR),
             "fif-buffer-color",
         ));
 
@@ -106,7 +106,7 @@ impl FifBuffers {
             |cmd| {
                 cmd.image_memory_barrier(
                     vk::DependencyFlags::empty(),
-                    &[ImageBarrier::new()
+                    &[GfxImageBarrier::new()
                         .image(color_image.handle())
                         .src_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())
                         .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
@@ -120,9 +120,9 @@ impl FifBuffers {
         (color_image, color_image_view)
     }
 
-    fn create_depth_image(frame_settings: &FrameSettings) -> (Rc<Image2D>, Rc<Image2DView>) {
-        let depth_image = Rc::new(Image2D::new(
-            Rc::new(ImageCreateInfo::new_image_2d_info(
+    fn create_depth_image(frame_settings: &FrameSettings) -> (Rc<GfxImage2D>, Rc<GfxImage2DView>) {
+        let depth_image = Rc::new(GfxImage2D::new(
+            Rc::new(GfxImageCreateInfo::new_image_2d_info(
                 frame_settings.frame_extent,
                 frame_settings.depth_format,
                 vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
@@ -134,20 +134,20 @@ impl FifBuffers {
             "fif-buffer-depth",
         ));
 
-        let depth_image_view = Image2DView::new(
+        let depth_image_view = GfxImage2DView::new(
             depth_image.handle(),
-            ImageViewCreateInfo::new_image_view_2d_info(frame_settings.depth_format, vk::ImageAspectFlags::DEPTH),
+            GfxImageViewCreateInfo::new_image_view_2d_info(frame_settings.depth_format, vk::ImageAspectFlags::DEPTH),
             "fif-buffer-depth",
         );
 
         (depth_image, Rc::new(depth_image_view))
     }
 
-    fn create_render_targets(frame_settings: &FrameSettings, fif_count: usize) -> Vec<Rc<Texture2D>> {
+    fn create_render_targets(frame_settings: &FrameSettings, fif_count: usize) -> Vec<Rc<GfxTexture2D>> {
         let create_texture = |fif_labe: FrameLabel| {
             let name = format!("render-target-{}", fif_labe);
-            let color_image = Rc::new(Image2D::new(
-                Rc::new(ImageCreateInfo::new_image_2d_info(
+            let color_image = Rc::new(GfxImage2D::new(
+                Rc::new(GfxImageCreateInfo::new_image_2d_info(
                     frame_settings.frame_extent,
                     frame_settings.color_format,
                     vk::ImageUsageFlags::STORAGE
@@ -161,7 +161,7 @@ impl FifBuffers {
                 },
                 &name,
             ));
-            Texture2D::new(color_image, &name)
+            GfxTexture2D::new(color_image, &name)
         };
 
         (0..fif_count)
@@ -175,12 +175,12 @@ impl FifBuffers {
 // getter
 impl FifBuffers {
     #[inline]
-    pub fn depth_image_view(&self) -> &Image2DView {
+    pub fn depth_image_view(&self) -> &GfxImage2DView {
         &self.depth_image_view
     }
 
     #[inline]
-    pub fn render_target_texture(&self, frame_label: FrameLabel) -> (Weak<Texture2D>, String) {
+    pub fn render_target_texture(&self, frame_label: FrameLabel) -> (Weak<GfxTexture2D>, String) {
         (
             Rc::downgrade(&self.off_screen_targets[frame_label as usize]),
             self.off_screen_target_bindless_keys[frame_label as usize].clone(),
@@ -193,7 +193,7 @@ impl FifBuffers {
     }
 
     #[inline]
-    pub fn render_target_image_view(&self, frame_label: FrameLabel) -> &Image2DView {
+    pub fn render_target_image_view(&self, frame_label: FrameLabel) -> &GfxImage2DView {
         self.off_screen_targets[frame_label as usize].image_view()
     }
 
@@ -202,12 +202,12 @@ impl FifBuffers {
     }
 
     #[inline]
-    pub fn color_image(&self) -> &Image2D {
+    pub fn color_image(&self) -> &GfxImage2D {
         &self.accum_image
     }
 
     #[inline]
-    pub fn color_image_view(&self) -> &Image2DView {
+    pub fn color_image_view(&self) -> &GfxImage2DView {
         &self.accum_image_view
     }
 

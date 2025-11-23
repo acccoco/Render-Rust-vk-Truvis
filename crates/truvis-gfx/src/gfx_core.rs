@@ -3,9 +3,9 @@ use std::ffi::CStr;
 use std::rc::Rc;
 
 use crate::{
-    commands::command_queue::CommandQueue,
+    commands::command_queue::GfxCommandQueue,
     foundation::{
-        debug_messenger::DebugMsger, device::GfxDevice, instance::GfxInstance, physical_device::GfxPhysicalDevice,
+        debug_messenger::GfxDebugMsger, device::GfxDevice, instance::GfxInstance, physical_device::GfxPhysicalDevice,
     },
 };
 
@@ -30,10 +30,10 @@ pub struct GfxCore {
     /// 3. 设备生命周期需要精确控制，`Rc` 确保在所有引用者销毁前设备不被销毁
     pub(crate) gfx_device: Rc<GfxDevice>,
 
-    pub(crate) debug_utils: DebugMsger,
+    pub(crate) debug_utils: GfxDebugMsger,
 
-    pub(crate) gfx_queue: CommandQueue,
-    pub(crate) transfer_queue: CommandQueue,
+    pub(crate) gfx_queue: GfxCommandQueue,
+    pub(crate) transfer_queue: GfxCommandQueue,
 }
 
 // 创建与销毁
@@ -67,19 +67,19 @@ impl GfxCore {
 
         let device = Rc::new(GfxDevice::new(&instance.ash_instance, physical_device.vk_handle, &queue_create_infos));
 
-        let gfx_queue = CommandQueue {
+        let gfx_queue = GfxCommandQueue {
             vk_queue: unsafe { device.get_device_queue(gfx_family_idx, 0) },
             queue_family: physical_device.gfx_queue_family.clone(),
             gfx_device: device.clone(),
         };
 
-        let transfer_queue = CommandQueue {
+        let transfer_queue = GfxCommandQueue {
             vk_queue: unsafe { device.get_device_queue(gfx_family_idx, 1) },
             queue_family: physical_device.gfx_queue_family.clone(),
             gfx_device: device.clone(),
         };
 
-        let debug_utils = DebugMsger::new(&vk_pf, &instance.ash_instance);
+        let debug_utils = GfxDebugMsger::new(&vk_pf, &instance.ash_instance);
 
         log::info!("gfx queue's queue family:\n{:#?}", gfx_queue.queue_family);
         log::info!("transfer queue's queue family:\n{:#?}", transfer_queue.queue_family);

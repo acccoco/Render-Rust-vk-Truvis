@@ -4,21 +4,21 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::resources::special_buffers::acceleration_buffer::{
-    AccelerationInstanceBuffer, AccelerationScratchBuffer, AccelerationStructureBuffer,
+    GfxAccelerationInstanceBuffer, GfxAccelerationScratchBuffer, GfxAccelerationStructureBuffer,
 };
-use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, query::query_pool::QueryPool};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, query::query_pool::GfxQueryPool};
 
-pub struct Acceleration {
+pub struct GfxAcceleration {
     /// 加速结构的核心对象
     ///
     /// 用于传递给 Gpu 的 device address，也是从该对象上获取到的
     acceleration_handle: vk::AccelerationStructureKHR,
 
     /// 这里的 buffer 仅仅是用于内存分配，实际的 Acceleration 相关的操作都是通过 acceleration_handle 来进行的
-    _buffer: AccelerationStructureBuffer,
+    _buffer: GfxAccelerationStructureBuffer,
 }
 // 构造与销毁
-impl Acceleration {
+impl GfxAcceleration {
     /// 同步构建 blas
     ///
     /// 需要指定每个 geometry 的信息，以及每个 geometry 拥有的 max primitives
@@ -34,7 +34,7 @@ impl Acceleration {
     /// # params
     /// - primitives 每个 geometry 的 max primitives 数量
     pub fn build_blas_sync(
-        blas_inputs: &[BlasInputInfo],
+        blas_inputs: &[GfxBlasInputInfo],
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: impl AsRef<str>,
     ) -> Self {
@@ -71,7 +71,7 @@ impl Acceleration {
             format!("{}-uncompact-blas", debug_name.as_ref()),
         );
 
-        let scratch_buffer = AccelerationScratchBuffer::new(
+        let scratch_buffer = GfxAccelerationScratchBuffer::new(
             size_info.build_scratch_size,
             format!("{}-blas-scratch-buffer", debug_name.as_ref()),
         );
@@ -83,7 +83,7 @@ impl Acceleration {
         };
 
         // 创建一个 QueryPool，用于查询 compact size
-        let mut query_pool = QueryPool::new(vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, 1, "");
+        let mut query_pool = GfxQueryPool::new(vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, 1, "");
         query_pool.reset(0, 1);
 
         // 等待初步 build 完成
@@ -145,7 +145,7 @@ impl Acceleration {
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: impl AsRef<str>,
     ) -> Self {
-        let acceleration_instance_buffer = AccelerationInstanceBuffer::new(
+        let acceleration_instance_buffer = GfxAccelerationInstanceBuffer::new(
             size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name.as_ref()),
         );
@@ -189,7 +189,7 @@ impl Acceleration {
             format!("{}-tlas", debug_name.as_ref()),
         );
 
-        let scratch_buffer = AccelerationScratchBuffer::new(
+        let scratch_buffer = GfxAccelerationScratchBuffer::new(
             size_info.build_scratch_size,
             format!("{}-tlas-scratch-buffer", debug_name.as_ref()),
         );
@@ -211,7 +211,7 @@ impl Acceleration {
 
     /// 创建 AccelerationStructure 以及 buffer    
     fn new(size: vk::DeviceSize, ty: vk::AccelerationStructureTypeKHR, debug_name: impl AsRef<str>) -> Self {
-        let buffer = AccelerationStructureBuffer::new(size, debug_name.as_ref());
+        let buffer = GfxAccelerationStructureBuffer::new(size, debug_name.as_ref());
 
         let create_info = vk::AccelerationStructureCreateInfoKHR::default() //
             .ty(ty)
@@ -236,7 +236,7 @@ impl Acceleration {
     }
 }
 // getters
-impl Acceleration {
+impl GfxAcceleration {
     #[inline]
     pub fn handle(&self) -> vk::AccelerationStructureKHR {
         self.acceleration_handle
@@ -252,7 +252,7 @@ impl Acceleration {
         }
     }
 }
-impl Drop for Acceleration {
+impl Drop for GfxAcceleration {
     fn drop(&mut self) {
         unsafe {
             Gfx::get()
@@ -262,7 +262,7 @@ impl Drop for Acceleration {
         }
     }
 }
-impl DebugType for Acceleration {
+impl DebugType for GfxAcceleration {
     fn debug_type_name() -> &'static str {
         "GfxAcceleration"
     }
@@ -274,7 +274,7 @@ impl DebugType for Acceleration {
 /// 用于构建 Blas 的输入信息
 ///
 /// 包含 geometry 的 buffer 信息，以及图元的描述信息
-pub struct BlasInputInfo<'a> {
+pub struct GfxBlasInputInfo<'a> {
     pub geometry: vk::AccelerationStructureGeometryKHR<'a>,
     pub range: vk::AccelerationStructureBuildRangeInfoKHR,
 }

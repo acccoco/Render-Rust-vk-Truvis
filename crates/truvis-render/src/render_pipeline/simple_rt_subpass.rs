@@ -7,10 +7,10 @@ use truvis_crate_tools::const_map;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
-    commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
+    commands::{barrier::GfxImageBarrier, command_buffer::GfxCommandBuffer},
     gfx::Gfx,
-    pipelines::shader::{ShaderGroupInfo, ShaderModuleCache, ShaderStageInfo},
-    resources::special_buffers::{sbt_buffer::SBTBuffer, structured_buffer::StructuredBuffer},
+    pipelines::shader::{GfxShaderGroupInfo, GfxShaderModuleCache, GfxShaderStageInfo},
+    resources::special_buffers::{sbt_buffer::GfxSBTBuffer, structured_buffer::GfxStructuredBuffer},
 };
 use truvis_shader_binding::{shader, shader::ImageHandle};
 
@@ -28,65 +28,65 @@ impl Drop for GfxRtPipeline {
     }
 }
 
-const_map!(ShaderStage<ShaderStageInfo>: {
-    RayGen: ShaderStageInfo {
+const_map!(ShaderStage<GfxShaderStageInfo>: {
+    RayGen: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::RAYGEN_KHR,
         entry_point: c"main_ray_gen",
         path: TruvisPath::shader_path("rt/rt.slang"),
     },
-    SkyMiss: ShaderStageInfo {
+    SkyMiss: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::MISS_KHR,
         entry_point: c"sky_miss",
         path: TruvisPath::shader_path("rt/rt.slang"),
     },
-    ShadowMiss: ShaderStageInfo {
+    ShadowMiss: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::MISS_KHR,
         entry_point: c"shadow_miss",
         path: TruvisPath::shader_path("rt/rt.slang"),
     },
-    ClosestHit: ShaderStageInfo {
+    ClosestHit: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
         entry_point: c"main_closest_hit",
         path: TruvisPath::shader_path("rt/rt.slang"),
     },
-    TransAny: ShaderStageInfo {
+    TransAny: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::ANY_HIT_KHR,
         entry_point: c"trans_any",
         path: TruvisPath::shader_path("rt/rt.slang"),
     },
-    DiffuseCall: ShaderStageInfo {
+    DiffuseCall: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::CALLABLE_KHR,
         entry_point: c"diffuse_callable",
         path: TruvisPath::shader_path("rt/rt.slang"),
     },
 });
 
-const_map!(ShaderGroups<ShaderGroupInfo>: {
-    RayGen: ShaderGroupInfo {
+const_map!(ShaderGroups<GfxShaderGroupInfo>: {
+    RayGen: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
         general: ShaderStage::RayGen.index() as u32,
-        ..ShaderGroupInfo::unused()
+        ..GfxShaderGroupInfo::unused()
     },
-    SkyMiss: ShaderGroupInfo {
+    SkyMiss: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
         general: ShaderStage::SkyMiss.index() as u32,
-        ..ShaderGroupInfo::unused()
+        ..GfxShaderGroupInfo::unused()
     },
-    ShadowMiss: ShaderGroupInfo {
+    ShadowMiss: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
         general: ShaderStage::ShadowMiss.index() as u32,
-        ..ShaderGroupInfo::unused()
+        ..GfxShaderGroupInfo::unused()
     },
-    Hit: ShaderGroupInfo {
+    Hit: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
         closest_hit: ShaderStage::ClosestHit.index() as u32,
         any_hit: ShaderStage::TransAny.index() as u32,
-        ..ShaderGroupInfo::unused()
+        ..GfxShaderGroupInfo::unused()
     },
-    DiffuseCall: ShaderGroupInfo {
+    DiffuseCall: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
         general: ShaderStage::DiffuseCall.index() as u32,
-        ..ShaderGroupInfo::unused()
+        ..GfxShaderGroupInfo::unused()
     },
 });
 
@@ -96,7 +96,7 @@ pub struct SBTRegions {
     sbt_region_hit: vk::StridedDeviceAddressRegionKHR,
     sbt_region_callable: vk::StridedDeviceAddressRegionKHR,
 
-    _sbt_buffer: SBTBuffer,
+    _sbt_buffer: GfxSBTBuffer,
 }
 impl SBTRegions {
     const RAYGEN_SBT_REGION: usize = ShaderGroups::RayGen.index();
@@ -129,7 +129,7 @@ impl SBTRegions {
             rt_pipeline_props.shader_group_base_alignment,
         );
 
-        let sbt_buffer = SBTBuffer::new(
+        let sbt_buffer = GfxSBTBuffer::new(
             (raygen_shader_group_region_size
                 + miss_shader_group_region_size
                 + hit_shader_group_region_size
@@ -256,7 +256,7 @@ impl Default for SimpleRtSubpass {
 
 impl SimpleRtSubpass {
     pub fn new() -> Self {
-        let mut shader_module_cache = ShaderModuleCache::new();
+        let mut shader_module_cache = GfxShaderModuleCache::new();
         let stage_infos = ShaderStage::iter()
             .map(|stage| stage.value())
             .map(|stage| {
@@ -336,12 +336,12 @@ impl SimpleRtSubpass {
     }
     pub fn ray_trace(
         &self,
-        cmd: &CommandBuffer,
+        cmd: &GfxCommandBuffer,
         framse_settings: &FrameSettings,
         pipeline_settings: &PipelineSettings,
         rt_image: vk::Image,
         rt_handle: ImageHandle,
-        per_frame_data: &StructuredBuffer<shader::PerFrameData>,
+        per_frame_data: &GfxStructuredBuffer<shader::PerFrameData>,
     ) {
         let frame_label = FrameContext::get().frame_label();
 
@@ -371,7 +371,7 @@ impl SimpleRtSubpass {
             if spp_idx != 0 {
                 cmd.image_memory_barrier(
                     vk::DependencyFlags::empty(),
-                    &[ImageBarrier::new()
+                    &[GfxImageBarrier::new()
                         .image(rt_image)
                         .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                         .src_mask(

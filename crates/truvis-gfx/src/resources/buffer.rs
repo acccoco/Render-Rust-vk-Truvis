@@ -5,7 +5,7 @@ use vk_mem::Alloc;
 
 use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 
-pub struct Buffer {
+pub struct GfxBuffer {
     pub handle: vk::Buffer,
     pub allocation: vk_mem::Allocation,
 
@@ -18,7 +18,7 @@ pub struct Buffer {
     pub debug_name: String,
 }
 
-impl DebugType for Buffer {
+impl DebugType for GfxBuffer {
     fn debug_type_name() -> &'static str {
         "GfxBuffer"
     }
@@ -28,7 +28,7 @@ impl DebugType for Buffer {
     }
 }
 
-impl Drop for Buffer {
+impl Drop for GfxBuffer {
     fn drop(&mut self) {
         let allocator = Gfx::get().allocator();
         unsafe {
@@ -42,7 +42,7 @@ impl Drop for Buffer {
 }
 
 // init & destroy
-impl Buffer {
+impl GfxBuffer {
     /// - align: 当 buffer 处于一个大的 memory block 中时，align 用来指定 buffer 的起始 offset,
     ///   其实地址的内存对齐，默认对齐到 8 字节
     /// - 优先使用 device memory
@@ -103,7 +103,7 @@ impl Buffer {
 }
 
 // getter
-impl Buffer {
+impl GfxBuffer {
     #[inline]
     pub fn vk_buffer(&self) -> vk::Buffer {
         self.handle
@@ -124,7 +124,7 @@ impl Buffer {
 }
 
 // tools
-impl Buffer {
+impl GfxBuffer {
     #[inline]
     pub fn mapped_ptr(&self) -> *mut u8 {
         self.map_ptr.expect("Buffer is not mapped, please call map() before using mapped_ptr()")
@@ -187,7 +187,7 @@ impl Buffer {
     /// # Note
     /// * 避免使用这个将 *小块* 数据从内存传到 GPU，推荐使用 cmd transfer
     /// * 这个应该是用来传输大块数据的
-    pub fn transfer_data_sync2(&self, total_size: vk::DeviceSize, do_with_stage_buffer: impl FnOnce(&Buffer)) {
+    pub fn transfer_data_sync2(&self, total_size: vk::DeviceSize, do_with_stage_buffer: impl FnOnce(&GfxBuffer)) {
         let stage_buffer = Self::new_stage_buffer(total_size, format!("{}-stage-buffer", self.debug_name));
 
         do_with_stage_buffer(&stage_buffer);

@@ -3,7 +3,7 @@ use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
 use truvis_asset::handle::TextureHandle;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::resources::special_buffers::index_buffer::Index32Buffer;
+use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 use truvis_model_manager::components::geometry::GeometrySoA3D;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::core::frame_context::FrameContext;
@@ -38,7 +38,7 @@ impl AsyncLoadTest {
         let indices = vec![0, 1, 2, 2, 3, 0];
 
         let vertex_buffer = VertexLayoutSoA3D::create_vertex_buffer(&positions, &normals, &tangents, &uvs, "quad-vb");
-        let index_buffer = Index32Buffer::new_with_data(&indices, "quad-ib");
+        let index_buffer = GfxIndex32Buffer::new_with_data(&indices, "quad-ib");
 
         GeometrySoA3D {
             vertex_buffer,

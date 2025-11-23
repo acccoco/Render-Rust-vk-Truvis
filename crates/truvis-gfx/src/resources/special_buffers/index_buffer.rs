@@ -2,19 +2,19 @@ use std::ops::{Deref, DerefMut};
 
 use ash::{vk, vk::Handle};
 
-use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::Buffer};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::GfxBuffer};
 
-pub trait IndexType: Sized + Copy {
+pub trait GfxIndexType: Sized + Copy {
     const VK_INDEX_TYPE: vk::IndexType;
     fn byte_size() -> usize;
 }
-impl IndexType for u16 {
+impl GfxIndexType for u16 {
     const VK_INDEX_TYPE: vk::IndexType = vk::IndexType::UINT16;
     fn byte_size() -> usize {
         size_of::<u16>()
     }
 }
-impl IndexType for u32 {
+impl GfxIndexType for u32 {
     const VK_INDEX_TYPE: vk::IndexType = vk::IndexType::UINT32;
     fn byte_size() -> usize {
         size_of::<u32>()
@@ -22,8 +22,8 @@ impl IndexType for u32 {
 }
 
 /// 顶点类型是 u32
-pub struct IndexBuffer<T: IndexType> {
-    inner: Buffer,
+pub struct GfxIndexBuffer<T: GfxIndexType> {
+    inner: GfxBuffer,
 
     /// 索引数量
     index_cnt: usize,
@@ -31,13 +31,13 @@ pub struct IndexBuffer<T: IndexType> {
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl_derive_buffer!(IndexBuffer<T: IndexType>, Buffer, inner);
+impl_derive_buffer!(GfxIndexBuffer<T: GfxIndexType>, GfxBuffer, inner);
 
 // init & destroy
-impl<T: IndexType> IndexBuffer<T> {
+impl<T: GfxIndexType> GfxIndexBuffer<T> {
     pub fn new(index_cnt: usize, debug_name: impl AsRef<str>) -> Self {
         let size = index_cnt * size_of::<u32>();
-        let buffer = Buffer::new(
+        let buffer = GfxBuffer::new(
             size as vk::DeviceSize,
             vk::BufferUsageFlags::INDEX_BUFFER
                 | vk::BufferUsageFlags::TRANSFER_DST
@@ -67,7 +67,7 @@ impl<T: IndexType> IndexBuffer<T> {
     }
 }
 // getter
-impl<T: IndexType> IndexBuffer<T> {
+impl<T: GfxIndexType> GfxIndexBuffer<T> {
     #[inline]
     pub fn index_type() -> vk::IndexType {
         T::VK_INDEX_TYPE
@@ -79,7 +79,7 @@ impl<T: IndexType> IndexBuffer<T> {
     }
 }
 
-impl<T: IndexType> DebugType for IndexBuffer<T> {
+impl<T: GfxIndexType> DebugType for GfxIndexBuffer<T> {
     fn debug_type_name() -> &'static str {
         "IndexBuffer"
     }
@@ -89,5 +89,5 @@ impl<T: IndexType> DebugType for IndexBuffer<T> {
     }
 }
 
-pub type Index32Buffer = IndexBuffer<u32>;
-pub type Index16Buffer = IndexBuffer<u16>;
+pub type GfxIndex32Buffer = GfxIndexBuffer<u32>;
+pub type GfxIndex16Buffer = GfxIndexBuffer<u16>;

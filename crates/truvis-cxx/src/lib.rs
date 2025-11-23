@@ -9,7 +9,7 @@
 use std::{ffi::c_void, mem::offset_of};
 
 use itertools::Itertools;
-use truvis_gfx::resources::special_buffers::index_buffer::Index32Buffer;
+use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 use truvis_model_manager::components::geometry::Geometry;
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;
@@ -129,7 +129,7 @@ impl AssimpSceneLoader {
                     std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
 
                 let index_buffer =
-                    Index32Buffer::new(index_data.len(), format!("{}-mesh-{}-indices", self.model_name, mesh_idx));
+                    GfxIndex32Buffer::new(index_data.len(), format!("{}-mesh-{}-indices", self.model_name, mesh_idx));
                 index_buffer.transfer_data_sync(index_data);
 
                 // 只有 single geometry 的 mesh

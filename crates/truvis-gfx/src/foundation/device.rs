@@ -6,7 +6,7 @@ use std::{
     ops::Deref,
 };
 
-use crate::{foundation::debug_messenger::DebugType, utilities::shader_cursor::WriteDescriptorSet};
+use crate::{foundation::debug_messenger::DebugType, utilities::shader_cursor::GfxWriteDescriptorSet};
 
 /// Vulkan 逻辑设备封装
 ///
@@ -189,7 +189,7 @@ impl GfxDevice {
 // tools
 impl GfxDevice {
     #[inline]
-    pub fn write_descriptor_sets(&self, writes: &[WriteDescriptorSet]) {
+    pub fn write_descriptor_sets(&self, writes: &[GfxWriteDescriptorSet]) {
         let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();
         unsafe {
             self.device.update_descriptor_sets(&writes, &[]);

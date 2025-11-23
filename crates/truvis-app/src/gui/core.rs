@@ -5,12 +5,12 @@ use std::rc::Rc;
 use ash::vk;
 
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::swapchain::render_swapchain::SwapchainImageInfo;
+use truvis_gfx::swapchain::render_swapchain::GfxSwapchainImageInfo;
 use truvis_gfx::{
     basic::color::LabelColor,
-    commands::command_buffer::CommandBuffer,
+    commands::command_buffer::GfxCommandBuffer,
     gfx::Gfx,
-    resources::{image::Image2D, texture::Texture2D},
+    resources::{image::GfxImage2D, texture::GfxTexture2D},
 };
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::FrameLabel;
@@ -35,7 +35,7 @@ impl Gui {
     const FONT_TEXTURE_KEY: &'static str = "imgui-fonts";
     const RENDER_IMAGE_ID: usize = 1;
 
-    pub fn new(window: &winit::window::Window, fif_num: usize, swapchain_image_infos: &SwapchainImageInfo) -> Self {
+    pub fn new(window: &winit::window::Window, fif_num: usize, swapchain_image_infos: &GfxSwapchainImageInfo) -> Self {
         let mut imgui_ctx = imgui::Context::create();
         // disable automatic saving .ini file
         imgui_ctx.set_ini_filename(None);
@@ -110,13 +110,13 @@ impl Gui {
             let fonts = imgui_ctx.fonts();
             let atlas_texture = fonts.build_rgba32_texture();
 
-            let image = Rc::new(Image2D::from_rgba8(
+            let image = Rc::new(GfxImage2D::from_rgba8(
                 atlas_texture.width,
                 atlas_texture.height,
                 atlas_texture.data,
                 "imgui-fonts",
             ));
-            Texture2D::new(image, "imgui-fonts")
+            GfxTexture2D::new(image, "imgui-fonts")
         };
 
         let fonts_texture_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);
@@ -288,7 +288,7 @@ impl Gui {
     pub fn imgui_render(
         &mut self,
 
-        cmd: &CommandBuffer,
+        cmd: &GfxCommandBuffer,
         frame_label: FrameLabel,
     ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> String + use<'_>)> {
         let draw_data = self.imgui_ctx.render();

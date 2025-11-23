@@ -9,15 +9,15 @@ use crate::gfx::Gfx;
 ///
 /// 描述符池用于分配描述符集。
 /// 一个描述符池可以分配多个描述符集，但所有描述符集必须使用相同的布局。
-pub struct DescriptorPool {
+pub struct GfxDescriptorPool {
     /// Vulkan 描述符池句柄
     handle: vk::DescriptorPool,
     /// 描述符池创建信息
-    _info: Rc<DescriptorPoolCreateInfo>,
+    _info: Rc<GfxDescriptorPoolCreateInfo>,
 
     _name: String,
 }
-impl DescriptorPool {
+impl GfxDescriptorPool {
     /// 创建新的描述符池
     ///
     /// # 参数
@@ -28,7 +28,7 @@ impl DescriptorPool {
     /// # 返回值
     /// 新的描述符池实例
     #[inline]
-    pub fn new(ci: Rc<DescriptorPoolCreateInfo>, name: &str) -> Self {
+    pub fn new(ci: Rc<GfxDescriptorPoolCreateInfo>, name: &str) -> Self {
         let gfx_device = Gfx::get().gfx_device();
         let pool = unsafe { gfx_device.create_descriptor_pool(&ci.inner, None).unwrap() };
         let pool = Self {
@@ -54,13 +54,13 @@ impl DescriptorPool {
         // drop
     }
 }
-impl Drop for DescriptorPool {
+impl Drop for GfxDescriptorPool {
     /// 释放 Vulkan 描述符池
     fn drop(&mut self) {
         unsafe { Gfx::get().gfx_device().destroy_descriptor_pool(self.handle, None) };
     }
 }
-impl DebugType for DescriptorPool {
+impl DebugType for GfxDescriptorPool {
     fn debug_type_name() -> &'static str {
         "GfxDescriptorPool"
     }
@@ -76,14 +76,14 @@ impl DebugType for DescriptorPool {
 /// - 标志位
 /// - 最大描述符集数量
 /// - 每种类型描述符的最大数量
-pub struct DescriptorPoolCreateInfo {
+pub struct GfxDescriptorPoolCreateInfo {
     /// Vulkan 描述符池创建信息
     inner: vk::DescriptorPoolCreateInfo<'static>,
     /// 描述符池大小信息
     _pool_sizes: Vec<vk::DescriptorPoolSize>,
 }
 
-impl DescriptorPoolCreateInfo {
+impl GfxDescriptorPoolCreateInfo {
     /// 创建新的描述符池创建信息
     ///
     /// # 参数

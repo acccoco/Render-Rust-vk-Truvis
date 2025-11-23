@@ -3,7 +3,7 @@ use std::{ffi::CStr, ptr::null_mut};
 use ash::vk;
 use itertools::Itertools;
 
-use crate::{commands::command_queue::QueueFamily, foundation::debug_messenger::DebugType};
+use crate::{commands::command_queue::GfxQueueFamily, foundation::debug_messenger::DebugType};
 
 /// 表示一张物理显卡
 pub struct GfxPhysicalDevice {
@@ -26,9 +26,9 @@ pub struct GfxPhysicalDevice {
 
     pub(crate) _mem_props: vk::PhysicalDeviceMemoryProperties,
 
-    pub(crate) gfx_queue_family: QueueFamily,
-    pub(crate) compute_queue_family: Option<QueueFamily>,
-    pub(crate) transfer_queue_family: Option<QueueFamily>,
+    pub(crate) gfx_queue_family: GfxQueueFamily,
+    pub(crate) compute_queue_family: Option<GfxQueueFamily>,
+    pub(crate) transfer_queue_family: Option<GfxQueueFamily>,
 }
 
 impl GfxPhysicalDevice {
@@ -102,7 +102,7 @@ impl GfxPhysicalDevice {
                         !(props.queue_flags & include_flags).is_empty()
                             && (props.queue_flags & exclude_flags).is_empty()
                     })
-                    .map(|(family_idx, props)| QueueFamily {
+                    .map(|(family_idx, props)| GfxQueueFamily {
                         name,
                         queue_family_index: family_idx as u32,
                         queue_flags: props.queue_flags,

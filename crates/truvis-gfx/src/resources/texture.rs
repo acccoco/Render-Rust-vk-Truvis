@@ -3,33 +3,33 @@ use std::rc::Rc;
 use ash::vk;
 
 use crate::{
-    descriptors::sampler::{Sampler, SamplerCreateInfo},
+    descriptors::sampler::{GfxSampler, GfxSamplerCreateInfo},
     resources::{
-        image::{Image2D, ImageContainer},
-        image_view::{Image2DView, ImageViewCreateInfo},
+        image::{GfxImage2D, ImageContainer},
+        image_view::{GfxImage2DView, GfxImageViewCreateInfo},
     },
 };
 
 #[derive(PartialOrd, PartialEq, Hash, Copy, Clone, Ord, Eq)]
-pub struct Texture2DUUID(pub uuid::Uuid);
+pub struct GfxTexture2DUUID(pub uuid::Uuid);
 
-pub struct Texture2D {
+pub struct GfxTexture2D {
     image: ImageContainer,
-    sampler: Sampler,
-    image_view: Image2DView,
+    sampler: GfxSampler,
+    image_view: GfxImage2DView,
 
     // FIXME 将 uuid 使用起来
-    _uuid: Texture2DUUID,
+    _uuid: GfxTexture2DUUID,
 }
 
-impl Texture2D {
+impl GfxTexture2D {
     #[inline]
-    pub fn new(image: Rc<Image2D>, name: &str) -> Self {
-        let sampler = Sampler::new(Rc::new(SamplerCreateInfo::new()), name);
+    pub fn new(image: Rc<GfxImage2D>, name: &str) -> Self {
+        let sampler = GfxSampler::new(Rc::new(GfxSamplerCreateInfo::new()), name);
 
-        let image_view = Image2DView::new(
+        let image_view = GfxImage2DView::new(
             image.handle(),
-            ImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
+            GfxImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
             name,
         );
 
@@ -38,17 +38,17 @@ impl Texture2D {
             sampler,
             image_view,
 
-            _uuid: Texture2DUUID(uuid::Uuid::new_v4()),
+            _uuid: GfxTexture2DUUID(uuid::Uuid::new_v4()),
         }
     }
 
     #[inline]
-    pub fn sampler(&self) -> &Sampler {
+    pub fn sampler(&self) -> &GfxSampler {
         &self.sampler
     }
 
     #[inline]
-    pub fn image_view(&self) -> &Image2DView {
+    pub fn image_view(&self) -> &GfxImage2DView {
         &self.image_view
     }
 
@@ -67,12 +67,12 @@ impl Texture2D {
 }
 
 pub enum Texture2DContainer {
-    Owned(Box<Texture2D>),
-    Shared(Rc<Texture2D>),
+    Owned(Box<GfxTexture2D>),
+    Shared(Rc<GfxTexture2D>),
 }
 impl Texture2DContainer {
     #[inline]
-    pub fn texture(&self) -> &Texture2D {
+    pub fn texture(&self) -> &GfxTexture2D {
         match self {
             Texture2DContainer::Owned(tex) => tex,
             Texture2DContainer::Shared(tex) => tex.as_ref(),

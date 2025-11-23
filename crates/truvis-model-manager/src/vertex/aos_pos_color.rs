@@ -1,7 +1,7 @@
 use ash::vk;
 use ash::vk::DeviceSize;
 use std::mem::offset_of;
-use truvis_gfx::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
+use truvis_gfx::resources::special_buffers::vertex_buffer::{GfxVertexBuffer, GfxVertexLayout};
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -12,7 +12,7 @@ pub struct VertexPosColor {
 
 pub struct VertexLayoutAoSPosColor;
 
-impl VertexLayout for VertexLayoutAoSPosColor {
+impl GfxVertexLayout for VertexLayoutAoSPosColor {
     fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription> {
         vec![vk::VertexInputBindingDescription {
             binding: 0,
@@ -53,8 +53,8 @@ impl VertexLayout for VertexLayoutAoSPosColor {
 
 impl VertexLayoutAoSPosColor {
     #[deprecated]
-    pub fn create_vertex_buffer2(data: &[VertexPosColor], name: impl AsRef<str>) -> VertexBuffer<Self> {
-        let vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
+    pub fn create_vertex_buffer2(data: &[VertexPosColor], name: impl AsRef<str>) -> GfxVertexBuffer<Self> {
+        let vertex_buffer = GfxVertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(data);
 
         vertex_buffer

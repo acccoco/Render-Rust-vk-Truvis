@@ -2,18 +2,18 @@ use std::ops::{Deref, DerefMut};
 
 use ash::{vk, vk::Handle};
 
-use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::Buffer};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::GfxBuffer};
 
-pub struct SBTBuffer {
-    _inner: Buffer,
+pub struct GfxSBTBuffer {
+    _inner: GfxBuffer,
 }
 
-impl_derive_buffer!(SBTBuffer, Buffer, _inner);
+impl_derive_buffer!(GfxSBTBuffer, GfxBuffer, _inner);
 
 // init & destroy
-impl SBTBuffer {
+impl GfxSBTBuffer {
     pub fn new(size: vk::DeviceSize, align: vk::DeviceSize, name: impl AsRef<str>) -> Self {
-        let inner = Buffer::new(
+        let inner = GfxBuffer::new(
             size,
             vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
                 | vk::BufferUsageFlags::TRANSFER_SRC
@@ -34,7 +34,7 @@ impl SBTBuffer {
     }
 }
 
-impl DebugType for SBTBuffer {
+impl DebugType for GfxSBTBuffer {
     fn debug_type_name() -> &'static str {
         "SBTBuffer"
     }

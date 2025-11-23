@@ -13,7 +13,7 @@ use crate::outer_app::OuterApp;
 use crate::platform::camera_controller::CameraController;
 use crate::window_system::main_window::{MainWindow, PresentData};
 use truvis_crate_tools::init_log::init_log;
-use truvis_gfx::commands::barrier::BarrierMask;
+use truvis_gfx::commands::barrier::GfxBarrierMask;
 use truvis_gfx::gfx::Gfx;
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::core::renderer::Renderer;
@@ -207,7 +207,7 @@ impl<T: OuterApp> TruvisApp<T> {
                 PresentData {
                     render_target,
                     render_target_bindless_key,
-                    render_target_barrier: BarrierMask {
+                    render_target_barrier: GfxBarrierMask {
                         src_stage: vk::PipelineStageFlags2::COMPUTE_SHADER,
                         src_access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
                         dst_stage: vk::PipelineStageFlags2::NONE,

@@ -7,12 +7,12 @@ use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtW
 use crate::gui::core::Gui;
 use crate::gui::gui_pass::GuiPass;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::commands::barrier::BarrierMask;
-use truvis_gfx::resources::texture::Texture2D;
+use truvis_gfx::commands::barrier::GfxBarrierMask;
+use truvis_gfx::resources::texture::GfxTexture2D;
 use truvis_gfx::{
-    commands::{barrier::ImageBarrier, semaphore::Semaphore, submit_info::SubmitInfo},
+    commands::{barrier::GfxImageBarrier, semaphore::GfxSemaphore, submit_info::GfxSubmitInfo},
     gfx::Gfx,
-    swapchain::render_swapchain::RenderSwapchain,
+    swapchain::render_swapchain::GfxRenderSwapchain,
 };
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::{DefaultRendererSettings, FrameLabel};
@@ -25,7 +25,7 @@ pub struct PresentData {
     /// 当前帧的渲染目标纹理
     ///
     /// 包含了最终的渲染结果，将被复制或演示到屏幕上
-    pub render_target: Weak<Texture2D>,
+    pub render_target: Weak<GfxTexture2D>,
 
     /// 渲染目标在 Bindless 系统中的唯一标识符
     ///
@@ -35,7 +35,7 @@ pub struct PresentData {
     /// 渲染目标的内存屏障配置
     ///
     /// 定义了渲染目标纹理的同步需求，确保在读取前所有写入操作已完成
-    pub render_target_barrier: BarrierMask,
+    pub render_target_barrier: GfxBarrierMask,
 }
 
 mod helper {
@@ -53,12 +53,12 @@ mod helper {
 pub struct MainWindow {
     winit_window: Window,
 
-    swapchain: Option<RenderSwapchain>,
+    swapchain: Option<GfxRenderSwapchain>,
     gui: Gui,
     gui_pass: GuiPass,
 
     /// 数量和 fif num 相同
-    present_complete_semaphores: Vec<Semaphore>,
+    present_complete_semaphores: Vec<GfxSemaphore>,
 
     /// 表示 gui 的绘制已经完成；
     ///
@@ -68,7 +68,7 @@ pub struct MainWindow {
     ///
     /// renderer 的 wait timeline 可以确保 signal 操作已经完成，但是无法 wait
     /// 操作已经完成
-    render_complete_semaphores: Vec<Semaphore>,
+    render_complete_semaphores: Vec<GfxSemaphore>,
 }
 
 // ctor
@@ -84,7 +84,7 @@ impl MainWindow {
             .with_inner_size(winit::dpi::LogicalSize::new(window_extent.width as f64, window_extent.height as f64));
 
         let window = event_loop.create_window(window_attr).unwrap();
-        let swapchain = RenderSwapchain::new(
+        let swapchain = GfxRenderSwapchain::new(
             Gfx::get().vk_core(),
             &window,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
@@ -97,10 +97,10 @@ impl MainWindow {
         let gui_pass = GuiPass::new(swapchain_image_infos.image_format);
 
         let present_complete_semaphores = (0..FrameContext::get().fif_count())
-            .map(|i| Semaphore::new(&format!("window-present-complete-{}", i)))
+            .map(|i| GfxSemaphore::new(&format!("window-present-complete-{}", i)))
             .collect_vec();
         let render_complete_semaphores = (0..swapchain_image_infos.image_cnt)
-            .map(|i| Semaphore::new(&format!("window-render-complete-{}", i)))
+            .map(|i| GfxSemaphore::new(&format!("window-render-complete-{}", i)))
             .collect_vec();
 
         Self {
@@ -129,7 +129,7 @@ impl MainWindow {
             // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
             // 注1: 可能有 blend 操作，因此需要 COLOR_ATTACHMENT_READ
             // 注2: 这里的 bottom 表示 layout transfer 等待 present 完成
-            let swapchain_image_layout_transfer_barrier = ImageBarrier::new()
+            let swapchain_image_layout_transfer_barrier = GfxImageBarrier::new()
                 .image(swapchain.current_image())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
@@ -139,7 +139,7 @@ impl MainWindow {
                     vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
                 );
 
-            let render_target_barrier = ImageBarrier::new()
+            let render_target_barrier = GfxImageBarrier::new()
                 .image(renderer_data.render_target.upgrade().unwrap().image())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(renderer_data.render_target_barrier.src_stage, renderer_data.render_target_barrier.src_access)
@@ -162,7 +162,7 @@ impl MainWindow {
             // 注1: 这里的 top 表示 present 需要等待 layout transfer 完成
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[ImageBarrier::new()
+                &[GfxImageBarrier::new()
                     .image(swapchain.current_image())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
@@ -176,7 +176,7 @@ impl MainWindow {
         cmd.end();
 
         // 等待 swapchain 的 image 准备好；通知 swapchain 的 image 已经绘制完成
-        let submit_info = SubmitInfo::new(std::slice::from_ref(&cmd))
+        let submit_info = GfxSubmitInfo::new(std::slice::from_ref(&cmd))
             .wait(
                 &self.present_complete_semaphores[*frame_label],
                 vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
@@ -255,7 +255,7 @@ impl MainWindow {
         }
 
         self.swapchain = None;
-        self.swapchain = Some(RenderSwapchain::new(
+        self.swapchain = Some(GfxRenderSwapchain::new(
             Gfx::get().vk_core(),
             &self.winit_window,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,

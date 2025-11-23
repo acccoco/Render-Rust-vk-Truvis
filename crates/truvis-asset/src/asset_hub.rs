@@ -7,17 +7,17 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
-use truvis_gfx::descriptors::sampler::{Sampler, SamplerCreateInfo};
-use truvis_gfx::resources::image::Image2D;
-use truvis_gfx::resources::image_view::{Image2DView, ImageViewCreateInfo};
+use truvis_gfx::descriptors::sampler::{GfxSampler, GfxSamplerCreateInfo};
+use truvis_gfx::resources::image::GfxImage2D;
+use truvis_gfx::resources::image_view::{GfxImage2DView, GfxImageViewCreateInfo};
 
 /// 纹理资源 (RAII)
 /// 包含 Image, Allocation, ImageView, Sampler
 /// Drop 时自动释放 Vulkan 资源
 pub struct TextureResource {
-    pub image: Image2D,
-    pub view: Image2DView,
-    pub sampler: Sampler,
+    pub image: GfxImage2D,
+    pub view: GfxImage2DView,
+    pub sampler: GfxSampler,
 }
 
 /// 资产中心 (Facade)
@@ -64,17 +64,17 @@ impl AssetHub {
     fn create_fallback_texture() -> Arc<TextureResource> {
         // 1. Create Image (1x1 Pink)
         let pixels: [u8; 4] = [255, 0, 255, 255];
-        let image = Image2D::from_rgba8(1, 1, &pixels, "FallbackTexture");
+        let image = GfxImage2D::from_rgba8(1, 1, &pixels, "FallbackTexture");
 
         // Create View
-        let view = Image2DView::new(
+        let view = GfxImage2DView::new(
             image.handle(),
-            ImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
+            GfxImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
             "FallbackView",
         );
 
         // Create Sampler
-        let sampler = Sampler::new(Rc::new(SamplerCreateInfo::new()), "FallbackSampler");
+        let sampler = GfxSampler::new(Rc::new(GfxSamplerCreateInfo::new()), "FallbackSampler");
 
         Arc::new(TextureResource { image, view, sampler })
     }
@@ -166,14 +166,14 @@ impl AssetHub {
             log::info!("Upload finished for texture handle: {:?}", handle);
 
             // 创建 ImageView
-            let view = Image2DView::new(
+            let view = GfxImage2DView::new(
                 image.handle(),
-                ImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
+                GfxImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
                 "TextureView",
             );
 
             // Create Sampler (TODO: Use params from load request)
-            let sampler = Sampler::new(Rc::new(SamplerCreateInfo::new()), "TextureSampler");
+            let sampler = GfxSampler::new(Rc::new(GfxSamplerCreateInfo::new()), "TextureSampler");
 
             let resource = Arc::new(TextureResource { image, view, sampler });
 

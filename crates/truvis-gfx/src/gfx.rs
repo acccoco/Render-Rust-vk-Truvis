@@ -5,10 +5,10 @@ use ash::vk;
 use crate::gfx_core::GfxCore;
 use crate::{
     commands::{
-        command_buffer::CommandBuffer,
-        command_pool::CommandPool,
-        command_queue::{CommandQueue, QueueFamily},
-        submit_info::SubmitInfo,
+        command_buffer::GfxCommandBuffer,
+        command_pool::GfxCommandPool,
+        command_queue::{GfxCommandQueue, GfxQueueFamily},
+        submit_info::GfxSubmitInfo,
     },
     foundation::{
         device::GfxDevice, instance::GfxInstance, physical_device::GfxPhysicalDevice, vmem_allocator::VMemAllocator,
@@ -32,7 +32,7 @@ pub struct Gfx {
     pub(crate) vm_allocator: VMemAllocator,
 
     /// 临时的 graphics command pool，主要用于临时的命令缓冲区
-    pub(crate) temp_graphics_command_pool: CommandPool,
+    pub(crate) temp_graphics_command_pool: GfxCommandPool,
 }
 
 // 创建与销毁
@@ -45,7 +45,7 @@ impl Gfx {
 
         // 注意：在初始化过程中，我们需要使用传统的参数传递方式
         // 因为 RenderContext 单例还没有被初始化
-        let gfx_command_pool = CommandPool::new_internal(
+        let gfx_command_pool = GfxCommandPool::new_internal(
             vk_ctx.gfx_device.clone(),
             vk_ctx.physical_device.gfx_queue_family.clone(),
             vk::CommandPoolCreateFlags::empty(),
@@ -153,27 +153,27 @@ impl Gfx {
     }
 
     #[inline]
-    pub fn gfx_queue_family(&self) -> QueueFamily {
+    pub fn gfx_queue_family(&self) -> GfxQueueFamily {
         self.gfx_core.physical_device.gfx_queue_family.clone()
     }
 
     #[inline]
-    pub fn compute_queue_family(&self) -> QueueFamily {
+    pub fn compute_queue_family(&self) -> GfxQueueFamily {
         self.gfx_core.physical_device.compute_queue_family.as_ref().unwrap().clone()
     }
 
     #[inline]
-    pub fn transfer_queue_family(&self) -> QueueFamily {
+    pub fn transfer_queue_family(&self) -> GfxQueueFamily {
         self.gfx_core.physical_device.transfer_queue_family.as_ref().unwrap().clone()
     }
 
     #[inline]
-    pub fn gfx_queue(&self) -> &CommandQueue {
+    pub fn gfx_queue(&self) -> &GfxCommandQueue {
         &self.gfx_core.gfx_queue
     }
 
     #[inline]
-    pub fn transfer_queue(&self) -> &CommandQueue {
+    pub fn transfer_queue(&self) -> &GfxCommandQueue {
         &self.gfx_core.transfer_queue
     }
 
@@ -221,17 +221,17 @@ impl Gfx {
     /// 立即执行某个 command，并同步等待执行结果
     pub fn one_time_exec<F, R>(&self, func: F, name: impl AsRef<str>) -> R
     where
-        F: FnOnce(&CommandBuffer) -> R,
+        F: FnOnce(&GfxCommandBuffer) -> R,
     {
         let command_buffer =
-            CommandBuffer::new(&self.temp_graphics_command_pool, &format!("one-time-{}", name.as_ref()));
+            GfxCommandBuffer::new(&self.temp_graphics_command_pool, &format!("one-time-{}", name.as_ref()));
 
         command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, name.as_ref());
         let result = func(&command_buffer);
         command_buffer.end();
 
         let command_buffer_clone = command_buffer.clone();
-        self.gfx_queue().submit(vec![SubmitInfo::new(&[command_buffer_clone])], None);
+        self.gfx_queue().submit(vec![GfxSubmitInfo::new(&[command_buffer_clone])], None);
         self.gfx_queue().wait_idle();
         unsafe {
             self.gfx_device()

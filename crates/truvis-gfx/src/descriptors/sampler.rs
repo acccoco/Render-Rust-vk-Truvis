@@ -4,11 +4,11 @@ use ash::vk;
 
 use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 
-pub struct SamplerCreateInfo {
+pub struct GfxSamplerCreateInfo {
     inner: vk::SamplerCreateInfo<'static>,
 }
 
-impl Default for SamplerCreateInfo {
+impl Default for GfxSamplerCreateInfo {
     fn default() -> Self {
         let sampler_info = vk::SamplerCreateInfo::default()
             .mag_filter(vk::Filter::LINEAR)
@@ -31,7 +31,7 @@ impl Default for SamplerCreateInfo {
     }
 }
 
-impl SamplerCreateInfo {
+impl GfxSamplerCreateInfo {
     /// 默认配置：linear，repeat
     #[inline]
     pub fn new() -> Self {
@@ -39,12 +39,12 @@ impl SamplerCreateInfo {
     }
 }
 
-pub struct Sampler {
+pub struct GfxSampler {
     handle: vk::Sampler,
 
-    _info: Rc<SamplerCreateInfo>,
+    _info: Rc<GfxSamplerCreateInfo>,
 }
-impl DebugType for Sampler {
+impl DebugType for GfxSampler {
     fn debug_type_name() -> &'static str {
         "GfxSampler"
     }
@@ -53,7 +53,7 @@ impl DebugType for Sampler {
         self.handle
     }
 }
-impl Drop for Sampler {
+impl Drop for GfxSampler {
     fn drop(&mut self) {
         let gfx_device = Gfx::get().gfx_device();
         unsafe {
@@ -62,9 +62,9 @@ impl Drop for Sampler {
     }
 }
 
-impl Sampler {
+impl GfxSampler {
     #[inline]
-    pub fn new(info: Rc<SamplerCreateInfo>, debug_name: &str) -> Self {
+    pub fn new(info: Rc<GfxSamplerCreateInfo>, debug_name: &str) -> Self {
         let gfx_device = Gfx::get().gfx_device();
         let handle = unsafe { gfx_device.create_sampler(&info.inner, None).unwrap() };
         let sampler = Self { handle, _info: info };

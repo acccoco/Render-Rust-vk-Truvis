@@ -2,7 +2,7 @@ use ash::vk;
 use truvis_shader_layout_trait::ShaderBindingLayout;
 
 use crate::gfx::Gfx;
-use crate::{descriptors::descriptor_pool::DescriptorPool, foundation::debug_messenger::DebugType};
+use crate::{descriptors::descriptor_pool::GfxDescriptorPool, foundation::debug_messenger::DebugType};
 
 /// 描述符集布局
 ///
@@ -16,13 +16,13 @@ use crate::{descriptors::descriptor_pool::DescriptorPool, foundation::debug_mess
 ///
 /// # 泛型参数
 /// - T: 实现了 ShaderBindingLayout trait 的类型，定义了具体的绑定布局
-pub struct DescriptorSetLayout<T: ShaderBindingLayout> {
+pub struct GfxDescriptorSetLayout<T: ShaderBindingLayout> {
     /// Vulkan 描述符集布局句柄
     layout: vk::DescriptorSetLayout,
     /// 用于在编译时关联泛型参数 T
     phantom_data: std::marker::PhantomData<T>,
 }
-impl<T: ShaderBindingLayout> DescriptorSetLayout<T> {
+impl<T: ShaderBindingLayout> GfxDescriptorSetLayout<T> {
     /// 创建新的描述符集布局
     ///
     /// # 参数
@@ -61,14 +61,14 @@ impl<T: ShaderBindingLayout> DescriptorSetLayout<T> {
         // drop
     }
 }
-impl<T: ShaderBindingLayout> Drop for DescriptorSetLayout<T> {
+impl<T: ShaderBindingLayout> Drop for GfxDescriptorSetLayout<T> {
     fn drop(&mut self) {
         unsafe {
             Gfx::get().gfx_device().destroy_descriptor_set_layout(self.layout, None);
         }
     }
 }
-impl<T: ShaderBindingLayout> DebugType for DescriptorSetLayout<T> {
+impl<T: ShaderBindingLayout> DebugType for GfxDescriptorSetLayout<T> {
     fn debug_type_name() -> &'static str {
         "GfxDescriptorSetLayout"
     }
@@ -89,7 +89,7 @@ impl<T: ShaderBindingLayout> DebugType for DescriptorSetLayout<T> {
 /// # Destroy
 ///
 /// 跟随 descriptor pool 一起销毁
-pub struct DescriptorSet<T: ShaderBindingLayout> {
+pub struct GfxDescriptorSet<T: ShaderBindingLayout> {
     /// Vulkan 描述符集句柄
     handle: vk::DescriptorSet,
     /// 用于在编译时关联泛型参数 T
@@ -97,7 +97,7 @@ pub struct DescriptorSet<T: ShaderBindingLayout> {
 
     _descriptor_pool: vk::DescriptorPool,
 }
-impl<T: ShaderBindingLayout> DescriptorSet<T> {
+impl<T: ShaderBindingLayout> GfxDescriptorSet<T> {
     /// 创建新的描述符集
     ///
     /// # 参数
@@ -107,7 +107,11 @@ impl<T: ShaderBindingLayout> DescriptorSet<T> {
     ///
     /// # 返回值
     /// 新的描述符集实例
-    pub fn new(descriptor_pool: &DescriptorPool, layout: &DescriptorSetLayout<T>, debug_name: impl AsRef<str>) -> Self {
+    pub fn new(
+        descriptor_pool: &GfxDescriptorPool,
+        layout: &GfxDescriptorSetLayout<T>,
+        debug_name: impl AsRef<str>,
+    ) -> Self {
         // 分配描述符集
         let alloc_info = vk::DescriptorSetAllocateInfo::default()
             .descriptor_pool(descriptor_pool.handle())
@@ -128,12 +132,12 @@ impl<T: ShaderBindingLayout> DescriptorSet<T> {
         self.handle
     }
 }
-impl<T: ShaderBindingLayout> Drop for DescriptorSet<T> {
+impl<T: ShaderBindingLayout> Drop for GfxDescriptorSet<T> {
     fn drop(&mut self) {
         // 无需手动释放，会跟随 DescriptorPool 一起释放
     }
 }
-impl<T: ShaderBindingLayout> DebugType for DescriptorSet<T> {
+impl<T: ShaderBindingLayout> DebugType for GfxDescriptorSet<T> {
     fn debug_type_name() -> &'static str {
         "GfxDescriptorSet"
     }
@@ -148,7 +152,7 @@ impl<T: ShaderBindingLayout> DebugType for DescriptorSet<T> {
 /// 用于更新描述符集的内容，可以是：
 /// - 图像描述符：用于纹理和采样器
 /// - 缓冲区描述符：用于统一缓冲区和存储缓冲区
-pub enum DescriptorUpdateInfo {
+pub enum GfxDescriptorUpdateInfo {
     /// 图像描述符信息
     Image(vk::DescriptorImageInfo),
     /// 缓冲区描述符信息

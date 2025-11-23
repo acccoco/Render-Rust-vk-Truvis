@@ -1,7 +1,7 @@
 use ash::vk;
 use ash::vk::DeviceSize;
 use std::mem::offset_of;
-use truvis_gfx::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
+use truvis_gfx::resources::special_buffers::vertex_buffer::{GfxVertexBuffer, GfxVertexLayout};
 
 /// AoS: Array of structures
 #[repr(C)]
@@ -14,7 +14,7 @@ pub struct VertexPosNormalUv {
 
 pub struct VertexLayoutAoSPosNormalUv;
 
-impl VertexLayout for VertexLayoutAoSPosNormalUv {
+impl GfxVertexLayout for VertexLayoutAoSPosNormalUv {
     fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription> {
         vec![vk::VertexInputBindingDescription {
             binding: 0,
@@ -61,8 +61,8 @@ impl VertexLayout for VertexLayoutAoSPosNormalUv {
 
 impl VertexLayoutAoSPosNormalUv {
     #[deprecated]
-    pub fn create_vertex_buffer2(data: &[VertexPosNormalUv], name: impl AsRef<str>) -> VertexBuffer<Self> {
-        let vertex_buffer = VertexBuffer::new(data.len(), name.as_ref());
+    pub fn create_vertex_buffer2(data: &[VertexPosNormalUv], name: impl AsRef<str>) -> GfxVertexBuffer<Self> {
+        let vertex_buffer = GfxVertexBuffer::new(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(data);
 
         vertex_buffer

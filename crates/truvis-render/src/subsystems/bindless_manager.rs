@@ -5,18 +5,18 @@ use itertools::Itertools;
 
 use slotmap::SecondaryMap;
 use truvis_asset::handle::TextureHandle;
-use truvis_gfx::descriptors::descriptor_pool::DescriptorPoolCreateInfo;
+use truvis_gfx::descriptors::descriptor_pool::GfxDescriptorPoolCreateInfo;
 use truvis_gfx::{
     descriptors::{
-        descriptor::{DescriptorSet, DescriptorSetLayout},
-        descriptor_pool::DescriptorPool,
+        descriptor::{GfxDescriptorSet, GfxDescriptorSetLayout},
+        descriptor_pool::GfxDescriptorPool,
     },
     gfx::Gfx,
     resources::{
-        image_view::Image2DView,
-        texture::{Texture2D, Texture2DContainer},
+        image_view::GfxImage2DView,
+        texture::{GfxTexture2D, Texture2DContainer},
     },
-    utilities::shader_cursor::ShaderCursor,
+    utilities::shader_cursor::GfxShaderCursor,
 };
 use truvis_shader_binding::shader;
 use truvis_shader_layout_macro::ShaderLayout;
@@ -58,12 +58,12 @@ pub struct BindlessDescriptorBinding {
 /// // 在着色器中: textures[key]
 /// ```
 pub struct BindlessManager {
-    _descriptor_pool: DescriptorPool,
+    _descriptor_pool: GfxDescriptorPool,
 
-    pub bindless_descriptor_layout: DescriptorSetLayout<BindlessDescriptorBinding>,
+    pub bindless_descriptor_layout: GfxDescriptorSetLayout<BindlessDescriptorBinding>,
 
     /// 每一个 frame in flights 都有一个 descriptor set
-    pub bindless_descriptor_sets: Vec<DescriptorSet<BindlessDescriptorBinding>>,
+    pub bindless_descriptor_sets: Vec<GfxDescriptorSet<BindlessDescriptorBinding>>,
 
     // TODO 这里不要使用 String 作为 key，这里不应该关心 Name
     /// 每一帧都需要重新构建的映射
@@ -88,13 +88,13 @@ pub struct BindlessManager {
 impl BindlessManager {
     pub fn new(fif_count: usize) -> Self {
         let descriptor_pool = Self::init_descriptor_pool();
-        let bindless_layout = DescriptorSetLayout::<BindlessDescriptorBinding>::new(
+        let bindless_layout = GfxDescriptorSetLayout::<BindlessDescriptorBinding>::new(
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
             "bindless-layout",
         );
         let bindless_descriptor_sets = (0..fif_count)
             .map(|idx| {
-                DescriptorSet::<BindlessDescriptorBinding>::new(
+                GfxDescriptorSet::<BindlessDescriptorBinding>::new(
                     &descriptor_pool,
                     &bindless_layout,
                     format!("bindless-descriptor-set-{idx}"),
@@ -122,7 +122,7 @@ impl BindlessManager {
     const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
     const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
 
-    fn init_descriptor_pool() -> DescriptorPool {
+    fn init_descriptor_pool() -> GfxDescriptorPool {
         let pool_size = vec![
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
@@ -154,13 +154,13 @@ impl BindlessManager {
             },
         ];
 
-        let pool_ci = Rc::new(DescriptorPoolCreateInfo::new(
+        let pool_ci = Rc::new(GfxDescriptorPoolCreateInfo::new(
             vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET | vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND,
             Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + Self::DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
             pool_size,
         ));
 
-        DescriptorPool::new(pool_ci, "renderer")
+        GfxDescriptorPool::new(pool_ci, "renderer")
     }
 }
 
@@ -171,7 +171,7 @@ impl Subsystem for BindlessManager {
 // getters
 impl BindlessManager {
     #[inline]
-    pub fn current_descriptor_set(&self) -> &DescriptorSet<BindlessDescriptorBinding> {
+    pub fn current_descriptor_set(&self) -> &GfxDescriptorSet<BindlessDescriptorBinding> {
         &self.bindless_descriptor_sets[*self.frame_label]
     }
 }
@@ -245,7 +245,7 @@ impl BindlessManager {
     }
 
     /// 获得图像在当前帧的 bindless 索引
-    pub fn get_image_handle(&self, image_view: &Image2DView) -> Option<shader::ImageHandle> {
+    pub fn get_image_handle(&self, image_view: &GfxImage2DView) -> Option<shader::ImageHandle> {
         self.images.get(&image_view.handle()).copied()
     }
 }
@@ -257,10 +257,10 @@ impl BindlessManager {
         let texture = ImageLoader::load_image(std::path::Path::new(&texture_path));
         self.register_texture(texture_path, Texture2DContainer::Owned(Box::new(texture)));
     }
-    pub fn register_texture_owned(&mut self, key: String, texture: Texture2D) {
+    pub fn register_texture_owned(&mut self, key: String, texture: GfxTexture2D) {
         self.register_texture(key, Texture2DContainer::Owned(Box::new(texture)));
     }
-    pub fn register_texture_shared(&mut self, key: String, texture: Rc<Texture2D>) {
+    pub fn register_texture_shared(&mut self, key: String, texture: Rc<GfxTexture2D>) {
         self.register_texture(key, Texture2DContainer::Shared(texture));
     }
 
@@ -277,7 +277,7 @@ impl BindlessManager {
         self.textures.remove(key);
     }
 
-    pub fn register_image(&mut self, image: &Image2DView) {
+    pub fn register_image(&mut self, image: &GfxImage2DView) {
         let key = image.handle();
         if self.images.contains_key(&key) {
             log::error!("Image {} has already been registered", image);
@@ -286,7 +286,7 @@ impl BindlessManager {
         self.images.insert(key, shader::ImageHandle { index: -1 });
     }
 
-    pub fn unregister_image2(&mut self, image: &Image2DView) {
+    pub fn unregister_image2(&mut self, image: &GfxImage2DView) {
         self.images.remove(&image.handle()).unwrap();
     }
 }

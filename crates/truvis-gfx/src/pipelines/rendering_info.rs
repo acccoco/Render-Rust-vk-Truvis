@@ -1,11 +1,11 @@
 use ash::vk;
 
-pub struct RenderingInfo {
+pub struct GfxRenderingInfo {
     color_attach_info: Vec<vk::RenderingAttachmentInfo<'static>>,
     depth_attach_info: Option<vk::RenderingAttachmentInfo<'static>>,
     range: vk::Rect2D,
 }
-impl RenderingInfo {
+impl GfxRenderingInfo {
     pub fn new(
         color_attach_image: Vec<vk::ImageView>,
         depth_attach_image: Option<vk::ImageView>,

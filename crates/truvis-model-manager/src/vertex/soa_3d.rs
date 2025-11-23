@@ -1,10 +1,10 @@
 use ash::vk;
 use std::ptr;
-use truvis_gfx::resources::special_buffers::vertex_buffer::{VertexBuffer, VertexLayout};
+use truvis_gfx::resources::special_buffers::vertex_buffer::{GfxVertexBuffer, GfxVertexLayout};
 
 /// SoA 的顶点 buffer 布局，包含：Positions, Normals, Tangents, UVs
 pub struct VertexLayoutSoA3D;
-impl VertexLayout for VertexLayoutSoA3D {
+impl GfxVertexLayout for VertexLayoutSoA3D {
     fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription> {
         vec![
             // positions
@@ -94,11 +94,11 @@ impl VertexLayoutSoA3D {
         tangents: &[glam::Vec3],
         uvs: &[glam::Vec2],
         name: impl AsRef<str>,
-    ) -> VertexBuffer<Self> {
+    ) -> GfxVertexBuffer<Self> {
         let vertex_cnt = positions.len();
         assert!(vertex_cnt == normals.len() && vertex_cnt == tangents.len() && vertex_cnt == uvs.len());
 
-        let vertex_buffer = VertexBuffer::new(vertex_cnt, name.as_ref());
+        let vertex_buffer = GfxVertexBuffer::new(vertex_cnt, name.as_ref());
         vertex_buffer.transfer_data_sync2(Self::buffer_size(vertex_cnt) as vk::DeviceSize, |stage_buffer| unsafe {
             ptr::copy_nonoverlapping(
                 positions.as_ptr() as *const u8,

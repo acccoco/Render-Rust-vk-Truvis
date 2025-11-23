@@ -5,12 +5,12 @@ use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 /// # Destroy
 /// 不应该实现 Semaphore，因为可以 Clone，需要手动 destroy
 #[derive(Clone)]
-pub struct Semaphore {
+pub struct GfxSemaphore {
     semaphore: vk::Semaphore,
 }
 
 // 创建与销毁
-impl Semaphore {
+impl GfxSemaphore {
     pub fn new(debug_name: &str) -> Self {
         let gfx_device = Gfx::get().gfx_device();
         let semaphore = unsafe { gfx_device.create_semaphore(&vk::SemaphoreCreateInfo::default(), None).unwrap() };
@@ -42,7 +42,7 @@ impl Semaphore {
 }
 
 // getters
-impl Semaphore {
+impl GfxSemaphore {
     #[inline]
     pub fn handle(&self) -> vk::Semaphore {
         self.semaphore
@@ -50,7 +50,7 @@ impl Semaphore {
 }
 
 // tools
-impl Semaphore {
+impl GfxSemaphore {
     #[inline]
     pub fn wait_timeline(&self, timeline_value: u64, timeout_ns: u64) {
         let gfx_device = Gfx::get().gfx_device();
@@ -64,7 +64,7 @@ impl Semaphore {
     }
 }
 
-impl DebugType for Semaphore {
+impl DebugType for GfxSemaphore {
     fn debug_type_name() -> &'static str {
         "GfxSemaphore"
     }

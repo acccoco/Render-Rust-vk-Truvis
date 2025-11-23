@@ -5,19 +5,19 @@ use std::{
 
 use ash::{vk, vk::Handle};
 
-use crate::{foundation::debug_messenger::DebugType, impl_derive_buffer, resources::buffer::Buffer};
+use crate::{foundation::debug_messenger::DebugType, impl_derive_buffer, resources::buffer::GfxBuffer};
 
 /// buffer 内存放的是结构体或者结构体的数组
-pub struct StructuredBuffer<T: bytemuck::Pod> {
-    inner: Buffer,
+pub struct GfxStructuredBuffer<T: bytemuck::Pod> {
+    inner: GfxBuffer,
     /// 结构体的数量
     ele_num: usize,
     _phantom: PhantomData<T>,
 }
 
-impl_derive_buffer!(StructuredBuffer<T: bytemuck::Pod>, Buffer, inner);
+impl_derive_buffer!(GfxStructuredBuffer<T: bytemuck::Pod>, GfxBuffer, inner);
 
-impl<T: bytemuck::Pod> StructuredBuffer<T> {
+impl<T: bytemuck::Pod> GfxStructuredBuffer<T> {
     #[inline]
     pub fn new_ubo(len: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new(
@@ -43,7 +43,7 @@ impl<T: bytemuck::Pod> StructuredBuffer<T> {
         mapped: bool,
     ) -> Self {
         let buffer =
-            Buffer::new((len * size_of::<T>()) as vk::DeviceSize, buffer_usage_flags, None, mapped, debug_name);
+            GfxBuffer::new((len * size_of::<T>()) as vk::DeviceSize, buffer_usage_flags, None, mapped, debug_name);
 
         Self {
             inner: buffer,
@@ -58,7 +58,7 @@ impl<T: bytemuck::Pod> StructuredBuffer<T> {
     }
 }
 
-impl<T: bytemuck::Pod> DebugType for StructuredBuffer<T> {
+impl<T: bytemuck::Pod> DebugType for GfxStructuredBuffer<T> {
     #[inline]
     fn debug_type_name() -> &'static str {
         "StructuredBuffer"

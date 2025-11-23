@@ -2,9 +2,9 @@ use std::cell::{Cell, Ref, RefCell, RefMut};
 
 use ash::vk;
 use truvis_asset::asset_hub::AssetHub;
-use truvis_gfx::commands::semaphore::Semaphore;
+use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::gfx::Gfx;
-use truvis_gfx::resources::special_buffers::structured_buffer::StructuredBuffer;
+use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
 use truvis_shader_binding::shader;
 
 use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings};
@@ -51,7 +51,7 @@ pub struct FrameContext {
     pub scene_manager: RefCell<SceneManager>,
     pub asset_hub: RefCell<AssetHub>,
 
-    pub per_frame_data_buffers: Vec<StructuredBuffer<shader::PerFrameData>>,
+    pub per_frame_data_buffers: Vec<GfxStructuredBuffer<shader::PerFrameData>>,
 
     pub fif_buffers: RefCell<FifBuffers>,
 
@@ -70,7 +70,7 @@ pub struct FrameContext {
     pipeline_settings: Cell<PipelineSettings>,
 
     /// fif 相关的 timeline semaphore，value 就等于 frame_id
-    pub fif_timeline_semaphore: Semaphore,
+    pub fif_timeline_semaphore: GfxSemaphore,
 }
 
 /// 内部的对象生命周期是一致的，因此非常适合使用单例
@@ -86,7 +86,7 @@ impl FrameContext {
         let init_frame_id = 1;
         let fif_count = 3;
 
-        let fif_timeline_semaphore = Semaphore::new_timeline(0, "render-timeline");
+        let fif_timeline_semaphore = GfxSemaphore::new_timeline(0, "render-timeline");
 
         let upload_buffer_manager = RefCell::new(StageBufferManager::new(fif_count));
         let bindless_manager = RefCell::new(BindlessManager::new(fif_count));
@@ -106,7 +106,7 @@ impl FrameContext {
 
         let fif_buffers = FifBuffers::new(&frame_settings, &mut bindless_manager.borrow_mut(), fif_count);
         let per_frame_data_buffers = (0..fif_count)
-            .map(|idx| StructuredBuffer::<shader::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{idx}")))
+            .map(|idx| GfxStructuredBuffer::<shader::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{idx}")))
             .collect();
 
         Self {

@@ -8,13 +8,13 @@ use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 /// # Destroy
 ///
 /// 需要手动调用 `destroy` 方法来释放资源。
-pub struct ShaderModule {
+pub struct GfxShaderModule {
     handle: vk::ShaderModule,
 
     #[cfg(debug_assertions)]
     destroyed: bool,
 }
-impl ShaderModule {
+impl GfxShaderModule {
     /// # param
     /// * path - spv shader 文件路径
     pub fn new(path: &std::path::Path) -> Self {
@@ -54,13 +54,13 @@ impl ShaderModule {
         }
     }
 }
-impl Drop for ShaderModule {
+impl Drop for GfxShaderModule {
     fn drop(&mut self) {
         #[cfg(debug_assertions)]
         debug_assert!(self.destroyed, "ShaderModule must be destroyed manually before drop.");
     }
 }
-impl DebugType for ShaderModule {
+impl DebugType for GfxShaderModule {
     fn debug_type_name() -> &'static str {
         "GfxShaderModule"
     }
@@ -71,18 +71,18 @@ impl DebugType for ShaderModule {
 }
 
 /// 可以存放多个 ShaderModule，使用路径进行索引
-pub struct ShaderModuleCache {
-    shader_modules: HashMap<String, ShaderModule>,
+pub struct GfxShaderModuleCache {
+    shader_modules: HashMap<String, GfxShaderModule>,
     #[cfg(debug_assertions)]
     destroyed: bool,
 }
-impl Default for ShaderModuleCache {
+impl Default for GfxShaderModuleCache {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ShaderModuleCache {
+impl GfxShaderModuleCache {
     pub fn new() -> Self {
         Self {
             shader_modules: HashMap::new(),
@@ -91,9 +91,9 @@ impl ShaderModuleCache {
         }
     }
 
-    pub fn get_or_load(&mut self, path: &std::path::Path) -> &ShaderModule {
+    pub fn get_or_load(&mut self, path: &std::path::Path) -> &GfxShaderModule {
         let path_str = path.to_str().unwrap().to_string();
-        self.shader_modules.entry(path_str).or_insert_with(|| ShaderModule::new(path))
+        self.shader_modules.entry(path_str).or_insert_with(|| GfxShaderModule::new(path))
     }
 
     pub fn destroy(mut self) {
@@ -107,7 +107,7 @@ impl ShaderModuleCache {
         shader_modules.into_values().for_each(|module| module.destroy());
     }
 }
-impl Drop for ShaderModuleCache {
+impl Drop for GfxShaderModuleCache {
     fn drop(&mut self) {
         #[cfg(debug_assertions)]
         debug_assert!(self.destroyed, "ShaderModuleCache must be destroyed manually before drop.");
@@ -115,12 +115,12 @@ impl Drop for ShaderModuleCache {
 }
 
 #[derive(Clone)]
-pub struct ShaderStageInfo {
+pub struct GfxShaderStageInfo {
     pub stage: vk::ShaderStageFlags,
     pub entry_point: &'static CStr,
     pub path: String,
 }
-impl ShaderStageInfo {
+impl GfxShaderStageInfo {
     #[inline]
     pub fn path(&self) -> &std::path::Path {
         std::path::Path::new(self.path.as_str())
@@ -132,14 +132,14 @@ impl ShaderStageInfo {
 /// 在 pipeline create info 的 groups 中，每个 shader group 的 index
 ///
 /// 每个 shader group 可以由多个 shader 组成，每个 shader group 都是独一无二的
-pub struct ShaderGroupInfo {
+pub struct GfxShaderGroupInfo {
     pub ty: vk::RayTracingShaderGroupTypeKHR,
     pub general: u32,
     pub closest_hit: u32,
     pub any_hit: u32,
     pub intersection: u32,
 }
-impl ShaderGroupInfo {
+impl GfxShaderGroupInfo {
     pub const fn unused() -> Self {
         Self {
             ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,

@@ -5,18 +5,23 @@ use std::{
 
 use ash::{vk, vk::Handle};
 
-use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::Buffer};
+use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::GfxBuffer};
 
-pub struct StageBuffer<T: bytemuck::Pod> {
-    inner: Buffer,
+pub struct GfxStageBuffer<T: bytemuck::Pod> {
+    inner: GfxBuffer,
     _phantom: PhantomData<T>,
 }
 
-impl_derive_buffer!(StageBuffer<T: bytemuck::Pod>, Buffer, inner);
-impl<T: bytemuck::Pod> StageBuffer<T> {
+impl_derive_buffer!(GfxStageBuffer<T: bytemuck::Pod>, GfxBuffer, inner);
+impl<T: bytemuck::Pod> GfxStageBuffer<T> {
     pub fn new(debug_name: impl AsRef<str>) -> Self {
-        let inner =
-            Buffer::new(size_of::<T>() as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, None, true, debug_name);
+        let inner = GfxBuffer::new(
+            size_of::<T>() as vk::DeviceSize,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            None,
+            true,
+            debug_name,
+        );
         let buffer = Self {
             inner,
             _phantom: PhantomData,
@@ -38,7 +43,7 @@ impl<T: bytemuck::Pod> StageBuffer<T> {
     }
 }
 
-impl<T: bytemuck::Pod> DebugType for StageBuffer<T> {
+impl<T: bytemuck::Pod> DebugType for GfxStageBuffer<T> {
     fn debug_type_name() -> &'static str {
         "StageBuffer"
     }

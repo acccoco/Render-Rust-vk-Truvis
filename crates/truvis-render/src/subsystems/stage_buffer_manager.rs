@@ -2,10 +2,10 @@ use itertools::Itertools;
 
 use crate::core::frame_context::FrameContext;
 use crate::subsystems::subsystem::Subsystem;
-use truvis_gfx::resources::buffer::Buffer;
+use truvis_gfx::resources::buffer::GfxBuffer;
 
 pub struct StageBufferManager {
-    buffers: Vec<Vec<Buffer>>,
+    buffers: Vec<Vec<GfxBuffer>>,
 }
 
 // init & destroy
@@ -21,14 +21,14 @@ impl Subsystem for StageBufferManager {
 
 // tools
 impl StageBufferManager {
-    pub fn alloc_buffer(&mut self, size: u64, debug_name: &str) -> &mut Buffer {
-        let buffer = Buffer::new_stage_buffer(size, debug_name);
+    pub fn alloc_buffer(&mut self, size: u64, debug_name: &str) -> &mut GfxBuffer {
+        let buffer = GfxBuffer::new_stage_buffer(size, debug_name);
         let frame_idx = *FrameContext::get().frame_label();
         self.buffers[frame_idx].push(buffer);
         self.buffers[frame_idx].last_mut().unwrap()
     }
 
-    pub fn register_stage_buffer(&mut self, stage_buffer: Buffer) {
+    pub fn register_stage_buffer(&mut self, stage_buffer: GfxBuffer) {
         let frame_idx = *FrameContext::get().frame_label();
         self.buffers[frame_idx].push(stage_buffer);
     }

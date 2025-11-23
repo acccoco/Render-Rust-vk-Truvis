@@ -5,7 +5,7 @@ use crate::core::frame_context::FrameContext;
 use crate::render_pipeline::{compute_subpass::ComputeSubpass, simple_rt_subpass::SimpleRtSubpass};
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
-    commands::{barrier::ImageBarrier, submit_info::SubmitInfo},
+    commands::{barrier::GfxImageBarrier, submit_info::GfxSubmitInfo},
     gfx::Gfx,
 };
 use truvis_shader_binding::shader;
@@ -65,7 +65,7 @@ impl RtRenderPass {
             // frams in flight 使用同一个 rt image，因此需要确保之前的 rt 写入已经完成
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[ImageBarrier::new()
+                &[GfxImageBarrier::new()
                     .image(color_image.handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .src_mask(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, vk::AccessFlags2::SHADER_STORAGE_WRITE)
@@ -95,7 +95,7 @@ impl RtRenderPass {
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit");
 
             // 等待 ray-tracing 执行完成
-            let rt_barrier = ImageBarrier::new()
+            let rt_barrier = GfxImageBarrier::new()
                 .image(color_image.handle())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, vk::AccessFlags2::SHADER_STORAGE_WRITE)
@@ -129,7 +129,7 @@ impl RtRenderPass {
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "hdr2sdr");
 
             // 等待之前的 compute shader 执行完成
-            let rt_barrier = ImageBarrier::new()
+            let rt_barrier = GfxImageBarrier::new()
                 .image(render_target)
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(
@@ -164,7 +164,7 @@ impl RtRenderPass {
             submit_cmds.push(cmd);
         }
 
-        Gfx::get().gfx_queue().submit(vec![SubmitInfo::new(&submit_cmds)], None);
+        Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(&submit_cmds)], None);
     }
 }
 impl RenderPass for RtRenderPass {}

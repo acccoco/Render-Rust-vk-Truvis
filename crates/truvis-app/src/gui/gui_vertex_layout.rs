@@ -1,6 +1,6 @@
 use ash::vk;
 use std::mem::offset_of;
-use truvis_gfx::resources::special_buffers::vertex_buffer::VertexLayout;
+use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
 
 /// AoS: Array of Structs
 pub struct ImGuiVertex {
@@ -10,7 +10,7 @@ pub struct ImGuiVertex {
 }
 
 pub struct ImGuiVertexLayoutAoS;
-impl VertexLayout for ImGuiVertexLayoutAoS {
+impl GfxVertexLayout for ImGuiVertexLayoutAoS {
     fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription> {
         vec![vk::VertexInputBindingDescription {
             binding: 0,

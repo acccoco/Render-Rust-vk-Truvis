@@ -4,10 +4,10 @@ use ash::vk;
 use vk_mem::Alloc;
 
 use crate::{
-    commands::{barrier::ImageBarrier, command_buffer::CommandBuffer},
+    commands::{barrier::GfxImageBarrier, command_buffer::GfxCommandBuffer},
     foundation::debug_messenger::DebugType,
     gfx::Gfx,
-    resources::buffer::Buffer,
+    resources::buffer::GfxBuffer,
 };
 
 /// Vulkan 格式相关的工具类
@@ -48,16 +48,16 @@ impl VulkanFormatUtils {
     }
 }
 
-pub struct Image2D {
+pub struct GfxImage2D {
     handle: vk::Image,
 
     allocation: vk_mem::Allocation,
 
     _name: String,
-    image_info: Rc<ImageCreateInfo>,
+    image_info: Rc<GfxImageCreateInfo>,
 }
 // getter
-impl Image2D {
+impl GfxImage2D {
     #[inline]
     pub fn width(&self) -> u32 {
         self.image_info.extent().width
@@ -80,8 +80,12 @@ impl Image2D {
 }
 
 // 构建与销毁
-impl Image2D {
-    pub fn new(image_info: Rc<ImageCreateInfo>, alloc_info: &vk_mem::AllocationCreateInfo, debug_name: &str) -> Self {
+impl GfxImage2D {
+    pub fn new(
+        image_info: Rc<GfxImageCreateInfo>,
+        alloc_info: &vk_mem::AllocationCreateInfo,
+        debug_name: &str,
+    ) -> Self {
         let allocator = Gfx::get().allocator();
         let gfx_device = Gfx::get().gfx_device();
         let (image, alloc) = unsafe { allocator.create_image(&image_info.as_info(), alloc_info).unwrap() };
@@ -99,7 +103,7 @@ impl Image2D {
     /// 根据 RGBA8_UNORM 的 data 创建 image
     pub fn from_rgba8(width: u32, height: u32, data: &[u8], name: impl AsRef<str>) -> Self {
         let image = Self::new(
-            Rc::new(ImageCreateInfo::new_image_2d_info(
+            Rc::new(GfxImageCreateInfo::new_image_2d_info(
                 vk::Extent2D { width, height },
                 vk::Format::R8G8B8A8_UNORM,
                 vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
@@ -122,18 +126,18 @@ impl Image2D {
     /// 3. 进行图像布局转换
     /// 4. 将 staging buffer 的数据复制到图像
     /// 5. 进行图像布局转换
-    pub fn transfer_data(&self, command_buffer: &CommandBuffer, data: &[u8]) -> Buffer {
+    pub fn transfer_data(&self, command_buffer: &GfxCommandBuffer, data: &[u8]) -> GfxBuffer {
         let pixels_cnt = self.width() * self.height();
         assert_eq!(data.len(), VulkanFormatUtils::pixel_size_in_bytes(self.image_info.format()) * pixels_cnt as usize);
 
-        let stage_buffer = Buffer::new_stage_buffer(size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
+        let stage_buffer = GfxBuffer::new_stage_buffer(size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
         stage_buffer.transfer_data_by_mmap(data);
 
         // 1. transition the image layout
         // 2. copy the buffer into the image
         // 3. transition the layout 为了让 fragment shader 可读
         {
-            let image_barrier = ImageBarrier::new()
+            let image_barrier = GfxImageBarrier::new()
                 .image(self.handle)
                 .src_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())
                 .dst_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
@@ -165,7 +169,7 @@ impl Image2D {
                     .regions(std::slice::from_ref(&buffer_image_copy)),
             );
 
-            let image_barrier = ImageBarrier::new()
+            let image_barrier = GfxImageBarrier::new()
                 .image(self.handle)
                 .src_mask(vk::PipelineStageFlags2::TRANSFER, vk::AccessFlags2::TRANSFER_WRITE)
                 .dst_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ)
@@ -183,13 +187,13 @@ impl Image2D {
     }
 }
 
-impl Drop for Image2D {
+impl Drop for GfxImage2D {
     fn drop(&mut self) {
         unsafe { Gfx::get().allocator().destroy_image(self.handle, &mut self.allocation) }
     }
 }
 
-impl DebugType for Image2D {
+impl DebugType for GfxImage2D {
     fn debug_type_name() -> &'static str {
         "GfxImage2D"
     }
@@ -199,8 +203,8 @@ impl DebugType for Image2D {
     }
 }
 pub enum ImageContainer {
-    Own(Box<Image2D>),
-    Shared(Rc<Image2D>),
+    Own(Box<GfxImage2D>),
+    Shared(Rc<GfxImage2D>),
     Raw(vk::Image),
 }
 
@@ -215,13 +219,13 @@ impl ImageContainer {
     }
 }
 
-pub struct ImageCreateInfo {
+pub struct GfxImageCreateInfo {
     inner: vk::ImageCreateInfo<'static>,
 
     queue_family_indices: Vec<u32>,
 }
 
-impl ImageCreateInfo {
+impl GfxImageCreateInfo {
     #[inline]
     pub fn new_image_2d_info(extent: vk::Extent2D, format: vk::Format, usage: vk::ImageUsageFlags) -> Self {
         Self {

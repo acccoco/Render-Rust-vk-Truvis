@@ -2,17 +2,17 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::gfx::Gfx;
-use crate::resources::special_buffers::index_buffer::{IndexBuffer, IndexType};
+use crate::resources::special_buffers::index_buffer::{GfxIndexBuffer, GfxIndexType};
 use crate::{
     basic::color::LabelColor,
     commands::{
-        barrier::{BufferBarrier, ImageBarrier},
-        command_pool::CommandPool,
+        barrier::{GfxBufferBarrier, GfxImageBarrier},
+        command_pool::GfxCommandPool,
     },
     foundation::debug_messenger::DebugType,
-    pipelines::rendering_info::RenderingInfo,
-    query::query_pool::QueryPool,
-    resources::buffer::Buffer,
+    pipelines::rendering_info::GfxRenderingInfo,
+    query::query_pool::GfxQueryPool,
+    resources::buffer::GfxBuffer,
 };
 
 /// 命令缓冲封装
@@ -29,21 +29,21 @@ use crate::{
 /// cmd.end();
 /// ```
 #[derive(Clone)]
-pub struct CommandBuffer {
+pub struct GfxCommandBuffer {
     vk_handle: vk::CommandBuffer,
     _command_pool_handle: vk::CommandPool,
 }
 
 // 创建与销毁
-impl CommandBuffer {
-    pub fn new(command_pool: &CommandPool, debug_name: &str) -> Self {
+impl GfxCommandBuffer {
+    pub fn new(command_pool: &GfxCommandPool, debug_name: &str) -> Self {
         let info = vk::CommandBufferAllocateInfo::default()
             .command_pool(command_pool.handle())
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_buffer_count(1);
 
         let command_buffer = unsafe { Gfx::get().gfx_device().allocate_command_buffers(&info).unwrap()[0] };
-        let cmd_buffer = CommandBuffer {
+        let cmd_buffer = GfxCommandBuffer {
             vk_handle: command_buffer,
             _command_pool_handle: command_pool.handle(),
         };
@@ -53,7 +53,7 @@ impl CommandBuffer {
 }
 
 // Basic 命令
-impl CommandBuffer {
+impl GfxCommandBuffer {
     /// 开始录制 command
     ///
     /// 自动设置 debug label
@@ -79,7 +79,7 @@ impl CommandBuffer {
 }
 
 // getters
-impl CommandBuffer {
+impl GfxCommandBuffer {
     /// getter
     #[inline]
     pub fn vk_handle(&self) -> vk::CommandBuffer {
@@ -88,11 +88,11 @@ impl CommandBuffer {
 }
 
 // 数据传输类型
-impl CommandBuffer {
+impl GfxCommandBuffer {
     /// - command type: action
     /// - 支持的 queue：transfer，graphics，compute
     #[inline]
-    pub fn cmd_copy_buffer(&self, src: &Buffer, dst: &Buffer, regions: &[vk::BufferCopy]) {
+    pub fn cmd_copy_buffer(&self, src: &GfxBuffer, dst: &GfxBuffer, regions: &[vk::BufferCopy]) {
         unsafe {
             Gfx::get().gfx_device().cmd_copy_buffer(self.vk_handle, src.vk_buffer(), dst.vk_buffer(), regions);
         }
@@ -137,7 +137,7 @@ impl CommandBuffer {
 }
 
 // 绘制类型的命令
-impl CommandBuffer {
+impl GfxCommandBuffer {
     /// - command type: action, state
     /// - supported queue types: graphics
     #[inline]
@@ -147,7 +147,7 @@ impl CommandBuffer {
         }
     }
 
-    pub fn cmd_begin_rendering2(&self, rendering_info: &RenderingInfo) {
+    pub fn cmd_begin_rendering2(&self, rendering_info: &GfxRenderingInfo) {
         let rendering_info = rendering_info.rendering_info();
         unsafe {
             Gfx::get().gfx_device().dynamic_rendering.cmd_begin_rendering(self.vk_handle, &rendering_info);
@@ -248,7 +248,7 @@ impl CommandBuffer {
     /// - command type: state
     /// - supported queue types: graphics
     #[inline]
-    pub fn cmd_bind_index_buffer<T: IndexType>(&self, buffer: &IndexBuffer<T>, offset: vk::DeviceSize) {
+    pub fn cmd_bind_index_buffer<T: GfxIndexType>(&self, buffer: &GfxIndexBuffer<T>, offset: vk::DeviceSize) {
         unsafe {
             Gfx::get().gfx_device().cmd_bind_index_buffer(self.vk_handle, buffer.vk_buffer(), offset, T::VK_INDEX_TYPE);
         }
@@ -274,7 +274,7 @@ impl CommandBuffer {
 }
 
 // 光追相关
-impl CommandBuffer {
+impl GfxCommandBuffer {
     /// - command type: action
     /// - supported queue types: compute
     #[inline]
@@ -308,7 +308,7 @@ impl CommandBuffer {
     #[inline]
     pub fn write_acceleration_structure_properties(
         &self,
-        query_pool: &mut QueryPool,
+        query_pool: &mut GfxQueryPool,
         first_query: u32,
         acceleration_structures: &[vk::AccelerationStructureKHR],
     ) {
@@ -351,7 +351,7 @@ impl CommandBuffer {
 }
 
 // 计算着色器相关命令
-impl CommandBuffer {
+impl GfxCommandBuffer {
     #[inline]
     pub fn cmd_dispatch(&self, group_cnt: glam::UVec3) {
         unsafe {
@@ -361,7 +361,7 @@ impl CommandBuffer {
 }
 
 // 同步相关命令
-impl CommandBuffer {
+impl GfxCommandBuffer {
     /// - command type: synchronize
     /// - supported queue types: graphics, compute, transfer
     #[inline]
@@ -375,7 +375,7 @@ impl CommandBuffer {
     /// - command type: synchronize
     /// - supported queue types: graphics, compute, transfer
     #[inline]
-    pub fn image_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[ImageBarrier]) {
+    pub fn image_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[GfxImageBarrier]) {
         let barriers = barriers.iter().map(|b| *b.inner()).collect_vec();
         let dependency_info =
             vk::DependencyInfo::default().image_memory_barriers(&barriers).dependency_flags(dependency_flags);
@@ -387,7 +387,7 @@ impl CommandBuffer {
     /// - command type: synchronize
     /// - supported queue types: graphics, compute, transfer
     #[inline]
-    pub fn buffer_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[BufferBarrier]) {
+    pub fn buffer_memory_barrier(&self, dependency_flags: vk::DependencyFlags, barriers: &[GfxBufferBarrier]) {
         let barriers = barriers.iter().map(|b| *b.inner()).collect_vec();
         let dependency_info =
             vk::DependencyInfo::default().buffer_memory_barriers(&barriers).dependency_flags(dependency_flags);
@@ -398,7 +398,7 @@ impl CommandBuffer {
 }
 
 // debug 相关命令
-impl CommandBuffer {
+impl GfxCommandBuffer {
     /// - command type: state, action
     /// - supported queue type: graphics, compute
     #[inline]
@@ -435,7 +435,7 @@ impl CommandBuffer {
     }
 }
 
-impl DebugType for CommandBuffer {
+impl DebugType for GfxCommandBuffer {
     fn debug_type_name() -> &'static str {
         "GfxCommandBuffer"
     }

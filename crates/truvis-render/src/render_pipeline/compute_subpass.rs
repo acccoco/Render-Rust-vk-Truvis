@@ -3,7 +3,7 @@ use std::ffi::CStr;
 use crate::apis::render_pass::RenderSubpass;
 use crate::subsystems::bindless_manager::BindlessManager;
 use ash::vk;
-use truvis_gfx::{commands::command_buffer::CommandBuffer, gfx::Gfx, pipelines::shader::ShaderModule};
+use truvis_gfx::{commands::command_buffer::GfxCommandBuffer, gfx::Gfx, pipelines::shader::GfxShaderModule};
 
 /// 泛型参数 P 表示 compute shader 的参数，以 push constant 的形式传入 shader
 pub struct ComputeSubpass<P: bytemuck::Pod> {
@@ -14,7 +14,7 @@ pub struct ComputeSubpass<P: bytemuck::Pod> {
 }
 impl<P: bytemuck::Pod> ComputeSubpass<P> {
     pub fn new(bindless_manager: &BindlessManager, entry_point: &CStr, shader_path: &str) -> Self {
-        let shader_module = ShaderModule::new(std::path::Path::new(shader_path));
+        let shader_module = GfxShaderModule::new(std::path::Path::new(shader_path));
         let stage_info = vk::PipelineShaderStageCreateInfo::default()
             .module(shader_module.handle())
             .stage(vk::ShaderStageFlags::COMPUTE)
@@ -52,7 +52,7 @@ impl<P: bytemuck::Pod> ComputeSubpass<P> {
         }
     }
 
-    pub fn exec(&self, cmd: &CommandBuffer, bindless_manager: &BindlessManager, params: &P, group_cnt: glam::UVec3) {
+    pub fn exec(&self, cmd: &GfxCommandBuffer, bindless_manager: &BindlessManager, params: &P, group_cnt: glam::UVec3) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::COMPUTE, self.pipeline);
 
         cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::COMPUTE, 0, bytemuck::bytes_of(params));
