@@ -10,7 +10,7 @@ use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxImageBarrier;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
-use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
+use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
     commands::command_buffer::GfxCommandBuffer,
     pipelines::{
@@ -210,7 +210,12 @@ impl ShaderToyPass {
                     )],
             );
 
-            self.shader_toy_pass.draw(&cmd, &frame_settings, render_target_view.handle(), shape);
+            self.shader_toy_pass.draw(
+                &cmd,
+                &frame_settings,
+                Gfx::get().resource_manager().get_image_view(render_target_view).unwrap().handle,
+                shape,
+            );
 
             // 将 render target 从 color attachment -> general
             cmd.image_memory_barrier(

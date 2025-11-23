@@ -52,6 +52,7 @@ impl RtRenderPass {
         let fif_buffers = FrameContext::get().fif_buffers.borrow();
 
         let color_image = fif_buffers.color_image();
+        let color_image_vk = Gfx::get().resource_manager().get_image(color_image).unwrap().image;
         let color_image_handle = fif_buffers.color_image_bindless_handle(&bindless_manager);
         let render_target = fif_buffers.render_target_image(frame_label);
         let render_target_handle = fif_buffers.render_target_image_bindless_handle(&bindless_manager, frame_label);
@@ -66,7 +67,7 @@ impl RtRenderPass {
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(color_image.handle())
+                    .image(color_image_vk)
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .src_mask(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, vk::AccessFlags2::SHADER_STORAGE_WRITE)
                     .dst_mask(
@@ -79,7 +80,7 @@ impl RtRenderPass {
                 &cmd,
                 &frame_settings,
                 &FrameContext::get().pipeline_settings(),
-                color_image.handle(),
+                color_image_vk,
                 color_image_handle,
                 &FrameContext::get().per_frame_data_buffers[*frame_label],
             );
@@ -96,7 +97,7 @@ impl RtRenderPass {
 
             // 等待 ray-tracing 执行完成
             let rt_barrier = GfxImageBarrier::new()
-                .image(color_image.handle())
+                .image(color_image_vk)
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, vk::AccessFlags2::SHADER_STORAGE_WRITE)
                 .dst_mask(vk::PipelineStageFlags2::COMPUTE_SHADER, vk::AccessFlags2::SHADER_READ);

@@ -1,36 +1,58 @@
-use std::ops::{Deref, DerefMut};
-
 use ash::{vk, vk::Handle};
 
-use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::GfxBuffer};
+use crate::{
+    foundation::debug_messenger::DebugType,
+    gfx::Gfx,
+    resources::{handles::BufferHandle, resource_data::BufferType},
+};
 
 pub struct GfxSBTBuffer {
-    _inner: GfxBuffer,
+    handle: BufferHandle,
 }
-
-impl_derive_buffer!(GfxSBTBuffer, GfxBuffer, _inner);
 
 // init & destroy
 impl GfxSBTBuffer {
-    pub fn new(size: vk::DeviceSize, align: vk::DeviceSize, name: impl AsRef<str>) -> Self {
-        let inner = GfxBuffer::new(
+    pub fn new(size: vk::DeviceSize, _align: vk::DeviceSize, name: impl AsRef<str>) -> Self {
+        let mut rm = Gfx::get().resource_manager();
+        let handle = rm.create_buffer(
             size,
             vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
                 | vk::BufferUsageFlags::TRANSFER_SRC
                 | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
-            Some(align),
             true,
+            BufferType::Raw,
             format!("SBTBuffer::{}", name.as_ref()),
         );
-        let buffer = Self { _inner: inner };
-        let gfx_device = Gfx::get().gfx_device();
-        gfx_device.set_debug_name(&buffer, name.as_ref());
-        buffer
+        Self { handle }
     }
 
     #[inline]
     pub fn handle(&self) -> vk::Buffer {
-        self._inner.handle
+        let rm = Gfx::get().resource_manager();
+        rm.get_buffer(self.handle).unwrap().buffer
+    }
+
+    #[inline]
+    pub fn device_address(&self) -> vk::DeviceAddress {
+        let rm = Gfx::get().resource_manager();
+        rm.get_buffer(self.handle).unwrap().device_addr.unwrap_or(0)
+    }
+
+    #[inline]
+    pub fn mapped_ptr(&self) -> *mut u8 {
+        let rm = Gfx::get().resource_manager();
+        rm.get_buffer(self.handle).unwrap().mapped_ptr.unwrap()
+    }
+
+    #[inline]
+    pub fn size(&self) -> vk::DeviceSize {
+        let rm = Gfx::get().resource_manager();
+        rm.get_buffer(self.handle).unwrap().size
+    }
+
+    pub fn flush(&self, offset: vk::DeviceSize, size: vk::DeviceSize) {
+        let rm = Gfx::get().resource_manager();
+        rm.flush_buffer(self.handle, offset, size);
     }
 }
 

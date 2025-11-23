@@ -7,17 +7,23 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use truvis_gfx::gfx::Gfx;
-use truvis_gfx::resources::image::GfxImage2D;
-use truvis_gfx::resources::image_view::{GfxImage2DView, GfxImageViewCreateInfo};
+use truvis_gfx::resources::handles::{ImageHandle, ImageViewHandle};
 use truvis_gfx::sampler_manager::GfxSamplerDesc;
 
 /// 纹理资源 (RAII)
 /// 包含 Image, Allocation, ImageView, Sampler
 /// Drop 时自动释放 Vulkan 资源
 pub struct TextureResource {
-    pub image: GfxImage2D,
-    pub view: GfxImage2DView,
+    pub image: ImageHandle,
+    pub view: ImageViewHandle,
     pub sampler: vk::Sampler,
+}
+
+impl Drop for TextureResource {
+    fn drop(&mut self) {
+        let mut rm = Gfx::get().resource_manager();
+        rm.destroy_image_auto(self.image);
+    }
 }
 
 /// 资产中心 (Facade)
@@ -45,6 +51,12 @@ pub struct AssetHub {
     transfer_manager: AssetTransferManager,
 }
 
+impl Default for AssetHub {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AssetHub {
     pub fn new() -> Self {
         let fallback_texture = Self::create_fallback_texture();
@@ -64,14 +76,32 @@ impl AssetHub {
     fn create_fallback_texture() -> Arc<TextureResource> {
         // 1. Create Image (1x1 Pink)
         let pixels: [u8; 4] = [255, 0, 255, 255];
-        let image = GfxImage2D::from_rgba8(1, 1, &pixels, "FallbackTexture");
 
-        // Create View
-        let view = GfxImage2DView::new(
-            image.handle(),
-            GfxImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
-            "FallbackView",
-        );
+        let create_info = vk::ImageCreateInfo::default()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(vk::Format::R8G8B8A8_UNORM)
+            .extent(vk::Extent3D {
+                width: 1,
+                height: 1,
+                depth: 1,
+            })
+            .mip_levels(1)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED)
+            .initial_layout(vk::ImageLayout::UNDEFINED);
+
+        let alloc_info = vk_mem::AllocationCreateInfo {
+            usage: vk_mem::MemoryUsage::AutoPreferDevice,
+            ..Default::default()
+        };
+
+        let mut rm = Gfx::get().resource_manager();
+        let image = rm.create_image_with_data(&create_info, &alloc_info, &pixels, "FallbackTexture");
+
+        // Get default view
+        let view = rm.get_image(image).unwrap().default_view;
 
         // Create Sampler
         let sampler = Gfx::get().sampler_manager().get_sampler(&GfxSamplerDesc::default());
@@ -165,12 +195,9 @@ impl AssetHub {
         for (handle, image) in finished_uploads {
             log::info!("Upload finished for texture handle: {:?}", handle);
 
-            // 创建 ImageView
-            let view = GfxImage2DView::new(
-                image.handle(),
-                GfxImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
-                "TextureView",
-            );
+            // ImageHandle already has a default view created by ResourceManager
+            let rm = Gfx::get().resource_manager();
+            let view = rm.get_image(image).unwrap().default_view;
 
             // Create Sampler (TODO: Use params from load request)
             let sampler = Gfx::get().sampler_manager().get_sampler(&GfxSamplerDesc::default());

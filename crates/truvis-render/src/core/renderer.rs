@@ -70,10 +70,12 @@ impl Renderer {
             let wait_timeline_value = if wait_frame == 0 { 0 } else { wait_frame };
             let timeout_ns = 30 * 1000 * 1000 * 1000;
             FrameContext::get().fif_timeline_semaphore.wait_timeline(wait_timeline_value, timeout_ns);
+
+            // Clean up resources
+            Gfx::get().resource_manager().cleanup(wait_timeline_value);
         }
 
         FrameContext::cmd_allocator_mut().free_frame_commands();
-        FrameContext::stage_buffer_manager().clear_fif_buffers();
         FrameContext::get().timer.borrow_mut().tic();
     }
 

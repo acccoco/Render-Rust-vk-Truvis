@@ -1,16 +1,11 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use std::rc::Rc;
-
 use ash::vk;
 
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::swapchain::render_swapchain::GfxSwapchainImageInfo;
 use truvis_gfx::{
-    basic::color::LabelColor,
-    commands::command_buffer::GfxCommandBuffer,
-    gfx::Gfx,
-    resources::{image::GfxImage2D, texture::GfxTexture2D},
+    basic::color::LabelColor, commands::command_buffer::GfxCommandBuffer, gfx::Gfx, resources::texture::GfxTexture2D,
 };
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::FrameLabel;
@@ -110,13 +105,43 @@ impl Gui {
             let fonts = imgui_ctx.fonts();
             let atlas_texture = fonts.build_rgba32_texture();
 
-            let image = Rc::new(GfxImage2D::from_rgba8(
-                atlas_texture.width,
-                atlas_texture.height,
-                atlas_texture.data,
-                "imgui-fonts",
-            ));
-            GfxTexture2D::new(image, "imgui-fonts")
+            let width = atlas_texture.width;
+            let height = atlas_texture.height;
+            let data = atlas_texture.data;
+            let name = "imgui-fonts";
+
+            let create_info = vk::ImageCreateInfo::default()
+                .image_type(vk::ImageType::TYPE_2D)
+                .format(vk::Format::R8G8B8A8_UNORM)
+                .extent(vk::Extent3D {
+                    width,
+                    height,
+                    depth: 1,
+                })
+                .mip_levels(1)
+                .array_layers(1)
+                .samples(vk::SampleCountFlags::TYPE_1)
+                .tiling(vk::ImageTiling::OPTIMAL)
+                .usage(
+                    vk::ImageUsageFlags::SAMPLED
+                        | vk::ImageUsageFlags::TRANSFER_DST
+                        | vk::ImageUsageFlags::TRANSFER_SRC,
+                )
+                .sharing_mode(vk::SharingMode::EXCLUSIVE)
+                .initial_layout(vk::ImageLayout::UNDEFINED);
+
+            let alloc_info = vk_mem::AllocationCreateInfo {
+                usage: vk_mem::MemoryUsage::AutoPreferDevice,
+                ..Default::default()
+            };
+
+            let mut resource_manager = Gfx::get().resource_manager();
+            let image_handle = resource_manager.create_image_with_data(&create_info, &alloc_info, data, name);
+
+            let image_res = resource_manager.get_image(image_handle).unwrap();
+            let view_handle = image_res.default_view;
+
+            GfxTexture2D::new(image_handle, view_handle, name)
         };
 
         let fonts_texture_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);

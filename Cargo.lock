@@ -2388,6 +2388,7 @@ dependencies = [
  "truvis-shader-layout-macro",
  "truvis-shader-layout-trait",
  "uuid",
+ "vk-mem",
  "winit",
 ]
 
@@ -2425,6 +2426,7 @@ dependencies = [
 name = "truvis-cxx"
 version = "0.1.0"
 dependencies = [
+ "ash",
  "bindgen",
  "glam",
  "itertools 0.10.5",
@@ -2446,6 +2448,8 @@ dependencies = [
  "itertools 0.10.5",
  "log",
  "raw-window-handle",
+ "slotmap",
+ "tracy-client",
  "truvis-shader-layout-macro",
  "truvis-shader-layout-trait",
  "uuid",

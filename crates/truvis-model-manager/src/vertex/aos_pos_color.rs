@@ -1,7 +1,10 @@
 use ash::vk;
 use ash::vk::DeviceSize;
 use std::mem::offset_of;
-use truvis_gfx::resources::special_buffers::vertex_buffer::{GfxVertexBuffer, GfxVertexLayout};
+use truvis_gfx::gfx::Gfx;
+use truvis_gfx::resources::handles::VertexBufferHandle;
+use truvis_gfx::resources::layout::GfxVertexLayout;
+use truvis_gfx::resources::resource_data::BufferType;
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -52,11 +55,47 @@ impl GfxVertexLayout for VertexLayoutAoSPosColor {
 }
 
 impl VertexLayoutAoSPosColor {
-    #[deprecated]
-    pub fn create_vertex_buffer2(data: &[VertexPosColor], name: impl AsRef<str>) -> GfxVertexBuffer<Self> {
-        let vertex_buffer = GfxVertexBuffer::new(data.len(), name.as_ref());
-        vertex_buffer.transfer_data_sync(data);
+    pub fn create_vertex_buffer(data: &[VertexPosColor], name: impl AsRef<str>) -> VertexBufferHandle<Self> {
+        let mut rm = Gfx::get().resource_manager();
+        let vertex_buffer_handle = rm.create_vertex_buffer::<Self>(data.len(), name.as_ref());
 
-        vertex_buffer
+        // Upload data
+        let stage_buffer_handle = rm.create_buffer(
+            std::mem::size_of_val(data) as u64,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            true,
+            BufferType::Stage,
+            format!("{}-stage", name.as_ref()),
+        );
+
+        {
+            let stage_buffer = rm.get_buffer_mut(stage_buffer_handle).unwrap();
+            if let Some(ptr) = stage_buffer.mapped_ptr {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(data.as_ptr(), ptr as *mut VertexPosColor, data.len());
+                }
+            }
+        }
+
+        let src_buffer = rm.get_buffer(stage_buffer_handle).unwrap().buffer;
+        let dst_buffer = rm.get_vertex_buffer(vertex_buffer_handle).unwrap().buffer;
+
+        Gfx::get().one_time_exec(
+            |cmd| {
+                let copy_region = vk::BufferCopy {
+                    src_offset: 0,
+                    dst_offset: 0,
+                    size: std::mem::size_of_val(data) as u64,
+                };
+                unsafe {
+                    Gfx::get().gfx_device().cmd_copy_buffer(cmd.vk_handle(), src_buffer, dst_buffer, &[copy_region]);
+                }
+            },
+            "upload_vertex_buffer",
+        );
+
+        rm.destroy_buffer_immediate(stage_buffer_handle);
+
+        vertex_buffer_handle
     }
 }

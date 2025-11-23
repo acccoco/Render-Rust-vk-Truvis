@@ -9,7 +9,7 @@ use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxImageBarrier;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
-use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
+use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
     commands::command_buffer::GfxCommandBuffer,
     pipelines::{
@@ -88,7 +88,13 @@ impl AsyncSubpass {
     ) {
         let viewport_extent = frame_settings.frame_extent;
         let rendering_info = GfxRenderingInfo::new(
-            vec![fif_buffers.render_target_image_view(frame_label).handle()],
+            vec![
+                Gfx::get()
+                    .resource_manager()
+                    .get_image_view(fif_buffers.render_target_image_view(frame_label))
+                    .unwrap()
+                    .handle,
+            ],
             None,
             vk::Rect2D {
                 offset: vk::Offset2D::default(),

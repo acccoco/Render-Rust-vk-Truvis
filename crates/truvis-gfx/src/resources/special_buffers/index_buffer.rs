@@ -1,29 +1,18 @@
-use std::ops::{Deref, DerefMut};
-
 use ash::{vk, vk::Handle};
 
-use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::GfxBuffer};
-
-pub trait GfxIndexType: Sized + Copy {
-    const VK_INDEX_TYPE: vk::IndexType;
-    fn byte_size() -> usize;
-}
-impl GfxIndexType for u16 {
-    const VK_INDEX_TYPE: vk::IndexType = vk::IndexType::UINT16;
-    fn byte_size() -> usize {
-        size_of::<u16>()
-    }
-}
-impl GfxIndexType for u32 {
-    const VK_INDEX_TYPE: vk::IndexType = vk::IndexType::UINT32;
-    fn byte_size() -> usize {
-        size_of::<u32>()
-    }
-}
+use crate::{
+    foundation::debug_messenger::DebugType,
+    gfx::Gfx,
+    resources::{
+        handles::{BufferHandle, IndexBufferHandle},
+        layout::GfxIndexType,
+        resource_data::BufferType,
+    },
+};
 
 /// 顶点类型是 u32
 pub struct GfxIndexBuffer<T: GfxIndexType> {
-    inner: GfxBuffer,
+    handle: IndexBufferHandle,
 
     /// 索引数量
     index_cnt: usize,
@@ -31,39 +20,89 @@ pub struct GfxIndexBuffer<T: GfxIndexType> {
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl_derive_buffer!(GfxIndexBuffer<T: GfxIndexType>, GfxBuffer, inner);
-
 // init & destroy
 impl<T: GfxIndexType> GfxIndexBuffer<T> {
     pub fn new(index_cnt: usize, debug_name: impl AsRef<str>) -> Self {
-        let size = index_cnt * size_of::<u32>();
-        let buffer = GfxBuffer::new(
+        let size = index_cnt * std::mem::size_of::<T>();
+        let mut rm = Gfx::get().resource_manager();
+        let handle = rm.create_buffer(
             size as vk::DeviceSize,
             vk::BufferUsageFlags::INDEX_BUFFER
                 | vk::BufferUsageFlags::TRANSFER_DST
                 | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
-            None,
             false,
-            debug_name,
+            BufferType::Index,
+            debug_name.as_ref(),
         );
 
-        let buffer = Self {
-            inner: buffer,
+        Self {
+            handle: IndexBufferHandle { inner: handle.inner },
             index_cnt,
             _phantom: std::marker::PhantomData,
-        };
-        let gfx_device = Gfx::get().gfx_device();
-        gfx_device.set_debug_name(&buffer, &buffer.inner.debug_name);
-        buffer
+        }
     }
 
     /// 创建 index buffer，并向其内写入数据
     #[inline]
-    pub fn new_with_data(data: &[u32], debug_name: impl AsRef<str>) -> Self {
+    pub fn new_with_data(data: &[T], debug_name: impl AsRef<str>) -> Self
+    where
+        T: bytemuck::Pod,
+    {
         let index_buffer = Self::new(data.len(), debug_name);
         index_buffer.transfer_data_sync(data);
         index_buffer
+    }
+
+    pub fn transfer_data_sync(&self, data: &[T])
+    where
+        T: bytemuck::Pod,
+    {
+        let size_bytes = std::mem::size_of_val(data);
+        let mut rm = Gfx::get().resource_manager();
+
+        // Create staging buffer
+        let staging_handle = rm.create_buffer(
+            size_bytes as u64,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            true,
+            BufferType::Stage,
+            "index-staging",
+        );
+
+        // Copy to staging
+        {
+            let buffer_res = rm.get_buffer_mut(staging_handle).unwrap();
+            if let Some(ptr) = buffer_res.mapped_ptr {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(data.as_ptr() as *const u8, ptr, size_bytes);
+                    // Flush
+                    let allocator = Gfx::get().allocator();
+                    allocator.flush_allocation(&buffer_res.allocation, 0, size_bytes as vk::DeviceSize).unwrap();
+                }
+            }
+        }
+
+        let staging_vk = rm.get_buffer(staging_handle).unwrap().buffer;
+        let dst_vk = self.vk_buffer();
+
+        // Copy command
+        Gfx::get().one_time_exec(
+            |cmd| {
+                let region = vk::BufferCopy {
+                    src_offset: 0,
+                    dst_offset: 0,
+                    size: size_bytes as vk::DeviceSize,
+                };
+                unsafe {
+                    Gfx::get().gfx_device().cmd_copy_buffer(cmd.vk_handle(), staging_vk, dst_vk, &[region]);
+                }
+            },
+            "upload-index-buffer",
+        );
+
+        // Destroy staging
+        rm.destroy_buffer_immediate(staging_handle);
     }
 }
 // getter
@@ -76,6 +115,24 @@ impl<T: GfxIndexType> GfxIndexBuffer<T> {
     #[inline]
     pub fn index_cnt(&self) -> usize {
         self.index_cnt
+    }
+
+    #[inline]
+    pub fn vk_buffer(&self) -> vk::Buffer {
+        let rm = Gfx::get().resource_manager();
+        let handle = BufferHandle {
+            inner: self.handle.inner,
+        };
+        rm.get_buffer(handle).unwrap().buffer
+    }
+
+    #[inline]
+    pub fn device_address(&self) -> vk::DeviceAddress {
+        let rm = Gfx::get().resource_manager();
+        let handle = BufferHandle {
+            inner: self.handle.inner,
+        };
+        rm.get_buffer(handle).unwrap().device_addr.unwrap_or(0)
     }
 }
 

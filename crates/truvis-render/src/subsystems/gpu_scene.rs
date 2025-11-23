@@ -5,6 +5,7 @@ use glam::Vec4Swizzles;
 use itertools::Itertools;
 
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
     commands::{
         barrier::{GfxBarrierMask, GfxBufferBarrier},
@@ -15,6 +16,7 @@ use truvis_gfx::{
 };
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
+use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_shader_binding::shader;
 
 use crate::core::frame_context::FrameContext;
@@ -511,6 +513,8 @@ impl GpuScene {
         // let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         let geometry_buffer_slices = crt_geometry_stage_buffer.mapped_slice();
 
+        let resource_manager = truvis_gfx::gfx::Gfx::get().resource_manager();
+
         let mut crt_geometry_idx = 0;
         for mesh_uuid in self.flatten_meshes.iter() {
             let mesh = scene_manager.mesh_map().get(mesh_uuid).unwrap();
@@ -518,12 +522,21 @@ impl GpuScene {
                 panic!("geometry cnt can not be larger than buffer");
             }
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
+                let v_buffer =
+                    resource_manager.get_vertex_buffer(geometry.vertex_buffer).expect("Vertex buffer not found");
+                let i_buffer =
+                    resource_manager.get_index_buffer(geometry.index_buffer).expect("Index buffer not found");
+
+                let vertex_cnt = v_buffer.element_count as usize;
+                let v_base_addr = v_buffer.device_addr.unwrap();
+                let i_base_addr = i_buffer.device_addr.unwrap();
+
                 geometry_buffer_slices[crt_geometry_idx + submesh_idx] = shader::NewGeometry {
-                    position_buffer: geometry.vertex_buffer.pos_address(),
-                    normal_buffer: geometry.vertex_buffer.normal_address(),
-                    tangent_buffer: geometry.vertex_buffer.tangent_address(),
-                    uv_buffer: geometry.vertex_buffer.uv_address(),
-                    index_buffer: geometry.index_buffer.device_address(),
+                    position_buffer: v_base_addr + VertexLayoutSoA3D::pos_offset(vertex_cnt),
+                    normal_buffer: v_base_addr + VertexLayoutSoA3D::normal_offset(vertex_cnt),
+                    tangent_buffer: v_base_addr + VertexLayoutSoA3D::tangent_offset(vertex_cnt),
+                    uv_buffer: v_base_addr + VertexLayoutSoA3D::uv_offset(vertex_cnt),
+                    index_buffer: i_base_addr,
                 };
             }
             crt_geometry_idx += mesh.geometries.len();
@@ -598,33 +611,42 @@ mod helper {
             barrier::{GfxBarrierMask, GfxBufferBarrier},
             command_buffer::GfxCommandBuffer,
         },
-        resources::buffer::GfxBuffer,
+        gfx::Gfx,
+        resources::special_buffers::structured_buffer::GfxStructuredBuffer,
     };
     /// 三个操作：
     /// 1. 将 stage buffer 的数据 *全部* flush 到 buffer 中
     /// 2. 从 stage buffer 中将 *所有* 数据复制到目标 buffer 中
     /// 3. 添加 barrier，确保后续访问时 copy 已经完成且数据可用
-    pub fn flush_copy_and_barrier(
+    pub fn flush_copy_and_barrier<T: bytemuck::Pod>(
         cmd: &GfxCommandBuffer,
-        stage_buffer: &mut GfxBuffer,
-        dst: &mut GfxBuffer,
+        stage_buffer: &mut GfxStructuredBuffer<T>,
+        dst: &mut GfxStructuredBuffer<T>,
         barrier_mask: GfxBarrierMask,
     ) {
         let buffer_size = stage_buffer.size();
         {
             stage_buffer.flush(0, buffer_size);
         }
-        cmd.cmd_copy_buffer(
-            stage_buffer,
-            dst,
-            &[vk::BufferCopy {
-                size: buffer_size,
-                ..Default::default()
-            }],
-        );
+
+        let src_buffer = stage_buffer.vk_buffer();
+        let dst_buffer = dst.vk_buffer();
+
+        unsafe {
+            Gfx::get().gfx_device().cmd_copy_buffer(
+                cmd.vk_handle(),
+                src_buffer,
+                dst_buffer,
+                &[vk::BufferCopy {
+                    size: buffer_size,
+                    ..Default::default()
+                }],
+            );
+        }
+
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
-            &[GfxBufferBarrier::default().mask(barrier_mask).buffer(dst.vk_buffer(), 0, vk::WHOLE_SIZE)],
+            &[GfxBufferBarrier::default().mask(barrier_mask).buffer(dst_buffer, 0, vk::WHOLE_SIZE)],
         );
     }
 

@@ -8,8 +8,10 @@
 
 use std::{ffi::c_void, mem::offset_of};
 
+use ash::vk;
 use itertools::Itertools;
-use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
+use truvis_gfx::gfx::Gfx;
+use truvis_gfx::resources::resource_data::BufferType;
 use truvis_model_manager::components::geometry::Geometry;
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;
@@ -128,15 +130,55 @@ impl AssimpSceneLoader {
                 let index_data =
                     std::slice::from_raw_parts(mesh.face_array_ as *const u32, mesh.face_cnt_ as usize * 3);
 
-                let index_buffer =
-                    GfxIndex32Buffer::new(index_data.len(), format!("{}-mesh-{}-indices", self.model_name, mesh_idx));
-                index_buffer.transfer_data_sync(index_data);
+                let mut rm = Gfx::get().resource_manager();
+                let index_buffer_handle = rm.create_index_buffer::<u32>(
+                    index_data.len(),
+                    format!("{}-mesh-{}-indices", self.model_name, mesh_idx),
+                );
+
+                // Upload data
+                let stage_buffer_handle = rm.create_buffer(
+                    std::mem::size_of_val(index_data) as u64,
+                    vk::BufferUsageFlags::TRANSFER_SRC,
+                    true,
+                    BufferType::Stage,
+                    format!("{}-mesh-{}-indices-stage", self.model_name, mesh_idx),
+                );
+
+                {
+                    let stage_buffer = rm.get_buffer_mut(stage_buffer_handle).unwrap();
+                    if let Some(ptr) = stage_buffer.mapped_ptr {
+                        std::ptr::copy_nonoverlapping(index_data.as_ptr(), ptr as *mut u32, index_data.len());
+                    }
+                }
+
+                let src_buffer = rm.get_buffer(stage_buffer_handle).unwrap().buffer;
+                let dst_buffer = rm.get_index_buffer(index_buffer_handle).unwrap().buffer;
+
+                Gfx::get().one_time_exec(
+                    |cmd| {
+                        let copy_region = vk::BufferCopy {
+                            src_offset: 0,
+                            dst_offset: 0,
+                            size: std::mem::size_of_val(index_data) as u64,
+                        };
+                        Gfx::get().gfx_device().cmd_copy_buffer(
+                            cmd.vk_handle(),
+                            src_buffer,
+                            dst_buffer,
+                            &[copy_region],
+                        );
+                    },
+                    "upload_index_buffer",
+                );
+
+                rm.destroy_buffer_immediate(stage_buffer_handle);
 
                 // 只有 single geometry 的 mesh
                 let mesh = Mesh {
                     geometries: vec![Geometry {
                         vertex_buffer,
-                        index_buffer,
+                        index_buffer: index_buffer_handle,
                     }],
                     blas: None,
                     blas_device_address: None,

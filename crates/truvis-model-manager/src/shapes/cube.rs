@@ -1,6 +1,8 @@
 use crate::components::geometry::GeometrySoA3D;
 use crate::vertex::soa_3d::VertexLayoutSoA3D;
-use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
+use ash::vk;
+use truvis_gfx::gfx::Gfx;
+use truvis_gfx::resources::resource_data::BufferType;
 
 /// 坐标系：Right-Hand, X-Right, Y-Up
 ///
@@ -162,8 +164,45 @@ impl CubeSoA {
             "cube-vertex-buffer",
         );
 
-        let index_buffer = GfxIndex32Buffer::new(Self::INDICES.len(), "cube-index-buffer");
-        index_buffer.transfer_data_sync(&Self::INDICES);
+        let mut rm = Gfx::get().resource_manager();
+        let index_buffer = rm.create_index_buffer::<u32>(Self::INDICES.len(), "cube-index-buffer");
+
+        // Upload data
+        let stage_buffer_handle = rm.create_buffer(
+            std::mem::size_of_val(&Self::INDICES) as u64,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            true,
+            BufferType::Stage,
+            "cube-index-buffer-stage",
+        );
+
+        {
+            let stage_buffer = rm.get_buffer_mut(stage_buffer_handle).unwrap();
+            if let Some(ptr) = stage_buffer.mapped_ptr {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(Self::INDICES.as_ptr(), ptr as *mut u32, Self::INDICES.len());
+                }
+            }
+        }
+
+        let src_buffer = rm.get_buffer(stage_buffer_handle).unwrap().buffer;
+        let dst_buffer = rm.get_index_buffer(index_buffer).unwrap().buffer;
+
+        Gfx::get().one_time_exec(
+            |cmd| {
+                let copy_region = vk::BufferCopy {
+                    src_offset: 0,
+                    dst_offset: 0,
+                    size: std::mem::size_of_val(&Self::INDICES) as u64,
+                };
+                unsafe {
+                    Gfx::get().gfx_device().cmd_copy_buffer(cmd.vk_handle(), src_buffer, dst_buffer, &[copy_region]);
+                }
+            },
+            "upload_index_buffer",
+        );
+
+        rm.destroy_buffer_immediate(stage_buffer_handle);
 
         GeometrySoA3D {
             vertex_buffer,

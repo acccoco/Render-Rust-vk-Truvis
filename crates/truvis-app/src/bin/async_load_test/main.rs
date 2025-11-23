@@ -1,9 +1,12 @@
+use ash::vk;
 use imgui::Ui;
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
 use truvis_asset::handle::TextureHandle;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
+use truvis_gfx::gfx::Gfx;
+use truvis_gfx::resources::handles::IndexBufferHandle;
+use truvis_gfx::resources::resource_data::BufferType;
 use truvis_model_manager::components::geometry::GeometrySoA3D;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::core::frame_context::FrameContext;
@@ -20,6 +23,52 @@ struct AsyncLoadTest {
 }
 
 impl AsyncLoadTest {
+    fn create_index_buffer(indices: &[u32], name: &str) -> IndexBufferHandle {
+        let mut rm = Gfx::get().resource_manager();
+        let index_count = indices.len();
+        let index_buffer = rm.create_index_buffer::<u32>(index_count, name);
+
+        let buffer_size = std::mem::size_of_val(indices) as u64;
+
+        let stage_buffer_handle = rm.create_buffer(
+            buffer_size,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            true,
+            BufferType::Stage,
+            format!("{}-stage", name),
+        );
+
+        {
+            let stage_buffer = rm.get_buffer_mut(stage_buffer_handle).unwrap();
+            if let Some(ptr) = stage_buffer.mapped_ptr {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(indices.as_ptr(), ptr as *mut u32, index_count);
+                }
+            }
+        }
+
+        let src_buffer = rm.get_buffer(stage_buffer_handle).unwrap().buffer;
+        let dst_buffer = rm.get_index_buffer(index_buffer).unwrap().buffer;
+
+        Gfx::get().one_time_exec(
+            |cmd| {
+                let copy_region = vk::BufferCopy {
+                    src_offset: 0,
+                    dst_offset: 0,
+                    size: buffer_size,
+                };
+                unsafe {
+                    Gfx::get().gfx_device().cmd_copy_buffer(cmd.vk_handle(), src_buffer, dst_buffer, &[copy_region]);
+                }
+            },
+            "upload_index_buffer",
+        );
+
+        rm.destroy_buffer_immediate(stage_buffer_handle);
+
+        index_buffer
+    }
+
     fn create_quad() -> GeometrySoA3D {
         let positions = vec![
             glam::vec3(-0.5, -0.5, 0.0),
@@ -38,7 +87,7 @@ impl AsyncLoadTest {
         let indices = vec![0, 1, 2, 2, 3, 0];
 
         let vertex_buffer = VertexLayoutSoA3D::create_vertex_buffer(&positions, &normals, &tangents, &uvs, "quad-vb");
-        let index_buffer = GfxIndex32Buffer::new_with_data(&indices, "quad-ib");
+        let index_buffer = Self::create_index_buffer(&indices, "quad-ib");
 
         GeometrySoA3D {
             vertex_buffer,

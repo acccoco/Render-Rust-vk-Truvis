@@ -57,6 +57,12 @@ pub struct IoWorker {
     io_thread: Option<std::thread::JoinHandle<()>>,
 }
 
+impl Default for IoWorker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IoWorker {
     pub fn new() -> Self {
         let (req_tx, req_rx) = crossbeam_channel::unbounded::<AssetLoadRequest>();

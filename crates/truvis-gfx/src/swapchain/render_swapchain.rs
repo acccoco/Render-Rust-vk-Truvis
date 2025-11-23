@@ -3,7 +3,7 @@ use crate::commands::fence::GfxFence;
 use crate::commands::semaphore::GfxSemaphore;
 use crate::gfx::Gfx;
 use crate::gfx_core::GfxCore;
-use crate::resources::image_view::{GfxImage2DView, GfxImageViewCreateInfo};
+use crate::resources::handles::{ImageHandle, ImageViewHandle};
 use crate::swapchain::surface::GfxSurface;
 use ash::vk;
 use itertools::Itertools;
@@ -13,8 +13,8 @@ pub struct GfxRenderSwapchain {
     swapchain_handle: vk::SwapchainKHR,
 
     /// 这里的 image 并非手动创建的，因此无法使用 GfxImage 类型
-    swapchain_images: Vec<vk::Image>,
-    swapchain_image_views: Vec<GfxImage2DView>,
+    swapchain_images: Vec<ImageHandle>,
+    swapchain_image_views: Vec<ImageViewHandle>,
     swapchain_image_index: usize,
 
     color_format: vk::Format,
@@ -36,26 +36,47 @@ impl GfxRenderSwapchain {
             Self::create_swapchain(&surface, surface_format.format, surface_format.color_space, extent, present_mode);
 
         let images = unsafe { vk_core.gfx_device.swapchain.get_swapchain_images(swapchain_handle).unwrap() };
+
+        let mut swapchain_images = Vec::with_capacity(images.len());
+        let mut swapchain_image_views = Vec::with_capacity(images.len());
+
+        let mut rm = Gfx::get().resource_manager();
+
         for (img_idx, img) in images.iter().enumerate() {
-            vk_core.gfx_device.set_object_debug_name(*img, format!("swapchain-image-{img_idx}"));
-        }
-        let image_views = images
-            .iter()
-            .enumerate()
-            .map(|(idx, img)| {
-                GfxImage2DView::new(
-                    *img,
-                    GfxImageViewCreateInfo::new_image_view_2d_info(surface_format.format, vk::ImageAspectFlags::COLOR),
-                    format!("swapchain-{}", idx),
+            let create_info = vk::ImageCreateInfo::default()
+                .image_type(vk::ImageType::TYPE_2D)
+                .format(surface_format.format)
+                .extent(vk::Extent3D {
+                    width: extent.width,
+                    height: extent.height,
+                    depth: 1,
+                })
+                .mip_levels(1)
+                .array_layers(1)
+                .samples(vk::SampleCountFlags::TYPE_1)
+                .tiling(vk::ImageTiling::OPTIMAL)
+                .usage(
+                    vk::ImageUsageFlags::COLOR_ATTACHMENT
+                        | vk::ImageUsageFlags::TRANSFER_DST
+                        | vk::ImageUsageFlags::STORAGE,
                 )
-            })
-            .collect_vec();
+                .sharing_mode(vk::SharingMode::EXCLUSIVE)
+                .initial_layout(vk::ImageLayout::UNDEFINED);
+
+            let handle = rm.create_external_image(*img, &create_info, format!("swapchain-image-{}", img_idx));
+
+            swapchain_images.push(handle);
+
+            // Get the default view created by create_external_image
+            let image_res = rm.get_image(handle).unwrap();
+            swapchain_image_views.push(image_res.default_view);
+        }
 
         Self {
             _surface: surface,
             swapchain_handle,
-            swapchain_images: images,
-            swapchain_image_views: image_views,
+            swapchain_images,
+            swapchain_image_views,
             swapchain_image_index: 0,
             swapchain_extent: extent,
             color_format: surface_format.format,
@@ -115,7 +136,7 @@ pub struct GfxSwapchainImageInfo {
 // getters
 impl GfxRenderSwapchain {
     #[inline]
-    pub fn present_images(&self) -> Vec<vk::Image> {
+    pub fn present_images(&self) -> Vec<ImageHandle> {
         self.swapchain_images.clone()
     }
 
@@ -125,7 +146,7 @@ impl GfxRenderSwapchain {
     }
 
     #[inline]
-    pub fn current_image(&self) -> vk::Image {
+    pub fn current_image(&self) -> ImageHandle {
         self.swapchain_images[self.swapchain_image_index]
     }
 
@@ -135,8 +156,8 @@ impl GfxRenderSwapchain {
     }
 
     #[inline]
-    pub fn current_image_view(&self) -> &GfxImage2DView {
-        &self.swapchain_image_views[self.swapchain_image_index]
+    pub fn current_image_view(&self) -> ImageViewHandle {
+        self.swapchain_image_views[self.swapchain_image_index]
     }
 
     #[inline]
@@ -193,6 +214,16 @@ impl Drop for GfxRenderSwapchain {
     fn drop(&mut self) {
         unsafe {
             Gfx::get().gfx_device().swapchain.destroy_swapchain(self.swapchain_handle, None);
+        }
+
+        // Destroy image handles (and their views)
+        let mut rm = Gfx::get().resource_manager();
+        // We use a dummy frame index here because we are destroying the swapchain, usually at app exit
+        // or swapchain recreation.
+        let frame_index = u64::MAX;
+
+        for handle in &self.swapchain_images {
+            rm.destroy_image(*handle, frame_index);
         }
     }
 }

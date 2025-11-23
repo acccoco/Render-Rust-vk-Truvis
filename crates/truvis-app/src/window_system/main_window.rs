@@ -1,5 +1,3 @@
-use std::rc::Weak;
-
 use ash::vk;
 use itertools::Itertools;
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
@@ -8,7 +6,7 @@ use crate::gui::core::Gui;
 use crate::gui::gui_pass::GuiPass;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxBarrierMask;
-use truvis_gfx::resources::texture::GfxTexture2D;
+use truvis_gfx::resources::handles::ImageViewHandle;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, semaphore::GfxSemaphore, submit_info::GfxSubmitInfo},
     gfx::Gfx,
@@ -25,7 +23,7 @@ pub struct PresentData {
     /// 当前帧的渲染目标纹理
     ///
     /// 包含了最终的渲染结果，将被复制或演示到屏幕上
-    pub render_target: Weak<GfxTexture2D>,
+    pub render_target: ImageViewHandle,
 
     /// 渲染目标在 Bindless 系统中的唯一标识符
     ///
@@ -126,11 +124,23 @@ impl MainWindow {
         let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("window-present");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         {
+            let (swapchain_image, render_target_image, swapchain_view) = {
+                let rm = Gfx::get().resource_manager();
+                let swapchain_image = rm.get_image(swapchain.current_image()).unwrap().image;
+
+                let render_target_view_res = rm.get_image_view(renderer_data.render_target).unwrap();
+                let render_target_image = rm.get_image(render_target_view_res.image).unwrap().image;
+
+                let swapchain_view = rm.get_image_view(swapchain.current_image_view()).unwrap().handle;
+
+                (swapchain_image, render_target_image, swapchain_view)
+            };
+
             // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
             // 注1: 可能有 blend 操作，因此需要 COLOR_ATTACHMENT_READ
             // 注2: 这里的 bottom 表示 layout transfer 等待 present 完成
             let swapchain_image_layout_transfer_barrier = GfxImageBarrier::new()
-                .image(swapchain.current_image())
+                .image(swapchain_image)
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
                 .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
@@ -140,7 +150,7 @@ impl MainWindow {
                 );
 
             let render_target_barrier = GfxImageBarrier::new()
-                .image(renderer_data.render_target.upgrade().unwrap().image())
+                .image(render_target_image)
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(renderer_data.render_target_barrier.src_stage, renderer_data.render_target_barrier.src_access)
                 .dst_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ);
@@ -150,20 +160,14 @@ impl MainWindow {
                 &[swapchain_image_layout_transfer_barrier, render_target_barrier],
             );
 
-            self.gui_pass.draw(
-                swapchain.current_image_view().handle(),
-                swapchain.extent(),
-                &cmd,
-                &mut self.gui,
-                frame_label,
-            );
+            self.gui_pass.draw(swapchain_view, swapchain.extent(), &cmd, &mut self.gui, frame_label);
 
             // 将 swapchain image layout 转换为 PRESENT_SRC_KHR
             // 注1: 这里的 top 表示 present 需要等待 layout transfer 完成
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(swapchain.current_image())
+                    .image(swapchain_image)
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
                     .src_mask(
