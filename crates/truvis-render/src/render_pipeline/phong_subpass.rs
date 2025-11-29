@@ -7,7 +7,8 @@ use crate::{
 use ash::vk;
 use std::{cell::RefCell, mem::offset_of, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
+use truvis_gfx::gfx::Gfx;
+use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
     basic::color::LabelColor,
     commands::command_buffer::GfxCommandBuffer,
@@ -110,9 +111,10 @@ impl PhongSubpass {
         frame_settings: &FrameSettings,
     ) {
         let frame_label = FrameContext::get().frame_label();
+        let rm = Gfx::get().resource_manager();
         let rendering_info = GfxRenderingInfo::new(
-            vec![fif_buffers.render_target_image_view(frame_label).handle()],
-            Some(fif_buffers.depth_image_view().handle()),
+            vec![rm.get_image_view(fif_buffers.render_target_image_view(frame_label)).unwrap().handle],
+            Some(rm.get_image_view(fif_buffers.depth_image_view()).unwrap().handle),
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
                 extent: frame_settings.frame_extent,

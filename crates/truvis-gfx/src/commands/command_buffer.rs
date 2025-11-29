@@ -2,7 +2,8 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::gfx::Gfx;
-use crate::resources::special_buffers::index_buffer::{GfxIndexBuffer, GfxIndexType};
+use crate::resources::layout::GfxIndexType;
+use crate::resources::special_buffers::index_buffer::GfxIndexBuffer;
 use crate::{
     basic::color::LabelColor,
     commands::{
@@ -12,7 +13,6 @@ use crate::{
     foundation::debug_messenger::DebugType,
     pipelines::rendering_info::GfxRenderingInfo,
     query::query_pool::GfxQueryPool,
-    resources::buffer::GfxBuffer,
 };
 
 /// 命令缓冲封装
@@ -92,9 +92,9 @@ impl GfxCommandBuffer {
     /// - command type: action
     /// - 支持的 queue：transfer，graphics，compute
     #[inline]
-    pub fn cmd_copy_buffer(&self, src: &GfxBuffer, dst: &GfxBuffer, regions: &[vk::BufferCopy]) {
+    pub fn cmd_copy_buffer(&self, src: vk::Buffer, dst: vk::Buffer, regions: &[vk::BufferCopy]) {
         unsafe {
-            Gfx::get().gfx_device().cmd_copy_buffer(self.vk_handle, src.vk_buffer(), dst.vk_buffer(), regions);
+            Gfx::get().gfx_device().cmd_copy_buffer(self.vk_handle, src, dst, regions);
         }
     }
 
@@ -251,6 +251,15 @@ impl GfxCommandBuffer {
     pub fn cmd_bind_index_buffer<T: GfxIndexType>(&self, buffer: &GfxIndexBuffer<T>, offset: vk::DeviceSize) {
         unsafe {
             Gfx::get().gfx_device().cmd_bind_index_buffer(self.vk_handle, buffer.vk_buffer(), offset, T::VK_INDEX_TYPE);
+        }
+    }
+
+    /// - command type: state
+    /// - supported queue types: graphics
+    #[inline]
+    pub fn cmd_bind_index_buffer_raw(&self, buffer: vk::Buffer, offset: vk::DeviceSize, index_type: vk::IndexType) {
+        unsafe {
+            Gfx::get().gfx_device().cmd_bind_index_buffer(self.vk_handle, buffer, offset, index_type);
         }
     }
 

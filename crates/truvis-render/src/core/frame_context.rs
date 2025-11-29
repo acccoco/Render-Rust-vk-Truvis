@@ -14,7 +14,6 @@ use crate::subsystems::bindless_manager::BindlessManager;
 use crate::subsystems::cmd_allocator::CmdAllocator;
 use crate::subsystems::gpu_scene::GpuScene;
 use crate::subsystems::scene_manager::SceneManager;
-use crate::subsystems::stage_buffer_manager::StageBufferManager;
 
 /// 帧上下文单例
 ///
@@ -44,7 +43,6 @@ use crate::subsystems::stage_buffer_manager::StageBufferManager;
 /// { let bindless = FrameContext::bindless_mgr_mut(); /* ... */ }
 /// ```
 pub struct FrameContext {
-    pub upload_buffer_manager: RefCell<StageBufferManager>,
     pub bindless_manager: RefCell<BindlessManager>,
     pub cmd_allocator: RefCell<CmdAllocator>,
     pub gpu_scene: RefCell<GpuScene>,
@@ -88,7 +86,6 @@ impl FrameContext {
 
         let fif_timeline_semaphore = GfxSemaphore::new_timeline(0, "render-timeline");
 
-        let upload_buffer_manager = RefCell::new(StageBufferManager::new(fif_count));
         let bindless_manager = RefCell::new(BindlessManager::new(fif_count));
         let cmd_allocator = RefCell::new(CmdAllocator::new(fif_count));
         let gpu_scene = RefCell::new(GpuScene::new(fif_count));
@@ -125,7 +122,6 @@ impl FrameContext {
             frame_settings: Cell::new(frame_settings),
             pipeline_settings: Cell::new(PipelineSettings::default()),
 
-            upload_buffer_manager,
             bindless_manager,
             cmd_allocator,
             gpu_scene,
@@ -160,7 +156,6 @@ impl FrameContext {
 
             context.fif_timeline_semaphore.destroy();
 
-            drop(context.upload_buffer_manager);
             drop(context.cmd_allocator);
             drop(context.bindless_manager);
             drop(context.gpu_scene);
@@ -256,12 +251,6 @@ impl FrameContext {
     }
 
     #[inline]
-    pub fn stage_buffer_manager() -> RefMut<'static, StageBufferManager> {
-        let context = Self::get();
-        context.upload_buffer_manager.borrow_mut()
-    }
-
-    #[inline]
     pub fn frame_settings(&self) -> FrameSettings {
         self.frame_settings.get()
     }
@@ -284,6 +273,8 @@ impl FrameContext {
         let new_frame_label = FrameLabel::from_usize(new_frame_id % self.fif_count);
         self.frame_id.set(new_frame_id);
         self.frame_label.set(new_frame_label);
+
+        Gfx::get().resource_manager().set_current_frame_index(new_frame_id as u64);
     }
 
     pub fn set_frame_extent(&self, extent: vk::Extent2D) {

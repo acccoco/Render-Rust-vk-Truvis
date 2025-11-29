@@ -8,6 +8,7 @@ description = "为 Truvis 提供 Assimp 绑定"
 [dependencies]
 truvis-model-manager = { workspace = true }
 truvis-gfx = { workspace = true }
+ash = { workspace = true }
 
 itertools = { workspace = true }
 glam = { workspace = true }

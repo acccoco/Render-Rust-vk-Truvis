@@ -29,5 +29,6 @@ imgui-winit-support = { workspace = true }
 raw-window-handle = { workspace = true }
 tracy-client = { workspace = true }
 image = { workspace = true }
+vk-mem = { workspace = true }
 
 

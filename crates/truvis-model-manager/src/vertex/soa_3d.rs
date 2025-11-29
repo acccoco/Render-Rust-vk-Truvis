@@ -1,6 +1,9 @@
 use ash::vk;
 use std::ptr;
-use truvis_gfx::resources::special_buffers::vertex_buffer::{GfxVertexBuffer, GfxVertexLayout};
+use truvis_gfx::gfx::Gfx;
+use truvis_gfx::resources::handles::VertexBufferHandle;
+use truvis_gfx::resources::layout::GfxVertexLayout;
+use truvis_gfx::resources::resource_data::BufferType;
 
 /// SoA 的顶点 buffer 布局，包含：Positions, Normals, Tangents, UVs
 pub struct VertexLayoutSoA3D;
@@ -94,34 +97,71 @@ impl VertexLayoutSoA3D {
         tangents: &[glam::Vec3],
         uvs: &[glam::Vec2],
         name: impl AsRef<str>,
-    ) -> GfxVertexBuffer<Self> {
+    ) -> VertexBufferHandle<Self> {
         let vertex_cnt = positions.len();
         assert!(vertex_cnt == normals.len() && vertex_cnt == tangents.len() && vertex_cnt == uvs.len());
 
-        let vertex_buffer = GfxVertexBuffer::new(vertex_cnt, name.as_ref());
-        vertex_buffer.transfer_data_sync2(Self::buffer_size(vertex_cnt) as vk::DeviceSize, |stage_buffer| unsafe {
-            ptr::copy_nonoverlapping(
-                positions.as_ptr() as *const u8,
-                stage_buffer.mapped_ptr().add(Self::pos_offset(vertex_cnt) as usize),
-                size_of_val(positions),
-            );
-            ptr::copy_nonoverlapping(
-                normals.as_ptr() as *const u8,
-                stage_buffer.mapped_ptr().add(Self::normal_offset(vertex_cnt) as usize),
-                size_of_val(normals),
-            );
-            ptr::copy_nonoverlapping(
-                tangents.as_ptr() as *const u8,
-                stage_buffer.mapped_ptr().add(Self::tangent_offset(vertex_cnt) as usize),
-                size_of_val(tangents),
-            );
-            ptr::copy_nonoverlapping(
-                uvs.as_ptr() as *const u8,
-                stage_buffer.mapped_ptr().add(Self::uv_offset(vertex_cnt) as usize),
-                size_of_val(uvs),
-            );
-        });
+        let mut rm = Gfx::get().resource_manager();
+        let vertex_buffer_handle = rm.create_vertex_buffer::<Self>(vertex_cnt, name.as_ref());
 
-        vertex_buffer
+        let buffer_size = Self::buffer_size(vertex_cnt);
+
+        // Upload data
+        let stage_buffer_handle = rm.create_buffer(
+            buffer_size as u64,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            true,
+            BufferType::Stage,
+            format!("{}-stage", name.as_ref()),
+        );
+
+        {
+            let stage_buffer = rm.get_buffer_mut(stage_buffer_handle).unwrap();
+            if let Some(ptr) = stage_buffer.mapped_ptr {
+                unsafe {
+                    ptr::copy_nonoverlapping(
+                        positions.as_ptr() as *const u8,
+                        ptr.add(Self::pos_offset(vertex_cnt) as usize),
+                        size_of_val(positions),
+                    );
+                    ptr::copy_nonoverlapping(
+                        normals.as_ptr() as *const u8,
+                        ptr.add(Self::normal_offset(vertex_cnt) as usize),
+                        size_of_val(normals),
+                    );
+                    ptr::copy_nonoverlapping(
+                        tangents.as_ptr() as *const u8,
+                        ptr.add(Self::tangent_offset(vertex_cnt) as usize),
+                        size_of_val(tangents),
+                    );
+                    ptr::copy_nonoverlapping(
+                        uvs.as_ptr() as *const u8,
+                        ptr.add(Self::uv_offset(vertex_cnt) as usize),
+                        size_of_val(uvs),
+                    );
+                }
+            }
+        }
+
+        let src_buffer = rm.get_buffer(stage_buffer_handle).unwrap().buffer;
+        let dst_buffer = rm.get_vertex_buffer(vertex_buffer_handle).unwrap().buffer;
+
+        Gfx::get().one_time_exec(
+            |cmd| {
+                let copy_region = vk::BufferCopy {
+                    src_offset: 0,
+                    dst_offset: 0,
+                    size: buffer_size as u64,
+                };
+                unsafe {
+                    Gfx::get().gfx_device().cmd_copy_buffer(cmd.vk_handle(), src_buffer, dst_buffer, &[copy_region]);
+                }
+            },
+            "upload_vertex_buffer",
+        );
+
+        rm.destroy_buffer_immediate(stage_buffer_handle);
+
+        vertex_buffer_handle
     }
 }

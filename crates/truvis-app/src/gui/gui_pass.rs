@@ -5,7 +5,8 @@ use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::const_map;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
+use truvis_gfx::gfx::Gfx;
+use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
     commands::command_buffer::GfxCommandBuffer,
     pipelines::{
@@ -163,8 +164,14 @@ impl GuiPass {
             bytemuck::bytes_of(&push_constant),
         );
 
-        cmd.cmd_bind_index_buffer(&mesh.index_buffer, 0);
-        cmd.cmd_bind_vertex_buffers(0, &[mesh.vertex_buffer.vk_buffer()], &[0]);
+        let rm = Gfx::get().resource_manager();
+        let index_buffer = rm.get_index_buffer(mesh.index_buffer).unwrap().buffer;
+        let vertex_buffer = rm.get_vertex_buffer(mesh.vertex_buffer).unwrap().buffer;
+
+        let index_type = if size_of::<imgui::DrawIdx>() == 2 { vk::IndexType::UINT16 } else { vk::IndexType::UINT32 };
+
+        cmd.cmd_bind_index_buffer_raw(index_buffer, 0, index_type);
+        cmd.cmd_bind_vertex_buffers(0, &[vertex_buffer], &[0]);
 
         let mut index_offset = 0;
         let mut vertex_offset = 0;
