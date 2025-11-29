@@ -25,6 +25,12 @@ fn copy_to_rust(cmake_project: &std::path::Path, cargo_target_dir: &std::path::P
     let cmake_output_path = cmake_project.join("build").join(build_type.cmake_output_dir());
     let cargo_output_path = cargo_target_dir.join(build_type.cargo_output_dir());
 
+    // 确保 target/debug, target/debug/examples 目录存在
+    std::fs::create_dir_all(cargo_output_path.join("examples")).unwrap();
+    // 确保 target/release, target/release/examples 目录存在
+    std::fs::create_dir_all(cargo_output_path.join("examples")).unwrap();
+
+
     let mut all_copy_files = Vec::new();
     for entry in std::fs::read_dir(cmake_output_path).unwrap() {
         let entry = entry.unwrap();

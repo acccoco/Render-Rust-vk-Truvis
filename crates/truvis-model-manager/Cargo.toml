@@ -9,7 +9,7 @@ description = "基础的模型管理，提供了模型的基础定义"
 truvis-gfx = { workspace = true }
 
 ash = { workspace = true }
-uuid = { workspace = true, features = ["v4"] }
-glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
-bytemuck = { workspace = true, features = ["derive"] }
+uuid = { workspace = true }
+glam = { workspace = true }
+bytemuck = { workspace = true }
 itertools = { workspace = true }

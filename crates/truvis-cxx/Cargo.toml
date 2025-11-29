@@ -11,7 +11,7 @@ truvis-gfx = { workspace = true }
 ash = { workspace = true }
 
 itertools = { workspace = true }
-glam = { workspace = true, features = ["bytemuck", "rand", "serde"] }
+glam = { workspace = true }
 tracy-client = { workspace = true }
 
 

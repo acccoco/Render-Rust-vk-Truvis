@@ -12,7 +12,7 @@ log = { workspace = true }
 anyhow = { workspace = true }
 slotmap = { workspace = true }
 crossbeam-channel = { workspace = true }
-crossbeam-utils = "0.8"
+crossbeam-utils = { workspace = true }
 rayon = { workspace = true }
 image = { workspace = true }
 vk-mem = { workspace = true }
