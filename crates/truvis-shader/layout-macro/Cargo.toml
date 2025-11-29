@@ -12,7 +12,7 @@ proc-macro = true
 truvis-shader-layout-trait = { workspace = true }
 
 # other
-syn = { workspace = true, features = ["full"] }
+syn = { workspace = true }
 quote = { workspace = true }
 proc-macro2 = { workspace = true }
 ash = { workspace = true }
