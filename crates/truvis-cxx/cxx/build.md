@@ -10,9 +10,15 @@ cmake --build --preset release
 
 # 使用 clang-cl 作为项目 generator
 
-- c compiler: clang-cl
-- c++ compiler: clang-cl
-- generator: "Ninja"
+```shell
+# debug
+cmake --presets clang-cl-debug
+cmake --build --preset clang-debug
+
+# release
+cmake --presets clang-cl-release
+cmake --build --preset clang-release
+```
 
 对应的 cmake 命令为：
 

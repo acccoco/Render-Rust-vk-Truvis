@@ -19,13 +19,46 @@
       },
       "binaryDir": "${sourceDir}/build/vs2022",
       "cacheVariables": {
-        // 输出目录（不同配置分开）
         "CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG": "${sourceDir}/build/Debug",
         "CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG": "${sourceDir}/build/Debug",
         "CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG": "${sourceDir}/build/Debug",
+
         "CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE": "${sourceDir}/build/Release",
         "CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE": "${sourceDir}/build/Release",
         "CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE": "${sourceDir}/build/Release"
+      }
+    },
+    {
+      "name": "clang-cl-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl.exe",
+        "CMAKE_CXX_COMPILER": "clang-cl.exe"
+      }
+    },
+    {
+      "name": "clang-cl-debug",
+      "displayName": "Clang-CL Debug (x64)",
+      "inherits": "clang-cl-base",
+      "binaryDir": "${sourceDir}/build/clang-cl/Debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/build/Debug",
+        "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "${sourceDir}/build/Debug",
+        "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "${sourceDir}/build/Debug"
+      }
+    },
+    {
+      "name": "clang-cl-release",
+      "displayName": "Clang-CL Release (x64)",
+      "inherits": "clang-cl-base",
+      "binaryDir": "${sourceDir}/build/clang-cl/Release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/build/Release",
+        "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "${sourceDir}/build/Release",
+        "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "${sourceDir}/build/Release"
       }
     }
   ],
@@ -41,6 +74,16 @@
       "displayName": "Build Release",
       "configurePreset": "vs2022",
       "configuration": "Release"
+    },
+    {
+      "name": "clang-debug",
+      "displayName": "Clang-CL Debug",
+      "configurePreset": "clang-cl-debug"
+    },
+    {
+      "name": "clang-release",
+      "displayName": "Clang-CL Release",
+      "configurePreset": "clang-cl-release"
     }
   ]
 }
