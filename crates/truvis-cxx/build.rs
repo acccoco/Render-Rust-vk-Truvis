@@ -5,6 +5,7 @@ fn gen_rust_binding() {
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
         .header("cxx/truvixx-interface/include/TruvixxInterface/lib.hpp")
+        .clang_args(["-Icxx/truvixx-assimp/include", "-Icxx/truvixx-interface/include"])
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .raw_line("#![allow(clippy::all)]")

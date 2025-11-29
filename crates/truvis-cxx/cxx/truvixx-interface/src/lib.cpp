@@ -3,8 +3,6 @@
 #include "TruvixxAssimp/scene_loader.hpp"
 #include "TruvixxAssimp/c_data_define.hpp"
 
-#include <iostream>
-
 
 void* load_scene(const char* mesh_path)
 {
