@@ -1,7 +1,7 @@
 # 使用 VisualStudio 作为项目 generator
 
 ```shell
-cmake --presets vs2022
+cmake --preset vs2022
 # build debug
 cmake --build --preset debug
 # build release
@@ -12,11 +12,11 @@ cmake --build --preset release
 
 ```shell
 # debug
-cmake --presets clang-cl-debug
+cmake --preset clang-cl-debug
 cmake --build --preset clang-debug
 
 # release
-cmake --presets clang-cl-release
+cmake --preset clang-cl-release
 cmake --build --preset clang-release
 ```
 
