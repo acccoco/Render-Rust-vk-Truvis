@@ -8,7 +8,7 @@ truvis-gfx = { workspace = true }
 truvis-shader-layout-trait = { workspace = true }
 truvis-shader-layout-macro = { workspace = true }
 truvis-model-manager = { workspace = true }
-truvis-cxx = { workspace = true }
+truvis-cxx-binding = { workspace = true }
 truvis-shader-binding = { workspace = true }
 truvis-crate-tools = { workspace = true }
 truvis-asset = { workspace = true }

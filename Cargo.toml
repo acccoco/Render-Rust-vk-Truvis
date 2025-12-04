@@ -3,10 +3,12 @@ resolver = "2"
 members = [
     "crates/truvis-gfx", # 渲染库
     "crates/truvis-model-manager", # 场景管理
-    "crates/truvis-shader/layout-macro", # 用于生成 shader 布局的 macro
-    "crates/truvis-shader/layout-trait", # 用于描述 shader 布局的 trait
-    "crates/truvis-shader/binding", # 将 shader 代码和 rust 代码绑定的库
-    "crates/truvis-cxx", # 手动绑定 assmip
+    "crates/truvis-shader/truvis-shader-layout-macro", # 用于生成 shader 布局的 macro
+    "crates/truvis-shader/truvis-shader-layout-trait", # 用于描述 shader 布局的 trait
+    "crates/truvis-shader/truvis-shader-binding", # 将 shader 代码和 rust 代码绑定的库
+    "crates/truvis-shader/truvis-shader-build",
+    "crates/truvis-cxx/truvis-cxx-binding",
+    "crates/truvis-cxx/truvis-cxx-build",
     "crates/truvis-render",
     "crates/truvis-app",
     "crates/truvis-crate-tools", # 可以在各个 crate 之间共享的工具
@@ -17,12 +19,14 @@ members = [
 [workspace.dependencies]
 truvis-gfx = { path = "crates/truvis-gfx" }
 truvis-model-manager = { path = "crates/truvis-model-manager" }
-truvis-cxx = { path = "crates/truvis-cxx" }
 truvis-render = { path = "crates/truvis-render" }
 truvis-app = { path = "crates/truvis-app" }
-truvis-shader-layout-macro = { path = "crates/truvis-shader/layout-macro" }
-truvis-shader-layout-trait = { path = "crates/truvis-shader/layout-trait" }
-truvis-shader-binding = { path = "crates/truvis-shader/binding" }
+truvis-shader-layout-macro = { path = "crates/truvis-shader/truvis-shader-layout-macro" }
+truvis-shader-layout-trait = { path = "crates/truvis-shader/truvis-shader-layout-trait" }
+truvis-shader-binding = { path = "crates/truvis-shader/truvis-shader-binding" }
+truvis-shader-build = { path = "crates/truvis-shader/truvis-shader-build" }
+truvis-cxx-binding = { path = "crates/truvis-cxx/truvis-cxx-binding" }
+truvis-cxx-build = { path = "crates/truvis-cxx/truvis-cxx-build" }
 truvis-crate-tools = { path = "crates/truvis-crate-tools" }
 truvis-asset = { path = "crates/truvis-asset" }
 

@@ -4,8 +4,11 @@ fn gen_rust_binding() {
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
-        .header("cxx/truvixx-interface/include/TruvixxInterface/lib.hpp")
-        .clang_args(["-Icxx/truvixx-assimp/include", "-Icxx/truvixx-interface/include"])
+        .header("../../../cxx/truvixx-interface/include/TruvixxInterface/lib.hpp")
+        .clang_args([
+            "-I../../../cxx/truvixx-assimp/include",
+            "-I../../../cxx/truvixx-interface/include",
+        ])
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .raw_line("#![allow(clippy::all)]")
@@ -34,7 +37,9 @@ fn main() {
     // {workspace}/crates/{current_crate}
     let crate_dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let build_type = std::env::var("PROFILE").unwrap();
-    let workspace_dir = crate_dir.parent().unwrap().parent().unwrap();
+    
+    // 手动找到 workspace 的路径，依赖当前 crate 的相对路径
+    let workspace_dir = crate_dir.parent().unwrap().parent().unwrap().parent().unwrap();
     let cargo_build_dir = workspace_dir.join("target").join(build_type);
     println!("cargo:rustc-link-search=native={}", cargo_build_dir.display());
     let libs = ["truvixx-interface"];

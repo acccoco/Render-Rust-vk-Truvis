@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::core::frame_context::FrameContext;
 use crate::subsystems::subsystem::Subsystem;
-use truvis_cxx::AssimpSceneLoader;
+use truvis_cxx_binding::AssimpSceneLoader;
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;
 use truvis_model_manager::components::mesh::Mesh;

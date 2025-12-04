@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use truvis_cxx::AssimpSceneLoader;
+use truvis_cxx_binding::AssimpSceneLoader;
 use truvis_gfx::gfx::Gfx;
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;

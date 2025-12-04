@@ -2421,7 +2421,7 @@ dependencies = [
  "tracy-client",
  "truvis-asset",
  "truvis-crate-tools",
- "truvis-cxx",
+ "truvis-cxx-binding",
  "truvis-gfx",
  "truvis-model-manager",
  "truvis-render",
@@ -2463,15 +2463,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "truvis-cxx"
+name = "truvis-cxx-binding"
 version = "0.1.0"
 dependencies = [
  "bindgen",
  "glam",
  "itertools 0.10.5",
  "tracy-client",
+ "truvis-crate-tools",
  "truvis-gfx",
  "truvis-model-manager",
+]
+
+[[package]]
+name = "truvis-cxx-build"
+version = "0.1.0"
+dependencies = [
+ "anstyle",
+ "chrono",
+ "env_logger",
+ "log",
+ "rayon",
+ "truvis-crate-tools",
+ "walkdir",
 ]
 
 [[package]]
@@ -2520,7 +2534,7 @@ dependencies = [
  "tracy-client",
  "truvis-asset",
  "truvis-crate-tools",
- "truvis-cxx",
+ "truvis-cxx-binding",
  "truvis-gfx",
  "truvis-model-manager",
  "truvis-shader-binding",
@@ -2537,6 +2551,19 @@ dependencies = [
  "bindgen",
  "bytemuck",
  "glam",
+]
+
+[[package]]
+name = "truvis-shader-build"
+version = "0.1.0"
+dependencies = [
+ "anstyle",
+ "chrono",
+ "env_logger",
+ "log",
+ "rayon",
+ "truvis-crate-tools",
+ "walkdir",
 ]
 
 [[package]]
