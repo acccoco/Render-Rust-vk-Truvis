@@ -34,7 +34,7 @@ truvis-asset = { path = "crates/truvis-asset" }
 # 图形相关的库
 ################################################
 ash = { version = "0.38.0", features = ["debug"] }
-glam = { version = "0.22.0", features = ["bytecheck", "rand", "serde"] }
+glam = { version = "0.22.0", features = ["bytecheck", "rand", "serde", "bytemuck"] }
 
 # vulkan memory allocate
 # vk-mem-0.4.0 和 ash-0.38.0+1.3.281 匹配
