@@ -1,0 +1,17 @@
+[package]
+name = "truvis-cxx-build"
+version = "0.1.0"
+edition = "2024"
+description = "build cxx"
+
+
+[dependencies]
+truvis-crate-tools = { workspace = true }
+
+log = { workspace = true }
+env_logger = { workspace = true }
+anstyle = { workspace = true }
+chrono = { workspace = true }
+
+rayon = { workspace = true }
+walkdir = { workspace = true }

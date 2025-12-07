@@ -818,6 +818,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12f597d56c1bd55a811a1be189459e8fad2bbc272616375602443bdfb37fa774"
 dependencies = [
  "bytemuck",
+ "bytemuck",
  "rand",
  "serde",
 ]
@@ -2380,7 +2381,7 @@ dependencies = [
  "tracy-client",
  "truvis-asset",
  "truvis-crate-tools",
- "truvis-cxx",
+ "truvis-cxx-binding",
  "truvis-gfx",
  "truvis-model-manager",
  "truvis-render",
@@ -2424,15 +2425,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "truvis-cxx"
+name = "truvis-cxx-binding"
 version = "0.1.0"
 dependencies = [
  "bindgen",
  "glam",
  "itertools 0.10.5",
  "tracy-client",
+ "truvis-crate-tools",
  "truvis-gfx",
  "truvis-model-manager",
+]
+
+[[package]]
+name = "truvis-cxx-build"
+version = "0.1.0"
+dependencies = [
+ "anstyle",
+ "chrono",
+ "env_logger",
+ "log",
+ "rayon",
+ "truvis-crate-tools",
+ "walkdir",
 ]
 
 [[package]]
@@ -2484,7 +2499,7 @@ dependencies = [
  "tracy-client",
  "truvis-asset",
  "truvis-crate-tools",
- "truvis-cxx",
+ "truvis-cxx-binding",
  "truvis-gfx",
  "truvis-model-manager",
  "truvis-resource",
@@ -2520,6 +2535,19 @@ dependencies = [
  "bindgen",
  "bytemuck",
  "glam",
+]
+
+[[package]]
+name = "truvis-shader-build"
+version = "0.1.0"
+dependencies = [
+ "anstyle",
+ "chrono",
+ "env_logger",
+ "log",
+ "rayon",
+ "truvis-crate-tools",
+ "walkdir",
 ]
 
 [[package]]
