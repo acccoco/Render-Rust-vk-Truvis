@@ -1,24 +1,11 @@
-use crate::handle::{LoadStatus, TextureHandle};
-use crate::loader::{AssetLoadRequest, IoWorker, LoadResult};
-use crate::transfer::AssetTransferManager;
-use ash::vk;
+use crate::handle::{AssetTextureHandle, LoadStatus};
+use crate::loader::{AssetLoadRequest, IoDispather, LoadResult};
+use crate::transfer::AssetUploadManager;
 use slotmap::{SecondaryMap, SlotMap};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
-use truvis_gfx::gfx::Gfx;
-use truvis_gfx::resources::image::GfxImage2D;
-use truvis_gfx::resources::image_view::{GfxImage2DView, GfxImageViewCreateInfo};
-use truvis_gfx::sampler_manager::GfxSamplerDesc;
-
-/// 纹理资源 (RAII)
-/// 包含 Image, Allocation, ImageView, Sampler
-/// Drop 时自动释放 Vulkan 资源
-pub struct TextureResource {
-    pub image: GfxImage2D,
-    pub view: GfxImage2DView,
-    pub sampler: vk::Sampler,
-}
+use truvis_gfx::resources::image::GfxImage;
+use truvis_resource::texture::GfxTexture2;
 
 /// 资产中心 (Facade)
 ///
@@ -30,21 +17,26 @@ pub struct TextureResource {
 /// 4. 提供 Fallback 机制 (未加载完成时返回粉色纹理)。
 pub struct AssetHub {
     // 存储纹理的状态
-    texture_states: SlotMap<TextureHandle, LoadStatus>,
+    texture_states: SlotMap<AssetTextureHandle, LoadStatus>,
 
     // 存储实际的纹理资源 (仅 Ready 状态才有)
-    textures: SecondaryMap<TextureHandle, Arc<TextureResource>>,
+    textures: SecondaryMap<AssetTextureHandle, GfxTexture2>,
 
     // 路径到句柄的映射，用于去重 (避免重复加载同一文件)
-    texture_cache: HashMap<PathBuf, TextureHandle>,
+    texture_cache: HashMap<PathBuf, AssetTextureHandle>,
 
     // 默认资源 (1x1 粉色纹理)，用于 Loading/Failed 状态时的占位
-    fallback_texture: Arc<TextureResource>,
+    fallback_texture: GfxTexture2,
 
-    io_worker: IoWorker,
-    transfer_manager: AssetTransferManager,
+    io_dispather: IoDispather,
+    upload_manager: AssetUploadManager,
 }
-
+impl Default for AssetHub {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+// new & init
 impl AssetHub {
     pub fn new() -> Self {
         let fallback_texture = Self::create_fallback_texture();
@@ -54,31 +46,32 @@ impl AssetHub {
             textures: SecondaryMap::new(),
             texture_cache: HashMap::new(),
             fallback_texture,
-            io_worker: IoWorker::new(),
-            transfer_manager: AssetTransferManager::new(),
+            io_dispather: IoDispather::new(),
+            upload_manager: AssetUploadManager::new(),
         }
     }
 
     /// 创建一个 1x1 的粉色纹理 (同步创建)
     /// 这是一个阻塞操作，只在初始化时执行一次。
-    fn create_fallback_texture() -> Arc<TextureResource> {
+    fn create_fallback_texture() -> GfxTexture2 {
         // 1. Create Image (1x1 Pink)
         let pixels: [u8; 4] = [255, 0, 255, 255];
-        let image = GfxImage2D::from_rgba8(1, 1, &pixels, "FallbackTexture");
+        let image = GfxImage::from_rgba8(1, 1, &pixels, "FallbackTexture");
 
-        // Create View
-        let view = GfxImage2DView::new(
-            image.handle(),
-            GfxImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
-            "FallbackView",
-        );
-
-        // Create Sampler
-        let sampler = Gfx::get().sampler_manager().get_sampler(&GfxSamplerDesc::default());
-
-        Arc::new(TextureResource { image, view, sampler })
+        GfxTexture2::new(image, "FallbackTexture")
     }
-
+}
+// destroy
+impl AssetHub {
+    pub fn destroy(self) {
+        self.fallback_texture.destroy();
+    }
+    pub fn destroy_mut(&mut self) {
+        self.fallback_texture.destroy_mut();
+    }
+}
+// tools
+impl AssetHub {
     /// 请求加载纹理
     ///
     /// 这是一个非阻塞调用。
@@ -86,7 +79,7 @@ impl AssetHub {
     /// 2. 如果是新请求，分配 Handle，状态设为 Loading。
     /// 3. 发送请求给后台 IO 线程。
     /// 4. 立即返回 Handle。
-    pub fn load_texture(&mut self, path: PathBuf) -> TextureHandle {
+    pub fn load_texture(&mut self, path: PathBuf) -> AssetTextureHandle {
         let _span = tracy_client::span!("load_texture");
         if let Some(&handle) = self.texture_cache.get(&path) {
             return handle;
@@ -99,12 +92,12 @@ impl AssetHub {
         log::info!("Request load texture: {:?}", path);
 
         // 发送 IO 请求到后台线程
-        self.io_worker.request_load(AssetLoadRequest { path, handle });
+        self.io_dispather.request_load(AssetLoadRequest { path, handle });
 
         handle
     }
 
-    pub fn get_status(&self, handle: TextureHandle) -> LoadStatus {
+    pub fn get_status(&self, handle: AssetTextureHandle) -> LoadStatus {
         self.texture_states.get(handle).copied().unwrap_or(LoadStatus::Failed)
     }
 
@@ -113,12 +106,8 @@ impl AssetHub {
     /// 如果资源已 Ready，返回实际纹理。
     /// 否则 (Loading/Uploading/Failed)，返回 Fallback 纹理。
     /// 这保证了渲染循环永远不会因为资源未就绪而阻塞或崩溃。
-    pub fn get_texture(&self, handle: TextureHandle) -> Arc<TextureResource> {
-        self.textures.get(handle).cloned().unwrap_or_else(|| self.fallback_texture.clone())
-    }
-
-    pub fn iter_handles(&self) -> impl Iterator<Item = TextureHandle> + '_ {
-        self.texture_states.keys()
+    pub fn get_texture(&self, handle: AssetTextureHandle) -> &GfxTexture2 {
+        self.textures.get(handle).unwrap_or(&self.fallback_texture)
     }
 
     /// 驱动加载流程 (每帧调用)
@@ -128,7 +117,7 @@ impl AssetHub {
     pub fn update(&mut self) {
         let _span = tracy_client::span!("AssetHub::update");
         // 1. 处理 IO 完成的消息
-        while let Some(result) = self.io_worker.try_recv_result() {
+        while let Some(result) = self.io_dispather.try_recv_result() {
             match result {
                 LoadResult::Success(data) => {
                     let handle = data.handle;
@@ -144,7 +133,7 @@ impl AssetHub {
                     }
 
                     // 提交给 TransferManager (CPU -> GPU)
-                    if let Err(e) = self.transfer_manager.upload_texture(data) {
+                    if let Err(e) = self.upload_manager.upload_texture(data) {
                         log::error!("Failed to submit upload task: {}", e);
                         if let Some(status) = self.texture_states.get_mut(handle) {
                             *status = LoadStatus::Failed;
@@ -161,23 +150,13 @@ impl AssetHub {
         }
 
         // 2. 检查 GPU 上传完成
-        let finished_uploads = self.transfer_manager.update();
+        let finished_uploads = self.upload_manager.update();
         for (handle, image) in finished_uploads {
             log::info!("Upload finished for texture handle: {:?}", handle);
 
-            // 创建 ImageView
-            let view = GfxImage2DView::new(
-                image.handle(),
-                GfxImageViewCreateInfo::new_image_view_2d_info(image.format(), vk::ImageAspectFlags::COLOR),
-                "TextureView",
-            );
+            let texture = GfxTexture2::new(image, "TextureView");
 
-            // Create Sampler (TODO: Use params from load request)
-            let sampler = Gfx::get().sampler_manager().get_sampler(&GfxSamplerDesc::default());
-
-            let resource = Arc::new(TextureResource { image, view, sampler });
-
-            self.textures.insert(handle, resource);
+            self.textures.insert(handle, texture);
 
             if let Some(status) = self.texture_states.get_mut(handle) {
                 *status = LoadStatus::Ready;

@@ -1,5 +1,3 @@
-use std::rc::Weak;
-
 use ash::vk;
 use itertools::Itertools;
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
@@ -8,7 +6,6 @@ use crate::gui::core::Gui;
 use crate::gui::gui_pass::GuiPass;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxBarrierMask;
-use truvis_gfx::resources::texture::GfxTexture2D;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, semaphore::GfxSemaphore, submit_info::GfxSubmitInfo},
     gfx::Gfx,
@@ -16,6 +13,7 @@ use truvis_gfx::{
 };
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::{DefaultRendererSettings, FrameLabel};
+use truvis_resource::handles::GfxTextureHandle;
 
 /// 渲染演示数据结构
 ///
@@ -25,12 +23,7 @@ pub struct PresentData {
     /// 当前帧的渲染目标纹理
     ///
     /// 包含了最终的渲染结果，将被复制或演示到屏幕上
-    pub render_target: Weak<GfxTexture2D>,
-
-    /// 渲染目标在 Bindless 系统中的唯一标识符
-    ///
-    /// 用于在着色器中通过 Bindless 方式访问渲染目标纹理
-    pub render_target_bindless_key: String,
+    pub render_target: GfxTextureHandle,
 
     /// 渲染目标的内存屏障配置
     ///
@@ -123,6 +116,10 @@ impl MainWindow {
         let swapchain_image_idx = swapchain.current_image_index();
         let frame_label = FrameContext::get().frame_label();
 
+        let gfx_resource_manager = FrameContext::gfx_resource_manager();
+
+        let render_target_texture = gfx_resource_manager.get_texture(renderer_data.render_target).unwrap();
+
         let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("window-present");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         {
@@ -140,7 +137,7 @@ impl MainWindow {
                 );
 
             let render_target_barrier = GfxImageBarrier::new()
-                .image(renderer_data.render_target.upgrade().unwrap().image())
+                .image(render_target_texture.image().handle())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(renderer_data.render_target_barrier.src_stage, renderer_data.render_target_barrier.src_access)
                 .dst_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ);
@@ -192,7 +189,7 @@ impl MainWindow {
     }
 }
 
-// 手动 drop
+// destroy
 impl MainWindow {
     pub fn destroy(self) {
         for semaphore in self.present_complete_semaphores {
@@ -200,6 +197,9 @@ impl MainWindow {
         }
         for semaphore in self.render_complete_semaphores {
             semaphore.destroy();
+        }
+        if let Some(swapchain) = self.swapchain {
+            swapchain.destroy();
         }
     }
 }
@@ -236,7 +236,7 @@ impl MainWindow {
     }
 
     pub fn draw_gui(&mut self, renderer_data: PresentData) {
-        self.gui.register_render_image_key(renderer_data.render_target_bindless_key.clone());
+        self.gui.register_render_texture(renderer_data.render_target);
         self.draw(renderer_data);
     }
 
@@ -254,7 +254,9 @@ impl MainWindow {
             Gfx::get().gfx_device().device_wait_idle().unwrap();
         }
 
-        self.swapchain = None;
+        if let Some(swapchain) = self.swapchain.take() {
+            swapchain.destroy();
+        }
         self.swapchain = Some(GfxRenderSwapchain::new(
             Gfx::get().vk_core(),
             &self.winit_window,

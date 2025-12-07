@@ -5,7 +5,7 @@ use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::const_map;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
+use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
     commands::command_buffer::GfxCommandBuffer,
     pipelines::{
@@ -114,9 +114,9 @@ impl GuiPass {
 
         let mesh;
         let draw_data;
-        let get_texture_key;
-        if let Some(r) = gui.imgui_render(cmd, frame_label) {
-            (mesh, draw_data, get_texture_key) = r;
+        let get_texture_handle;
+        if let Some(res) = gui.imgui_render(cmd, frame_label) {
+            (mesh, draw_data, get_texture_handle) = res;
         } else {
             log::warn!("No ImGui draw data available, skipping GUI pass.");
             return;
@@ -207,16 +207,16 @@ impl GuiPass {
                         // 加载 texture，如果和上一个 command 使用的 texture
                         // 不是同一个，则需要重新加载
                         if Some(texture_id) != last_texture_id {
-                            let texture_key = get_texture_key(texture_id);
-                            let texture_handle = bindless_manager
-                                .get_texture_handle(&texture_key)
-                                .unwrap_or_else(|| panic!("Texture not found: {}", texture_key));
+                            let texture_handle = get_texture_handle(texture_id);
+                            let texture_bindless_handle = bindless_manager
+                                .get_texture_handle2(texture_handle)
+                                .unwrap_or_else(|| panic!("Texture not found: {:?}", texture_id));
 
                             cmd.cmd_push_constants(
                                 self.pipeline_layout.handle(),
                                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                                 offset_of!(shader::imgui::PushConstant, texture) as u32,
-                                bytemuck::bytes_of(&texture_handle),
+                                bytemuck::bytes_of(&texture_bindless_handle.0),
                             );
                             last_texture_id = Some(texture_id);
                         }

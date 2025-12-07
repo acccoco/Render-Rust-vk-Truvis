@@ -10,7 +10,7 @@ use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxImageBarrier;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
-use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
+use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
     commands::command_buffer::GfxCommandBuffer,
     pipelines::{
@@ -184,8 +184,11 @@ impl ShaderToyPass {
         let fif_buffers = FrameContext::get().fif_buffers.borrow();
 
         let frame_label = FrameContext::get().frame_label();
-        let render_target = fif_buffers.render_target_image(frame_label);
-        let render_target_view = fif_buffers.render_target_image_view(frame_label);
+
+        let gfx_resource_manager = FrameContext::get().gfx_resource_manager.borrow();
+
+        let render_target_texture =
+            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
         let frame_settings = FrameContext::get().frame_settings();
 
         // render shader toy
@@ -197,7 +200,7 @@ impl ShaderToyPass {
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(render_target)
+                    .image(render_target_texture.image().handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
                     .src_mask(
@@ -210,13 +213,13 @@ impl ShaderToyPass {
                     )],
             );
 
-            self.shader_toy_pass.draw(&cmd, &frame_settings, render_target_view.handle(), shape);
+            self.shader_toy_pass.draw(&cmd, &frame_settings, render_target_texture.image_view().handle(), shape);
 
             // 将 render target 从 color attachment -> general
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(render_target)
+                    .image(render_target_texture.image().handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
                     .src_mask(

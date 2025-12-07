@@ -1,4 +1,4 @@
-use crate::handle::TextureHandle;
+use crate::handle::AssetTextureHandle;
 use ash::vk;
 use crossbeam_channel::{Receiver, Sender};
 use crossbeam_utils::sync::WaitGroup;
@@ -8,7 +8,7 @@ use std::thread;
 
 pub struct AssetLoadRequest {
     pub path: PathBuf,
-    pub handle: TextureHandle,
+    pub handle: AssetTextureHandle,
     // pub params: AssetParams, // Future expansion
 }
 
@@ -18,13 +18,13 @@ pub struct RawAssetData {
     pub pixels: Vec<u8>,
     pub extent: vk::Extent3D,
     pub format: vk::Format,
-    pub handle: TextureHandle,
+    pub handle: AssetTextureHandle,
     pub mip_levels: u32,
 }
 
 pub enum LoadResult {
     Success(RawAssetData),
-    Failure(TextureHandle, String),
+    Failure(AssetTextureHandle, String),
 }
 
 /// IO 工作器
@@ -48,16 +48,23 @@ pub enum LoadResult {
 /// 2. 后台线程中的 `req_rx.recv()` 返回错误，退出循环。
 /// 3. 线程执行 `wg.wait()`，阻塞等待所有已分发的 Rayon 任务完成。
 /// 4. `IoWorker::drop` 会调用 `thread.join()` 等待后台线程完全退出。
-pub struct IoWorker {
+pub struct IoDispather {
     /// 用于向 IoWorker 发送加载请求
-    request_tx: Option<Sender<AssetLoadRequest>>,
+    request_sender: Option<Sender<AssetLoadRequest>>,
     /// 用于从 IoWorker 接收加载结果
-    result_rx: Receiver<LoadResult>,
+    result_receiver: Receiver<LoadResult>,
 
-    io_thread: Option<std::thread::JoinHandle<()>>,
+    /// 用于分发 IO 任务的后台线程
+    dispatch_thread: Option<std::thread::JoinHandle<()>>,
 }
 
-impl IoWorker {
+impl Default for IoDispather {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IoDispather {
     pub fn new() -> Self {
         let (req_tx, req_rx) = crossbeam_channel::unbounded::<AssetLoadRequest>();
         let (res_tx, res_rx) = crossbeam_channel::unbounded::<LoadResult>();
@@ -100,23 +107,23 @@ impl IoWorker {
             .expect("Failed to spawn IO dispatcher thread");
 
         Self {
-            request_tx: Some(req_tx),
-            result_rx: res_rx,
+            request_sender: Some(req_tx),
+            result_receiver: res_rx,
 
-            io_thread: Some(io_thread),
+            dispatch_thread: Some(io_thread),
         }
     }
 
     pub fn request_load(&self, req: AssetLoadRequest) {
-        if let Some(tx) = &self.request_tx {
-            if let Err(e) = tx.send(req) {
-                log::error!("Failed to send asset load request: {}", e);
-            }
+        if let Some(sender) = &self.request_sender
+            && let Err(e) = sender.send(req)
+        {
+            log::error!("Failed to send asset load request: {}", e);
         }
     }
 
     pub fn try_recv_result(&self) -> Option<LoadResult> {
-        self.result_rx.try_recv().ok()
+        self.result_receiver.try_recv().ok()
     }
 
     /// 显式等待所有任务完成并销毁 IoWorker
@@ -124,17 +131,17 @@ impl IoWorker {
     pub fn join(self) {}
 }
 
-impl Drop for IoWorker {
+impl Drop for IoDispather {
     fn drop(&mut self) {
         // 显式关闭 channel，通知后台线程退出
         // 必须先 drop sender，否则 recv 会一直阻塞，导致 join 死锁
-        self.request_tx = None;
+        self.request_sender = None;
 
         log::info!("IoWorker is being dropped, waiting for tasks to complete...");
-        if let Some(thread) = self.io_thread.take() {
-            if let Err(_) = thread.join() {
-                log::error!("Failed to join IO dispatcher thread");
-            }
+        if let Some(thread) = self.dispatch_thread.take()
+            && let Err(_) = thread.join()
+        {
+            log::error!("Failed to join IO dispatcher thread");
         }
         log::info!("All IO tasks completed, IoWorker dropped.");
     }

@@ -1,9 +1,15 @@
-use std::collections::HashMap;
-
 use ash::vk;
 use glam::Vec4Swizzles;
 use itertools::Itertools;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
+use crate::core::frame_context::FrameContext;
+use crate::subsystems::subsystem::Subsystem;
+use crate::{
+    pipeline_settings::FrameLabel,
+    subsystems::{bindless_manager::BindlessManager, scene_manager::SceneManager},
+};
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
     commands::{
@@ -15,14 +21,10 @@ use truvis_gfx::{
 };
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
+use truvis_resource::gfx_resource_manager::GfxResourceManager;
+use truvis_resource::handles::GfxTextureHandle;
+use truvis_resource::texture::{GfxTexture2, ImageLoader};
 use truvis_shader_binding::shader;
-
-use crate::core::frame_context::FrameContext;
-use crate::subsystems::subsystem::Subsystem;
-use crate::{
-    pipeline_settings::FrameLabel,
-    subsystems::{bindless_manager::BindlessManager, scene_manager::SceneManager},
-};
 
 /// 数据以顺序的方式存储，同时查找时间为 O(1)
 #[derive(Default)]
@@ -144,11 +146,6 @@ impl GpuSceneBuffers {
     }
 }
 
-struct Resources {
-    sky: String,
-    uv_checker: String,
-}
-
 /// 用于构建传输到 GPU 的场景数据
 pub struct GpuScene {
     /// GPU 中以顺序存储的 instance
@@ -169,7 +166,8 @@ pub struct GpuScene {
 
     gpu_scene_buffers: Vec<GpuSceneBuffers>,
 
-    resources: Resources,
+    sky_texture_handle: GfxTextureHandle,
+    uv_checker_texture_handle: GfxTextureHandle,
 }
 // getter
 impl GpuScene {
@@ -185,11 +183,24 @@ impl GpuScene {
 }
 // init & destroy
 impl GpuScene {
-    pub fn new(fif_count: usize) -> Self {
-        let resources = Resources {
-            sky: TruvisPath::resources_path("sky.jpg"),
-            uv_checker: TruvisPath::resources_path("uv_checker.png"),
-        };
+    pub fn new(
+        fif_count: usize,
+        gfx_resource_manager: &mut GfxResourceManager,
+        bindless_manager: &mut BindlessManager,
+    ) -> Self {
+        let sky_path = TruvisPath::resources_path("sky.jpg");
+        let uv_checker_path = TruvisPath::resources_path("uv_checker.png");
+        let sky_image = ImageLoader::load_image(&PathBuf::from(&sky_path));
+        let uv_checker_image = ImageLoader::load_image(&PathBuf::from(&uv_checker_path));
+
+        let sky_texture = GfxTexture2::new(sky_image, &sky_path);
+        let uv_checker_texture = GfxTexture2::new(uv_checker_image, &uv_checker_path);
+
+        let sky_texture_handle = gfx_resource_manager.register_texture(sky_texture);
+        let uv_checker_texture_handle = gfx_resource_manager.register_texture(uv_checker_texture);
+
+        bindless_manager.register_texture2(sky_texture_handle);
+        bindless_manager.register_texture2(uv_checker_texture_handle);
 
         Self {
             flatten_instances: vec![],
@@ -198,7 +209,9 @@ impl GpuScene {
             mesh_geometry_map: HashMap::new(),
 
             gpu_scene_buffers: (0..fif_count).map(GpuSceneBuffers::new).collect(),
-            resources,
+
+            sky_texture_handle,
+            uv_checker_texture_handle,
         }
     }
 }
@@ -209,20 +222,18 @@ impl Subsystem for GpuScene {
 
 // tools
 impl GpuScene {
-    /// 注册 GpuScene 使用的默认纹理
-    pub fn register_default_textures(&self) {
-        let mut bindless_manager = FrameContext::bindless_manager_mut();
-        bindless_manager.register_texture_by_path(self.resources.sky.clone());
-        bindless_manager.register_texture_by_path(self.resources.uv_checker.clone());
-    }
-
     /// # Phase: Before Render
     ///
     /// 在每一帧开始时调用，将场景数据转换为 GPU 可读的形式
-    pub fn prepare_render_data(&mut self, scene_manager: &SceneManager) {
+    pub fn prepare_render_data(
+        &mut self,
+        scene_manager: &SceneManager,
+        bindless_manager: &mut BindlessManager,
+        gfx_resource_manager: &GfxResourceManager,
+    ) {
         let _span = tracy_client::span!("GpuScene::prepare_render_data");
-        let mut bindless_manager = FrameContext::bindless_manager_mut();
-        bindless_manager.prepare_render_data(FrameContext::get().frame_label());
+
+        bindless_manager.prepare_render_data(gfx_resource_manager, FrameContext::get().frame_label());
 
         self.flatten_material_data(scene_manager);
         self.flatten_mesh_data(scene_manager);
@@ -330,8 +341,8 @@ impl GpuScene {
             spot_light_count: 0, // TODO 暂时无用
             tlas: crt_gpu_buffers.tlas.as_ref().map_or(vk::DeviceAddress::default(), |tlas| tlas.device_address()),
 
-            sky: bindless_manager.get_texture_handle(&self.resources.sky).unwrap(),
-            uv_checker: bindless_manager.get_texture_handle(&self.resources.uv_checker).unwrap(),
+            sky: bindless_manager.get_texture_handle2(self.sky_texture_handle).unwrap().0,
+            uv_checker: bindless_manager.get_texture_handle2(self.uv_checker_texture_handle).unwrap().0,
         };
 
         cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.vk_buffer(), 0, bytemuck::bytes_of(&scene_data));
@@ -447,17 +458,23 @@ impl GpuScene {
 
         for (mat_idx, mat_uuid) in self.flatten_materials.iter().enumerate() {
             let mat = scene_manager.mat_map().get(mat_uuid).unwrap();
+
+            let diffuse_bindless_handle = scene_manager
+                .get_texture(&mat.diffuse_map)
+                .and_then(|tex_handle| bindless_manager.get_texture_handle2(tex_handle))
+                .unwrap_or_default();
+            let normal_bindless_handle = scene_manager
+                .get_texture(&mat.normal_map)
+                .and_then(|tex_handle| bindless_manager.get_texture_handle2(tex_handle))
+                .unwrap_or_default();
+
             material_buffer_slices[mat_idx] = shader::PBRMaterial {
                 base_color: mat.base_color.xyz().into(),
                 emissive: mat.emissive.xyz().into(),
                 metallic: mat.metallic,
                 roughness: mat.roughness,
-                diffuse_map: bindless_manager.get_texture_handle(&mat.diffuse_map).unwrap_or(shader::TextureHandle {
-                    index: shader::INVALID_TEX_ID,
-                }),
-                normal_map: bindless_manager.get_texture_handle(&mat.normal_map).unwrap_or(shader::TextureHandle {
-                    index: shader::INVALID_TEX_ID,
-                }),
+                diffuse_map: diffuse_bindless_handle.0,
+                normal_map: normal_bindless_handle.0,
                 opaque: mat.opaque,
                 _padding_1: Default::default(),
             };

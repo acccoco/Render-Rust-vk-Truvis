@@ -14,9 +14,7 @@ pub struct GfxStructuredBuffer<T: bytemuck::Pod> {
     ele_num: usize,
     _phantom: PhantomData<T>,
 }
-
 impl_derive_buffer!(GfxStructuredBuffer<T: bytemuck::Pod>, GfxBuffer, inner);
-
 impl<T: bytemuck::Pod> GfxStructuredBuffer<T> {
     #[inline]
     pub fn new_ubo(len: usize, debug_name: impl AsRef<str>) -> Self {
@@ -57,7 +55,6 @@ impl<T: bytemuck::Pod> GfxStructuredBuffer<T> {
         unsafe { std::slice::from_raw_parts_mut(mapped_ptr as *mut T, self.ele_num) }
     }
 }
-
 impl<T: bytemuck::Pod> DebugType for GfxStructuredBuffer<T> {
     #[inline]
     fn debug_type_name() -> &'static str {
@@ -66,6 +63,6 @@ impl<T: bytemuck::Pod> DebugType for GfxStructuredBuffer<T> {
 
     #[inline]
     fn vk_handle(&self) -> impl Handle {
-        self.inner.handle
+        self.vk_buffer()
     }
 }

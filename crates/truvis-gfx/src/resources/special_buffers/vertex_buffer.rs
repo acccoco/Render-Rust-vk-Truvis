@@ -5,39 +5,8 @@ use std::{
 
 use ash::{vk, vk::Handle};
 
+use crate::resources::layout::GfxVertexLayout;
 use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::GfxBuffer};
-
-/// Vertex Buffer 中顶点布局的 trait 定义
-pub trait GfxVertexLayout {
-    fn vertex_input_bindings() -> Vec<vk::VertexInputBindingDescription>;
-
-    fn vertex_input_attributes() -> Vec<vk::VertexInputAttributeDescription>;
-
-    /// 整个 Buffer 的大小
-    fn buffer_size(vertex_cnt: usize) -> usize;
-
-    /// position 属性的 stride
-    fn pos_stride() -> u32 {
-        unimplemented!()
-    }
-
-    /// position 属性在 Buffer 中的偏移量
-    fn pos_offset(_vertex_cnt: usize) -> vk::DeviceSize {
-        unimplemented!()
-    }
-    /// normal 属性在 Buffer 中的偏移量
-    fn normal_offset(_vertex_cnt: usize) -> vk::DeviceSize {
-        unimplemented!()
-    }
-    /// tangent 属性在 Buffer 中的偏移量
-    fn tangent_offset(_vertex_cnt: usize) -> vk::DeviceSize {
-        unimplemented!()
-    }
-    /// uv 属性在 Buffer 中的偏移量
-    fn uv_offset(_vertex_cnt: usize) -> vk::DeviceSize {
-        unimplemented!()
-    }
-}
 
 pub struct GfxVertexBuffer<L: GfxVertexLayout> {
     inner: GfxBuffer,
@@ -57,7 +26,7 @@ impl<L: GfxVertexLayout> GfxVertexBuffer<L> {
                 | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
             None,
             false,
-            debug_name,
+            debug_name.as_ref(),
         );
 
         let buffer = Self {
@@ -66,7 +35,7 @@ impl<L: GfxVertexLayout> GfxVertexBuffer<L> {
             _phantom: PhantomData,
         };
         let gfx_device = Gfx::get().gfx_device();
-        gfx_device.set_debug_name(&buffer, &buffer.inner.debug_name);
+        gfx_device.set_debug_name(&buffer, debug_name);
         buffer
     }
 
@@ -95,13 +64,12 @@ impl<L: GfxVertexLayout> GfxVertexBuffer<L> {
         self.device_address() + L::uv_offset(self.vertex_cnt)
     }
 }
-
 impl<L: GfxVertexLayout> DebugType for GfxVertexBuffer<L> {
     fn debug_type_name() -> &'static str {
         "VertexBuffer"
     }
 
     fn vk_handle(&self) -> impl Handle {
-        self.inner.handle
+        self.vk_buffer()
     }
 }

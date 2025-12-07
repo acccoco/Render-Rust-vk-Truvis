@@ -1,12 +1,14 @@
-use std::collections::HashMap;
-
 use crate::core::frame_context::FrameContext;
 use crate::subsystems::subsystem::Subsystem;
+use std::collections::HashMap;
+use std::path::PathBuf;
 use truvis_cxx::AssimpSceneLoader;
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;
 use truvis_model_manager::components::mesh::Mesh;
 use truvis_model_manager::guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid};
+use truvis_resource::handles::GfxTextureHandle;
+use truvis_resource::texture::{GfxTexture2, ImageLoader};
 use truvis_shader_binding::shader;
 
 /// 在 CPU 侧管理场景数据
@@ -18,6 +20,8 @@ pub struct SceneManager {
 
     // all_textures: HashMap<>
     all_point_lights: HashMap<LightGuid, shader::PointLight>,
+
+    texture_map: HashMap<String, GfxTextureHandle>,
 }
 // getter
 impl SceneManager {
@@ -37,7 +41,6 @@ impl SceneManager {
     pub fn point_light_map(&self) -> &HashMap<LightGuid, shader::PointLight> {
         &self.all_point_lights
     }
-
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.all_instances.is_empty()
@@ -52,11 +55,9 @@ impl SceneManager {
         Self::default()
     }
 }
-
 impl Subsystem for SceneManager {
     fn before_render(&mut self) {}
 }
-
 // tools
 impl SceneManager {
     #[inline]
@@ -72,6 +73,11 @@ impl SceneManager {
     #[inline]
     pub fn get_material(&self, guid: &MatGuid) -> Option<&Material> {
         self.all_mats.get(guid)
+    }
+
+    #[inline]
+    pub fn get_texture(&self, path: &str) -> Option<GfxTextureHandle> {
+        self.texture_map.get(path).copied()
     }
 
     /// 向世界中添加一个外部场景
@@ -94,10 +100,18 @@ impl SceneManager {
             |mat| {
                 let guid = MatGuid::new();
 
-                // 注册纹理
                 let mut bindless_manager = FrameContext::get().bindless_manager.borrow_mut();
+                let mut gfx_resource_manager = FrameContext::get().gfx_resource_manager.borrow_mut();
+
+                // 注册纹理
                 if !mat.diffuse_map.is_empty() {
-                    bindless_manager.register_texture_by_path(mat.diffuse_map.clone());
+                    let entry = self.texture_map.entry(mat.diffuse_map.clone()).or_insert_with(|| {
+                        let diffuse_map_path = PathBuf::from(&mat.diffuse_map);
+                        let image = ImageLoader::load_image(&diffuse_map_path);
+                        let texture = GfxTexture2::new(image, &mat.diffuse_map);
+                        gfx_resource_manager.register_texture(texture)
+                    });
+                    bindless_manager.register_texture2(*entry);
                 }
 
                 self.all_mats.insert(guid, mat);

@@ -30,7 +30,6 @@ fn copy_to_rust(cmake_project: &std::path::Path, cargo_target_dir: &std::path::P
     // 确保 target/release, target/release/examples 目录存在
     std::fs::create_dir_all(cargo_output_path.join("examples")).unwrap();
 
-
     let mut all_copy_files = Vec::new();
     for entry in std::fs::read_dir(cmake_output_path).unwrap() {
         let entry = entry.unwrap();

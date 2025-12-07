@@ -1,7 +1,6 @@
-use std::rc::Rc;
-
 use ash::vk;
-use vk_mem::Alloc;
+use ash::vk::Handle;
+use vk_mem::{Alloc, Allocation};
 
 use crate::{
     commands::{barrier::GfxImageBarrier, command_buffer::GfxCommandBuffer},
@@ -12,7 +11,6 @@ use crate::{
 
 /// Vulkan 格式相关的工具类
 pub struct VulkanFormatUtils;
-
 impl VulkanFormatUtils {
     /// 计算指定 Vulkan 格式下每个像素需要的字节数
     ///
@@ -48,24 +46,36 @@ impl VulkanFormatUtils {
     }
 }
 
-pub struct GfxImage2D {
+/// Image 来源枚举
+pub enum ImageSource {
+    /// 由 VMA 分配的 Image
+    Allocated(Allocation),
+    /// 外部 Image（例如 Swapchain Image），不管理其内存生命周期
+    External,
+}
+
+pub struct GfxImage {
     handle: vk::Image,
+    source: ImageSource,
 
-    allocation: vk_mem::Allocation,
+    extent: vk::Extent3D,
+    format: vk::Format,
 
-    _name: String,
-    image_info: Rc<GfxImageCreateInfo>,
+    usage: vk::ImageUsageFlags,
+
+    #[cfg(debug_assertions)]
+    name: String,
 }
 // getter
-impl GfxImage2D {
+impl GfxImage {
     #[inline]
     pub fn width(&self) -> u32 {
-        self.image_info.extent().width
+        self.extent.width
     }
 
     #[inline]
     pub fn height(&self) -> u32 {
-        self.image_info.extent().height
+        self.extent.height
     }
 
     #[inline]
@@ -75,39 +85,39 @@ impl GfxImage2D {
 
     #[inline]
     pub fn format(&self) -> vk::Format {
-        self.image_info.format()
+        self.format
     }
 }
-
-// 构建与销毁
-impl GfxImage2D {
-    pub fn new(
-        image_info: Rc<GfxImageCreateInfo>,
-        alloc_info: &vk_mem::AllocationCreateInfo,
-        debug_name: &str,
-    ) -> Self {
+// new & init
+impl GfxImage {
+    pub fn new(image_info: &GfxImageCreateInfo, alloc_info: &vk_mem::AllocationCreateInfo, debug_name: &str) -> Self {
         let allocator = Gfx::get().allocator();
         let gfx_device = Gfx::get().gfx_device();
         let (image, alloc) = unsafe { allocator.create_image(&image_info.as_info(), alloc_info).unwrap() };
         let image = Self {
-            _name: debug_name.to_string(),
-
             handle: image,
-            allocation: alloc,
+            source: ImageSource::Allocated(alloc),
+            extent: image_info.inner.extent,
+            format: image_info.inner.format,
+            usage: image_info.inner.usage,
 
-            image_info,
+            #[cfg(debug_assertions)]
+            name: debug_name.to_string(),
         };
         gfx_device.set_debug_name(&image, debug_name);
         image
     }
+
+    // TODO 考虑将 GfxImage::from_rgba8 放入 UploadManager 中，并提供异步版本
     /// 根据 RGBA8_UNORM 的 data 创建 image
     pub fn from_rgba8(width: u32, height: u32, data: &[u8], name: impl AsRef<str>) -> Self {
+        let image_create_info = GfxImageCreateInfo::new_image_2d_info(
+            vk::Extent2D { width, height },
+            vk::Format::R8G8B8A8_UNORM,
+            vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
+        );
         let image = Self::new(
-            Rc::new(GfxImageCreateInfo::new_image_2d_info(
-                vk::Extent2D { width, height },
-                vk::Format::R8G8B8A8_UNORM,
-                vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
-            )),
+            &image_create_info,
             &vk_mem::AllocationCreateInfo {
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
@@ -119,7 +129,38 @@ impl GfxImage2D {
 
         image
     }
+}
+impl DebugType for GfxImage {
+    fn debug_type_name() -> &'static str {
+        "GfxImage2D"
+    }
 
+    fn vk_handle(&self) -> impl vk::Handle {
+        self.handle
+    }
+}
+// destroy
+impl GfxImage {
+    pub fn destroy(mut self) {
+        self.destroy_mut();
+    }
+    pub fn destroy_mut(&mut self) {
+        match &mut self.source {
+            ImageSource::External => (),
+            ImageSource::Allocated(allocation) => unsafe {
+                Gfx::get().allocator().destroy_image(self.handle, allocation)
+            },
+        }
+        self.handle = vk::Image::null();
+    }
+}
+impl Drop for GfxImage {
+    fn drop(&mut self) {
+        debug_assert!(self.handle.is_null());
+    }
+}
+// tools
+impl GfxImage {
     /// # 实现步骤
     /// 1. 创建一个 staging buffer，用于存放待复制的数据
     /// 2. 将数据复制到 staging buffer
@@ -128,7 +169,7 @@ impl GfxImage2D {
     /// 5. 进行图像布局转换
     pub fn transfer_data(&self, command_buffer: &GfxCommandBuffer, data: &[u8]) -> GfxBuffer {
         let pixels_cnt = self.width() * self.height();
-        assert_eq!(data.len(), VulkanFormatUtils::pixel_size_in_bytes(self.image_info.format()) * pixels_cnt as usize);
+        assert_eq!(data.len(), VulkanFormatUtils::pixel_size_in_bytes(self.format()) * pixels_cnt as usize);
 
         let stage_buffer = GfxBuffer::new_stage_buffer(size_of_val(data) as vk::DeviceSize, "image-stage-buffer");
         stage_buffer.transfer_data_by_mmap(data);
@@ -180,43 +221,6 @@ impl GfxImage2D {
 
         stage_buffer
     }
-
-    #[inline]
-    pub fn destroy(self) {
-        // 通过 drop 实现
-    }
-}
-
-impl Drop for GfxImage2D {
-    fn drop(&mut self) {
-        unsafe { Gfx::get().allocator().destroy_image(self.handle, &mut self.allocation) }
-    }
-}
-
-impl DebugType for GfxImage2D {
-    fn debug_type_name() -> &'static str {
-        "GfxImage2D"
-    }
-
-    fn vk_handle(&self) -> impl vk::Handle {
-        self.handle
-    }
-}
-pub enum ImageContainer {
-    Own(Box<GfxImage2D>),
-    Shared(Rc<GfxImage2D>),
-    Raw(vk::Image),
-}
-
-impl ImageContainer {
-    #[inline]
-    pub fn vk_image(&self) -> vk::Image {
-        match self {
-            ImageContainer::Own(image) => image.handle(),
-            ImageContainer::Shared(image) => image.handle(),
-            ImageContainer::Raw(image) => *image,
-        }
-    }
 }
 
 pub struct GfxImageCreateInfo {
@@ -224,7 +228,6 @@ pub struct GfxImageCreateInfo {
 
     queue_family_indices: Vec<u32>,
 }
-
 impl GfxImageCreateInfo {
     #[inline]
     pub fn new_image_2d_info(extent: vk::Extent2D, format: vk::Format, usage: vk::ImageUsageFlags) -> Self {
@@ -250,16 +253,6 @@ impl GfxImageCreateInfo {
     #[inline]
     pub fn as_info(&self) -> vk::ImageCreateInfo<'_> {
         self.inner.queue_family_indices(&self.queue_family_indices)
-    }
-
-    // getter
-    #[inline]
-    pub fn extent(&self) -> &vk::Extent3D {
-        &self.inner.extent
-    }
-    #[inline]
-    pub fn format(&self) -> vk::Format {
-        self.inner.format
     }
 
     // builder

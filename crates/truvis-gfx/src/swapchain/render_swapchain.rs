@@ -3,9 +3,10 @@ use crate::commands::fence::GfxFence;
 use crate::commands::semaphore::GfxSemaphore;
 use crate::gfx::Gfx;
 use crate::gfx_core::GfxCore;
-use crate::resources::image_view::{GfxImage2DView, GfxImageViewCreateInfo};
+use crate::resources::image_view::{GfxImageView, GfxImageViewDesc};
 use crate::swapchain::surface::GfxSurface;
 use ash::vk;
+use ash::vk::Handle;
 use itertools::Itertools;
 
 pub struct GfxRenderSwapchain {
@@ -14,14 +15,14 @@ pub struct GfxRenderSwapchain {
 
     /// 这里的 image 并非手动创建的，因此无法使用 GfxImage 类型
     swapchain_images: Vec<vk::Image>,
-    swapchain_image_views: Vec<GfxImage2DView>,
+    swapchain_image_views: Vec<GfxImageView>,
     swapchain_image_index: usize,
 
     color_format: vk::Format,
     swapchain_extent: vk::Extent2D,
 }
 
-// 构建过程
+// new & init
 impl GfxRenderSwapchain {
     pub fn new(
         vk_core: &GfxCore,
@@ -43,9 +44,9 @@ impl GfxRenderSwapchain {
             .iter()
             .enumerate()
             .map(|(idx, img)| {
-                GfxImage2DView::new(
+                GfxImageView::new(
                     *img,
-                    GfxImageViewCreateInfo::new_image_view_2d_info(surface_format.format, vk::ImageAspectFlags::COLOR),
+                    GfxImageViewDesc::new_2d(surface_format.format, vk::ImageAspectFlags::COLOR),
                     format!("swapchain-{}", idx),
                 )
             })
@@ -105,13 +106,11 @@ impl GfxRenderSwapchain {
         }
     }
 }
-
 pub struct GfxSwapchainImageInfo {
     pub image_extent: vk::Extent2D,
     pub image_cnt: usize,
     pub image_format: vk::Format,
 }
-
 // getters
 impl GfxRenderSwapchain {
     #[inline]
@@ -135,7 +134,7 @@ impl GfxRenderSwapchain {
     }
 
     #[inline]
-    pub fn current_image_view(&self) -> &GfxImage2DView {
+    pub fn current_image_view(&self) -> &GfxImageView {
         &self.swapchain_image_views[self.swapchain_image_index]
     }
 
@@ -148,7 +147,6 @@ impl GfxRenderSwapchain {
         }
     }
 }
-
 // tools
 impl GfxRenderSwapchain {
     /// timeout: nano seconds
@@ -188,11 +186,23 @@ impl GfxRenderSwapchain {
         unsafe { Gfx::get().gfx_device().swapchain.queue_present(queue.handle(), &present_info).unwrap() };
     }
 }
-
+// destroy
+impl GfxRenderSwapchain {
+    pub fn destroy(mut self) {
+        unsafe {
+            let gfx_device = Gfx::get().gfx_device();
+            for image_view in self.swapchain_image_views.drain(..) {
+                image_view.destroy();
+            }
+            gfx_device.swapchain.destroy_swapchain(self.swapchain_handle, None);
+        }
+        self.swapchain_images.clear();
+        self.swapchain_handle = vk::SwapchainKHR::null();
+    }
+}
 impl Drop for GfxRenderSwapchain {
     fn drop(&mut self) {
-        unsafe {
-            Gfx::get().gfx_device().swapchain.destroy_swapchain(self.swapchain_handle, None);
-        }
+        debug_assert!(self.swapchain_images.is_empty());
+        debug_assert!(self.swapchain_handle.is_null());
     }
 }

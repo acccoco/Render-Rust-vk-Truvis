@@ -1,7 +1,7 @@
 use imgui::Ui;
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
-use truvis_asset::handle::TextureHandle;
+use truvis_asset::handle::AssetTextureHandle;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 use truvis_model_manager::components::geometry::GeometrySoA3D;
@@ -16,7 +16,7 @@ use async_pass::AsyncPass;
 struct AsyncLoadTest {
     pipeline: AsyncPass,
     quad: GeometrySoA3D,
-    texture_handle: TextureHandle,
+    texture_handle: AssetTextureHandle,
 }
 
 impl AsyncLoadTest {
@@ -66,7 +66,7 @@ impl OuterApp for AsyncLoadTest {
 
     fn draw(&self) {
         let texture_id = FrameContext::bindless_manager()
-            .get_asset_texture_handle(self.texture_handle)
+            .get_texture_handle2(self.texture_handle)
             .map(|h| h.index as u32)
             .unwrap_or(0);
 

@@ -202,11 +202,10 @@ impl<T: OuterApp> TruvisApp<T> {
         {
             let _span = tracy_client::span!("Present GUI");
             let present_data = {
-                let (render_target, render_target_bindless_key) =
-                    FrameContext::get().fif_buffers.borrow().render_target_texture(frame_label);
+                let render_target_texture =
+                    FrameContext::get().fif_buffers.borrow().render_target_texture_handle(frame_label);
                 PresentData {
-                    render_target,
-                    render_target_bindless_key,
+                    render_target: render_target_texture,
                     render_target_barrier: GfxBarrierMask {
                         src_stage: vk::PipelineStageFlags2::COMPUTE_SHADER,
                         src_access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,

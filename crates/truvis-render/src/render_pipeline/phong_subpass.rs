@@ -7,7 +7,7 @@ use crate::{
 use ash::vk;
 use std::{cell::RefCell, mem::offset_of, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
+use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
     basic::color::LabelColor,
     commands::command_buffer::GfxCommandBuffer,
@@ -18,6 +18,7 @@ use truvis_gfx::{
     resources::special_buffers::structured_buffer::GfxStructuredBuffer,
 };
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_shader_binding::shader;
 
 pub struct PhongSubpass {
@@ -106,13 +107,19 @@ impl PhongSubpass {
         per_frame_data: &GfxStructuredBuffer<shader::PerFrameData>,
         gpu_scene: &GpuScene,
         scene_manager: &SceneManager,
+        gfx_resource_manager: &GfxResourceManager,
         fif_buffers: &FifBuffers,
         frame_settings: &FrameSettings,
     ) {
         let frame_label = FrameContext::get().frame_label();
+
+        let render_target_texture =
+            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
+        let depth_image_view = gfx_resource_manager.get_image_view(fif_buffers.depth_image_view_handle()).unwrap();
+
         let rendering_info = GfxRenderingInfo::new(
-            vec![fif_buffers.render_target_image_view(frame_label).handle()],
-            Some(fif_buffers.depth_image_view().handle()),
+            vec![render_target_texture.image_view().handle()],
+            Some(depth_image_view.handle()),
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
                 extent: frame_settings.frame_extent,

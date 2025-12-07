@@ -46,15 +46,21 @@ impl RtRenderPass {
 
     pub fn render(&self) {
         let frame_label = FrameContext::get().frame_label();
-        let bindless_manager = FrameContext::bindless_manager();
         let frame_settings = FrameContext::get().frame_settings();
+
+        let bindless_manager = FrameContext::bindless_manager();
+        let gfx_resource_manager = FrameContext::gfx_resource_manager();
 
         let fif_buffers = FrameContext::get().fif_buffers.borrow();
 
-        let color_image = fif_buffers.color_image();
-        let color_image_handle = fif_buffers.color_image_bindless_handle(&bindless_manager);
-        let render_target = fif_buffers.render_target_image(frame_label);
-        let render_target_handle = fif_buffers.render_target_image_bindless_handle(&bindless_manager, frame_label);
+        let color_image = gfx_resource_manager.get_image(fif_buffers.color_image_handle()).unwrap();
+        let color_image_bindless_handle =
+            bindless_manager.get_image_handle2(fif_buffers.color_image_view_handle()).unwrap();
+        let render_target_texture =
+            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
+        let render_target_image_bindless_handle = bindless_manager
+            .get_image_handle_in_texture(fif_buffers.render_target_texture_handle(frame_label))
+            .unwrap();
 
         let mut submit_cmds = Vec::new();
         // ray tracing
@@ -62,7 +68,7 @@ impl RtRenderPass {
             let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("ray-tracing");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
 
-            // frams in flight 使用同一个 rt image，因此需要确保之前的 rt 写入已经完成
+            // RT 的 accum image 在 fif 中只有一个， 因此需要确保之前的 rt 写入已经完成
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
@@ -80,7 +86,7 @@ impl RtRenderPass {
                 &frame_settings,
                 &FrameContext::get().pipeline_settings(),
                 color_image.handle(),
-                color_image_handle,
+                color_image_bindless_handle,
                 &FrameContext::get().per_frame_data_buffers[*frame_label],
             );
 
@@ -106,8 +112,8 @@ impl RtRenderPass {
                 &cmd,
                 &bindless_manager,
                 &shader::blit::PushConstant {
-                    src_image: color_image_handle,
-                    dst_image: render_target_handle,
+                    src_image: color_image_bindless_handle.0,
+                    dst_image: render_target_image_bindless_handle.0,
                     src_image_size: glam::uvec2(frame_settings.frame_extent.width, frame_settings.frame_extent.height)
                         .into(),
                     offset: glam::uvec2(0, 0).into(),
@@ -130,7 +136,7 @@ impl RtRenderPass {
 
             // 等待之前的 compute shader 执行完成
             let rt_barrier = GfxImageBarrier::new()
-                .image(render_target)
+                .image(render_target_texture.image().handle())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(
                     vk::PipelineStageFlags2::COMPUTE_SHADER,
@@ -146,8 +152,8 @@ impl RtRenderPass {
                 &cmd,
                 &bindless_manager,
                 &shader::sdr::PushConstant {
-                    src_image: color_image_handle,
-                    dst_image: render_target_handle,
+                    src_image: color_image_bindless_handle.0,
+                    dst_image: render_target_image_bindless_handle.0,
                     image_size: glam::uvec2(frame_settings.frame_extent.width, frame_settings.frame_extent.height)
                         .into(),
                     channel: FrameContext::get().pipeline_settings().channel,

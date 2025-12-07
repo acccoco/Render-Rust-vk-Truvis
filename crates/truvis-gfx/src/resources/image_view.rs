@@ -1,60 +1,16 @@
-use std::rc::Rc;
-
-use ash::vk;
-
 use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
+use ash::vk;
+use ash::vk::Handle;
 
-impl GfxImageViewCreateInfo {
-    #[inline]
-    pub fn new_image_view_2d_info(format: vk::Format, aspect: vk::ImageAspectFlags) -> Self {
-        Self {
-            inner: vk::ImageViewCreateInfo {
-                format,
-                view_type: vk::ImageViewType::TYPE_2D,
-                subresource_range: vk::ImageSubresourceRange {
-                    aspect_mask: aspect,
-                    level_count: 1,
-                    layer_count: 1,
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        }
-    }
-
-    #[inline]
-    pub fn inner(&self) -> &vk::ImageViewCreateInfo<'_> {
-        &self.inner
-    }
-}
-
-#[derive(PartialOrd, PartialEq, Hash, Copy, Clone, Ord, Eq, Debug)]
-pub struct GfxImage2DViewUUID(pub uuid::Uuid);
-
-impl std::fmt::Display for GfxImage2DViewUUID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "image2d-view-uuid-{}", self.0)
-    }
-}
-
-pub struct GfxImage2DView {
+pub struct GfxImageView {
     handle: vk::ImageView,
-    uuid: GfxImage2DViewUUID,
 
-    _info: Rc<GfxImageViewCreateInfo>,
-    _name: String,
+    desc: GfxImageViewDesc,
+
+    #[cfg(debug_assertions)]
+    name: String,
 }
-
-impl Drop for GfxImage2DView {
-    fn drop(&mut self) {
-        unsafe {
-            let gfx_device = Gfx::get().gfx_device();
-            gfx_device.destroy_image_view(self.handle, None);
-        }
-    }
-}
-
-impl DebugType for GfxImage2DView {
+impl DebugType for GfxImageView {
     fn debug_type_name() -> &'static str {
         "GfxImage2DView"
     }
@@ -63,57 +19,92 @@ impl DebugType for GfxImage2DView {
         self.handle
     }
 }
-
-impl GfxImage2DView {
-    pub fn new(image: vk::Image, mut info: GfxImageViewCreateInfo, name: impl AsRef<str>) -> Self {
+// new & init
+impl GfxImageView {
+    pub fn new(image: vk::Image, view_desc: GfxImageViewDesc, name: impl AsRef<str>) -> Self {
         let gfx_device = Gfx::get().gfx_device();
-        info.inner.image = image;
-        let handle = unsafe { gfx_device.create_image_view(&info.inner, None).unwrap() };
+
+        let info = vk::ImageViewCreateInfo {
+            image,
+            view_type: view_desc.view_type,
+            format: view_desc.format,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: view_desc.aspect_mask,
+                base_mip_level: view_desc.mip.0 as u32,
+                level_count: view_desc.mip.1 as u32,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            ..Default::default()
+        };
+
+        let handle = unsafe { gfx_device.create_image_view(&info, None).unwrap() };
         let image_view = Self {
             handle,
-            uuid: GfxImage2DViewUUID(uuid::Uuid::new_v4()),
-            _info: Rc::new(info),
-            _name: name.as_ref().to_string(),
+
+            desc: view_desc,
+
+            #[cfg(debug_assertions)]
+            name: name.as_ref().to_string(),
         };
         gfx_device.set_debug_name(&image_view, &name);
         image_view
     }
-
+}
+// destory
+impl GfxImageView {
+    pub fn destroy(mut self) {
+        self.destroy_mut();
+    }
+    pub fn destroy_mut(&mut self) {
+        unsafe {
+            let gfx_device = Gfx::get().gfx_device();
+            gfx_device.destroy_image_view(self.handle, None);
+        }
+        self.handle = vk::ImageView::null();
+    }
+}
+impl Drop for GfxImageView {
+    fn drop(&mut self) {
+        debug_assert!(self.handle.is_null());
+    }
+}
+// getters
+impl GfxImageView {
     /// getter
     #[inline]
     pub fn handle(&self) -> vk::ImageView {
         self.handle
     }
-
     #[inline]
-    pub fn uuid(&self) -> GfxImage2DViewUUID {
-        self.uuid
+    pub fn desc(&self) -> &GfxImageViewDesc {
+        &self.desc
     }
 }
-
-impl std::fmt::Display for GfxImage2DView {
+impl std::fmt::Display for GfxImageView {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Image2DView({}, {:?})", self._name, self.handle)
+        write!(f, "Image2DView({}, {:?})", self.name, self.handle)
     }
 }
 
-pub enum GfxImage2DViewContainer {
-    Own(Box<GfxImage2DView>),
-    Shared(Rc<GfxImage2DView>),
-    Raw(vk::ImageView),
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct GfxImageViewDesc {
+    /// format 可以基于 vk::Image 重解释
+    pub(crate) format: vk::Format,
+    /// view type 可以基于 vk::Image 重解释
+    pub(crate) view_type: vk::ImageViewType,
+    /// aspect 可以基于 vk::Image 重解释
+    pub(crate) aspect_mask: vk::ImageAspectFlags,
+    /// base mip level 和 mip level count
+    pub(crate) mip: (u8, u8),
 }
-
-impl GfxImage2DViewContainer {
-    #[inline]
-    pub fn vk_image_view(&self) -> vk::ImageView {
-        match self {
-            GfxImage2DViewContainer::Own(view) => view.handle(),
-            GfxImage2DViewContainer::Shared(view) => view.handle(),
-            GfxImage2DViewContainer::Raw(view) => *view,
+impl GfxImageViewDesc {
+    pub fn new_2d(format: vk::Format, aspect: vk::ImageAspectFlags) -> Self {
+        Self {
+            format,
+            view_type: vk::ImageViewType::TYPE_2D,
+            aspect_mask: aspect,
+            mip: (0, 1),
         }
     }
-}
-
-pub struct GfxImageViewCreateInfo {
-    inner: vk::ImageViewCreateInfo<'static>,
 }

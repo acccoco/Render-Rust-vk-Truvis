@@ -2,7 +2,8 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::gfx::Gfx;
-use crate::resources::special_buffers::index_buffer::{GfxIndexBuffer, GfxIndexType};
+use crate::resources::layout::GfxIndexType;
+use crate::resources::special_buffers::index_buffer::GfxIndexBuffer;
 use crate::{
     basic::color::LabelColor,
     commands::{

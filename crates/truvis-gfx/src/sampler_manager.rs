@@ -3,6 +3,7 @@ use ash::vk;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+// TODO Sampler manager 应该放到 renderer 层级，而不是 GFX 层级
 // Sampler descriptor
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct GfxSamplerDesc {

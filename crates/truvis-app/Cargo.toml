@@ -15,6 +15,7 @@ truvis-cxx = { workspace = true }
 truvis-shader-binding = { workspace = true }
 truvis-crate-tools = { workspace = true }
 truvis-asset = { workspace = true }
+truvis-resource = { workspace = true }
 
 log = { workspace = true }
 ash = { workspace = true }

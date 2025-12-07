@@ -1,22 +1,19 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use std::rc::Rc;
-
 use ash::vk;
 
+use crate::gui::gui_mesh::GuiMesh;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::swapchain::render_swapchain::GfxSwapchainImageInfo;
 use truvis_gfx::{
-    basic::color::LabelColor,
-    commands::command_buffer::GfxCommandBuffer,
-    gfx::Gfx,
-    resources::{image::GfxImage2D, texture::GfxTexture2D},
+    basic::color::LabelColor, commands::command_buffer::GfxCommandBuffer, gfx::Gfx, resources::image::GfxImage,
 };
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::FrameLabel;
 use truvis_render::subsystems::bindless_manager::BindlessManager;
-
-use crate::gui::gui_mesh::GuiMesh;
+use truvis_resource::gfx_resource_manager::GfxResourceManager;
+use truvis_resource::handles::GfxTextureHandle;
+use truvis_resource::texture::GfxTexture2;
 
 pub struct Gui {
     pub imgui_ctx: imgui::Context,
@@ -27,12 +24,13 @@ pub struct Gui {
 
     /// 存放多帧 imgui 的 mesh 数据
     meshes: Vec<Option<GuiMesh>>,
-    render_image_key: Option<String>,
+
+    render_texture_handle: Option<GfxTextureHandle>,
+    font_texture_handle: GfxTextureHandle,
 }
 // 创建过程
 impl Gui {
     const FONT_TEXTURE_ID: usize = 0;
-    const FONT_TEXTURE_KEY: &'static str = "imgui-fonts";
     const RENDER_IMAGE_ID: usize = 1;
 
     pub fn new(window: &winit::window::Window, fif_num: usize, swapchain_image_infos: &GfxSwapchainImageInfo) -> Self {
@@ -51,7 +49,9 @@ impl Gui {
         platform.attach_window(imgui_ctx.io_mut(), window, imgui_winit_support::HiDpiMode::Rounded);
 
         let mut bindless_manager = FrameContext::bindless_manager_mut();
-        Self::init_fonts(&mut imgui_ctx, &platform, &mut bindless_manager);
+        let mut gfx_resource_manager = FrameContext::gfx_resource_manager_mut();
+        let font_texture_handle =
+            Self::init_fonts(&mut imgui_ctx, &platform, &mut bindless_manager, &mut gfx_resource_manager);
 
         Self {
             imgui_ctx,
@@ -63,7 +63,9 @@ impl Gui {
             },
 
             meshes: (0..fif_num).map(|_| None).collect(),
-            render_image_key: None,
+
+            render_texture_handle: None,
+            font_texture_handle,
         }
     }
 
@@ -80,7 +82,8 @@ impl Gui {
         imgui_ctx: &mut imgui::Context,
         platform: &imgui_winit_support::WinitPlatform,
         bindless_manager: &mut BindlessManager,
-    ) {
+        gfx_resource_manager: &mut GfxResourceManager,
+    ) -> GfxTextureHandle {
         let hidpi_factor = platform.hidpi_factor();
         let font_size = (13.0 * hidpi_factor) as f32;
 
@@ -110,18 +113,15 @@ impl Gui {
             let fonts = imgui_ctx.fonts();
             let atlas_texture = fonts.build_rgba32_texture();
 
-            let image = Rc::new(GfxImage2D::from_rgba8(
-                atlas_texture.width,
-                atlas_texture.height,
-                atlas_texture.data,
-                "imgui-fonts",
-            ));
-            GfxTexture2D::new(image, "imgui-fonts")
+            let image =
+                GfxImage::from_rgba8(atlas_texture.width, atlas_texture.height, atlas_texture.data, "imgui-fonts");
+            GfxTexture2::new(image, "imgui-fonts")
         };
+        let fonts_texture_handle = gfx_resource_manager.register_texture(fonts_texture);
+        bindless_manager.register_texture2(fonts_texture_handle);
+        imgui_ctx.fonts().tex_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);
 
-        let fonts_texture_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);
-        bindless_manager.register_texture_owned(Self::FONT_TEXTURE_KEY.to_string(), fonts_texture);
-        imgui_ctx.fonts().tex_id = fonts_texture_id;
+        fonts_texture_handle
     }
 }
 // tools
@@ -278,10 +278,11 @@ impl Gui {
         self.platform.prepare_render(ui, window);
     }
 
-    pub fn register_render_image_key(&mut self, key: String) {
-        self.render_image_key = Some(key);
+    pub fn register_render_texture(&mut self, texture_handle: GfxTextureHandle) {
+        self.render_texture_handle = Some(texture_handle);
     }
 
+    // TODO 这个函数设计的非常别扭
     /// # Phase: Render
     ///
     /// 使用 imgui 将 ui 操作编译为 draw data；构建 draw 需要的 mesh 数据
@@ -290,7 +291,7 @@ impl Gui {
 
         cmd: &GfxCommandBuffer,
         frame_label: FrameLabel,
-    ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> String + use<'_>)> {
+    ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> GfxTextureHandle + use<'_>)> {
         let draw_data = self.imgui_ctx.render();
         if draw_data.total_vtx_count == 0 {
             return None;
@@ -304,9 +305,9 @@ impl Gui {
             self.meshes[*frame_label].as_ref().unwrap(), //
             draw_data,
             |texture_id: imgui::TextureId| match texture_id.id() {
-                Self::RENDER_IMAGE_ID => self.render_image_key.as_ref().unwrap().clone(),
-                Self::FONT_TEXTURE_ID => Self::FONT_TEXTURE_KEY.to_string(),
-                _ => format!("imgui-texture-{}", texture_id.id()),
+                Self::RENDER_IMAGE_ID => *self.render_texture_handle.as_ref().unwrap(),
+                Self::FONT_TEXTURE_ID => self.font_texture_handle,
+                _ => panic!("unknown texture id: {}", texture_id.id()),
             },
         ))
     }

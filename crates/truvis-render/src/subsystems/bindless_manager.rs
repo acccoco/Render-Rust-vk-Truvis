@@ -1,10 +1,9 @@
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 use ash::vk;
 use itertools::Itertools;
 
-use slotmap::SecondaryMap;
-use truvis_asset::handle::TextureHandle;
+use slotmap::{Key, SecondaryMap};
 use truvis_gfx::descriptors::descriptor_pool::GfxDescriptorPoolCreateInfo;
 use truvis_gfx::{
     descriptors::{
@@ -12,18 +11,61 @@ use truvis_gfx::{
         descriptor_pool::GfxDescriptorPool,
     },
     gfx::Gfx,
-    resources::{
-        image_view::GfxImage2DView,
-        texture::{GfxTexture2D, Texture2DContainer},
-    },
     utilities::shader_cursor::GfxShaderCursor,
 };
 use truvis_shader_binding::shader;
 use truvis_shader_layout_macro::ShaderLayout;
 
-use crate::core::frame_context::FrameContext;
-use crate::subsystems::subsystem::Subsystem;
-use crate::{pipeline_settings::FrameLabel, resources::ImageLoader};
+use crate::pipeline_settings::FrameLabel;
+use truvis_resource::gfx_resource_manager::GfxResourceManager;
+use truvis_resource::handles::{GfxImageViewHandle, GfxTextureHandle};
+
+#[derive(Copy, Clone)]
+pub struct BindlessTextureHandle(pub shader::TextureHandle);
+impl BindlessTextureHandle {
+    #[inline]
+    pub fn new(index: usize) -> Self {
+        Self(shader::TextureHandle { index: index as i32 })
+    }
+    #[inline]
+    pub fn null() -> Self {
+        Self(shader::TextureHandle {
+            index: shader::INVALID_TEX_ID,
+        })
+    }
+    #[inline]
+    pub fn index(&self) -> usize {
+        self.0.index as usize
+    }
+}
+impl Default for BindlessTextureHandle {
+    fn default() -> Self {
+        Self::null()
+    }
+}
+#[derive(Copy, Clone)]
+pub struct BindlessImageHandle(pub shader::ImageHandle);
+impl BindlessImageHandle {
+    #[inline]
+    pub fn new(index: usize) -> Self {
+        Self(shader::ImageHandle { index: index as i32 })
+    }
+    #[inline]
+    pub fn null() -> Self {
+        Self(shader::ImageHandle {
+            index: shader::INVALID_TEX_ID,
+        })
+    }
+    #[inline]
+    pub fn index(&self) -> usize {
+        self.0.index as usize
+    }
+}
+impl Default for BindlessImageHandle {
+    fn default() -> Self {
+        Self::null()
+    }
+}
 
 #[derive(ShaderLayout)]
 pub struct BindlessDescriptorBinding {
@@ -65,26 +107,18 @@ pub struct BindlessManager {
     /// 每一个 frame in flights 都有一个 descriptor set
     pub bindless_descriptor_sets: Vec<GfxDescriptorSet<BindlessDescriptorBinding>>,
 
-    // TODO 这里不要使用 String 作为 key，这里不应该关心 Name
     /// 每一帧都需要重新构建的映射
-    ///
-    /// key: texture path
-    ///
-    /// value: bindless idx
-    bindless_textures: HashMap<String, u32>,
-    textures: HashMap<String, Texture2DContainer>,
-
-    /// AssetHub 纹理索引映射
-    asset_texture_indices: SecondaryMap<TextureHandle, u32>,
+    textures: SecondaryMap<GfxTextureHandle, BindlessTextureHandle>,
 
     /// 每一帧都需要重新构建的数据
-    images: HashMap<vk::ImageView, shader::ImageHandle>,
+    images: SecondaryMap<GfxImageViewHandle, BindlessImageHandle>,
+    /// 纹理里面的图形
+    texture_images: SecondaryMap<GfxTextureHandle, BindlessImageHandle>,
 
     /// 当前 frame in flight 的标签，每帧更新
     frame_label: FrameLabel,
 }
-
-// init & destroy
+// new & init
 impl BindlessManager {
     pub fn new(fif_count: usize) -> Self {
         let descriptor_pool = Self::init_descriptor_pool();
@@ -108,11 +142,9 @@ impl BindlessManager {
             bindless_descriptor_layout: bindless_layout,
             bindless_descriptor_sets,
 
-            bindless_textures: HashMap::new(),
-            textures: HashMap::new(),
-            asset_texture_indices: SecondaryMap::new(),
-
-            images: HashMap::new(),
+            textures: SecondaryMap::new(),
+            images: SecondaryMap::new(),
+            texture_images: SecondaryMap::new(),
 
             frame_label: FrameLabel::A,
         }
@@ -163,11 +195,13 @@ impl BindlessManager {
         GfxDescriptorPool::new(pool_ci, "renderer")
     }
 }
-
-impl Subsystem for BindlessManager {
-    fn before_render(&mut self) {}
+// destroy
+impl BindlessManager {}
+impl Drop for BindlessManager {
+    fn drop(&mut self) {
+        log::info!("Dropping BindlessManager");
+    }
 }
-
 // getters
 impl BindlessManager {
     #[inline]
@@ -175,47 +209,48 @@ impl BindlessManager {
         &self.bindless_descriptor_sets[*self.frame_label]
     }
 }
-
 // tools
 impl BindlessManager {
     /// # Phase: Before Render
     ///
     /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
-    pub fn prepare_render_data(&mut self, frame_label: FrameLabel) {
+    pub fn prepare_render_data(&mut self, gfx_resource_manager: &GfxResourceManager, frame_label: FrameLabel) {
         let _span = tracy_client::span!("BindlessManager::prepare_render_data");
         self.frame_label = frame_label;
 
+        // 生成 texture 的 descriptor 信息
         let mut texture_infos = Vec::with_capacity(self.textures.len());
-        self.bindless_textures.clear();
-        for (tex_idx, (tex_name, tex)) in self.textures.iter().enumerate() {
-            texture_infos.push(tex.texture().descriptor_image_info(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL));
-            self.bindless_textures.insert(tex_name.clone(), tex_idx as u32);
+        for (tex_idx, (tex_handle, shader_tex_handle)) in self.textures.iter_mut().enumerate() {
+            let texture = gfx_resource_manager.get_texture(tex_handle).unwrap();
+            texture_infos.push(
+                vk::DescriptorImageInfo::default()
+                    .sampler(texture.sampler())
+                    .image_view(texture.image_view().handle())
+                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL),
+            );
+            shader_tex_handle.0.index = tex_idx as i32;
         }
 
-        // Sync with AssetHub
-        let asset_hub = FrameContext::asset_hub();
-        self.asset_texture_indices.clear();
-        for handle in asset_hub.iter_handles() {
-            let resource = asset_hub.get_texture(handle);
-            let info = vk::DescriptorImageInfo::default()
-                .image_view(resource.view.handle())
-                .sampler(resource.sampler)
-                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
-
-            let idx = texture_infos.len() as u32;
-            texture_infos.push(info);
-            self.asset_texture_indices.insert(handle, idx);
-        }
-
-        // 生成 descriptor 信息，更新 ImageHandle
-        let mut image_infos = Vec::with_capacity(self.images.len());
-        for (image_idx, (image_view, handle)) in self.images.iter_mut().enumerate() {
+        // 生成 image views 的 descriptor 信息
+        let mut image_infos = Vec::with_capacity(self.images.len() + self.texture_images.len());
+        for (image_idx, (image_view_handle, shader_image_handle)) in self.images.iter_mut().enumerate() {
+            let image_view = gfx_resource_manager.get_image_view(image_view_handle).unwrap();
             image_infos.push(
-                vk::DescriptorImageInfo::default() //
-                    .image_view(*image_view)
+                vk::DescriptorImageInfo::default()
+                    .image_view(image_view.handle())
                     .image_layout(vk::ImageLayout::GENERAL),
             );
-            handle.index = image_idx as i32;
+            shader_image_handle.0.index = image_idx as i32;
+        }
+        // 生成 image views 的 descriptor 信息 (from textures)
+        for (image_idx, (texture_handle, shader_image_handle)) in self.texture_images.iter_mut().enumerate() {
+            let texture = gfx_resource_manager.get_texture(texture_handle).unwrap();
+            image_infos.push(
+                vk::DescriptorImageInfo::default()
+                    .image_view(texture.image_view().handle())
+                    .image_layout(vk::ImageLayout::GENERAL),
+            );
+            shader_image_handle.0.index = (image_idx + self.images.len()) as i32;
         }
 
         // 将 images 和 textures 信息写入 descriptor set
@@ -233,66 +268,77 @@ impl BindlessManager {
         ];
         Gfx::get().gfx_device().write_descriptor_sets(&writes);
     }
+}
+// register & unregister
+impl BindlessManager {
+    // TODO rename: register_texture2 -> register_texture_handle
+    #[inline]
+    pub fn register_texture2(&mut self, handle: GfxTextureHandle) {
+        debug_assert!(!handle.is_null());
 
-    /// 获得纹理在当前帧的 bindless 索引
-    pub fn get_texture_handle(&self, texture_path: &str) -> Option<shader::TextureHandle> {
-        self.bindless_textures.get(texture_path).copied().map(|idx| shader::TextureHandle { index: idx as _ })
+        if self.textures.contains_key(handle) {
+            log::error!("Texture handle {:?} is already registered", handle);
+            return;
+        }
+        self.textures.insert(handle, BindlessTextureHandle::null());
     }
 
-    /// 获得 AssetHub 纹理在当前帧的 bindless 索引
-    pub fn get_asset_texture_handle(&self, handle: TextureHandle) -> Option<shader::TextureHandle> {
-        self.asset_texture_indices.get(handle).copied().map(|idx| shader::TextureHandle { index: idx as _ })
+    // TODO rename: unregister_texture2 -> unregister_texture_handle
+    pub fn unregister_texture2(&mut self, handle: GfxTextureHandle) {
+        debug_assert!(!handle.is_null());
+
+        self.textures.remove(handle);
+    }
+
+    pub fn register_image2(&mut self, image_view_handle: GfxImageViewHandle) {
+        debug_assert!(!image_view_handle.is_null());
+
+        if self.images.contains_key(image_view_handle) {
+            log::error!("Image view handle {:?} is already registered", image_view_handle);
+            return;
+        }
+        self.images.insert(image_view_handle, BindlessImageHandle::null());
+    }
+
+    pub fn unregister_image(&mut self, image_view_handle: GfxImageViewHandle) {
+        debug_assert!(!image_view_handle.is_null());
+
+        self.images.remove(image_view_handle).unwrap();
+    }
+
+    pub fn register_image_in_texture(&mut self, texture_handle: GfxTextureHandle) {
+        debug_assert!(!texture_handle.is_null());
+
+        if self.texture_images.contains_key(texture_handle) {
+            log::error!("Texture handle {:?} is already registered for image", texture_handle);
+            return;
+        }
+        self.texture_images.insert(texture_handle, BindlessImageHandle::null());
+    }
+
+    pub fn unregister_image_in_texture(&mut self, texture_handle: GfxTextureHandle) {
+        debug_assert!(!texture_handle.is_null());
+
+        self.texture_images.remove(texture_handle).unwrap();
+    }
+
+    /// 获得纹理在当前帧的 bindless 索引
+    pub fn get_texture_handle2(&self, texture_handle: GfxTextureHandle) -> Option<BindlessTextureHandle> {
+        debug_assert!(!texture_handle.is_null());
+
+        self.textures.get(texture_handle).copied()
     }
 
     /// 获得图像在当前帧的 bindless 索引
-    pub fn get_image_handle(&self, image_view: &GfxImage2DView) -> Option<shader::ImageHandle> {
-        self.images.get(&image_view.handle()).copied()
-    }
-}
+    pub fn get_image_handle2(&self, image_view_handle: GfxImageViewHandle) -> Option<BindlessImageHandle> {
+        debug_assert!(!image_view_handle.is_null());
 
-// register & unregister
-impl BindlessManager {
-    pub fn register_texture_by_path(&mut self, texture_path: String) {
-        let _span = tracy_client::span!("register_texture");
-        let texture = ImageLoader::load_image(std::path::Path::new(&texture_path));
-        self.register_texture(texture_path, Texture2DContainer::Owned(Box::new(texture)));
-    }
-    pub fn register_texture_owned(&mut self, key: String, texture: GfxTexture2D) {
-        self.register_texture(key, Texture2DContainer::Owned(Box::new(texture)));
-    }
-    pub fn register_texture_shared(&mut self, key: String, texture: Rc<GfxTexture2D>) {
-        self.register_texture(key, Texture2DContainer::Shared(texture));
+        self.images.get(image_view_handle).copied()
     }
 
-    #[inline]
-    fn register_texture(&mut self, key: String, texture: Texture2DContainer) {
-        if self.textures.contains_key(&key) {
-            log::error!("Texture {} is already registered", key);
-            return;
-        }
-        self.textures.insert(key, texture);
-    }
+    pub fn get_image_handle_in_texture(&self, texture_handle: GfxTextureHandle) -> Option<BindlessImageHandle> {
+        debug_assert!(!texture_handle.is_null());
 
-    pub fn unregister_texture(&mut self, key: &str) {
-        self.textures.remove(key);
-    }
-
-    pub fn register_image(&mut self, image: &GfxImage2DView) {
-        let key = image.handle();
-        if self.images.contains_key(&key) {
-            log::error!("Image {} has already been registered", image);
-            return;
-        }
-        self.images.insert(key, shader::ImageHandle { index: -1 });
-    }
-
-    pub fn unregister_image2(&mut self, image: &GfxImage2DView) {
-        self.images.remove(&image.handle()).unwrap();
-    }
-}
-
-impl Drop for BindlessManager {
-    fn drop(&mut self) {
-        log::info!("Dropping BindlessManager");
+        self.texture_images.get(texture_handle).copied()
     }
 }

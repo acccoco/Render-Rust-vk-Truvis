@@ -6,18 +6,20 @@ use vk_mem::Alloc;
 use crate::{foundation::debug_messenger::DebugType, gfx::Gfx};
 
 pub struct GfxBuffer {
-    pub handle: vk::Buffer,
-    pub allocation: vk_mem::Allocation,
+    handle: vk::Buffer,
+    allocation: vk_mem::Allocation,
 
-    pub map_ptr: Option<*mut u8>,
-    pub size: vk::DeviceSize,
+    size: vk::DeviceSize,
 
-    pub device_addr: Option<vk::DeviceAddress>,
+    map_ptr: Option<*mut u8>,
+    device_addr: Option<vk::DeviceAddress>,
 
     #[cfg(debug_assertions)]
-    pub debug_name: String,
-}
+    debug_name: String,
 
+    #[cfg(debug_assertions)]
+    usage: vk::BufferUsageFlags,
+}
 impl DebugType for GfxBuffer {
     fn debug_type_name() -> &'static str {
         "GfxBuffer"
@@ -27,7 +29,6 @@ impl DebugType for GfxBuffer {
         self.handle
     }
 }
-
 impl Drop for GfxBuffer {
     fn drop(&mut self) {
         let allocator = Gfx::get().allocator();
@@ -40,7 +41,6 @@ impl Drop for GfxBuffer {
         }
     }
 }
-
 // init & destroy
 impl GfxBuffer {
     /// - align: 当 buffer 处于一个大的 memory block 中时，align 用来指定 buffer 的起始 offset,
@@ -92,6 +92,10 @@ impl GfxBuffer {
             size: buffer_size,
             map_ptr: mapped_ptr,
             device_addr,
+
+            #[cfg(debug_assertions)]
+            usage: buffer_usage,
+            #[cfg(debug_assertions)]
             debug_name: name.as_ref().to_string(),
         }
     }
@@ -100,8 +104,12 @@ impl GfxBuffer {
     pub fn new_stage_buffer(size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
         Self::new(size, vk::BufferUsageFlags::TRANSFER_SRC, None, true, debug_name)
     }
-}
 
+    #[inline]
+    pub fn destroy(self) {
+        drop(self)
+    }
+}
 // getter
 impl GfxBuffer {
     #[inline]
@@ -122,7 +130,6 @@ impl GfxBuffer {
         self.size
     }
 }
-
 // tools
 impl GfxBuffer {
     #[inline]
@@ -147,6 +154,17 @@ impl GfxBuffer {
             let allocator = Gfx::get().allocator();
             allocator.flush_allocation(&self.allocation, 0, size_of_val(data) as vk::DeviceSize).unwrap();
         }
+    }
+
+    // BUG 可能需要考虑内存对齐
+    pub fn transfer<T: bytemuck::Pod>(&self, trans_func: &dyn Fn(&mut T)) {
+        unsafe {
+            let ptr = self.map_ptr.unwrap() as *mut T;
+
+            trans_func(&mut *ptr);
+        }
+        let allocator = Gfx::get().allocator();
+        allocator.flush_allocation(&self.allocation, 0, size_of::<T>() as vk::DeviceSize).unwrap();
     }
 
     /// 创建一个临时的 stage buffer，先将数据放入 stage buffer，再 transfer 到

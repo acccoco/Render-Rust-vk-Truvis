@@ -1,7 +1,8 @@
 use ash::vk;
 use ash::vk::DeviceSize;
 use std::mem::offset_of;
-use truvis_gfx::resources::special_buffers::vertex_buffer::{GfxVertexBuffer, GfxVertexLayout};
+use truvis_gfx::resources::layout::GfxVertexLayout;
+use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexBuffer;
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy, bytemuck::Pod, bytemuck::Zeroable)]

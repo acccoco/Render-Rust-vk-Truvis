@@ -47,9 +47,6 @@ impl Renderer {
         Gfx::init("Truvis".to_string(), extra_instance_ext);
         FrameContext::init();
 
-        // 注册 GPU 场景使用的默认纹理
-        FrameContext::gpu_scene_mut().register_default_textures();
-
         Self {}
     }
 }
@@ -117,7 +114,14 @@ impl Renderer {
             Gfx::get().gfx_device().device_wait_idle().unwrap();
         }
         FrameContext::get().set_frame_extent(new_extent);
-        FrameContext::get().fif_buffers.borrow_mut().rebuild(&FrameContext::get().frame_settings());
+
+        let mut bindless_manager = FrameContext::bindless_manager_mut();
+        let mut gfx_resource_manager = FrameContext::gfx_resource_manager_mut();
+        FrameContext::get().fif_buffers.borrow_mut().rebuild(
+            &mut bindless_manager,
+            &mut gfx_resource_manager,
+            &FrameContext::get().frame_settings(),
+        );
     }
 
     fn update_gpu_scene(&mut self, input_state: &InputState, camera: &Camera) {
@@ -139,7 +143,13 @@ impl Renderer {
         };
 
         let mut gpu_scene = FrameContext::gpu_scene_mut();
-        gpu_scene.prepare_render_data(&FrameContext::scene_manager());
+        let gfx_resource_manager = FrameContext::gfx_resource_manager();
+
+        // 因为 Bindless RefCel 的问题，所以这里提前结束作用域
+        {
+            let mut bindless_manager = FrameContext::bindless_manager_mut();
+            gpu_scene.prepare_render_data(&FrameContext::scene_manager(), &mut bindless_manager, &gfx_resource_manager);
+        }
         gpu_scene.upload_to_buffer(&cmd, transfer_barrier_mask, &FrameContext::scene_manager());
 
         // 准备好当前帧的数据

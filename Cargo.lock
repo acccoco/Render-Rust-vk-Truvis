@@ -312,27 +312,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
-name = "bytecheck"
-version = "0.6.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23cdc57ce23ac53c931e88a43d06d070a6fd142f2617be5855eb75efc9beb1c2"
-dependencies = [
- "bytecheck_derive",
- "ptr_meta",
-]
-
-[[package]]
-name = "bytecheck_derive"
-version = "0.6.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3db406d29fbcd95542e92559bed4d8ad92636d1ca8b3b72ede10b4bcc010e659"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "bytemuck"
 version = "1.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -838,7 +817,7 @@ version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12f597d56c1bd55a811a1be189459e8fad2bbc272616375602443bdfb37fa774"
 dependencies = [
- "bytecheck",
+ "bytemuck",
  "rand",
  "serde",
 ]
@@ -1783,26 +1762,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ptr_meta"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0738ccf7ea06b608c10564b31debd4f5bc5e197fc8bfe088f68ae5ce81e7a4f1"
-dependencies = [
- "ptr_meta_derive",
-]
-
-[[package]]
-name = "ptr_meta_derive"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16b845dbfca988fa33db069c0e230574d15a3088f147a87b64c7589eb662c9ac"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "qoi"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2425,6 +2384,7 @@ dependencies = [
  "truvis-gfx",
  "truvis-model-manager",
  "truvis-render",
+ "truvis-resource",
  "truvis-shader-binding",
  "truvis-shader-layout-macro",
  "truvis-shader-layout-trait",
@@ -2447,6 +2407,7 @@ dependencies = [
  "tracy-client",
  "truvis-crate-tools",
  "truvis-gfx",
+ "truvis-resource",
  "vk-mem",
 ]
 
@@ -2487,6 +2448,8 @@ dependencies = [
  "itertools 0.10.5",
  "log",
  "raw-window-handle",
+ "slotmap",
+ "tracy-client",
  "truvis-shader-layout-macro",
  "truvis-shader-layout-trait",
  "uuid",
@@ -2503,6 +2466,7 @@ dependencies = [
  "glam",
  "itertools 0.10.5",
  "truvis-gfx",
+ "truvis-resource",
  "uuid",
 ]
 
@@ -2523,11 +2487,30 @@ dependencies = [
  "truvis-cxx",
  "truvis-gfx",
  "truvis-model-manager",
+ "truvis-resource",
  "truvis-shader-binding",
  "truvis-shader-layout-macro",
  "truvis-shader-layout-trait",
  "vk-mem",
  "winit",
+]
+
+[[package]]
+name = "truvis-resource"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ash",
+ "crossbeam-channel",
+ "crossbeam-utils",
+ "image",
+ "log",
+ "rayon",
+ "slotmap",
+ "tracy-client",
+ "truvis-crate-tools",
+ "truvis-gfx",
+ "vk-mem",
 ]
 
 [[package]]

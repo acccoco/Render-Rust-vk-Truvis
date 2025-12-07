@@ -2,24 +2,8 @@ use std::ops::{Deref, DerefMut};
 
 use ash::{vk, vk::Handle};
 
+use crate::resources::layout::GfxIndexType;
 use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer, resources::buffer::GfxBuffer};
-
-pub trait GfxIndexType: Sized + Copy {
-    const VK_INDEX_TYPE: vk::IndexType;
-    fn byte_size() -> usize;
-}
-impl GfxIndexType for u16 {
-    const VK_INDEX_TYPE: vk::IndexType = vk::IndexType::UINT16;
-    fn byte_size() -> usize {
-        size_of::<u16>()
-    }
-}
-impl GfxIndexType for u32 {
-    const VK_INDEX_TYPE: vk::IndexType = vk::IndexType::UINT32;
-    fn byte_size() -> usize {
-        size_of::<u32>()
-    }
-}
 
 /// 顶点类型是 u32
 pub struct GfxIndexBuffer<T: GfxIndexType> {
@@ -30,9 +14,7 @@ pub struct GfxIndexBuffer<T: GfxIndexType> {
 
     _phantom: std::marker::PhantomData<T>,
 }
-
 impl_derive_buffer!(GfxIndexBuffer<T: GfxIndexType>, GfxBuffer, inner);
-
 // init & destroy
 impl<T: GfxIndexType> GfxIndexBuffer<T> {
     pub fn new(index_cnt: usize, debug_name: impl AsRef<str>) -> Self {
@@ -45,7 +27,7 @@ impl<T: GfxIndexType> GfxIndexBuffer<T> {
                 | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
             None,
             false,
-            debug_name,
+            debug_name.as_ref(),
         );
 
         let buffer = Self {
@@ -54,7 +36,7 @@ impl<T: GfxIndexType> GfxIndexBuffer<T> {
             _phantom: std::marker::PhantomData,
         };
         let gfx_device = Gfx::get().gfx_device();
-        gfx_device.set_debug_name(&buffer, &buffer.inner.debug_name);
+        gfx_device.set_debug_name(&buffer, debug_name);
         buffer
     }
 
@@ -78,7 +60,6 @@ impl<T: GfxIndexType> GfxIndexBuffer<T> {
         self.index_cnt
     }
 }
-
 impl<T: GfxIndexType> DebugType for GfxIndexBuffer<T> {
     fn debug_type_name() -> &'static str {
         "IndexBuffer"

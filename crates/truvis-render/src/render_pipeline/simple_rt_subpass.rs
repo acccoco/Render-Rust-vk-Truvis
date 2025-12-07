@@ -1,6 +1,7 @@
 use crate::apis::render_pass::RenderSubpass;
 use crate::core::frame_context::FrameContext;
 use crate::pipeline_settings::{FrameSettings, PipelineSettings};
+use crate::subsystems::bindless_manager::BindlessImageHandle;
 use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::const_map;
@@ -12,7 +13,7 @@ use truvis_gfx::{
     pipelines::shader::{GfxShaderGroupInfo, GfxShaderModuleCache, GfxShaderStageInfo},
     resources::special_buffers::{sbt_buffer::GfxSBTBuffer, structured_buffer::GfxStructuredBuffer},
 };
-use truvis_shader_binding::{shader, shader::ImageHandle};
+use truvis_shader_binding::shader;
 
 pub struct GfxRtPipeline {
     pub pipeline: vk::Pipeline,
@@ -340,7 +341,7 @@ impl SimpleRtSubpass {
         framse_settings: &FrameSettings,
         pipeline_settings: &PipelineSettings,
         rt_image: vk::Image,
-        rt_handle: ImageHandle,
+        rt_handle: BindlessImageHandle,
         per_frame_data: &GfxStructuredBuffer<shader::PerFrameData>,
     ) {
         let frame_label = FrameContext::get().frame_label();
@@ -360,7 +361,7 @@ impl SimpleRtSubpass {
         let mut push_constant = shader::rt::PushConstants {
             frame_data: per_frame_data.device_address(),
             scene: FrameContext::gpu_scene().scene_device_address(frame_label),
-            rt_render_target: rt_handle,
+            rt_render_target: rt_handle.0,
             spp,
             spp_idx: 0,
             channel: pipeline_settings.channel,

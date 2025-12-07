@@ -5,6 +5,7 @@ use truvis_asset::asset_hub::AssetHub;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
+use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_shader_binding::shader;
 
 use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings};
@@ -50,6 +51,7 @@ pub struct FrameContext {
     pub gpu_scene: RefCell<GpuScene>,
     pub scene_manager: RefCell<SceneManager>,
     pub asset_hub: RefCell<AssetHub>,
+    pub gfx_resource_manager: RefCell<GfxResourceManager>,
 
     pub per_frame_data_buffers: Vec<GfxStructuredBuffer<shader::PerFrameData>>,
 
@@ -88,10 +90,16 @@ impl FrameContext {
 
         let fif_timeline_semaphore = GfxSemaphore::new_timeline(0, "render-timeline");
 
+        let gfx_resource_manager = RefCell::new(GfxResourceManager::new());
+
         let upload_buffer_manager = RefCell::new(StageBufferManager::new(fif_count));
         let bindless_manager = RefCell::new(BindlessManager::new(fif_count));
         let cmd_allocator = RefCell::new(CmdAllocator::new(fif_count));
-        let gpu_scene = RefCell::new(GpuScene::new(fif_count));
+        let gpu_scene = RefCell::new(GpuScene::new(
+            fif_count,
+            &mut gfx_resource_manager.borrow_mut(),
+            &mut bindless_manager.borrow_mut(),
+        ));
         let scene_manager = RefCell::new(SceneManager::new());
         let asset_hub = RefCell::new(AssetHub::new());
 
@@ -104,7 +112,12 @@ impl FrameContext {
             },
         };
 
-        let fif_buffers = FifBuffers::new(&frame_settings, &mut bindless_manager.borrow_mut(), fif_count);
+        let fif_buffers = FifBuffers::new(
+            &frame_settings,
+            &mut bindless_manager.borrow_mut(),
+            &mut gfx_resource_manager.borrow_mut(),
+            fif_count,
+        );
         let per_frame_data_buffers = (0..fif_count)
             .map(|idx| GfxStructuredBuffer::<shader::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{idx}")))
             .collect();
@@ -131,6 +144,7 @@ impl FrameContext {
             gpu_scene,
             scene_manager,
             asset_hub,
+            gfx_resource_manager,
         }
     }
 
@@ -156,16 +170,21 @@ impl FrameContext {
         unsafe {
             // 使用 addr_of_mut! 避免直接对 static mut 创建可变引用
             let ptr = std::ptr::addr_of_mut!(FRAME_CONTEXT);
-            let context = (*ptr).take().expect("FrameContext not initialized");
+            let mut context = (*ptr).take().expect("FrameContext not initialized");
 
             context.fif_timeline_semaphore.destroy();
 
+            context.fif_buffers.get_mut().destroy_mut(
+                &mut context.bindless_manager.borrow_mut(),
+                &mut context.gfx_resource_manager.borrow_mut(),
+            );
             drop(context.upload_buffer_manager);
             drop(context.cmd_allocator);
             drop(context.bindless_manager);
             drop(context.gpu_scene);
             drop(context.scene_manager);
-            drop(context.asset_hub);
+            context.asset_hub.get_mut().destroy_mut();
+            context.gfx_resource_manager.get_mut().destroy_mut();
         }
     }
 
@@ -253,6 +272,17 @@ impl FrameContext {
     pub fn asset_hub() -> Ref<'static, AssetHub> {
         let context = Self::get();
         context.asset_hub.borrow()
+    }
+
+    #[inline]
+    pub fn gfx_resource_manager_mut() -> RefMut<'static, GfxResourceManager> {
+        let context = Self::get();
+        context.gfx_resource_manager.borrow_mut()
+    }
+    #[inline]
+    pub fn gfx_resource_manager() -> Ref<'static, GfxResourceManager> {
+        let context = Self::get();
+        context.gfx_resource_manager.borrow()
     }
 
     #[inline]

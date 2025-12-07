@@ -7,9 +7,7 @@ use crate::{foundation::debug_messenger::DebugType, gfx::Gfx, impl_derive_buffer
 pub struct GfxSBTBuffer {
     _inner: GfxBuffer,
 }
-
 impl_derive_buffer!(GfxSBTBuffer, GfxBuffer, _inner);
-
 // init & destroy
 impl GfxSBTBuffer {
     pub fn new(size: vk::DeviceSize, align: vk::DeviceSize, name: impl AsRef<str>) -> Self {
@@ -27,19 +25,13 @@ impl GfxSBTBuffer {
         gfx_device.set_debug_name(&buffer, name.as_ref());
         buffer
     }
-
-    #[inline]
-    pub fn handle(&self) -> vk::Buffer {
-        self._inner.handle
-    }
 }
-
 impl DebugType for GfxSBTBuffer {
     fn debug_type_name() -> &'static str {
         "SBTBuffer"
     }
 
     fn vk_handle(&self) -> impl Handle {
-        self.handle()
+        self.vk_buffer()
     }
 }

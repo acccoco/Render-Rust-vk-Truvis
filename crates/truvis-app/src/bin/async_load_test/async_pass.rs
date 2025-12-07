@@ -9,7 +9,7 @@ use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxImageBarrier;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
-use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexLayout;
+use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
     commands::command_buffer::GfxCommandBuffer,
     pipelines::{
@@ -87,8 +87,14 @@ impl AsyncSubpass {
         texture_id: u32,
     ) {
         let viewport_extent = frame_settings.frame_extent;
+
+        let gfx_resource_manager = FrameContext::gfx_resource_manager();
+
+        let render_target_texture =
+            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
+
         let rendering_info = GfxRenderingInfo::new(
-            vec![fif_buffers.render_target_image_view(frame_label).handle()],
+            vec![render_target_texture.image_view().handle()],
             None,
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
@@ -159,9 +165,13 @@ impl AsyncPass {
 
     pub fn render(&self, shape: &GeometrySoA3D, texture_id: u32) {
         let fif_buffers = FrameContext::get().fif_buffers.borrow();
-
         let frame_label = FrameContext::get().frame_label();
-        let render_target = fif_buffers.render_target_image(frame_label);
+
+        let gfx_resource_manager = FrameContext::gfx_resource_manager();
+
+        let render_target_texture =
+            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
+
         let frame_settings = FrameContext::get().frame_settings();
 
         // render
@@ -173,7 +183,7 @@ impl AsyncPass {
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(render_target)
+                    .image(render_target_texture.image().handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
                     .src_mask(
@@ -192,7 +202,7 @@ impl AsyncPass {
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(render_target)
+                    .image(render_target_texture.image().handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
                     .src_mask(
