@@ -3,6 +3,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
+#include <assimp/matrix4x4.h>
 #include <deque>
 #include <format>
 
@@ -15,8 +16,7 @@ namespace truvixx
 
 SceneImporter::SceneImporter()
     : importer_(std::make_unique<Assimp::Importer>())
-{
-}
+{}
 
 SceneImporter::~SceneImporter() = default;
 
@@ -43,13 +43,12 @@ bool SceneImporter::load(const std::filesystem::path& path)
     // 三角形环绕：CCW (Assimp 默认)
     // UV 原点：左上角 (通过 FlipUVs)
     // 矩阵存储：row-major (Assimp 默认，转换时处理)
-    constexpr unsigned int flags =
-        aiProcess_CalcTangentSpace |       // 生成切线空间
-        aiProcess_JoinIdenticalVertices |  // 去重顶点，生成索引
-        aiProcess_Triangulate |            // 三角化
-        aiProcess_GenNormals |             // 生成法线（如果没有）
-        aiProcess_SortByPType |            // 按图元类型排序
-        aiProcess_FlipUVs;                 // UV 翻转为左上角原点
+    constexpr unsigned int flags = aiProcess_CalcTangentSpace |         // 生成切线空间
+                                   aiProcess_JoinIdenticalVertices |    // 去重顶点，生成索引
+                                   aiProcess_Triangulate |              // 三角化
+                                   aiProcess_GenNormals |               // 生成法线（如果没有）
+                                   aiProcess_SortByPType |              // 按图元类型排序
+                                   aiProcess_FlipUVs;                   // UV 翻转为左上角原点
 
     // 加载场景
     ai_scene_ = importer_->ReadFile(path.string(), flags);
@@ -86,7 +85,7 @@ bool SceneImporter::load(const std::filesystem::path& path)
 void SceneImporter::clear()
 {
     scene_data_.clear();
-    ai_scene_  = nullptr;
+    ai_scene_ = nullptr;
     is_loaded_ = false;
     error_msg_.clear();
 
@@ -105,7 +104,7 @@ void SceneImporter::process_nodes(const aiNode* root_node)
 
     // BFS 遍历节点树
     std::deque<std::pair<const aiNode*, aiMatrix4x4>> queue;
-    queue.emplace_back(root_node, aiMatrix4x4()); // 根节点，单位矩阵
+    queue.emplace_back(root_node, aiMatrix4x4());    // 根节点，单位矩阵
 
     while (!queue.empty())
     {
@@ -142,18 +141,18 @@ void SceneImporter::process_node(const aiNode* node, const aiMatrix4x4& parent_t
     // 转换为列主序
     // Assimp: a1-a4 是第1行
     // 我们: m[0-3] 是第1列
-    instance.world_transform[0]  = world.a1;
-    instance.world_transform[1]  = world.b1;
-    instance.world_transform[2]  = world.c1;
-    instance.world_transform[3]  = world.d1;
+    instance.world_transform[0] = world.a1;
+    instance.world_transform[1] = world.b1;
+    instance.world_transform[2] = world.c1;
+    instance.world_transform[3] = world.d1;
 
-    instance.world_transform[4]  = world.a2;
-    instance.world_transform[5]  = world.b2;
-    instance.world_transform[6]  = world.c2;
-    instance.world_transform[7]  = world.d2;
+    instance.world_transform[4] = world.a2;
+    instance.world_transform[5] = world.b2;
+    instance.world_transform[6] = world.c2;
+    instance.world_transform[7] = world.d2;
 
-    instance.world_transform[8]  = world.a3;
-    instance.world_transform[9]  = world.b3;
+    instance.world_transform[8] = world.a3;
+    instance.world_transform[9] = world.b3;
     instance.world_transform[10] = world.c3;
     instance.world_transform[11] = world.d3;
 
@@ -186,7 +185,7 @@ void SceneImporter::process_mesh(const aiMesh* mesh, MeshData& out_mesh)
         return;
 
     const unsigned int vertex_count = mesh->mNumVertices;
-    const unsigned int face_count   = mesh->mNumFaces;
+    const unsigned int face_count = mesh->mNumFaces;
 
     out_mesh.reserve(vertex_count, face_count);
 
@@ -258,7 +257,7 @@ void SceneImporter::process_mesh(const aiMesh* mesh, MeshData& out_mesh)
 // 材质处理
 //=============================================================================
 
-void SceneImporter::process_material(const aiMaterial* material, MaterialData& out_material)
+void SceneImporter::process_material(const aiMaterial* material, MaterialData& out_material) const
 {
     if (!material)
         return;
@@ -327,7 +326,7 @@ void SceneImporter::process_material(const aiMaterial* material, MaterialData& o
     };
 
     out_material.diffuse_map = get_texture_path(aiTextureType_DIFFUSE);
-    out_material.normal_map  = get_texture_path(aiTextureType_NORMALS);
+    out_material.normal_map = get_texture_path(aiTextureType_NORMALS);
 }
 
-} // namespace truvixx
+}    // namespace truvixx

@@ -6,13 +6,8 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <assimp/scene.h>
 
-// 前向声明 Assimp 类型，避免头文件依赖
-struct aiScene;
-struct aiNode;
-struct aiMesh;
-struct aiMaterial;
-struct aiMatrix4x4;
 
 namespace Assimp
 {
@@ -40,10 +35,10 @@ public:
     ~SceneImporter();
 
     // 禁止拷贝和移动 (持有 Assimp::Importer)
-    SceneImporter(const SceneImporter&)            = delete;
+    SceneImporter(const SceneImporter&) = delete;
     SceneImporter& operator=(const SceneImporter&) = delete;
-    SceneImporter(SceneImporter&&)                 = delete;
-    SceneImporter& operator=(SceneImporter&&)      = delete;
+    SceneImporter(SceneImporter&&) = delete;
+    SceneImporter& operator=(SceneImporter&&) = delete;
 
     /// 加载场景文件
     /// @param path 场景文件路径
@@ -73,16 +68,16 @@ private:
     void process_mesh(const aiMesh* mesh, MeshData& out_mesh);
 
     /// 处理材质
-    void process_material(const aiMaterial* material, MaterialData& out_material);
+    void process_material(const aiMaterial* material, MaterialData& out_material) const;
 
 private:
-    std::unique_ptr<Assimp::Importer> importer_; ///< Assimp 导入器，持有 ai_scene 生命周期
-    const aiScene* ai_scene_ = nullptr;          ///< Assimp 场景 (由 importer_ 管理)
+    std::unique_ptr<Assimp::Importer> importer_;    ///< Assimp 导入器，持有 ai_scene 生命周期
+    const aiScene* ai_scene_ = nullptr;             ///< Assimp 场景 (由 importer_ 管理)
 
-    SceneData scene_data_;        ///< 转换后的场景数据
-    std::filesystem::path dir_;   ///< 场景文件所在目录
-    std::string error_msg_;       ///< 错误信息
-    bool is_loaded_ = false;      ///< 加载状态
+    SceneData scene_data_;         ///< 转换后的场景数据
+    std::filesystem::path dir_;    ///< 场景文件所在目录
+    std::string error_msg_;        ///< 错误信息
+    bool is_loaded_ = false;       ///< 加载状态
 };
 
-} // namespace truvixx
+}    // namespace truvixx
