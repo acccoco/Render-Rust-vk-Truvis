@@ -2,8 +2,8 @@
 #include "truvixx_interface.export.h"
 #include "TruvixxAssimp/c_data_define.hpp"
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,38 +61,38 @@ typedef void* TruvixxSceneHandle;
 /// 坐标系：右手系，X-Right，Y-Up
 typedef struct TruvixxMat4
 {
-    float m[16]; ///< m[0..3] 是第一列，以此类推
+    float m[16];    ///< m[0..3] 是第一列，以此类推
 } TruvixxMat4;
 
 /// 材质信息 (POD, C 兼容)
 typedef struct TruvixxMaterial
 {
-    char name[256]; ///< 材质名称，null 结尾
+    char name[256];    ///< 材质名称，null 结尾
 
-    float base_color[4];     ///< RGBA 基础颜色
-    float roughness_factor;  ///< 粗糙度因子
-    float metallic_factor;   ///< 金属度因子
-    float emissive_color[4]; ///< RGBA 自发光颜色
-    float opacity;           ///< 不透明度：1 = opaque, 0 = transparent
+    float base_color[4];        ///< RGBA 基础颜色
+    float roughness_factor;     ///< 粗糙度因子
+    float metallic_factor;      ///< 金属度因子
+    float emissive_color[4];    ///< RGBA 自发光颜色
+    float opacity;              ///< 不透明度：1 = opaque, 0 = transparent
 
-    char diffuse_map[256]; ///< 漫反射贴图路径，null 结尾
-    char normal_map[256];  ///< 法线贴图路径，null 结尾
+    char diffuse_map[256];    ///< 漫反射贴图路径，null 结尾
+    char normal_map[256];     ///< 法线贴图路径，null 结尾
 } TruvixxMaterial;
 
 /// Instance 基础信息 (POD, 不含动态数组)
 typedef struct TruvixxInstanceInfo
 {
-    char name[256];              ///< 实例名称，null 结尾
-    TruvixxMat4 world_transform; ///< 世界变换矩阵 (列主序)
-    uint32_t mesh_count;         ///< 该 instance 引用的 mesh 数量
-    uint32_t _padding;           ///< 对齐填充
+    char name[256];                 ///< 实例名称，null 结尾
+    TruvixxMat4 world_transform;    ///< 世界变换矩阵 (列主序)
+    uint32_t mesh_count;            ///< 该 instance 引用的 mesh 数量
+    uint32_t _padding;              ///< 对齐填充
 } TruvixxInstanceInfo;
 
 /// Mesh 元信息 (用于查询分配空间)
 typedef struct TruvixxMeshInfo
 {
-    uint32_t vertex_count; ///< 顶点数量
-    uint32_t index_count;  ///< 索引数量 (三角形面数 * 3)
+    uint32_t vertex_count;    ///< 顶点数量
+    uint32_t index_count;     ///< 索引数量 (三角形面数 * 3)
 } TruvixxMeshInfo;
 
 //-----------------------------------------------------------------------------
@@ -130,11 +130,7 @@ TRUVIXX_INTERFACE_API uint32_t truvixx_get_instance_count(TruvixxSceneHandle sce
 /// @param index 材质索引
 /// @param out_material [out] 输出材质信息
 /// @return 成功返回 1，失败返回 0
-TRUVIXX_INTERFACE_API int truvixx_get_material(
-    TruvixxSceneHandle scene,
-    uint32_t index,
-    TruvixxMaterial* out_material
-);
+TRUVIXX_INTERFACE_API int truvixx_get_material(TruvixxSceneHandle scene, uint32_t index, TruvixxMaterial* out_material);
 
 //-----------------------------------------------------------------------------
 // Instance 访问
@@ -145,11 +141,8 @@ TRUVIXX_INTERFACE_API int truvixx_get_material(
 /// @param index Instance 索引
 /// @param out_info [out] 输出 Instance 信息
 /// @return 成功返回 1，失败返回 0
-TRUVIXX_INTERFACE_API int truvixx_get_instance_info(
-    TruvixxSceneHandle scene,
-    uint32_t index,
-    TruvixxInstanceInfo* out_info
-);
+TRUVIXX_INTERFACE_API int truvixx_get_instance_info(TruvixxSceneHandle scene, uint32_t index,
+                                                    TruvixxInstanceInfo* out_info);
 
 /// 获取 Instance 引用的 mesh 和材质索引列表
 /// @param scene 场景句柄
@@ -157,12 +150,8 @@ TRUVIXX_INTERFACE_API int truvixx_get_instance_info(
 /// @param out_mesh_indices [out] 外部分配的数组，大小 >= mesh_count
 /// @param out_material_indices [out] 外部分配的数组，大小 >= mesh_count
 /// @return 成功返回 1，失败返回 0
-TRUVIXX_INTERFACE_API int truvixx_get_instance_mesh_refs(
-    TruvixxSceneHandle scene,
-    uint32_t instance_index,
-    uint32_t* out_mesh_indices,
-    uint32_t* out_material_indices
-);
+TRUVIXX_INTERFACE_API int truvixx_get_instance_mesh_refs(TruvixxSceneHandle scene, uint32_t instance_index,
+                                                         uint32_t* out_mesh_indices, uint32_t* out_material_indices);
 
 //-----------------------------------------------------------------------------
 // Mesh 数据访问 (SOA 布局, 查询-分配-填充模式)
@@ -173,11 +162,8 @@ TRUVIXX_INTERFACE_API int truvixx_get_instance_mesh_refs(
 /// @param mesh_index Mesh 索引
 /// @param out_info [out] 输出 Mesh 元信息
 /// @return 成功返回 1，失败返回 0
-TRUVIXX_INTERFACE_API int truvixx_get_mesh_info(
-    TruvixxSceneHandle scene,
-    uint32_t mesh_index,
-    TruvixxMeshInfo* out_info
-);
+TRUVIXX_INTERFACE_API int truvixx_get_mesh_info(TruvixxSceneHandle scene, uint32_t mesh_index,
+                                                TruvixxMeshInfo* out_info);
 
 /// 填充顶点位置数据 (SOA 布局)
 /// @param scene 场景句柄
@@ -185,44 +171,27 @@ TRUVIXX_INTERFACE_API int truvixx_get_mesh_info(
 /// @param out_positions [out] 外部分配的 buffer，大小 >= vertex_count * 3 * sizeof(float)
 ///        布局: [x0, y0, z0, x1, y1, z1, ...]
 /// @return 成功返回 1，失败返回 0
-TRUVIXX_INTERFACE_API int truvixx_fill_mesh_positions(
-    TruvixxSceneHandle scene,
-    uint32_t mesh_index,
-    float* out_positions
-);
+TRUVIXX_INTERFACE_API int truvixx_fill_mesh_positions(TruvixxSceneHandle scene, uint32_t mesh_index,
+                                                      float* out_positions);
 
 /// 填充顶点法线数据 (SOA 布局)
 /// @param out_normals [out] 外部分配的 buffer，大小 >= vertex_count * 3 * sizeof(float)
-TRUVIXX_INTERFACE_API int truvixx_fill_mesh_normals(
-    TruvixxSceneHandle scene,
-    uint32_t mesh_index,
-    float* out_normals
-);
+TRUVIXX_INTERFACE_API int truvixx_fill_mesh_normals(TruvixxSceneHandle scene, uint32_t mesh_index, float* out_normals);
 
 /// 填充顶点切线数据 (SOA 布局)
 /// @param out_tangents [out] 外部分配的 buffer，大小 >= vertex_count * 3 * sizeof(float)
-TRUVIXX_INTERFACE_API int truvixx_fill_mesh_tangents(
-    TruvixxSceneHandle scene,
-    uint32_t mesh_index,
-    float* out_tangents
-);
+TRUVIXX_INTERFACE_API int truvixx_fill_mesh_tangents(TruvixxSceneHandle scene, uint32_t mesh_index,
+                                                     float* out_tangents);
 
 /// 填充顶点 UV 数据 (SOA 布局)
 /// @param out_uvs [out] 外部分配的 buffer，大小 >= vertex_count * 2 * sizeof(float)
 ///        布局: [u0, v0, u1, v1, ...]
-TRUVIXX_INTERFACE_API int truvixx_fill_mesh_uvs(
-    TruvixxSceneHandle scene,
-    uint32_t mesh_index,
-    float* out_uvs
-);
+TRUVIXX_INTERFACE_API int truvixx_fill_mesh_uvs(TruvixxSceneHandle scene, uint32_t mesh_index, float* out_uvs);
 
 /// 填充索引数据
 /// @param out_indices [out] 外部分配的 buffer，大小 >= index_count * sizeof(uint32_t)
-TRUVIXX_INTERFACE_API int truvixx_fill_mesh_indices(
-    TruvixxSceneHandle scene,
-    uint32_t mesh_index,
-    uint32_t* out_indices
-);
+TRUVIXX_INTERFACE_API int truvixx_fill_mesh_indices(TruvixxSceneHandle scene, uint32_t mesh_index,
+                                                    uint32_t* out_indices);
 
 /// 批量填充所有顶点属性 (减少多次调用开销)
 /// @param out_positions [out] [vertex_count * 3] 或 NULL 跳过
@@ -231,15 +200,9 @@ TRUVIXX_INTERFACE_API int truvixx_fill_mesh_indices(
 /// @param out_uvs [out] [vertex_count * 2] 或 NULL 跳过
 /// @param out_indices [out] [index_count] 或 NULL 跳过
 /// @return 成功返回 1，失败返回 0
-TRUVIXX_INTERFACE_API int truvixx_fill_mesh_all(
-    TruvixxSceneHandle scene,
-    uint32_t mesh_index,
-    float* out_positions,
-    float* out_normals,
-    float* out_tangents,
-    float* out_uvs,
-    uint32_t* out_indices
-);
+TRUVIXX_INTERFACE_API int truvixx_fill_mesh_all(TruvixxSceneHandle scene, uint32_t mesh_index, float* out_positions,
+                                                float* out_normals, float* out_tangents, float* out_uvs,
+                                                uint32_t* out_indices);
 
 #ifdef __cplusplus
 }

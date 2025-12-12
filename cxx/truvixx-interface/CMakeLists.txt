@@ -28,7 +28,7 @@ target_link_libraries(truvixx-interface PUBLIC
 
 # target main
 ###########################################################################
-add_executable(main src/main.cpp)
-target_link_libraries(main truvixx-assimp truvixx-interface)
+add_executable(truvixx-main main.cpp)
+target_link_libraries(truvixx-main truvixx-assimp truvixx-interface)
 
 

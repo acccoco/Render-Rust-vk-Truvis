@@ -22,7 +22,6 @@
         "CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG": "${sourceDir}/build/Debug",
         "CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG": "${sourceDir}/build/Debug",
         "CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG": "${sourceDir}/build/Debug",
-
         "CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE": "${sourceDir}/build/Release",
         "CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE": "${sourceDir}/build/Release",
         "CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE": "${sourceDir}/build/Release"
@@ -64,25 +63,21 @@
   ],
   "buildPresets": [
     {
-      "name": "debug",
-      "displayName": "Build Debug",
+      "name": "vs2022-build-debug",
       "configurePreset": "vs2022",
       "configuration": "Debug"
     },
     {
-      "name": "release",
-      "displayName": "Build Release",
+      "name": "vs2022-build-release",
       "configurePreset": "vs2022",
       "configuration": "Release"
     },
     {
-      "name": "clang-debug",
-      "displayName": "Clang-CL Debug",
+      "name": "clang-cl-build-debug",
       "configurePreset": "clang-cl-debug"
     },
     {
-      "name": "clang-release",
-      "displayName": "Clang-CL Release",
+      "name": "clang-cl-build-release",
       "configurePreset": "clang-cl-release"
     }
   ]

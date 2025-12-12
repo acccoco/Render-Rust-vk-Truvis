@@ -17,8 +17,8 @@
 
 #include "TruvixxInterface/truvixx_interface.export.h"
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,36 +45,36 @@ typedef struct TruvixxMat4
 /// 材质信息
 typedef struct TruvixxMaterial
 {
-    char name[256];           ///< 材质名称 (null 结尾)
+    char name[256]; ///< 材质名称 (null 结尾)
 
-    float base_color[4];      ///< RGBA 基础颜色
-    float roughness;          ///< 粗糙度 [0, 1]
-    float metallic;           ///< 金属度 [0, 1]
-    float emissive[4];        ///< RGBA 自发光颜色
-    float opacity;            ///< 不透明度: 1=opaque, 0=transparent
+    float base_color[4]; ///< RGBA 基础颜色
+    float roughness; ///< 粗糙度 [0, 1]
+    float metallic; ///< 金属度 [0, 1]
+    float emissive[4]; ///< RGBA 自发光颜色
+    float opacity; ///< 不透明度: 1=opaque, 0=transparent
 
-    char diffuse_map[256];    ///< 漫反射贴图路径 (null 结尾, 空字符串表示无)
-    char normal_map[256];     ///< 法线贴图路径 (null 结尾, 空字符串表示无)
+    char diffuse_map[256]; ///< 漫反射贴图路径 (null 结尾, 空字符串表示无)
+    char normal_map[256]; ///< 法线贴图路径 (null 结尾, 空字符串表示无)
 } TruvixxMaterial;
 
 /// Instance 信息
 typedef struct TruvixxInstance
 {
-    char name[256];              ///< 实例名称 (null 结尾)
+    char name[256]; ///< 实例名称 (null 结尾)
     TruvixxMat4 world_transform; ///< 世界变换矩阵
-    uint32_t mesh_count;         ///< 引用的 mesh 数量
-    uint32_t _pad0;              ///< 对齐填充
+    uint32_t mesh_count; ///< 引用的 mesh 数量
+    uint32_t _pad0; ///< 对齐填充
 } TruvixxInstance;
 
 /// Mesh 元信息 (用于预分配 buffer)
 typedef struct TruvixxMeshInfo
 {
-    uint32_t vertex_count;    ///< 顶点数量
-    uint32_t index_count;     ///< 索引数量 (三角形数 * 3)
-    uint32_t has_normals;     ///< 是否有法线 (1=有, 0=无)
-    uint32_t has_tangents;    ///< 是否有切线 (1=有, 0=无)
-    uint32_t has_uvs;         ///< 是否有 UV (1=有, 0=无)
-    uint32_t _pad0;           ///< 对齐填充
+    uint32_t vertex_count; ///< 顶点数量
+    uint32_t index_count; ///< 索引数量 (三角形数 * 3)
+    uint32_t has_normals; ///< 是否有法线 (1=有, 0=无)
+    uint32_t has_tangents; ///< 是否有切线 (1=有, 0=无)
+    uint32_t has_uvs; ///< 是否有 UV (1=有, 0=无)
+    uint32_t _pad0; ///< 对齐填充
 } TruvixxMeshInfo;
 
 //=============================================================================
@@ -209,11 +209,11 @@ TRUVIXX_INTERFACE_API int truvixx_mesh_fill_indices(
 TRUVIXX_INTERFACE_API int truvixx_mesh_fill_all(
     TruvixxScene scene,
     uint32_t index,
-    float* out_positions,    ///< [vertex_count * 3] 或 NULL
-    float* out_normals,      ///< [vertex_count * 3] 或 NULL
-    float* out_tangents,     ///< [vertex_count * 3] 或 NULL
-    float* out_uvs,          ///< [vertex_count * 2] 或 NULL
-    uint32_t* out_indices    ///< [index_count] 或 NULL
+    float* out_positions, ///< [vertex_count * 3] 或 NULL
+    float* out_normals, ///< [vertex_count * 3] 或 NULL
+    float* out_tangents, ///< [vertex_count * 3] 或 NULL
+    float* out_uvs, ///< [vertex_count * 2] 或 NULL
+    uint32_t* out_indices ///< [index_count] 或 NULL
 );
 
 #ifdef __cplusplus
