@@ -2428,12 +2428,6 @@ name = "truvis-cxx-binding"
 version = "0.1.0"
 dependencies = [
  "bindgen",
- "glam",
- "itertools 0.10.5",
- "tracy-client",
- "truvis-crate-tools",
- "truvis-gfx",
- "truvis-model-manager",
 ]
 
 [[package]]
@@ -2479,6 +2473,8 @@ dependencies = [
  "bytemuck",
  "glam",
  "itertools 0.10.5",
+ "tracy-client",
+ "truvis-cxx-binding",
  "truvis-gfx",
  "truvis-resource",
  "uuid",

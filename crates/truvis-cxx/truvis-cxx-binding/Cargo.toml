@@ -2,17 +2,10 @@
 name = "truvis-cxx-binding"
 version = "0.1.0"
 edition = "2024"
-description = "为 Truvis 提供 Assimp 绑定"
+description = "为 Truvis 提供 Cxx 绑定"
 
 
 [dependencies]
-truvis-crate-tools = { workspace = true }
-truvis-model-manager = { workspace = true }
-truvis-gfx = { workspace = true }
-
-itertools = { workspace = true }
-glam = { workspace = true }
-tracy-client = { workspace = true }
 
 
 [build-dependencies]

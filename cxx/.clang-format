@@ -1,77 +1,110 @@
-# Generated from CLion C/C++ Code Style settings
+# tab settings
+UseTab: Never
+TabWidth: 4
 
-BasedOnStyle: LLVM # 基础风格：使用LLVM风格作为基准
-Language: Cpp # 语言：指定为C++代码
+# indent settings
+IndentWidth: 4
+ObjCBlockIndentWidth: 4
+AccessModifierOffset: -4 # public: private: protected: indent
+ContinuationIndentWidth: 4 # 行延长缩进
+MaxEmptyLinesToKeep: 1
+IndentCaseLabels: false
+IndentExternBlock: NoIndent # extern "c" indent
 
-AccessModifierOffset: -4 # 访问修饰符偏移：访问修饰符(public/private等)的缩进值
-SortIncludes: Never # 包含排序：不对include语句进行排序
-AlignAfterOpenBracket: Align # 开括号后对齐：在开括号后进行对齐
-# AlignConsecutiveAssignments: Consecutive # 连续赋值对齐：对连续的赋值语句进行对齐
-# AlignConsecutiveDeclarations: Consecutive # 连续声明对齐：对连续的变量声明进行对齐
+# allow `if (a) xxx;` AND `if (a) { xxx }``
+AllowShortIfStatementsOnASingleLine: true
+AllowShortBlocksOnASingleLine: true
 
-AlignOperands: AlignAfterOperator # 操作数对齐：在操作符后对齐操作数
-AllowAllArgumentsOnNextLine: false # 允许参数换行：不允许将所有参数放在下一行
-PackConstructorInitializers: Never # 构造函数初始化列表包装：从不自动包装初始化列表
-AllowAllParametersOfDeclarationOnNextLine: false # 允许声明参数换行：不允许将声明的所有参数放在下一行
-AllowShortBlocksOnASingleLine: Empty # 短块单行：只允许空块在单行显示
-AllowShortCaseLabelsOnASingleLine: true # 短case标签单行：允许将短的case标签放在单行
-AllowShortFunctionsOnASingleLine: Inline # 短函数单行：只允许内联函数在单行显示
-AllowShortIfStatementsOnASingleLine: Never # 短if语句单行：不允许if语句在单行显示
-AllowShortLambdasOnASingleLine: All # 短lambda单行：允许所有lambda表达式在单行显示
-AllowShortLoopsOnASingleLine: false # 短循环单行：不允许循环在单行显示
-AlwaysBreakAfterReturnType: None # 返回类型后换行：不在返回类型后强制换行
-AlwaysBreakTemplateDeclarations: Yes # 模板声明后换行：在模板声明后始终换行
-Cpp11BracedListStyle: true # C++11花括号列表风格：使用C++11的花括号列表风格
-# BinPackArguments: false                   # (已注释)参数打包：不对参数进行打包
+# align settings
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignTrailingComments: true
+AlignAfterOpenBracket: BlockIndent
+AlignOperands: DontAlign
+AlignEscapedNewlinesLeft: true
 
-BreakBeforeBraces: Custom # 大括号前换行：使用自定义规则
-BraceWrapping: # 大括号包装规则：
-  AfterCaseLabel: false # case标签后：不在case标签后换行放置大括号
-  AfterClass: true # 类定义后：在类定义后换行放置大括号
-  AfterStruct: true # 结构体后：在结构体定义后换行放置大括号
-  AfterControlStatement: Always # 控制语句后：在控制语句后始终换行放置大括号
-  AfterEnum: true # 枚举后：在枚举定义后换行放置大括号
-  AfterFunction: true # 函数后：在函数定义后换行放置大括号
-  AfterNamespace: true # 命名空间后：在命名空间定义后换行放置大括号
-  AfterUnion: true # 联合体后：在联合体定义后换行放置大括号
-  BeforeCatch: true # catch前：在catch前换行放置大括号
-  BeforeElse: true # else前：在else前换行放置大括号
-  IndentBraces: false # 缩进大括号：不缩进大括号本身
-  SplitEmptyFunction: false # 分割空函数：不将空函数的大括号分成两行
-  SplitEmptyRecord: true # 分割空记录：将空记录的大括号分成两行
+# space settings
+SpacesBeforeTrailingComments: 1
+SpacesInSquareBrackets: false
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyParentheses: false
+SpaceBeforeAssignmentOperators: true
 
-BreakBeforeBinaryOperators: NonAssignment # 二元操作符前换行：在非赋值操作符前换行
-BreakBeforeTernaryOperators: true # 三元操作符前换行：在三元操作符前换行
-BreakConstructorInitializers: BeforeColon # 构造函数初始化列表换行：在冒号前换行
-BreakInheritanceList: BeforeColon # 继承列表换行：在冒号前换行
-ColumnLimit: 120 # 列宽限制：每行代码的最大字符数
-CompactNamespaces: false # 紧凑命名空间：不使用紧凑命名空间
-ContinuationIndentWidth: 8 # 续行缩进宽度：续行的缩进宽度
-IndentCaseLabels: true # 缩进case标签：对case标签进行缩进
-IndentPPDirectives: None # 预处理指令缩进：不对预处理指令进行缩进
-IndentWidth: 4 # 缩进宽度：每级缩进的空格数
-KeepEmptyLinesAtTheStartOfBlocks: true # 保留块起始的空行：保留块起始处的空行
-MaxEmptyLinesToKeep: 2 # 最大空行数：保留的最大连续空行数
-NamespaceIndentation: None # 命名空间缩进：不对命名空间内容进行额外缩进
-PointerAlignment: Left # 指针对齐：将指针符号与变量名对齐
-ReferenceAlignment: Left # 引用对齐：将引用符号与变量名对齐
-ReflowComments: false # 重排注释：不对注释进行重排
-SpacesBeforeTrailingComments: 4 # 尾注释前空格：尾注释前的空格数
-AlignTrailingComments: true # 对齐尾注释：对齐尾部注释
-SpaceAfterCStyleCast: true # C风格强制类型转换后空格：在C风格强制类型转换后添加空格
-SpaceAfterLogicalNot: false # 逻辑非后空格：不在逻辑非操作符后添加空格
-SpaceAfterTemplateKeyword: false # 模板关键字后空格：不在模板关键字后添加空格
-SpaceBeforeAssignmentOperators: true # 赋值操作符前空格：在赋值操作符前添加空格
-SpaceBeforeCpp11BracedList: false # C++11花括号列表前空格：不在C++11花括号列表前添加空格
-SpaceBeforeCtorInitializerColon: true # 构造函数初始化列表冒号前空格：在构造函数初始化列表的冒号前添加空格
-SpaceBeforeInheritanceColon: true # 继承冒号前空格：在继承冒号前添加空格
-SpaceBeforeParens: ControlStatements # 括号前空格：在控制语句的括号前添加空格
-SpaceBeforeRangeBasedForLoopColon: false # 范围for循环冒号前空格：不在范围for循环的冒号前添加空格
-SpaceInEmptyParentheses: false # 空括号内空格：不在空括号内添加空格
-SpacesInAngles: false # 尖括号内空格：不在尖括号内添加空格
-SpacesInCStyleCastParentheses: false # C风格强制类型转换括号内空格：不在C风格强制类型转换的括号内添加空格
-SpacesInContainerLiterals: false # 容器字面量内空格：不在容器字面量的括号内添加空格
-SpacesInParentheses: false # 括号内空格：不在括号内添加空格
-SpacesInSquareBrackets: false # 方括号内空格：不在方括号内添加空格
-TabWidth: 4 # 制表符宽度：制表符的宽度
-UseTab: Never # 使用制表符：从不使用制表符
+# break settings
+BreakConstructorInitializers: BeforeComma # 多行构造初始化列表样式
+BreakInheritanceList: BeforeComma # 多行继承样式
+
+# sort settings
+SortUsingDeclarations: false
+
+# disable column limit, prefer control it manually
+ColumnLimit: 0
+
+# int*, int&
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# allow multi line params like
+# int func(
+#   int a,
+#   int b,
+#   int c
+# )
+AllowAllParametersOfDeclarationOnNextLine: true
+
+# multiline binary expr syntax, our style:
+# a && b ||
+# c && d
+BreakBeforeBinaryOperators: None
+
+# multiline cond ? a : b, our style:
+# cond ?
+#   a :
+#   b
+BreakBeforeTernaryOperators: false
+
+# can we write params in single line, our style:
+# func(
+#   xxxx, xxx,
+#   xxxxx
+#   xxxxx
+# )
+BinPackArguments: true
+BinPackParameters: BinPack
+
+# do not control #if xxx, let user control it
+IndentPPDirectives: BeforeHash
+
+# brace break
+BreakBeforeBraces: Custom
+BraceWrapping:
+  # type & namespace
+  AfterClass: true
+  AfterStruct: true
+  AfterEnum: true
+  AfterNamespace: true
+  AfterUnion: true
+  # if while for...
+  AfterControlStatement: true
+  BeforeElse: true
+  BeforeWhile: true
+  # function
+  AfterFunction: true
+  # lambda
+  BeforeLambdaBody: false
+  IndentBraces: false
+  AfterExternBlock: false
+
+# func({ 1, 2, 3 })
+Cpp11BracedListStyle: false
+
+# try to keep require in single line
+RequiresClausePosition: SingleLine
+
+# keep attribute itself
+BreakAfterAttributes: Leave
+
+# do not sort includes
+SortIncludes: false

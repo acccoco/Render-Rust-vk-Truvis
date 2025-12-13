@@ -8,9 +8,11 @@ description = "基础的模型管理，提供了模型的基础定义"
 [dependencies]
 truvis-gfx = { workspace = true }
 truvis-resource = { workspace = true }
+truvis-cxx-binding = { workspace = true }
 
 ash = { workspace = true }
 uuid = { workspace = true }
 glam = { workspace = true }
 bytemuck = { workspace = true }
 itertools = { workspace = true }
+tracy-client = { workspace = true }

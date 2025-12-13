@@ -16,6 +16,7 @@
 //! let triangle: Geometry<VertexLayoutAoSPosColor> = VertexLayoutAoSPosColor::triangle();
 //! ```
 
+pub mod assimp_loader;
 pub mod components;
 pub mod guid_new_type;
 pub mod shapes;

@@ -4,7 +4,7 @@ fn gen_rust_binding() {
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
-        .header("../../../cxx/truvixx-interface/include/TruvixxInterface/lib.hpp")
+        .header("../../../cxx/truvixx-interface/include/TruvixxInterface/lib.h")
         .clang_args([
             "-I../../../cxx/truvixx-assimp/include",
             "-I../../../cxx/truvixx-interface/include",
@@ -13,6 +13,7 @@ fn gen_rust_binding() {
         // included header files changed.
         .raw_line("#![allow(clippy::all)]")
         .raw_line("#![allow(warnings)]")
+        .derive_default(true)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .enable_cxx_namespaces()
         .generate()

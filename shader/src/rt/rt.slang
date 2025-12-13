@@ -134,7 +134,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     const uint primitive_id = PrimitiveIndex();
 
     PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
-    NewGeometry *geometry = scene.get_geometry(instance_id, geometry_id);
+    Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
     const uint3 triangle = geometry.get_triangle(primitive_id);
     const float3 interp_pos = geometry.get_interp_position(triangle, attr.barycentrics);
     const float3 interp_normal = geometry.get_interp_normal(triangle, attr.barycentrics);
@@ -310,7 +310,7 @@ void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttribute
     const uint primitive_id = PrimitiveIndex();
 
     PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
-    NewGeometry *geometry = scene.get_geometry(instance_id, geometry_id);
+    Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
     const uint3 triangle = geometry.get_triangle(primitive_id);
     const float2 interp_uv = geometry.get_interp_uv(triangle, attr.barycentrics);
 

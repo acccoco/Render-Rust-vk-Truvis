@@ -10,57 +10,7 @@ struct Vertex
     float2 uv;
 };
 
-struct _Geometry
-{
-    /// 这个字段就是 vertex buffer
-    PTR(Vertex, position_buffer);
-    PTR(uint, index_buffer);
-
-#ifdef __SLANG__
-
-    /// 从 vertex buffer 中获取顶点
-    [ForceInline]
-    Vertex *get_vertex(uint vertex_idx)
-    {
-        return position_buffer + vertex_idx;
-    }
-
-    /// 根据 primitive id，获取对应的三角形的三个顶点
-    /// @return 可以使用这三个索引，到 vertex buffer 中获取顶点
-    [ForceInline]
-    uint3 get_triangle(uint primive_id)
-    {
-        uint index0 = index_buffer[primive_id * 3 + 0];
-        uint index1 = index_buffer[primive_id * 3 + 1];
-        uint index2 = index_buffer[primive_id * 3 + 2];
-        return uint3(index0, index1, index2);
-    }
-
-    /// 根据插值系数，得到插值后的顶点
-    Vertex get_interp_vertex(uint primive_id, float2 barycentrics)
-    {
-        uint3 triangle = get_triangle(primive_id);
-        Vertex *A = get_vertex(triangle.x);
-        Vertex *B = get_vertex(triangle.y);
-        Vertex *C = get_vertex(triangle.z);
-
-        const float a = 1.f - barycentrics.x - barycentrics.y;
-        const float b = barycentrics.x;
-        const float c = barycentrics.y;
-
-        Vertex vertex;
-        vertex.position = A->position * a + B->position * b + C->position * c;
-        vertex.normal = normalize(A->normal * a + B->normal * b + C->normal * c);
-        vertex.tangent = normalize(A->tangent * a + B->tangent * b + C->tangent * c);
-        vertex.bitangent = normalize(A->bitangent * a + B->bitangent * b + C->bitangent * c);
-        vertex.uv = A->uv * a + B->uv * b + C->uv * c;
-        return vertex;
-    }
-
-#endif
-};
-
-struct NewGeometry
+struct Geometry
 {
     PTR(float3, position_buffer);
     PTR(float3, normal_buffer);

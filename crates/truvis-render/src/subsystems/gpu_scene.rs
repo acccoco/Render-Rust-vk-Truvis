@@ -85,8 +85,8 @@ struct GpuSceneBuffers {
     light_stage_buffer: GfxStructuredBuffer<truvisl::PointLight>,
     material_buffer: GfxStructuredBuffer<truvisl::PBRMaterial>,
     material_stage_buffer: GfxStructuredBuffer<truvisl::PBRMaterial>,
-    geometry_buffer: GfxStructuredBuffer<truvisl::NewGeometry>,
-    geometry_stage_buffer: GfxStructuredBuffer<truvisl::NewGeometry>,
+    geometry_buffer: GfxStructuredBuffer<truvisl::Geometry>,
+    geometry_stage_buffer: GfxStructuredBuffer<truvisl::Geometry>,
     instance_buffer: GfxStructuredBuffer<truvisl::Instance>,
     instance_stage_buffer: GfxStructuredBuffer<truvisl::Instance>,
     material_indirect_buffer: GfxStructuredBuffer<u32>,
@@ -535,7 +535,7 @@ impl GpuScene {
                 panic!("geometry cnt can not be larger than buffer");
             }
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
-                geometry_buffer_slices[crt_geometry_idx + submesh_idx] = truvisl::NewGeometry {
+                geometry_buffer_slices[crt_geometry_idx + submesh_idx] = truvisl::Geometry {
                     position_buffer: geometry.vertex_buffer.pos_address(),
                     normal_buffer: geometry.vertex_buffer.normal_address(),
                     tangent_buffer: geometry.vertex_buffer.tangent_address(),

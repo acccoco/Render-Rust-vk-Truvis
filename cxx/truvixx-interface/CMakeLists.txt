@@ -4,10 +4,12 @@
 # target main
 ###########################################################################
 file(GLOB_RECURSE SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
-file(GLOB_RECURSE HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/TruvixxInterface/*.hpp)
+file(GLOB_RECURSE HEADER_FILES_HPP ${CMAKE_CURRENT_SOURCE_DIR}/include/TruvixxInterface/*.hpp)
+file(GLOB_RECURSE HEADER_FILES_H ${CMAKE_CURRENT_SOURCE_DIR}/include/TruvixxInterface/*.h)
 add_library(truvixx-interface SHARED
         ${SOURCE_FILES}
-        ${HEADER_FILES}
+        ${HEADER_FILES_HPP}
+        ${HEADER_FILES_H}
 )
 
 # 定义导入/导出宏
