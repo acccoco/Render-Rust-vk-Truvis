@@ -14,8 +14,8 @@ use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexBuffer;
 /// # 类型别名
 /// - `GeometryAoS3D`: AoS 3D 顶点布局（Position + Normal + TexCoord）
 /// - `GeometrySoA3D`: SoA 3D 顶点布局（分离存储）
-pub struct Geometry<L: GfxVertexLayout> {
-    pub vertex_buffer: GfxVertexBuffer<L>,
+pub struct Geometry<T: GfxVertexLayout> {
+    pub vertex_buffer: GfxVertexBuffer<T>,
     pub index_buffer: GfxIndex32Buffer,
 }
 pub type GeometrySoA3D = Geometry<VertexLayoutSoA3D>;

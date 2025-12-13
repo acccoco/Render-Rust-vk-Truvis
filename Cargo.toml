@@ -92,6 +92,7 @@ crossbeam-utils = "0.8"
 
 # 高性能哈希表，支持代际索引
 slotmap = "1.0.7"
+indexmap = "2.12.1"
 
 # Tracy
 tracy-client = "0.18.3"

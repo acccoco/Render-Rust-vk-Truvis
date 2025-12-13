@@ -840,9 +840,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.15.2"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
+checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 
 [[package]]
 name = "heck"
@@ -955,9 +955,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.7.0"
+version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62f822373a4fe84d4bb149bf54e584a7f4abec90e072ed49cda0edea5b95471f"
+checksum = "0ad4bb2b565bca0645f4d68c5c9af97fba094e9791da685bf83cb5f3ce74acf2"
 dependencies = [
  "equivalent",
  "hashbrown",
@@ -2473,6 +2473,7 @@ dependencies = [
  "bytemuck",
  "glam",
  "itertools 0.10.5",
+ "slotmap",
  "tracy-client",
  "truvis-cxx-binding",
  "truvis-gfx",
@@ -2488,6 +2489,7 @@ dependencies = [
  "bytemuck",
  "glam",
  "image",
+ "indexmap",
  "itertools 0.10.5",
  "log",
  "slotmap",

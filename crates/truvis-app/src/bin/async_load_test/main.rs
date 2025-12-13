@@ -65,12 +65,12 @@ impl OuterApp for AsyncLoadTest {
     fn draw_ui(&mut self, _ui: &Ui) {}
 
     fn draw(&self) {
-        let texture_id = FrameContext::bindless_manager()
-            .get_texture_handle2(self.texture_handle)
-            .map(|h| h.index as u32)
-            .unwrap_or(0);
-
-        self.pipeline.render(&self.quad, texture_id);
+        // let texture_id = FrameContext::bindless_manager()
+        //     .get_texture_handle2(self.texture_handle)
+        //     .map(|h| h.index as u32)
+        //     .unwrap_or(0);
+        //
+        // self.pipeline.render(&self.quad, texture_id);
     }
 }
 

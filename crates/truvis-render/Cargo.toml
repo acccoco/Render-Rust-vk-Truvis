@@ -28,4 +28,5 @@ vk-mem = { workspace = true }
 log = { workspace = true }
 image = { workspace = true }
 tracy-client = { workspace = true }
-slotmap = "1.0"
+slotmap = { workspace = true }
+indexmap = { workspace = true }

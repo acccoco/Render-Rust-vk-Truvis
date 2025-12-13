@@ -16,3 +16,4 @@ glam = { workspace = true }
 bytemuck = { workspace = true }
 itertools = { workspace = true }
 tracy-client = { workspace = true }
+slotmap = { workspace = true }

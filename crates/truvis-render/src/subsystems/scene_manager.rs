@@ -1,12 +1,13 @@
 use crate::core::frame_context::FrameContext;
 use crate::subsystems::subsystem::Subsystem;
+use slotmap::SlotMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use truvis_model_manager::assimp_loader::AssimpSceneLoader;
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;
 use truvis_model_manager::components::mesh::Mesh;
-use truvis_model_manager::guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid};
+use truvis_model_manager::guid_new_type::{InstanceHandle, LightHandle, MaterialHandle, MeshHandle};
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::{GfxTexture2, ImageLoader};
 use truvis_shader_binding::truvisl;
@@ -14,31 +15,31 @@ use truvis_shader_binding::truvisl;
 /// 在 CPU 侧管理场景数据
 #[derive(Default)]
 pub struct SceneManager {
-    all_mats: HashMap<MatGuid, Material>,
-    all_instances: HashMap<InsGuid, Instance>,
-    all_meshes: HashMap<MeshGuid, Mesh>,
+    all_mats: SlotMap<MaterialHandle, Material>,
+    all_instances: SlotMap<InstanceHandle, Instance>,
+    all_meshes: SlotMap<MeshHandle, Mesh>,
 
     // all_textures: HashMap<>
-    all_point_lights: HashMap<LightGuid, truvisl::PointLight>,
+    all_point_lights: SlotMap<LightHandle, truvisl::PointLight>,
 
     texture_map: HashMap<String, GfxTextureHandle>,
 }
 // getter
 impl SceneManager {
     #[inline]
-    pub fn mat_map(&self) -> &HashMap<MatGuid, Material> {
+    pub fn mat_map(&self) -> &SlotMap<MaterialHandle, Material> {
         &self.all_mats
     }
     #[inline]
-    pub fn instance_map(&self) -> &HashMap<InsGuid, Instance> {
+    pub fn instance_map(&self) -> &SlotMap<InstanceHandle, Instance> {
         &self.all_instances
     }
     #[inline]
-    pub fn mesh_map(&self) -> &HashMap<MeshGuid, Mesh> {
+    pub fn mesh_map(&self) -> &SlotMap<MeshHandle, Mesh> {
         &self.all_meshes
     }
     #[inline]
-    pub fn point_light_map(&self) -> &HashMap<LightGuid, truvisl::PointLight> {
+    pub fn point_light_map(&self) -> &SlotMap<LightHandle, truvisl::PointLight> {
         &self.all_point_lights
     }
     #[inline]
@@ -61,18 +62,18 @@ impl Subsystem for SceneManager {
 // tools
 impl SceneManager {
     #[inline]
-    pub fn get_instance(&self, guid: &InsGuid) -> Option<&Instance> {
-        self.all_instances.get(guid)
+    pub fn get_instance(&self, handle: InstanceHandle) -> Option<&Instance> {
+        self.all_instances.get(handle)
     }
 
     #[inline]
-    pub fn get_mesh(&self, guid: &MeshGuid) -> Option<&Mesh> {
-        self.all_meshes.get(guid)
+    pub fn get_mesh(&self, handle: MeshHandle) -> Option<&Mesh> {
+        self.all_meshes.get(handle)
     }
 
     #[inline]
-    pub fn get_material(&self, guid: &MatGuid) -> Option<&Material> {
-        self.all_mats.get(guid)
+    pub fn get_material(&self, handle: MaterialHandle) -> Option<&Material> {
+        self.all_mats.get(handle)
     }
 
     #[inline]
@@ -81,25 +82,19 @@ impl SceneManager {
     }
 
     /// 向世界中添加一个外部场景
-    pub fn load_scene(&mut self, model_path: &std::path::Path, _transform: &glam::Mat4) -> Vec<InsGuid> {
+    pub fn load_scene(&mut self, model_path: &std::path::Path, _transform: &glam::Mat4) -> Vec<InstanceHandle> {
         AssimpSceneLoader::load_scene(
             model_path,
             |ins| {
-                let guid = InsGuid::new();
                 // Instance 应该有 transform 字段
                 // ins.transform = *transform * ins.transform;
-                self.all_instances.insert(guid, ins);
-                guid
+                self.all_instances.insert(ins)
             },
             |mut mesh| {
-                let guid = MeshGuid::new();
                 mesh.build_blas();
-                self.all_meshes.insert(guid, mesh);
-                guid
+                self.all_meshes.insert(mesh)
             },
             |mat| {
-                let guid = MatGuid::new();
-
                 let mut bindless_manager = FrameContext::get().bindless_manager.borrow_mut();
                 let mut gfx_resource_manager = FrameContext::get().gfx_resource_manager.borrow_mut();
 
@@ -114,38 +109,29 @@ impl SceneManager {
                     bindless_manager.register_texture2(*entry);
                 }
 
-                self.all_mats.insert(guid, mat);
-                guid
+                self.all_mats.insert(mat)
             },
         )
     }
 
     /// 向场景中添加材质
-    pub fn register_mat(&mut self, mat: Material) -> MatGuid {
-        let guid = MatGuid::new();
-        self.all_mats.insert(guid, mat);
-        guid
+    pub fn register_mat(&mut self, mat: Material) -> MaterialHandle {
+        self.all_mats.insert(mat)
     }
 
     /// 向场景中添加 mesh
-    pub fn register_mesh(&mut self, mesh: Mesh) -> MeshGuid {
-        let guid = MeshGuid::new();
-        self.all_meshes.insert(guid, mesh);
-        guid
+    pub fn register_mesh(&mut self, mesh: Mesh) -> MeshHandle {
+        self.all_meshes.insert(mesh)
     }
 
     /// 向场景中添加 instance
-    pub fn register_instance(&mut self, instance: Instance) -> InsGuid {
-        let guid = InsGuid::new();
-        self.all_instances.insert(guid, instance);
-        guid
+    pub fn register_instance(&mut self, instance: Instance) -> InstanceHandle {
+        self.all_instances.insert(instance)
     }
 
     /// 向场景中添加点光源
-    pub fn register_point_light(&mut self, light: truvisl::PointLight) -> LightGuid {
-        let guid = LightGuid::new();
-        self.all_point_lights.insert(guid, light);
-        guid
+    pub fn register_point_light(&mut self, light: truvisl::PointLight) -> LightHandle {
+        self.all_point_lights.insert(light)
     }
 }
 

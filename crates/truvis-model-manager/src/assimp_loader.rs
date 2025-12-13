@@ -2,7 +2,7 @@ use crate::components::geometry::Geometry;
 use crate::components::instance::Instance;
 use crate::components::material::Material;
 use crate::components::mesh::Mesh;
-use crate::guid_new_type::{InsGuid, MatGuid, MeshGuid};
+use crate::guid_new_type::{InstanceHandle, MaterialHandle, MeshHandle};
 use crate::vertex::soa_3d::VertexLayoutSoA3D;
 use itertools::Itertools;
 use truvis_cxx_binding::truvixx;
@@ -25,9 +25,9 @@ pub struct AssimpSceneLoader {
     scene_handle: truvixx::TruvixxSceneHandle,
     model_name: String,
 
-    meshes: Vec<MeshGuid>,
-    mats: Vec<MatGuid>,
-    instances: Vec<InsGuid>,
+    meshes: Vec<MeshHandle>,
+    mats: Vec<MaterialHandle>,
+    instances: Vec<InstanceHandle>,
 }
 
 impl AssimpSceneLoader {
@@ -35,10 +35,10 @@ impl AssimpSceneLoader {
     /// 返回整个场景的所有 instance id
     pub fn load_scene(
         model_file: &std::path::Path,
-        instance_register: impl FnMut(Instance) -> InsGuid,
-        mesh_register: impl FnMut(Mesh) -> MeshGuid,
-        mat_register: impl FnMut(Material) -> MatGuid,
-    ) -> Vec<InsGuid> {
+        instance_register: impl FnMut(Instance) -> InstanceHandle,
+        mesh_register: impl FnMut(Mesh) -> MeshHandle,
+        mat_register: impl FnMut(Material) -> MaterialHandle,
+    ) -> Vec<InstanceHandle> {
         let _span = tracy_client::span!("AssimpSceneLoader::load_scene");
 
         let model_file = model_file.to_str().unwrap();
@@ -120,7 +120,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中基础的几何体
-    fn load_mesh(&mut self, mut mesh_register: impl FnMut(Mesh) -> MeshGuid) {
+    fn load_mesh(&mut self, mut mesh_register: impl FnMut(Mesh) -> MeshHandle) {
         let _span = tracy_client::span!("load_mesh");
         let mesh_cnt = unsafe { truvixx::truvixx_scene_mesh_count(self.scene_handle) };
 
@@ -156,7 +156,7 @@ impl AssimpSceneLoader {
     }
 
     /// 加载场景中的所有材质
-    fn load_mats(&mut self, mut mat_register: impl FnMut(Material) -> MatGuid) {
+    fn load_mats(&mut self, mut mat_register: impl FnMut(Material) -> MaterialHandle) {
         let _span = tracy_client::span!("load_mats");
         let mat_cnt = unsafe { truvixx::truvixx_scene_material_count(self.scene_handle) };
 
@@ -206,7 +206,7 @@ impl AssimpSceneLoader {
     ///
     /// 因此将 Assimp 中的一个 Instance 拆分为多个 Instance，将其 geometry
     /// 提升为 mesh
-    fn load_instance(&mut self, instance_register: impl FnMut(Instance) -> InsGuid) {
+    fn load_instance(&mut self, instance_register: impl FnMut(Instance) -> InstanceHandle) {
         let _span = tracy_client::span!("load_instance");
         let instance_cnt = unsafe { truvixx::truvixx_scene_instance_count(self.scene_handle) };
         let instances = (0..instance_cnt)

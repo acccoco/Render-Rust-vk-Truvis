@@ -1,15 +1,15 @@
-use ash::vk;
-use glam::Vec4Swizzles;
-use itertools::Itertools;
-use std::collections::HashMap;
-use std::path::PathBuf;
-
 use crate::core::frame_context::FrameContext;
 use crate::subsystems::subsystem::Subsystem;
 use crate::{
     pipeline_settings::FrameLabel,
     subsystems::{bindless_manager::BindlessManager, scene_manager::SceneManager},
 };
+use ash::vk;
+use glam::Vec4Swizzles;
+use indexmap::IndexSet;
+use itertools::Itertools;
+use slotmap::SecondaryMap;
+use std::path::PathBuf;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
     commands::{
@@ -20,63 +20,11 @@ use truvis_gfx::{
     resources::special_buffers::structured_buffer::GfxStructuredBuffer,
 };
 use truvis_model_manager::components::instance::Instance;
-use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
+use truvis_model_manager::guid_new_type::{InstanceHandle, MaterialHandle, MeshHandle};
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::{GfxTexture2, ImageLoader};
 use truvis_shader_binding::truvisl;
-
-/// 数据以顺序的方式存储，同时查找时间为 O(1)
-#[derive(Default)]
-struct FlattenMap<T: std::hash::Hash + Eq + Copy> {
-    /// 顺序形式存储的数据
-    linear_storage: Vec<T>,
-
-    /// 用于查找数据的 HashMap
-    query_table: HashMap<T, usize>,
-}
-impl<T: std::hash::Hash + Eq + Copy> FlattenMap<T> {
-    /// 找到数据在 store 中的索引
-    #[inline]
-    pub fn at(&self, key: &T) -> Option<usize> {
-        self.query_table.get(key).copied()
-    }
-
-    #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.linear_storage.iter()
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.linear_storage.len()
-    }
-
-    /// 清空所有数据
-    #[inline]
-    pub fn clear(&mut self) {
-        self.linear_storage.clear();
-        self.query_table.clear();
-    }
-
-    /// 为数据预留空间
-    #[inline]
-    pub fn reserve(&mut self, cnt: usize) {
-        self.linear_storage.reserve(cnt);
-    }
-
-    /// 将数据插入到 store 中
-    #[inline]
-    pub fn insert(&mut self, key: T) {
-        if self.query_table.contains_key(&key) {
-            panic!("key already exists in store");
-        }
-
-        let idx = self.linear_storage.len();
-        self.linear_storage.push(key);
-        self.query_table.insert(key, idx);
-    }
-}
 
 /// 构建 Gpu Scene 所需的所有 buffer
 struct GpuSceneBuffers {
@@ -151,18 +99,18 @@ pub struct GpuScene {
     /// GPU 中以顺序存储的 instance
     ///
     /// CPU 执行绘制时，会使用这个顺序来绘制实例
-    flatten_instances: Vec<InsGuid>,
+    flatten_instances: Vec<InstanceHandle>,
 
     /// GPU 中以顺序存储的材质信息
-    flatten_materials: FlattenMap<MatGuid>,
+    flatten_materials: IndexSet<MaterialHandle>,
 
     /// GPU 中以顺序存储的 mesh 信息
     ///
     /// 每个 mesh 会被分为多个 submesh，且每个 mesh 的 submesh 会被顺序存储
-    flatten_meshes: FlattenMap<MeshGuid>,
+    flatten_meshes: IndexSet<MeshHandle>,
 
     /// mesh 在 geometry buffer 中的 idx
-    mesh_geometry_map: HashMap<MeshGuid, usize>,
+    mesh_geometry_map: SecondaryMap<MeshHandle, usize>,
 
     gpu_scene_buffers: Vec<GpuSceneBuffers>,
 
@@ -204,9 +152,9 @@ impl GpuScene {
 
         Self {
             flatten_instances: vec![],
-            flatten_materials: FlattenMap::default(),
-            flatten_meshes: FlattenMap::default(),
-            mesh_geometry_map: HashMap::new(),
+            flatten_materials: IndexSet::default(),
+            flatten_meshes: IndexSet::default(),
+            mesh_geometry_map: SecondaryMap::new(),
 
             gpu_scene_buffers: (0..fif_count).map(GpuSceneBuffers::new).collect(),
 
@@ -267,9 +215,9 @@ impl GpuScene {
     /// before_draw(instance_idx, submesh_idx)
     pub fn draw(&self, cmd: &GfxCommandBuffer, scene_manager: &SceneManager, mut before_draw: impl FnMut(u32, u32)) {
         let _span = tracy_client::span!("GpuScene::draw");
-        for (instance_idx, instance_uuid) in self.flatten_instances.iter().enumerate() {
-            let instance = scene_manager.get_instance(instance_uuid).unwrap();
-            let mesh = scene_manager.get_mesh(&instance.mesh).unwrap();
+        for (instance_idx, instance_handle) in self.flatten_instances.iter().enumerate() {
+            let instance = scene_manager.get_instance(*instance_handle).unwrap();
+            let mesh = scene_manager.get_mesh(instance.mesh).unwrap();
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
                 geometry.cmd_bind_index_buffer(cmd);
                 geometry.cmd_bind_vertex_buffers(cmd);
@@ -289,8 +237,8 @@ impl GpuScene {
         self.flatten_instances.clear();
         self.flatten_instances.reserve(scene_manager.instance_map().len());
 
-        for (instance_uuid, _) in scene_manager.instance_map().iter() {
-            self.flatten_instances.push(*instance_uuid);
+        for (instance_handle, _) in scene_manager.instance_map().iter() {
+            self.flatten_instances.push(instance_handle);
         }
     }
 
@@ -303,9 +251,9 @@ impl GpuScene {
         self.flatten_meshes.reserve(scene_manager.mesh_map().len());
 
         let mut geometry_idx = 0;
-        for (mesh_id, mesh) in scene_manager.mesh_map().iter() {
-            self.flatten_meshes.insert(*mesh_id);
-            self.mesh_geometry_map.insert(*mesh_id, geometry_idx);
+        for (mesh_handle, mesh) in scene_manager.mesh_map().iter() {
+            self.flatten_meshes.insert(mesh_handle);
+            self.mesh_geometry_map.insert(mesh_handle, geometry_idx);
             geometry_idx += mesh.geometries.len();
         }
     }
@@ -315,8 +263,8 @@ impl GpuScene {
         self.flatten_materials.clear();
         self.flatten_materials.reserve(scene_manager.mat_map().len());
 
-        for (mat_id, _) in scene_manager.mat_map().iter() {
-            self.flatten_materials.insert(*mat_id);
+        for (mat_handle, _) in scene_manager.mat_map().iter() {
+            self.flatten_materials.insert(mat_handle);
         }
     }
 
@@ -383,7 +331,7 @@ impl GpuScene {
         let mut crt_geometry_indirect_idx = 0;
         let mut crt_material_indirect_idx = 0;
         for (instance_idx, instance_uuid) in self.flatten_instances.iter().enumerate() {
-            let instance = scene_manager.get_instance(instance_uuid).unwrap();
+            let instance = scene_manager.get_instance(*instance_uuid).unwrap();
             let submesh_cnt = instance.materials.len();
             if geometry_indirect_buffer_slices.len() < crt_geometry_indirect_idx + submesh_cnt {
                 panic!("instance geometry cnt can not be larger than buffer");
@@ -406,7 +354,7 @@ impl GpuScene {
             //  的实际索引，写入一个间接索引 buffer: geometry_indirect_buffer，
             //  然后获得 instance 数据在间接索引 buffer 中的起始 idx 和长度，将这个值写入到
             //  truvisl::Instance 中
-            let geometry_idx_start = self.mesh_geometry_map.get(&instance.mesh).unwrap();
+            let geometry_idx_start = self.mesh_geometry_map.get(instance.mesh).unwrap();
             for submesh_idx in 0..instance.materials.len() {
                 let geometry_idx = geometry_idx_start + submesh_idx;
                 geometry_indirect_buffer_slices[crt_geometry_indirect_idx + submesh_idx] = geometry_idx as u32;
@@ -414,7 +362,7 @@ impl GpuScene {
             crt_geometry_indirect_idx += submesh_cnt;
 
             for material_uuid in instance.materials.iter() {
-                let material_idx = self.flatten_materials.at(material_uuid).unwrap();
+                let material_idx = self.flatten_materials.get_index_of(material_uuid).unwrap();
                 material_indirect_buffer_slices[crt_material_indirect_idx] = material_idx as u32;
                 crt_material_indirect_idx += 1;
             }
@@ -456,8 +404,8 @@ impl GpuScene {
             panic!("material cnt can not be larger than buffer");
         }
 
-        for (mat_idx, mat_uuid) in self.flatten_materials.iter().enumerate() {
-            let mat = scene_manager.mat_map().get(mat_uuid).unwrap();
+        for (mat_idx, mat_handle) in self.flatten_materials.iter().enumerate() {
+            let mat = scene_manager.mat_map().get(*mat_handle).unwrap();
 
             let diffuse_bindless_handle = scene_manager
                 .get_texture(&mat.diffuse_map)
@@ -529,8 +477,8 @@ impl GpuScene {
         let geometry_buffer_slices = crt_geometry_stage_buffer.mapped_slice();
 
         let mut crt_geometry_idx = 0;
-        for mesh_uuid in self.flatten_meshes.iter() {
-            let mesh = scene_manager.mesh_map().get(mesh_uuid).unwrap();
+        for mesh_handle in self.flatten_meshes.iter() {
+            let mesh = scene_manager.mesh_map().get(*mesh_handle).unwrap();
             if geometry_buffer_slices.len() < crt_geometry_idx + mesh.geometries.len() {
                 panic!("geometry cnt can not be larger than buffer");
             }
@@ -563,7 +511,7 @@ impl GpuScene {
         custom_idx: u32,
         scene_manager: &SceneManager,
     ) -> vk::AccelerationStructureInstanceKHR {
-        let mesh = scene_manager.get_mesh(&instance.mesh).expect("Mesh not found");
+        let mesh = scene_manager.get_mesh(instance.mesh).expect("Mesh not found");
         vk::AccelerationStructureInstanceKHR {
             // 3x4 row-major matrix
             transform: helper::get_rt_matrix(&instance.transform),
@@ -593,7 +541,7 @@ impl GpuScene {
         let instance_infos = self
             .flatten_instances
             .iter()
-            .map(|ins_uuid| scene_manager.get_instance(ins_uuid).unwrap())
+            .map(|ins_handle| scene_manager.get_instance(*ins_handle).unwrap())
             .enumerate()
             // TODO 这里暂时将 instance 的 index 作为 custom index
             .map(|(ins_idx, ins)| self.get_as_instance_info(ins, ins_idx as u32, scene_manager))
