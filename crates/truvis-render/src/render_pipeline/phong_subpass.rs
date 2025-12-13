@@ -19,7 +19,7 @@ use truvis_gfx::{
 };
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
-use truvis_shader_binding::shader;
+use truvis_shader_binding::truvisl;
 
 pub struct PhongSubpass {
     pipeline: GfxGraphicsPipeline,
@@ -53,7 +53,7 @@ impl PhongSubpass {
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .offset(0)
-                .size(size_of::<shader::raster::PushConstants>() as u32)],
+                .size(size_of::<truvisl::raster::PushConstants>() as u32)],
             "phong-pass",
         ));
 
@@ -69,7 +69,7 @@ impl PhongSubpass {
         &self,
         cmd: &GfxCommandBuffer,
         viewport: &vk::Rect2D,
-        push_constant: &shader::raster::PushConstants,
+        push_constant: &truvisl::raster::PushConstants,
         frame_idx: FrameLabel,
     ) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
@@ -104,7 +104,7 @@ impl PhongSubpass {
     pub fn draw(
         &self,
         cmd: &GfxCommandBuffer,
-        per_frame_data: &GfxStructuredBuffer<shader::PerFrameData>,
+        per_frame_data: &GfxStructuredBuffer<truvisl::PerFrameData>,
         gpu_scene: &GpuScene,
         scene_manager: &SceneManager,
         gfx_resource_manager: &GfxResourceManager,
@@ -132,7 +132,7 @@ impl PhongSubpass {
         self.bind(
             cmd,
             &frame_settings.frame_extent.into(),
-            &shader::raster::PushConstants {
+            &truvisl::raster::PushConstants {
                 frame_data: per_frame_data.device_address(),
                 scene: gpu_scene.scene_device_address(frame_label),
 
@@ -150,7 +150,7 @@ impl PhongSubpass {
             cmd.cmd_push_constants(
                 self.pipeline.layout(),
                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                offset_of!(shader::raster::PushConstants, instance_idx) as u32,
+                offset_of!(truvisl::raster::PushConstants, instance_idx) as u32,
                 bytemuck::bytes_of(&data),
             );
         });

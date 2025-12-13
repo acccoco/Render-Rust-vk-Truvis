@@ -14,6 +14,7 @@ fn gen_rust_binding() {
         .raw_line("#![allow(clippy::all)]")
         .raw_line("#![allow(warnings)]")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        .enable_cxx_namespaces()
         .generate()
         .expect("Unable to generate bindings");
 
@@ -37,7 +38,7 @@ fn main() {
     // {workspace}/crates/{current_crate}
     let crate_dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let build_type = std::env::var("PROFILE").unwrap();
-    
+
     // 手动找到 workspace 的路径，依赖当前 crate 的相对路径
     let workspace_dir = crate_dir.parent().unwrap().parent().unwrap().parent().unwrap();
     let cargo_build_dir = workspace_dir.join("target").join(build_type);

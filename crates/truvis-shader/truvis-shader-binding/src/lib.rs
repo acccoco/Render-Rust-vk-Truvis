@@ -5,7 +5,7 @@
 //!
 //! # 使用示例
 //! ```ignore
-//! use truvis_shader_binding::shader::PerFrameData;
+//! use truvis_shader_binding::truvisl::PerFrameData;
 //!
 //! let data = PerFrameData {
 //!     projection: glam::Mat4::IDENTITY.into(),
@@ -17,7 +17,7 @@
 
 mod _shader_bindings;
 
-pub use crate::_shader_bindings::root as shader;
+pub use crate::_shader_bindings::root as truvisl;
 
 mod slang_traits {
     use crate::_shader_bindings::root::*;

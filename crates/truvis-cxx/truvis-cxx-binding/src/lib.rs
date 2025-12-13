@@ -19,20 +19,20 @@ use truvis_model_manager::vertex::aos_3d::Vertex3D;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 
 pub mod _ffi_bindings;
-use crate::_ffi_bindings::*;
+pub use crate::_ffi_bindings::root as truvixx;
 
 // TODO 使用 SoA 来简化，就可以移除这些代码了
 /// 确保 Vertex3D 的布局和 C++ 中的 Vertex3D 一致
 fn validate_vertex_memory_layout() {
-    debug_assert!(size_of::<Vertex3D>() == size_of::<CxxVertex3D>());
-    debug_assert!(offset_of!(Vertex3D, position) == offset_of!(CxxVertex3D, position));
-    debug_assert!(offset_of!(Vertex3D, normal) == offset_of!(CxxVertex3D, normal));
-    debug_assert!(offset_of!(Vertex3D, tangent) == offset_of!(CxxVertex3D, tangent));
-    debug_assert!(offset_of!(Vertex3D, bitangent) == offset_of!(CxxVertex3D, bitangent));
-    debug_assert!(offset_of!(Vertex3D, uv) == offset_of!(CxxVertex3D, uv));
+    debug_assert!(size_of::<Vertex3D>() == size_of::<truvixx::CxxVertex3D>());
+    debug_assert!(offset_of!(Vertex3D, position) == offset_of!(truvixx::CxxVertex3D, position));
+    debug_assert!(offset_of!(Vertex3D, normal) == offset_of!(truvixx::CxxVertex3D, normal));
+    debug_assert!(offset_of!(Vertex3D, tangent) == offset_of!(truvixx::CxxVertex3D, tangent));
+    debug_assert!(offset_of!(Vertex3D, bitangent) == offset_of!(truvixx::CxxVertex3D, bitangent));
+    debug_assert!(offset_of!(Vertex3D, uv) == offset_of!(truvixx::CxxVertex3D, uv));
 
-    debug_assert!(size_of::<glam::Vec4>() == size_of::<CxxVec4f>());
-    debug_assert!(size_of::<glam::Mat4>() == size_of::<CxxMat4f>());
+    debug_assert!(size_of::<glam::Vec4>() == size_of::<truvixx::CxxVec4f>());
+    debug_assert!(size_of::<glam::Mat4>() == size_of::<truvixx::CxxMat4f>());
 }
 
 /// Assimp 场景加载器
@@ -73,7 +73,7 @@ impl AssimpSceneLoader {
         let c_model_file = std::ffi::CString::new(model_file).unwrap();
 
         unsafe {
-            let loader = load_scene(c_model_file.as_ptr());
+            let loader = truvixx::load_scene(c_model_file.as_ptr());
             let model_name = model_file.split('/').next_back().unwrap();
 
             let mut scene_loader = AssimpSceneLoader {
@@ -88,7 +88,7 @@ impl AssimpSceneLoader {
             scene_loader.load_mats(mat_register);
             scene_loader.load_instance(instance_register);
 
-            free_scene(loader);
+            truvixx::free_scene(loader);
 
             scene_loader.instances
         }
@@ -97,11 +97,11 @@ impl AssimpSceneLoader {
     /// 加载场景中基础的几何体
     fn load_mesh(&mut self, mut mesh_register: impl FnMut(Mesh) -> MeshGuid) {
         let _span = tracy_client::span!("load_mesh");
-        let mesh_cnt = unsafe { get_mesh_cnt(self.loader) };
+        let mesh_cnt = unsafe { truvixx::get_mesh_cnt(self.loader) };
 
         let mesh_uuids = (0..mesh_cnt)
             .map(|mesh_idx| unsafe {
-                let mesh = get_mesh(self.loader, mesh_idx);
+                let mesh = truvixx::get_mesh(self.loader, mesh_idx);
                 let mesh = &*mesh;
 
                 if mesh.vertex_array_.is_null() {
@@ -153,16 +153,16 @@ impl AssimpSceneLoader {
     /// 加载场景中的所有材质
     fn load_mats(&mut self, mut mat_register: impl FnMut(Material) -> MatGuid) {
         let _span = tracy_client::span!("load_mats");
-        let mat_cnt = unsafe { get_mat_cnt(self.loader) };
+        let mat_cnt = unsafe { truvixx::get_mat_cnt(self.loader) };
 
         let mat_uuids = (0..mat_cnt)
             .map(|mat_idx| unsafe {
-                let mat = get_mat(self.loader, mat_idx);
+                let mat = truvixx::get_mat(self.loader, mat_idx);
                 let mat = &*mat;
 
                 mat_register(Material {
-                    base_color: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.base_color),
-                    emissive: std::mem::transmute::<CxxVec4f, glam::Vec4>(mat.emissive_color),
+                    base_color: std::mem::transmute::<truvixx::CxxVec4f, glam::Vec4>(mat.base_color),
+                    emissive: std::mem::transmute::<truvixx::CxxVec4f, glam::Vec4>(mat.emissive_color),
                     metallic: mat.metallic_factor,
                     roughness: mat.roughness_factor,
                     opaque: mat.opaque_factor,
@@ -184,10 +184,10 @@ impl AssimpSceneLoader {
     /// 提升为 mesh
     fn load_instance(&mut self, mut instance_register: impl FnMut(Instance) -> InsGuid) {
         let _span = tracy_client::span!("load_instance");
-        let instance_cnt = unsafe { get_instance_cnt(self.loader) };
+        let instance_cnt = unsafe { truvixx::get_instance_cnt(self.loader) };
         let instances = (0..instance_cnt)
             .filter_map(|instance_idx| unsafe {
-                let instance = get_instance(self.loader, instance_idx);
+                let instance = truvixx::get_instance(self.loader, instance_idx);
                 let instance = &*instance;
 
                 let mesh_cnt = instance.mesh_cnt_;
@@ -213,7 +213,7 @@ impl AssimpSceneLoader {
                 let mut ins_uuids = Vec::with_capacity(mesh_cnt as usize);
                 for (mesh_uuid, mat_uuid) in std::iter::zip(mesh_uuids, mat_uuids) {
                     let instance = Instance {
-                        transform: std::mem::transmute::<CxxMat4f, glam::Mat4>(instance.world_transform),
+                        transform: std::mem::transmute::<truvixx::CxxMat4f, glam::Mat4>(instance.world_transform),
                         mesh: mesh_uuid,
                         materials: vec![mat_uuid],
                     };

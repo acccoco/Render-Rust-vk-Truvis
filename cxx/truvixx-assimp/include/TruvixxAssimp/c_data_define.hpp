@@ -29,7 +29,7 @@ struct TRUVIXX_ASSIMP_API alignas(4) CxxVec4f
 /// 4x4 矩阵结构体 (列主序)
 struct TRUVIXX_ASSIMP_API alignas(4) CxxMat4f
 {
-    float m[16]; // m[0]..m[3] 是第一列，以此类推
+    float m[16];    // m[0]..m[3] 是第一列，以此类推
 };
 
 /// 三角形面结构体
@@ -82,7 +82,7 @@ constexpr static size_t PATH_BUFFER_SIZE = 256;
 /// 材质结构体
 struct TRUVIXX_ASSIMP_API CxxMaterial
 {
-    char name[PATH_BUFFER_SIZE]; // 材质名称，使用 C 风格字符数组，确保以 null 结尾
+    char name[PATH_BUFFER_SIZE];    // 材质名称，使用 C 风格字符数组，确保以 null 结尾
 
     CxxVec4f base_color;
     float roughness_factor;
@@ -90,7 +90,7 @@ struct TRUVIXX_ASSIMP_API CxxMaterial
 
     CxxVec4f emissive_color;
 
-    float opaque_factor; // 透射率，1 表示 opaque, 0 表示 transparent
+    float opaque_factor;    // 透射率，1 表示 opaque, 0 表示 transparent
 
     /// 字符串使用 C 风格字符数组，确保以 null 结尾
     char diffuse_map[PATH_BUFFER_SIZE];
@@ -116,7 +116,7 @@ struct TRUVIXX_ASSIMP_API CxxInstance
 
     /// 坐标系：右手系，X-Right，Y-Up
     CxxMat4f world_transform = {};
-    char name[PATH_BUFFER_SIZE]{}; // 名称，使用 C 风格字符数组，确保以 null 结尾
+    char name[PATH_BUFFER_SIZE]{};    // 名称，使用 C 风格字符数组，确保以 null 结尾
 
 private:
     unsigned int* mat_indices_ = nullptr;

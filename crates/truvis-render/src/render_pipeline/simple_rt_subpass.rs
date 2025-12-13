@@ -13,7 +13,7 @@ use truvis_gfx::{
     pipelines::shader::{GfxShaderGroupInfo, GfxShaderModuleCache, GfxShaderStageInfo},
     resources::special_buffers::{sbt_buffer::GfxSBTBuffer, structured_buffer::GfxStructuredBuffer},
 };
-use truvis_shader_binding::shader;
+use truvis_shader_binding::truvisl;
 
 pub struct GfxRtPipeline {
     pub pipeline: vk::Pipeline,
@@ -289,7 +289,7 @@ impl SimpleRtSubpass {
                     | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
             )
             .offset(0)
-            .size(size_of::<shader::rt::PushConstants>() as u32);
+            .size(size_of::<truvisl::rt::PushConstants>() as u32);
 
         let pipeline_layout = {
             let bindless_manager = FrameContext::bindless_manager();
@@ -342,7 +342,7 @@ impl SimpleRtSubpass {
         pipeline_settings: &PipelineSettings,
         rt_image: vk::Image,
         rt_handle: BindlessImageHandle,
-        per_frame_data: &GfxStructuredBuffer<shader::PerFrameData>,
+        per_frame_data: &GfxStructuredBuffer<truvisl::PerFrameData>,
     ) {
         let frame_label = FrameContext::get().frame_label();
 
@@ -358,7 +358,7 @@ impl SimpleRtSubpass {
             None,
         );
         let spp = 4;
-        let mut push_constant = shader::rt::PushConstants {
+        let mut push_constant = truvisl::rt::PushConstants {
             frame_data: per_frame_data.device_address(),
             scene: FrameContext::gpu_scene().scene_device_address(frame_label),
             rt_render_target: rt_handle.0,

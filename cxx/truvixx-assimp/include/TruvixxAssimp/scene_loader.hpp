@@ -20,7 +20,9 @@ struct TRUVIXX_ASSIMP_API SceneLoader
 {
     explicit SceneLoader(const std::filesystem::path& mesh_path)
         : mesh_path_(mesh_path),
-          dir_path_(mesh_path.parent_path()) {}
+          dir_path_(mesh_path.parent_path())
+    {}
+
 
     ~SceneLoader() = default;
     SceneLoader(const SceneLoader&) = delete;
@@ -57,7 +59,7 @@ struct TRUVIXX_ASSIMP_API SceneLoader
     /// @return 指向顶点位置的指针，指针类型为 float*，每三个 float 代表一个顶点的 x, y, z 坐标
     float* get_position(const size_t mesh_idx, size_t& vertex_cnt) const
     {
-        assert(sizeof( aiVector3D) == sizeof(float) * 3);
+        assert(sizeof(aiVector3D) == sizeof(float) * 3);
         const auto mesh = this->ai_scene_->mMeshes[mesh_idx];
         vertex_cnt = mesh->mNumVertices;
         return reinterpret_cast<float*>(mesh->mVertices);
@@ -79,13 +81,13 @@ private:
     static bool process_geometry(CxxRasterGeometry& geometry, const aiMesh& ai_mesh);
 
 private:
-    const std::filesystem::path mesh_path_; // mesh 文件对应的路径
-    const std::filesystem::path dir_path_;  // mesh 文件所在的文件夹，形式："xx/xxx"
+    const std::filesystem::path mesh_path_;    // mesh 文件对应的路径
+    const std::filesystem::path dir_path_;     // mesh 文件所在的文件夹，形式："xx/xxx"
 
-    std::vector<CxxInstance> instances_;        // 所有的实例
-    std::vector<CxxRasterGeometry> geometries_; // 所有的几何体
-    std::vector<CxxMaterial> materials_;        // 所有的材质
+    std::vector<CxxInstance> instances_;           // 所有的实例
+    std::vector<CxxRasterGeometry> geometries_;    // 所有的几何体
+    std::vector<CxxMaterial> materials_;           // 所有的材质
 
     const aiScene* ai_scene_ = nullptr;
 };
-} // namespace truvis
+}    // namespace truvis

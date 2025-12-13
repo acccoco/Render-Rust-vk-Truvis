@@ -138,7 +138,7 @@ struct PerFrameData {
 };
 
 // 自动生成到 truvis-shader-binding crate
-use truvis_shader_binding::shader::PerFrameData;
+use truvis_shader_binding::truvisl::PerFrameData;
 ```
 
 ### 描述符布局简化（关键宏）

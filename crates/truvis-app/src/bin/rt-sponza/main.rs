@@ -4,7 +4,7 @@ use truvis_app::outer_app::OuterApp;
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::core::renderer::Renderer;
 use truvis_render::{platform::camera::Camera, render_pipeline::rt_pass::RtRenderPass};
-use truvis_shader_binding::shader;
+use truvis_shader_binding::truvisl;
 
 struct SponzaApp {
     rt_pipeline: RtRenderPass,
@@ -18,21 +18,21 @@ impl SponzaApp {
 
         let mut scene_manager = FrameContext::scene_manager_mut();
 
-        scene_manager.register_point_light(shader::PointLight {
+        scene_manager.register_point_light(truvisl::PointLight {
             pos: glam::vec3(-20.0, 40.0, 0.0).into(),
             color: (glam::vec3(5.0, 6.0, 1.0) * 2.0).into(),
 
             _pos_padding: Default::default(),
             _color_padding: Default::default(),
         });
-        scene_manager.register_point_light(shader::PointLight {
+        scene_manager.register_point_light(truvisl::PointLight {
             pos: glam::vec3(40.0, 40.0, -30.0).into(),
             color: (glam::vec3(1.0, 6.0, 7.0) * 3.0).into(),
 
             _pos_padding: Default::default(),
             _color_padding: Default::default(),
         });
-        scene_manager.register_point_light(shader::PointLight {
+        scene_manager.register_point_light(truvisl::PointLight {
             pos: glam::vec3(40.0, 40.0, 30.0).into(),
             color: (glam::vec3(5.0, 1.0, 8.0) * 3.0).into(),
 

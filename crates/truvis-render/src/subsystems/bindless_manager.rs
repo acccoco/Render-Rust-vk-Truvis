@@ -13,7 +13,7 @@ use truvis_gfx::{
     gfx::Gfx,
     utilities::shader_cursor::GfxShaderCursor,
 };
-use truvis_shader_binding::shader;
+use truvis_shader_binding::truvisl;
 use truvis_shader_layout_macro::ShaderLayout;
 
 use crate::pipeline_settings::FrameLabel;
@@ -21,16 +21,16 @@ use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::{GfxImageViewHandle, GfxTextureHandle};
 
 #[derive(Copy, Clone)]
-pub struct BindlessTextureHandle(pub shader::TextureHandle);
+pub struct BindlessTextureHandle(pub truvisl::TextureHandle);
 impl BindlessTextureHandle {
     #[inline]
     pub fn new(index: usize) -> Self {
-        Self(shader::TextureHandle { index: index as i32 })
+        Self(truvisl::TextureHandle { index: index as i32 })
     }
     #[inline]
     pub fn null() -> Self {
-        Self(shader::TextureHandle {
-            index: shader::INVALID_TEX_ID,
+        Self(truvisl::TextureHandle {
+            index: truvisl::INVALID_TEX_ID,
         })
     }
     #[inline]
@@ -44,16 +44,16 @@ impl Default for BindlessTextureHandle {
     }
 }
 #[derive(Copy, Clone)]
-pub struct BindlessImageHandle(pub shader::ImageHandle);
+pub struct BindlessImageHandle(pub truvisl::ImageHandle);
 impl BindlessImageHandle {
     #[inline]
     pub fn new(index: usize) -> Self {
-        Self(shader::ImageHandle { index: index as i32 })
+        Self(truvisl::ImageHandle { index: index as i32 })
     }
     #[inline]
     pub fn null() -> Self {
-        Self(shader::ImageHandle {
-            index: shader::INVALID_TEX_ID,
+        Self(truvisl::ImageHandle {
+            index: truvisl::INVALID_TEX_ID,
         })
     }
     #[inline]

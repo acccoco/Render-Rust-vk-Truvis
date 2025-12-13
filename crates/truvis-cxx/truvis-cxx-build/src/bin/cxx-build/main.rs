@@ -22,7 +22,7 @@ impl BuildType {
 
 /// 将 cxx 编译的结果 copy 到 rust
 fn copy_to_rust(cmake_project: &std::path::Path, cargo_target_dir: &std::path::Path, build_type: BuildType) {
-    let cmake_output_path = cmake_project.join("build").join(build_type.cmake_output_dir());
+    let cmake_output_path = cmake_project.join("build").join("output").join(build_type.cmake_output_dir());
     let cargo_output_path = cargo_target_dir.join(build_type.cargo_output_dir());
 
     // 确保 target/debug, target/debug/examples 目录存在
@@ -68,12 +68,12 @@ fn main() {
 
     std::process::Command::new("cmake")
         .current_dir(&cmake_project)
-        .args(["--build", "--preset", "debug"])
+        .args(["--build", "--preset", "vs2022-build-debug"])
         .status()
         .expect("Failed to run cmake build");
     std::process::Command::new("cmake")
         .current_dir(&cmake_project)
-        .args(["--build", "--preset", "release"])
+        .args(["--build", "--preset", "vs2022-build-release"])
         .status()
         .expect("Failed to run cmake build");
 

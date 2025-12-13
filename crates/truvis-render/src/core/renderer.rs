@@ -9,7 +9,7 @@ use truvis_gfx::{
     },
     gfx::Gfx,
 };
-use truvis_shader_binding::shader;
+use truvis_shader_binding::truvisl;
 
 use crate::core::frame_context::FrameContext;
 use crate::platform::{camera::Camera, input_manager::InputState};
@@ -159,7 +159,7 @@ impl Renderer {
             let view = camera.get_view_matrix();
             let projection = camera.get_projection_matrix();
 
-            shader::PerFrameData {
+            truvisl::PerFrameData {
                 projection: projection.into(),
                 view: view.into(),
                 inv_view: view.inverse().into(),
@@ -169,11 +169,11 @@ impl Renderer {
                 time_ms: FrameContext::get().timer.borrow().total_time.as_micros() as f32 / 1000.0,
                 delta_time_ms: FrameContext::get().timer.borrow().delte_time_ms(),
                 frame_id: FrameContext::get().frame_id() as u64,
-                mouse_pos: shader::Float2 {
+                mouse_pos: truvisl::Float2 {
                     x: mouse_pos.x as f32,
                     y: mouse_pos.y as f32,
                 },
-                resolution: shader::Float2 {
+                resolution: truvisl::Float2 {
                     x: frame_extent.width as f32,
                     y: frame_extent.height as f32,
                 },

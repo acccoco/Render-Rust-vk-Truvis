@@ -15,7 +15,7 @@ use truvis_gfx::{
 };
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::pipeline_settings::FrameLabel;
-use truvis_shader_binding::{shader, shader::TextureHandle};
+use truvis_shader_binding::{truvisl, truvisl::TextureHandle};
 
 use crate::gui::core::Gui;
 use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
@@ -45,7 +45,7 @@ impl GuiPass {
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 offset: 0,
-                size: size_of::<shader::imgui::PushConstant>() as u32,
+                size: size_of::<truvisl::imgui::PushConstant>() as u32,
             }],
             "uipass",
         ));
@@ -133,7 +133,7 @@ impl GuiPass {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
         cmd.cmd_set_viewport(0, std::slice::from_ref(&viewport));
 
-        let push_constant = shader::imgui::PushConstant {
+        let push_constant = truvisl::imgui::PushConstant {
             ortho: glam::Mat4::orthographic_rh(
                 0.0,
                 draw_data.display_size[0],
@@ -215,7 +215,7 @@ impl GuiPass {
                             cmd.cmd_push_constants(
                                 self.pipeline_layout.handle(),
                                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                                offset_of!(shader::imgui::PushConstant, texture) as u32,
+                                offset_of!(truvisl::imgui::PushConstant, texture) as u32,
                                 bytemuck::bytes_of(&texture_bindless_handle.0),
                             );
                             last_texture_id = Some(texture_id);

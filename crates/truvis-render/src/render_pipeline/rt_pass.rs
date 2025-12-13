@@ -8,13 +8,13 @@ use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, submit_info::GfxSubmitInfo},
     gfx::Gfx,
 };
-use truvis_shader_binding::shader;
+use truvis_shader_binding::truvisl;
 
 /// 整个 RT 管线
 pub struct RtRenderPass {
     rt_pass: SimpleRtSubpass,
-    blit_pass: ComputeSubpass<shader::blit::PushConstant>,
-    sdr_pass: ComputeSubpass<shader::sdr::PushConstant>,
+    blit_pass: ComputeSubpass<truvisl::blit::PushConstant>,
+    sdr_pass: ComputeSubpass<truvisl::sdr::PushConstant>,
 }
 impl Default for RtRenderPass {
     fn default() -> Self {
@@ -26,12 +26,12 @@ impl RtRenderPass {
     pub fn new() -> Self {
         let rt_pass = SimpleRtSubpass::new();
         let bindless_manager = FrameContext::bindless_manager();
-        let blit_pass = ComputeSubpass::<shader::blit::PushConstant>::new(
+        let blit_pass = ComputeSubpass::<truvisl::blit::PushConstant>::new(
             &bindless_manager,
             c"main",
             TruvisPath::shader_path("imgui/blit.slang").as_str(),
         );
-        let sdr_pass = ComputeSubpass::<shader::sdr::PushConstant>::new(
+        let sdr_pass = ComputeSubpass::<truvisl::sdr::PushConstant>::new(
             &bindless_manager,
             c"main",
             TruvisPath::shader_path("pass/pp/sdr.slang").as_str(),
@@ -111,7 +111,7 @@ impl RtRenderPass {
             self.blit_pass.exec(
                 &cmd,
                 &bindless_manager,
-                &shader::blit::PushConstant {
+                &truvisl::blit::PushConstant {
                     src_image: color_image_bindless_handle.0,
                     dst_image: render_target_image_bindless_handle.0,
                     src_image_size: glam::uvec2(frame_settings.frame_extent.width, frame_settings.frame_extent.height)
@@ -119,8 +119,8 @@ impl RtRenderPass {
                     offset: glam::uvec2(0, 0).into(),
                 },
                 glam::uvec3(
-                    frame_settings.frame_extent.width.div_ceil(shader::blit::SHADER_X as u32),
-                    frame_settings.frame_extent.height.div_ceil(shader::blit::SHADER_Y as u32),
+                    frame_settings.frame_extent.width.div_ceil(truvisl::blit::SHADER_X as u32),
+                    frame_settings.frame_extent.height.div_ceil(truvisl::blit::SHADER_Y as u32),
                     1,
                 ),
             );
@@ -151,7 +151,7 @@ impl RtRenderPass {
             self.sdr_pass.exec(
                 &cmd,
                 &bindless_manager,
-                &shader::sdr::PushConstant {
+                &truvisl::sdr::PushConstant {
                     src_image: color_image_bindless_handle.0,
                     dst_image: render_target_image_bindless_handle.0,
                     image_size: glam::uvec2(frame_settings.frame_extent.width, frame_settings.frame_extent.height)
@@ -160,8 +160,8 @@ impl RtRenderPass {
                     _padding_1: Default::default(),
                 },
                 glam::uvec3(
-                    frame_settings.frame_extent.width.div_ceil(shader::blit::SHADER_X as u32),
-                    frame_settings.frame_extent.height.div_ceil(shader::blit::SHADER_Y as u32),
+                    frame_settings.frame_extent.width.div_ceil(truvisl::blit::SHADER_X as u32),
+                    frame_settings.frame_extent.height.div_ceil(truvisl::blit::SHADER_Y as u32),
                     1,
                 ),
             );

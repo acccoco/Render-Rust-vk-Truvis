@@ -24,7 +24,7 @@ use truvis_model_manager::guid_new_type::{InsGuid, MatGuid, MeshGuid};
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::{GfxTexture2, ImageLoader};
-use truvis_shader_binding::shader;
+use truvis_shader_binding::truvisl;
 
 /// 数据以顺序的方式存储，同时查找时间为 O(1)
 #[derive(Default)]
@@ -80,15 +80,15 @@ impl<T: std::hash::Hash + Eq + Copy> FlattenMap<T> {
 
 /// 构建 Gpu Scene 所需的所有 buffer
 struct GpuSceneBuffers {
-    scene_buffer: GfxStructuredBuffer<shader::Scene>,
-    light_buffer: GfxStructuredBuffer<shader::PointLight>,
-    light_stage_buffer: GfxStructuredBuffer<shader::PointLight>,
-    material_buffer: GfxStructuredBuffer<shader::PBRMaterial>,
-    material_stage_buffer: GfxStructuredBuffer<shader::PBRMaterial>,
-    geometry_buffer: GfxStructuredBuffer<shader::NewGeometry>,
-    geometry_stage_buffer: GfxStructuredBuffer<shader::NewGeometry>,
-    instance_buffer: GfxStructuredBuffer<shader::Instance>,
-    instance_stage_buffer: GfxStructuredBuffer<shader::Instance>,
+    scene_buffer: GfxStructuredBuffer<truvisl::Scene>,
+    light_buffer: GfxStructuredBuffer<truvisl::PointLight>,
+    light_stage_buffer: GfxStructuredBuffer<truvisl::PointLight>,
+    material_buffer: GfxStructuredBuffer<truvisl::PBRMaterial>,
+    material_stage_buffer: GfxStructuredBuffer<truvisl::PBRMaterial>,
+    geometry_buffer: GfxStructuredBuffer<truvisl::NewGeometry>,
+    geometry_stage_buffer: GfxStructuredBuffer<truvisl::NewGeometry>,
+    instance_buffer: GfxStructuredBuffer<truvisl::Instance>,
+    instance_stage_buffer: GfxStructuredBuffer<truvisl::Instance>,
     material_indirect_buffer: GfxStructuredBuffer<u32>,
     material_indirect_stage_buffer: GfxStructuredBuffer<u32>,
     geometry_indirect_buffer: GfxStructuredBuffer<u32>,
@@ -329,7 +329,7 @@ impl GpuScene {
         bindless_manager: &BindlessManager,
     ) {
         let crt_gpu_buffers = &self.gpu_scene_buffers[*FrameContext::get().frame_label()];
-        let scene_data = shader::Scene {
+        let scene_data = truvisl::Scene {
             all_instances: crt_gpu_buffers.instance_buffer.device_address(),
             all_mats: crt_gpu_buffers.material_buffer.device_address(),
             all_geometries: crt_gpu_buffers.geometry_buffer.device_address(),
@@ -392,7 +392,7 @@ impl GpuScene {
                 panic!("instance material cnt can not be larger than buffer");
             }
 
-            instance_buffer_slices[instance_idx] = shader::Instance {
+            instance_buffer_slices[instance_idx] = truvisl::Instance {
                 geometry_indirect_idx: crt_geometry_indirect_idx as u32,
                 geometry_count: submesh_cnt as u32,
                 material_indirect_idx: crt_material_indirect_idx as u32,
@@ -405,7 +405,7 @@ impl GpuScene {
             //  buffer 中是连续的 首先将 instance 需要的 geometry
             //  的实际索引，写入一个间接索引 buffer: geometry_indirect_buffer，
             //  然后获得 instance 数据在间接索引 buffer 中的起始 idx 和长度，将这个值写入到
-            //  shader::Instance 中
+            //  truvisl::Instance 中
             let geometry_idx_start = self.mesh_geometry_map.get(&instance.mesh).unwrap();
             for submesh_idx in 0..instance.materials.len() {
                 let geometry_idx = geometry_idx_start + submesh_idx;
@@ -468,7 +468,7 @@ impl GpuScene {
                 .and_then(|tex_handle| bindless_manager.get_texture_handle2(tex_handle))
                 .unwrap_or_default();
 
-            material_buffer_slices[mat_idx] = shader::PBRMaterial {
+            material_buffer_slices[mat_idx] = truvisl::PBRMaterial {
                 base_color: mat.base_color.xyz().into(),
                 emissive: mat.emissive.xyz().into(),
                 metallic: mat.metallic,
@@ -503,7 +503,7 @@ impl GpuScene {
         }
 
         for (light_idx, (_, point_light)) in scene_manager.point_light_map().iter().enumerate() {
-            light_buffer_slices[light_idx] = shader::PointLight {
+            light_buffer_slices[light_idx] = truvisl::PointLight {
                 pos: point_light.pos,
                 color: point_light.color,
 
@@ -535,7 +535,7 @@ impl GpuScene {
                 panic!("geometry cnt can not be larger than buffer");
             }
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
-                geometry_buffer_slices[crt_geometry_idx + submesh_idx] = shader::NewGeometry {
+                geometry_buffer_slices[crt_geometry_idx + submesh_idx] = truvisl::NewGeometry {
                     position_buffer: geometry.vertex_buffer.pos_address(),
                     normal_buffer: geometry.vertex_buffer.normal_address(),
                     tangent_buffer: geometry.vertex_buffer.tangent_address(),

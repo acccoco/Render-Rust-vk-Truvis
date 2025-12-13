@@ -9,7 +9,7 @@ use truvis_model_manager::components::mesh::Mesh;
 use truvis_model_manager::guid_new_type::{InsGuid, LightGuid, MatGuid, MeshGuid};
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::{GfxTexture2, ImageLoader};
-use truvis_shader_binding::shader;
+use truvis_shader_binding::truvisl;
 
 /// 在 CPU 侧管理场景数据
 #[derive(Default)]
@@ -19,7 +19,7 @@ pub struct SceneManager {
     all_meshes: HashMap<MeshGuid, Mesh>,
 
     // all_textures: HashMap<>
-    all_point_lights: HashMap<LightGuid, shader::PointLight>,
+    all_point_lights: HashMap<LightGuid, truvisl::PointLight>,
 
     texture_map: HashMap<String, GfxTextureHandle>,
 }
@@ -38,7 +38,7 @@ impl SceneManager {
         &self.all_meshes
     }
     #[inline]
-    pub fn point_light_map(&self) -> &HashMap<LightGuid, shader::PointLight> {
+    pub fn point_light_map(&self) -> &HashMap<LightGuid, truvisl::PointLight> {
         &self.all_point_lights
     }
     #[inline]
@@ -142,7 +142,7 @@ impl SceneManager {
     }
 
     /// 向场景中添加点光源
-    pub fn register_point_light(&mut self, light: shader::PointLight) -> LightGuid {
+    pub fn register_point_light(&mut self, light: truvisl::PointLight) -> LightGuid {
         let guid = LightGuid::new();
         self.all_point_lights.insert(guid, light);
         guid

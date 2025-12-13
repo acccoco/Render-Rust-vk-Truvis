@@ -6,7 +6,7 @@ use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
-use truvis_shader_binding::shader;
+use truvis_shader_binding::truvisl;
 
 use crate::pipeline_settings::{AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings};
 use crate::platform::timer::Timer;
@@ -53,7 +53,7 @@ pub struct FrameContext {
     pub asset_hub: RefCell<AssetHub>,
     pub gfx_resource_manager: RefCell<GfxResourceManager>,
 
-    pub per_frame_data_buffers: Vec<GfxStructuredBuffer<shader::PerFrameData>>,
+    pub per_frame_data_buffers: Vec<GfxStructuredBuffer<truvisl::PerFrameData>>,
 
     pub fif_buffers: RefCell<FifBuffers>,
 
@@ -119,7 +119,7 @@ impl FrameContext {
             fif_count,
         );
         let per_frame_data_buffers = (0..fif_count)
-            .map(|idx| GfxStructuredBuffer::<shader::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{idx}")))
+            .map(|idx| GfxStructuredBuffer::<truvisl::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{idx}")))
             .collect();
 
         Self {
