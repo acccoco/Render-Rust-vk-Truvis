@@ -117,7 +117,7 @@ impl<T: OuterApp> TruvisApp<T> {
 
         self.renderer.begin_frame();
         let frame_label = FrameContext::get().frame_label();
-        let elapsed = self.renderer.frame_context2.timer.delta_time;
+        let elapsed = self.renderer.render_context.timer.delta_time;
 
         {
             let _span = tracy_client::span!("Acquire Image");
@@ -152,7 +152,7 @@ impl<T: OuterApp> TruvisApp<T> {
                         ui.slider("channel", 0, 3, &mut pipeline_settings.channel);
                         FrameContext::get().set_pipeline_settings(pipeline_settings);
                     }
-                    ui.text(format!("Accum Frames: {}", self.renderer.frame_context2.accum_data.accum_frames_num));
+                    ui.text(format!("Accum Frames: {}", self.renderer.render_context.accum_data.accum_frames_num));
                     ui.new_line();
                 }
 
@@ -180,7 +180,7 @@ impl<T: OuterApp> TruvisApp<T> {
                 self.camera_controller.update(
                     &self.input_manager,
                     glam::vec2(extent.width as f32, extent.height as f32),
-                    self.renderer.frame_context2.timer.delta_time,
+                    self.renderer.render_context.timer.delta_time,
                 );
             }
 
@@ -195,7 +195,10 @@ impl<T: OuterApp> TruvisApp<T> {
         {
             let _span = tracy_client::span!("OuterApp::draw");
             // 构建出 PipelineContext
-            self.outer_app.get_mut().unwrap().draw(&self.renderer.frame_context2, &mut self.renderer.frame_context3);
+            self.outer_app
+                .get_mut()
+                .unwrap()
+                .draw(&self.renderer.render_context, &mut self.renderer.render_context_mut);
         }
 
         // Window: Draw Gui ===============================
@@ -203,7 +206,7 @@ impl<T: OuterApp> TruvisApp<T> {
             let _span = tracy_client::span!("Present GUI");
             let present_data = {
                 let render_target_texture =
-                    self.renderer.frame_context2.fif_buffers.render_target_texture_handle(frame_label);
+                    self.renderer.render_context.fif_buffers.render_target_texture_handle(frame_label);
 
                 PresentData {
                     render_target: render_target_texture,
@@ -216,8 +219,8 @@ impl<T: OuterApp> TruvisApp<T> {
                 }
             };
             self.window_system.get_mut().unwrap().draw_gui(
-                &self.renderer.frame_context2,
-                &mut self.renderer.frame_context3,
+                &self.renderer.render_context,
+                &mut self.renderer.render_context_mut,
                 present_data,
             );
         }

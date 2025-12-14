@@ -2,7 +2,7 @@ use ash::vk;
 
 use crate::apis::render_pass::RenderPass;
 use crate::core::frame_context::FrameContext;
-use crate::core::renderer::{FrameContext2, FrameContext3};
+use crate::core::renderer::{RenderContext, RenderContextMut};
 use crate::render_pipeline::{compute_subpass::ComputeSubpass, simple_rt_subpass::SimpleRtSubpass};
 use crate::subsystems::bindless_manager::BindlessManager;
 use truvis_crate_tools::resource::TruvisPath;
@@ -40,17 +40,17 @@ impl RtRenderPass {
         }
     }
 
-    pub fn render(&self, frame_context2: &FrameContext2, frame_context3: &mut FrameContext3) {
+    pub fn render(&self, render_context: &RenderContext, render_context_mut: &mut RenderContextMut) {
         let frame_label = FrameContext::get().frame_label();
         let frame_settings = FrameContext::get().frame_settings();
 
-        let fif_buffers = &frame_context2.fif_buffers;
-        let bindless_manager = &frame_context2.bindless_manager;
+        let fif_buffers = &render_context.fif_buffers;
+        let bindless_manager = &render_context.bindless_manager;
 
-        let color_image = frame_context2.gfx_resource_manager.get_image(fif_buffers.color_image_handle()).unwrap();
+        let color_image = render_context.gfx_resource_manager.get_image(fif_buffers.color_image_handle()).unwrap();
         let color_image_bindless_handle =
             bindless_manager.get_image_handle2(fif_buffers.color_image_view_handle()).unwrap();
-        let render_target_texture = frame_context2
+        let render_target_texture = render_context
             .gfx_resource_manager
             .get_texture(fif_buffers.render_target_texture_handle(frame_label))
             .unwrap();
@@ -61,7 +61,7 @@ impl RtRenderPass {
         let mut submit_cmds = Vec::new();
         // ray tracing
         {
-            let cmd = frame_context3.cmd_allocator.alloc_command_buffer("ray-tracing");
+            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("ray-tracing");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
 
             // RT 的 accum image 在 fif 中只有一个， 因此需要确保之前的 rt 写入已经完成
@@ -78,13 +78,13 @@ impl RtRenderPass {
             );
 
             self.rt_pass.ray_trace(
-                frame_context2,
+                render_context,
                 &cmd,
                 &frame_settings,
                 &FrameContext::get().pipeline_settings(),
                 color_image.handle(),
                 color_image_bindless_handle,
-                &frame_context2.per_frame_data_buffers[*frame_label],
+                &render_context.per_frame_data_buffers[*frame_label],
             );
 
             cmd.end();
@@ -94,7 +94,7 @@ impl RtRenderPass {
 
         // blit
         {
-            let cmd = frame_context3.cmd_allocator.alloc_command_buffer("blit");
+            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("blit");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit");
 
             // 等待 ray-tracing 执行完成
@@ -128,7 +128,7 @@ impl RtRenderPass {
 
         // hdr -> sdr
         {
-            let cmd = frame_context3.cmd_allocator.alloc_command_buffer("hdr2sdr");
+            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("hdr2sdr");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "hdr2sdr");
 
             // 等待之前的 compute shader 执行完成

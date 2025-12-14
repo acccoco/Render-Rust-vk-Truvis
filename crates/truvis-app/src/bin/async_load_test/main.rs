@@ -7,7 +7,7 @@ use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 use truvis_model_manager::components::geometry::GeometrySoA3D;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::core::frame_context::FrameContext;
-use truvis_render::core::renderer::{FrameContext2, FrameContext3, Renderer};
+use truvis_render::core::renderer::{RenderContext, RenderContextMut, Renderer};
 use truvis_render::platform::camera::Camera;
 
 mod async_pass;
@@ -53,10 +53,10 @@ impl OuterApp for AsyncLoadTest {
 
         // Load a texture
         let texture_path = TruvisPath::resources_path("uv_checker.png");
-        let texture_handle = renderer.frame_context2.asset_hub.load_texture(texture_path.into());
+        let texture_handle = renderer.render_context.asset_hub.load_texture(texture_path.into());
 
         Self {
-            pipeline: AsyncPass::new(&renderer.frame_context2.bindless_manager, &FrameContext::get().frame_settings()),
+            pipeline: AsyncPass::new(&renderer.render_context.bindless_manager, &FrameContext::get().frame_settings()),
             quad: Self::create_quad(),
             texture_handle,
         }
@@ -64,7 +64,7 @@ impl OuterApp for AsyncLoadTest {
 
     fn draw_ui(&mut self, _ui: &Ui) {}
 
-    fn draw(&self, _frame_context2: &FrameContext2, _frame_context3: &mut FrameContext3) {
+    fn draw(&self, _frame_context2: &RenderContext, _frame_context3: &mut RenderContextMut) {
         // let texture_id = FrameContext::bindless_manager()
         //     .get_texture_handle2(self.texture_handle)
         //     .map(|h| h.index as u32)

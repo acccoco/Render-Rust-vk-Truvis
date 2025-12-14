@@ -1,7 +1,7 @@
 use imgui::Ui;
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
-use truvis_render::core::renderer::{FrameContext2, FrameContext3, Renderer};
+use truvis_render::core::renderer::{RenderContext, RenderContextMut, Renderer};
 use truvis_render::{platform::camera::Camera, render_pipeline::rt_pass::RtRenderPass};
 use truvis_shader_binding::truvisl;
 
@@ -15,21 +15,21 @@ impl CornellApp {
         camera.euler_yaw_deg = 330.0;
         camera.euler_pitch_deg = -27.0;
 
-        renderer.frame_context2.scene_manager.register_point_light(truvisl::PointLight {
+        renderer.render_context.scene_manager.register_point_light(truvisl::PointLight {
             pos: glam::vec3(-20.0, 40.0, 0.0).into(),
             color: (glam::vec3(5.0, 6.0, 1.0) * 2.0).into(),
 
             _pos_padding: Default::default(),
             _color_padding: Default::default(),
         });
-        renderer.frame_context2.scene_manager.register_point_light(truvisl::PointLight {
+        renderer.render_context.scene_manager.register_point_light(truvisl::PointLight {
             pos: glam::vec3(40.0, 40.0, -30.0).into(),
             color: (glam::vec3(1.0, 6.0, 7.0) * 3.0).into(),
 
             _pos_padding: Default::default(),
             _color_padding: Default::default(),
         });
-        renderer.frame_context2.scene_manager.register_point_light(truvisl::PointLight {
+        renderer.render_context.scene_manager.register_point_light(truvisl::PointLight {
             pos: glam::vec3(40.0, 40.0, 30.0).into(),
             color: (glam::vec3(5.0, 1.0, 8.0) * 3.0).into(),
 
@@ -42,9 +42,9 @@ impl CornellApp {
         //     &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         // );
         log::info!("Loading scene...");
-        renderer.frame_context2.scene_manager.load_scene(
-            &mut renderer.frame_context2.gfx_resource_manager,
-            &mut renderer.frame_context2.bindless_manager,
+        renderer.render_context.scene_manager.load_scene(
+            &mut renderer.render_context.gfx_resource_manager,
+            &mut renderer.render_context.bindless_manager,
             std::path::Path::new("C:/Users/bigso/Downloads/coord.fbx"),
             &glam::Mat4::IDENTITY,
         );
@@ -54,7 +54,7 @@ impl CornellApp {
 
 impl OuterApp for CornellApp {
     fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self {
-        let rt_pipeline = RtRenderPass::new(&renderer.frame_context2.bindless_manager);
+        let rt_pipeline = RtRenderPass::new(&renderer.render_context.bindless_manager);
 
         Self::create_scene(renderer, camera);
 
@@ -63,8 +63,8 @@ impl OuterApp for CornellApp {
 
     fn draw_ui(&mut self, _ui: &Ui) {}
 
-    fn draw(&self, frame_context2: &FrameContext2, frame_context3: &mut FrameContext3) {
-        self.rt_pipeline.render(frame_context2, frame_context3);
+    fn draw(&self, render_context: &RenderContext, render_context_mut: &mut RenderContextMut) {
+        self.rt_pipeline.render(render_context, render_context_mut);
     }
 }
 

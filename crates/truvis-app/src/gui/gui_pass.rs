@@ -13,7 +13,7 @@ use truvis_gfx::{
         shader::GfxShaderStageInfo,
     },
 };
-use truvis_render::core::renderer::{FrameContext2, FrameContext3};
+use truvis_render::core::renderer::{RenderContext, RenderContextMut};
 use truvis_render::pipeline_settings::FrameLabel;
 use truvis_render::subsystems::bindless_manager::BindlessManager;
 use truvis_shader_binding::{truvisl, truvisl::TextureHandle};
@@ -88,8 +88,8 @@ impl GuiPass {
 
     pub fn draw(
         &self,
-        frame_context2: &FrameContext2,
-        frame_context3: &mut FrameContext3,
+        render_context: &RenderContext,
+        render_context_mut: &mut RenderContextMut,
         canvas_color_view: vk::ImageView,
         canvas_extent: vk::Extent2D,
         cmd: &GfxCommandBuffer,
@@ -116,7 +116,7 @@ impl GuiPass {
         let mesh;
         let draw_data;
         let get_texture_handle;
-        if let Some(res) = gui.imgui_render(frame_context3, cmd, frame_label) {
+        if let Some(res) = gui.imgui_render(render_context_mut, cmd, frame_label) {
             (mesh, draw_data, get_texture_handle) = res;
         } else {
             log::warn!("No ImGui draw data available, skipping GUI pass.");
@@ -148,7 +148,7 @@ impl GuiPass {
             _padding_0: 0,
         };
 
-        let bindless_manager = &frame_context2.bindless_manager;
+        let bindless_manager = &render_context.bindless_manager;
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),

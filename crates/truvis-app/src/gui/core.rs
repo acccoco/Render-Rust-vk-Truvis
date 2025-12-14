@@ -8,7 +8,7 @@ use truvis_gfx::swapchain::render_swapchain::GfxSwapchainImageInfo;
 use truvis_gfx::{
     basic::color::LabelColor, commands::command_buffer::GfxCommandBuffer, gfx::Gfx, resources::image::GfxImage,
 };
-use truvis_render::core::renderer::{FrameContext3, Renderer};
+use truvis_render::core::renderer::{RenderContextMut, Renderer};
 use truvis_render::pipeline_settings::FrameLabel;
 use truvis_render::subsystems::bindless_manager::BindlessManager;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
@@ -56,8 +56,8 @@ impl Gui {
         let font_texture_handle = Self::init_fonts(
             &mut imgui_ctx,
             &platform,
-            &mut renderer.frame_context2.bindless_manager,
-            &mut renderer.frame_context2.gfx_resource_manager,
+            &mut renderer.render_context.bindless_manager,
+            &mut renderer.render_context.gfx_resource_manager,
         );
 
         Self {
@@ -295,7 +295,7 @@ impl Gui {
     /// 使用 imgui 将 ui 操作编译为 draw data；构建 draw 需要的 mesh 数据
     pub fn imgui_render(
         &mut self,
-        frame_context3: &mut FrameContext3,
+        render_context_mut: &mut RenderContextMut,
         cmd: &GfxCommandBuffer,
         frame_label: FrameLabel,
     ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> GfxTextureHandle + use<'_>)> {
@@ -305,7 +305,7 @@ impl Gui {
         }
 
         Gfx::get().gfx_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
-        self.meshes[*frame_label].replace(GuiMesh::new(frame_context3, cmd, &format!("{frame_label}"), draw_data));
+        self.meshes[*frame_label].replace(GuiMesh::new(render_context_mut, cmd, &format!("{frame_label}"), draw_data));
         Gfx::get().gfx_queue().end_label();
 
         Some((

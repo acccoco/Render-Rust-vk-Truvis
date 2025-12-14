@@ -95,10 +95,6 @@ impl FrameContext {
         self.frame_label.get()
     }
     #[inline]
-    pub fn frame_label2() -> FrameLabel {
-        FrameLabel::from_usize(Self::frame_id() % Self::fif_count())
-    }
-    #[inline]
     pub fn fif_count() -> usize {
         3
     }

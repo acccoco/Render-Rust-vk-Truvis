@@ -23,7 +23,7 @@ use truvis_model_manager::components::geometry::GeometrySoA3D;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render::core::frame_context::FrameContext;
-use truvis_render::core::renderer::{FrameContext2, FrameContext3};
+use truvis_render::core::renderer::{RenderContext, RenderContextMut};
 use truvis_render::pipeline_settings::FrameSettings;
 
 const_map!(ShaderStage<GfxShaderStageInfo>:{
@@ -98,7 +98,7 @@ impl ShaderToySubpass {
 
     pub fn draw(
         &self,
-        frame_context2: &FrameContext2,
+        render_context: &RenderContext,
         cmd: &GfxCommandBuffer,
         frame_settings: &FrameSettings,
         render_target: vk::ImageView,
@@ -106,7 +106,7 @@ impl ShaderToySubpass {
     ) {
         let viewport_extent = frame_settings.frame_extent;
 
-        let timer = &frame_context2.timer;
+        let timer = &render_context.timer;
 
         let push_constants = PushConstants {
             time: timer.total_time.as_secs_f32(),
@@ -182,18 +182,23 @@ impl ShaderToyPass {
         Self { shader_toy_pass }
     }
 
-    pub fn render(&self, frame_context2: &FrameContext2, frame_context3: &mut FrameContext3, shape: &GeometrySoA3D) {
+    pub fn render(
+        &self,
+        render_context: &RenderContext,
+        render_context_mut: &mut RenderContextMut,
+        shape: &GeometrySoA3D,
+    ) {
         let frame_label = FrameContext::get().frame_label();
 
-        let render_target_texture = frame_context2
+        let render_target_texture = render_context
             .gfx_resource_manager
-            .get_texture(frame_context2.fif_buffers.render_target_texture_handle(frame_label))
+            .get_texture(render_context.fif_buffers.render_target_texture_handle(frame_label))
             .unwrap();
         let frame_settings = FrameContext::get().frame_settings();
 
         // render shader toy
         {
-            let cmd = frame_context3.cmd_allocator.alloc_command_buffer("shader-toy");
+            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("shader-toy");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "shader-toy");
 
             // 将 render target 从 general -> color attachment
@@ -214,7 +219,7 @@ impl ShaderToyPass {
             );
 
             self.shader_toy_pass.draw(
-                frame_context2,
+                render_context,
                 &cmd,
                 &frame_settings,
                 render_target_texture.image_view().handle(),

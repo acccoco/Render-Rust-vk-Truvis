@@ -26,7 +26,7 @@ use crate::subsystems::scene_manager::SceneManager;
 use crate::subsystems::stage_buffer_manager::StageBufferManager;
 
 // Render 期间不可变
-pub struct FrameContext2 {
+pub struct RenderContext {
     pub scene_manager: SceneManager,
     pub asset_hub: AssetHub,
     pub gpu_scene: GpuScene,
@@ -42,7 +42,7 @@ pub struct FrameContext2 {
 }
 
 // Render 期间可变
-pub struct FrameContext3 {
+pub struct RenderContextMut {
     pub cmd_allocator: CmdAllocator,
     pub stage_buffer_manager: StageBufferManager,
 }
@@ -61,8 +61,8 @@ pub struct FrameContext3 {
 /// renderer.end_frame();          // 提交命令、推进帧计数
 /// ```
 pub struct Renderer {
-    pub frame_context2: FrameContext2,
-    pub frame_context3: FrameContext3,
+    pub render_context: RenderContext,
+    pub render_context_mut: RenderContextMut,
 }
 
 // new & init
@@ -97,7 +97,7 @@ impl Renderer {
             .collect();
 
         Self {
-            frame_context2: FrameContext2 {
+            render_context: RenderContext {
                 fif_timeline_semaphore,
                 scene_manager,
                 asset_hub,
@@ -109,7 +109,7 @@ impl Renderer {
                 timer,
                 accum_data,
             },
-            frame_context3: FrameContext3 {
+            render_context_mut: RenderContextMut {
                 cmd_allocator,
                 stage_buffer_manager,
             },
@@ -122,18 +122,18 @@ impl Renderer {
         // 在 Renderer 被销毁时，等待 Gfx 设备空闲
         Gfx::get().wait_idel();
 
-        self.frame_context2
+        self.render_context
             .fif_buffers
-            .destroy_mut(&mut self.frame_context2.bindless_manager, &mut self.frame_context2.gfx_resource_manager);
+            .destroy_mut(&mut self.render_context.bindless_manager, &mut self.render_context.gfx_resource_manager);
         FrameContext::destroy();
-        self.frame_context2.bindless_manager.destroy();
-        self.frame_context2.scene_manager.destroy();
-        self.frame_context2.asset_hub.destroy();
-        self.frame_context2.gpu_scene.destroy();
-        self.frame_context3.cmd_allocator.destroy();
-        self.frame_context3.stage_buffer_manager.destroy();
-        self.frame_context2.gfx_resource_manager.destroy();
-        self.frame_context2.fif_timeline_semaphore.destroy();
+        self.render_context.bindless_manager.destroy();
+        self.render_context.scene_manager.destroy();
+        self.render_context.asset_hub.destroy();
+        self.render_context.gpu_scene.destroy();
+        self.render_context_mut.cmd_allocator.destroy();
+        self.render_context_mut.stage_buffer_manager.destroy();
+        self.render_context.gfx_resource_manager.destroy();
+        self.render_context.fif_timeline_semaphore.destroy();
     }
 }
 // phase call
@@ -142,7 +142,7 @@ impl Renderer {
         let _span = tracy_client::span!("Renderer::begin_frame");
 
         // Update AssetHub
-        self.frame_context2.asset_hub.update();
+        self.render_context.asset_hub.update();
 
         // 等待 fif 的同一帧渲染完成
         {
@@ -151,12 +151,12 @@ impl Renderer {
             let wait_frame = if frame_id > 3 { frame_id as u64 - 3 } else { 0 };
             let wait_timeline_value = if wait_frame == 0 { 0 } else { wait_frame };
             let timeout_ns = 30 * 1000 * 1000 * 1000;
-            self.frame_context2.fif_timeline_semaphore.wait_timeline(wait_timeline_value, timeout_ns);
+            self.render_context.fif_timeline_semaphore.wait_timeline(wait_timeline_value, timeout_ns);
         }
 
-        self.frame_context3.cmd_allocator.free_frame_commands();
-        self.frame_context3.stage_buffer_manager.clear_fif_buffers();
-        self.frame_context2.timer.tic();
+        self.render_context_mut.cmd_allocator.free_frame_commands();
+        self.render_context_mut.stage_buffer_manager.clear_fif_buffers();
+        self.render_context.timer.tic();
     }
 
     pub fn end_frame(&mut self) {
@@ -164,7 +164,7 @@ impl Renderer {
         // 设置当前帧结束的 semaphore，用于保护当前帧的资源
         {
             let submit_info = GfxSubmitInfo::new(&[]).signal(
-                &self.frame_context2.fif_timeline_semaphore,
+                &self.render_context.fif_timeline_semaphore,
                 vk::PipelineStageFlags2::NONE,
                 Some(FrameContext::frame_id() as u64),
             );
@@ -178,21 +178,21 @@ impl Renderer {
 
     pub fn time_to_render(&mut self) -> bool {
         let limit_elapsed_us = 1000.0 * 1000.0 / FrameContext::frame_limit();
-        limit_elapsed_us < self.frame_context2.timer.toc().as_micros() as f32
+        limit_elapsed_us < self.render_context.timer.toc().as_micros() as f32
     }
 
     pub fn before_render(&mut self, input_state: &InputState, camera: &Camera) {
         let _span = tracy_client::span!("Renderer::before_render");
         let current_camera_dir = glam::vec3(camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg);
 
-        let mut accum_data = self.frame_context2.accum_data;
+        let mut accum_data = self.render_context.accum_data;
         accum_data.update_accum_frames(current_camera_dir, camera.position);
 
         self.update_gpu_scene(input_state, camera);
     }
 
     pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
-        let mut accum_data = self.frame_context2.accum_data;
+        let mut accum_data = self.render_context.accum_data;
         accum_data.reset();
 
         unsafe {
@@ -200,9 +200,9 @@ impl Renderer {
         }
         FrameContext::get().set_frame_extent(new_extent);
 
-        self.frame_context2.fif_buffers.rebuild(
-            &mut self.frame_context2.bindless_manager,
-            &mut self.frame_context2.gfx_resource_manager,
+        self.render_context.fif_buffers.rebuild(
+            &mut self.render_context.bindless_manager,
+            &mut self.render_context.gfx_resource_manager,
             &FrameContext::get().frame_settings(),
         );
     }
@@ -213,7 +213,7 @@ impl Renderer {
         let crt_frame_label = FrameContext::get().frame_label();
 
         // 将数据上传到 gpu buffer 中
-        let cmd = self.frame_context3.cmd_allocator.alloc_command_buffer("update-draw-buffer");
+        let cmd = self.render_context_mut.cmd_allocator.alloc_command_buffer("update-draw-buffer");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
 
         let transfer_barrier_mask = GfxBarrierMask {
@@ -226,16 +226,16 @@ impl Renderer {
         };
 
         // 因为 Bindless RefCel 的问题，所以这里提前结束作用域
-        self.frame_context2.gpu_scene.prepare_render_data(
-            &self.frame_context2.scene_manager,
-            &mut self.frame_context2.bindless_manager,
-            &self.frame_context2.gfx_resource_manager,
+        self.render_context.gpu_scene.prepare_render_data(
+            &self.render_context.scene_manager,
+            &mut self.render_context.bindless_manager,
+            &self.render_context.gfx_resource_manager,
         );
-        self.frame_context2.gpu_scene.upload_to_buffer(
+        self.render_context.gpu_scene.upload_to_buffer(
             &cmd,
             transfer_barrier_mask,
-            &self.frame_context2.scene_manager,
-            &self.frame_context2.bindless_manager,
+            &self.render_context.scene_manager,
+            &self.render_context.bindless_manager,
         );
 
         // 准备好当前帧的数据
@@ -252,8 +252,8 @@ impl Renderer {
                 inv_projection: projection.inverse().into(),
                 camera_pos: camera.position.into(),
                 camera_forward: camera.camera_forward().into(),
-                time_ms: self.frame_context2.timer.total_time.as_micros() as f32 / 1000.0,
-                delta_time_ms: self.frame_context2.timer.delte_time_ms(),
+                time_ms: self.render_context.timer.total_time.as_micros() as f32 / 1000.0,
+                delta_time_ms: self.render_context.timer.delte_time_ms(),
                 frame_id: FrameContext::frame_id() as u64,
                 mouse_pos: truvisl::Float2 {
                     x: mouse_pos.x as f32,
@@ -263,11 +263,11 @@ impl Renderer {
                     x: frame_extent.width as f32,
                     y: frame_extent.height as f32,
                 },
-                accum_frames: self.frame_context2.accum_data.accum_frames_num as u32,
+                accum_frames: self.render_context.accum_data.accum_frames_num as u32,
                 _padding_0: Default::default(),
             }
         };
-        let crt_frame_data_buffer = &self.frame_context2.per_frame_data_buffers[*crt_frame_label];
+        let crt_frame_data_buffer = &self.render_context.per_frame_data_buffers[*crt_frame_label];
         cmd.cmd_update_buffer(crt_frame_data_buffer.vk_buffer(), 0, bytemuck::bytes_of(&per_frame_data));
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),

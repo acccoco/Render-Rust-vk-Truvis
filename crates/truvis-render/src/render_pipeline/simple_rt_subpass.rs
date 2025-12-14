@@ -1,6 +1,6 @@
 use crate::apis::render_pass::RenderSubpass;
 use crate::core::frame_context::FrameContext;
-use crate::core::renderer::FrameContext2;
+use crate::core::renderer::RenderContext;
 use crate::pipeline_settings::{FrameSettings, PipelineSettings};
 use crate::subsystems::bindless_manager::{BindlessImageHandle, BindlessManager};
 use ash::vk;
@@ -330,7 +330,7 @@ impl SimpleRtSubpass {
     }
     pub fn ray_trace(
         &self,
-        frame_context2: &FrameContext2,
+        render_context: &RenderContext,
         cmd: &GfxCommandBuffer,
         framse_settings: &FrameSettings,
         pipeline_settings: &PipelineSettings,
@@ -343,7 +343,7 @@ impl SimpleRtSubpass {
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::RAY_TRACING_KHR, self.pipeline.pipeline);
-        let bindless_manager = &frame_context2.bindless_manager;
+        let bindless_manager = &render_context.bindless_manager;
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
@@ -354,7 +354,7 @@ impl SimpleRtSubpass {
         let spp = 4;
         let mut push_constant = truvisl::rt::PushConstants {
             frame_data: per_frame_data.device_address(),
-            scene: frame_context2.gpu_scene.scene_device_address(frame_label),
+            scene: render_context.gpu_scene.scene_device_address(frame_label),
             rt_render_target: rt_handle.0,
             spp,
             spp_idx: 0,

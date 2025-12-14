@@ -12,7 +12,7 @@ use truvis_gfx::{
     swapchain::render_swapchain::GfxRenderSwapchain,
 };
 use truvis_render::core::frame_context::FrameContext;
-use truvis_render::core::renderer::{FrameContext2, FrameContext3, Renderer};
+use truvis_render::core::renderer::{RenderContext, RenderContextMut, Renderer};
 use truvis_render::pipeline_settings::{DefaultRendererSettings, FrameLabel};
 use truvis_resource::handles::GfxTextureHandle;
 
@@ -93,7 +93,7 @@ impl MainWindow {
         let swapchain_image_infos = swapchain.image_infos();
 
         let gui = Gui::new(renderer, &window, FrameContext::fif_count(), &swapchain_image_infos);
-        let gui_pass = GuiPass::new(&renderer.frame_context2.bindless_manager, swapchain_image_infos.image_format);
+        let gui_pass = GuiPass::new(&renderer.render_context.bindless_manager, swapchain_image_infos.image_format);
 
         let present_complete_semaphores = (0..FrameContext::fif_count())
             .map(|i| GfxSemaphore::new(&format!("window-present-complete-{}", i)))
@@ -117,15 +117,20 @@ impl MainWindow {
         &self.winit_window
     }
 
-    fn draw(&mut self, frame_context2: &FrameContext2, frame_context3: &mut FrameContext3, renderer_data: PresentData) {
+    fn draw(
+        &mut self,
+        render_context: &RenderContext,
+        render_context_mut: &mut RenderContextMut,
+        renderer_data: PresentData,
+    ) {
         let swapchain = self.swapchain.as_ref().unwrap();
         let swapchain_image_idx = swapchain.current_image_index();
         let frame_label = FrameContext::get().frame_label();
 
         let render_target_texture =
-            frame_context2.gfx_resource_manager.get_texture(renderer_data.render_target).unwrap();
+            render_context.gfx_resource_manager.get_texture(renderer_data.render_target).unwrap();
 
-        let cmd = frame_context3.cmd_allocator.alloc_command_buffer("window-present");
+        let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("window-present");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         {
             // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
@@ -153,8 +158,8 @@ impl MainWindow {
             );
 
             self.gui_pass.draw(
-                frame_context2,
-                frame_context3,
+                render_context,
+                render_context_mut,
                 swapchain.current_image_view().handle(),
                 swapchain.extent(),
                 &cmd,
@@ -244,12 +249,12 @@ impl MainWindow {
 
     pub fn draw_gui(
         &mut self,
-        frame_context2: &FrameContext2,
-        frame_context3: &mut FrameContext3,
+        render_context: &RenderContext,
+        render_context_mut: &mut RenderContextMut,
         renderer_data: PresentData,
     ) {
         self.gui.register_render_texture(renderer_data.render_target);
-        self.draw(frame_context2, frame_context3, renderer_data);
+        self.draw(render_context, render_context_mut, renderer_data);
     }
 
     pub fn handle_event<T>(&mut self, event: &winit::event::Event<T>) {
