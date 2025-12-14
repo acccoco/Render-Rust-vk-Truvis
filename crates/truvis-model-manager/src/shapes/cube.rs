@@ -1,4 +1,4 @@
-use crate::components::geometry::GeometrySoA3D;
+use crate::components::geometry::RtGeometry;
 use crate::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 
@@ -153,7 +153,7 @@ impl CubeSoA {
         20, 22, 21, 20, 23, 22, // right
     ];
 
-    pub fn create_mesh() -> GeometrySoA3D {
+    pub fn create_mesh() -> RtGeometry {
         let vertex_buffer = VertexLayoutSoA3D::create_vertex_buffer(
             &Self::POSITIONS,
             &Self::NORMALS,
@@ -165,7 +165,7 @@ impl CubeSoA {
         let index_buffer = GfxIndex32Buffer::new(Self::INDICES.len(), "cube-index-buffer");
         index_buffer.transfer_data_sync(&Self::INDICES);
 
-        GeometrySoA3D {
+        RtGeometry {
             vertex_buffer,
             index_buffer,
         }

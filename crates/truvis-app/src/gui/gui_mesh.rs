@@ -96,7 +96,8 @@ impl GuiMesh {
 
     /// 从 draw data 中提取出 index 数据，创建 index buffer
     ///
-    /// @return (index buffer, index count, stage buffer)
+    /// # return
+    /// (index buffer, index count, stage buffer)
     fn create_index_buffer(
         render_context_mut: &mut RenderContextMut,
         frame_name: &str,

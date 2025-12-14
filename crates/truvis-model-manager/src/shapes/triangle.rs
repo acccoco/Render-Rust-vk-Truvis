@@ -1,4 +1,4 @@
-use crate::components::geometry::GeometrySoA3D;
+use crate::components::geometry::RtGeometry;
 use crate::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 
@@ -55,7 +55,7 @@ impl TriangleSoA {
 
     const INDICES: [u32; 3] = [0, 1, 2];
 
-    pub fn create_mesh() -> GeometrySoA3D {
+    pub fn create_mesh() -> RtGeometry {
         let vertex_buffer = VertexLayoutSoA3D::create_vertex_buffer(
             &Self::POSITIONS,
             &Self::NORMALS,
@@ -67,7 +67,7 @@ impl TriangleSoA {
         let index_buffer = GfxIndex32Buffer::new(Self::INDICES.len(), "triangle-index-buffer");
         index_buffer.transfer_data_sync(&Self::INDICES);
 
-        GeometrySoA3D {
+        RtGeometry {
             vertex_buffer,
             index_buffer,
         }

@@ -3,11 +3,11 @@ use itertools::Itertools;
 
 use truvis_gfx::raytracing::acceleration::GfxAcceleration;
 
-use crate::components::geometry::GeometrySoA3D;
+use crate::components::geometry::RtGeometry;
 
 /// CPU 侧的 Mesh 数据
 pub struct Mesh {
-    pub geometries: Vec<GeometrySoA3D>,
+    pub geometries: Vec<RtGeometry>,
 
     pub blas: Option<GfxAcceleration>,
     pub name: String,

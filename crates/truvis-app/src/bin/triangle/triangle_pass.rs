@@ -18,7 +18,7 @@ use truvis_gfx::{
         shader::GfxShaderStageInfo,
     },
 };
-use truvis_model_manager::components::geometry::GeometrySoA3D;
+use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render::core::frame_context::FrameContext;
@@ -74,7 +74,7 @@ impl TriangleSubpass {
         cmd: &GfxCommandBuffer,
         frame_label: FrameLabel,
         frame_settings: &FrameSettings,
-        shape: &GeometrySoA3D,
+        shape: &RtGeometry,
     ) {
         let viewport_extent = frame_settings.frame_extent;
 
@@ -139,7 +139,7 @@ impl TrianglePass {
         &self,
         render_context: &RenderContext,
         render_context_mut: &mut RenderContextMut,
-        shape: &GeometrySoA3D,
+        shape: &RtGeometry,
     ) {
         let frame_label = FrameContext::get().frame_label();
         let frame_settings = FrameContext::get().frame_settings();

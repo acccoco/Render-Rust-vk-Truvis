@@ -1,4 +1,4 @@
-use crate::components::geometry::Geometry;
+use crate::components::geometry::RtGeometry;
 use crate::components::instance::Instance;
 use crate::components::material::Material;
 use crate::components::mesh::Mesh;
@@ -108,7 +108,7 @@ impl AssimpSceneLoader {
 
             // 只有 single geometry 的 mesh
             Mesh {
-                geometries: vec![Geometry {
+                geometries: vec![RtGeometry {
                     vertex_buffer,
                     index_buffer,
                 }],

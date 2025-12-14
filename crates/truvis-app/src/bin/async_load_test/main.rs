@@ -4,7 +4,7 @@ use truvis_app::outer_app::OuterApp;
 use truvis_asset::handle::AssetTextureHandle;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
-use truvis_model_manager::components::geometry::GeometrySoA3D;
+use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::core::renderer::{RenderContext, RenderContextMut, Renderer};
@@ -15,12 +15,12 @@ use async_pass::AsyncPass;
 
 struct AsyncLoadTest {
     pipeline: AsyncPass,
-    quad: GeometrySoA3D,
+    quad: RtGeometry,
     texture_handle: AssetTextureHandle,
 }
 
 impl AsyncLoadTest {
-    fn create_quad() -> GeometrySoA3D {
+    fn create_quad() -> RtGeometry {
         let positions = vec![
             glam::vec3(-0.5, -0.5, 0.0),
             glam::vec3(0.5, -0.5, 0.0),
@@ -40,7 +40,7 @@ impl AsyncLoadTest {
         let vertex_buffer = VertexLayoutSoA3D::create_vertex_buffer(&positions, &normals, &tangents, &uvs, "quad-vb");
         let index_buffer = GfxIndex32Buffer::new_with_data(&indices, "quad-ib");
 
-        GeometrySoA3D {
+        RtGeometry {
             vertex_buffer,
             index_buffer,
         }

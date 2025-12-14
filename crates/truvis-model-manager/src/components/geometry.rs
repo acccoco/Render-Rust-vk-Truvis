@@ -14,14 +14,13 @@ use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexBuffer;
 /// # 类型别名
 /// - `GeometryAoS3D`: AoS 3D 顶点布局（Position + Normal + TexCoord）
 /// - `GeometrySoA3D`: SoA 3D 顶点布局（分离存储）
-pub struct Geometry<T: GfxVertexLayout> {
-    pub vertex_buffer: GfxVertexBuffer<T>,
+pub struct RtGeometry {
+    pub vertex_buffer: GfxVertexBuffer<VertexLayoutSoA3D>,
     pub index_buffer: GfxIndex32Buffer,
 }
-pub type GeometrySoA3D = Geometry<VertexLayoutSoA3D>;
 
 // getters
-impl<L: GfxVertexLayout> Geometry<L> {
+impl RtGeometry {
     #[inline]
     pub fn index_type() -> vk::IndexType {
         vk::IndexType::UINT32
@@ -34,14 +33,14 @@ impl<L: GfxVertexLayout> Geometry<L> {
 }
 
 // tools
-impl<L: GfxVertexLayout> Geometry<L> {
+impl RtGeometry {
     pub fn get_blas_geometry_info(&self) -> GfxBlasInputInfo<'_> {
         let geometry_triangle = vk::AccelerationStructureGeometryTrianglesDataKHR {
             vertex_format: vk::Format::R32G32B32_SFLOAT,
             vertex_data: vk::DeviceOrHostAddressConstKHR {
                 device_address: self.vertex_buffer.pos_address(),
             },
-            vertex_stride: L::pos_stride() as vk::DeviceSize,
+            vertex_stride: VertexLayoutSoA3D::pos_stride() as vk::DeviceSize,
             // spec 上说应该是 vertex cnt - 1，应该是用作 index
             max_vertex: self.vertex_buffer.vertex_cnt() as u32 - 1,
             index_type: Self::index_type(),
@@ -76,7 +75,7 @@ impl<L: GfxVertexLayout> Geometry<L> {
     }
 }
 
-impl GeometrySoA3D {
+impl RtGeometry {
     #[inline]
     pub fn cmd_bind_index_buffer(&self, cmd: &GfxCommandBuffer) {
         cmd.cmd_bind_index_buffer(&self.index_buffer, 0)

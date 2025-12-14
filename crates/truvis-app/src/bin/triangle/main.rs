@@ -1,7 +1,7 @@
 use imgui::Ui;
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
-use truvis_model_manager::components::geometry::GeometrySoA3D;
+use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::platform::camera::Camera;
 
@@ -13,7 +13,7 @@ use truvis_render::core::renderer::{RenderContext, RenderContextMut, Renderer};
 
 struct HelloTriangle {
     triangle_pipeline: TrianglePass,
-    triangle: GeometrySoA3D,
+    triangle: RtGeometry,
 }
 impl OuterApp for HelloTriangle {
     fn init(_renderer: &mut Renderer, _camera: &mut Camera) -> Self {

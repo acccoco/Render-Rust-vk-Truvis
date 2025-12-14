@@ -19,7 +19,7 @@ use truvis_gfx::{
         shader::GfxShaderStageInfo,
     },
 };
-use truvis_model_manager::components::geometry::GeometrySoA3D;
+use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render::core::frame_context::FrameContext;
@@ -102,7 +102,7 @@ impl ShaderToySubpass {
         cmd: &GfxCommandBuffer,
         frame_settings: &FrameSettings,
         render_target: vk::ImageView,
-        rect: &GeometrySoA3D,
+        rect: &RtGeometry,
     ) {
         let viewport_extent = frame_settings.frame_extent;
 
@@ -186,7 +186,7 @@ impl ShaderToyPass {
         &self,
         render_context: &RenderContext,
         render_context_mut: &mut RenderContextMut,
-        shape: &GeometrySoA3D,
+        shape: &RtGeometry,
     ) {
         let frame_label = FrameContext::get().frame_label();
 

@@ -1,7 +1,7 @@
 use imgui::Ui;
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
-use truvis_model_manager::components::geometry::GeometrySoA3D;
+use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_render::core::frame_context::FrameContext;
 use truvis_render::platform::camera::Camera;
 
@@ -12,7 +12,7 @@ use truvis_model_manager::shapes::rect::RectSoA;
 use truvis_render::core::renderer::{RenderContext, RenderContextMut, Renderer};
 
 struct ShaderToy {
-    rectangle: GeometrySoA3D,
+    rectangle: RtGeometry,
     pipeline: ShaderToyPass,
 }
 impl OuterApp for ShaderToy {
