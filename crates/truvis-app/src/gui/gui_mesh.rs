@@ -1,5 +1,6 @@
 use ash::vk;
 
+use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
 use truvis_gfx::resources::buffer::GfxBuffer;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndexBuffer;
 use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexBuffer;
@@ -7,9 +8,7 @@ use truvis_gfx::{
     basic::color::LabelColor,
     commands::{barrier::GfxBufferBarrier, command_buffer::GfxCommandBuffer},
 };
-use truvis_render::core::frame_context::FrameContext;
-
-use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
+use truvis_render::core::renderer::FrameContext3;
 
 /// imgui 绘制所需的 vertex buffer 和 index buffer
 pub struct GuiMesh {
@@ -20,9 +19,14 @@ pub struct GuiMesh {
 }
 
 impl GuiMesh {
-    pub fn new(cmd: &GfxCommandBuffer, frame_name: &str, draw_data: &imgui::DrawData) -> Self {
-        let (vertex_buffer, vertex_cnt) = Self::create_vertex_buffer(frame_name, cmd, draw_data);
-        let index_buffer = Self::create_index_buffer(frame_name, cmd, draw_data);
+    pub fn new(
+        frame_context3: &mut FrameContext3,
+        cmd: &GfxCommandBuffer,
+        frame_name: &str,
+        draw_data: &imgui::DrawData,
+    ) -> Self {
+        let (vertex_buffer, vertex_cnt) = Self::create_vertex_buffer(frame_context3, frame_name, cmd, draw_data);
+        let index_buffer = Self::create_index_buffer(frame_context3, frame_name, cmd, draw_data);
 
         cmd.begin_label("uipass-mesh-transfer-barrier", LabelColor::COLOR_CMD);
         {
@@ -55,6 +59,7 @@ impl GuiMesh {
     /// ## Return
     /// `(vertex buffer, vertex count)`
     fn create_vertex_buffer(
+        frame_context3: &mut FrameContext3,
         frame_name: &str,
         cmd: &GfxCommandBuffer,
         draw_data: &imgui::DrawData,
@@ -68,8 +73,8 @@ impl GuiMesh {
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
         let vertex_buffer =
             GfxVertexBuffer::<ImGuiVertexLayoutAoS>::new(vertex_count, format!("{}-imgui-vertex", frame_name));
-        let mut upload_buffer_manager = FrameContext::stage_buffer_manager();
-        let stage_buffer = upload_buffer_manager
+        let stage_buffer = frame_context3
+            .stage_buffer_manager
             .alloc_buffer(vertices_size as vk::DeviceSize, &format!("{}-imgui-vertex-stage", frame_name));
         stage_buffer.transfer_data_by_mmap(&vertices);
 
@@ -93,6 +98,7 @@ impl GuiMesh {
     ///
     /// @return (index buffer, index count, stage buffer)
     fn create_index_buffer(
+        frame_context3: &mut FrameContext3,
         frame_name: &str,
         cmd: &GfxCommandBuffer,
         draw_data: &imgui::DrawData,
@@ -125,7 +131,7 @@ impl GuiMesh {
         }
         cmd.end_label();
 
-        FrameContext::stage_buffer_manager().register_stage_buffer(stage_buffer);
+        frame_context3.stage_buffer_manager.register_stage_buffer(stage_buffer);
 
         index_buffer
     }

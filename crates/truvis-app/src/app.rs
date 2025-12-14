@@ -86,7 +86,6 @@ impl<T: OuterApp> TruvisApp<T> {
 
         app.destroy();
 
-        FrameContext::destroy();
         Gfx::destroy();
     }
 }
@@ -95,6 +94,7 @@ impl<T: OuterApp> TruvisApp<T> {
     /// 在 window 创建之后调用，初始化 Renderer 和 GUI
     fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
         let window_system = MainWindow::new(
+            &mut self.renderer,
             event_loop,
             "Truvis".to_string(),
             vk::Extent2D {
@@ -117,7 +117,7 @@ impl<T: OuterApp> TruvisApp<T> {
 
         self.renderer.begin_frame();
         let frame_label = FrameContext::get().frame_label();
-        let elapsed = FrameContext::get().timer.borrow().delta_time;
+        let elapsed = self.renderer.frame_context2.timer.delta_time;
 
         {
             let _span = tracy_client::span!("Acquire Image");
@@ -152,7 +152,7 @@ impl<T: OuterApp> TruvisApp<T> {
                         ui.slider("channel", 0, 3, &mut pipeline_settings.channel);
                         FrameContext::get().set_pipeline_settings(pipeline_settings);
                     }
-                    ui.text(format!("Accum Frames: {}", FrameContext::get().accum_data.get().accum_frames_num));
+                    ui.text(format!("Accum Frames: {}", self.renderer.frame_context2.accum_data.accum_frames_num));
                     ui.new_line();
                 }
 
@@ -180,7 +180,7 @@ impl<T: OuterApp> TruvisApp<T> {
                 self.camera_controller.update(
                     &self.input_manager,
                     glam::vec2(extent.width as f32, extent.height as f32),
-                    FrameContext::get().timer.borrow().delta_time,
+                    self.renderer.frame_context2.timer.delta_time,
                 );
             }
 
@@ -195,7 +195,7 @@ impl<T: OuterApp> TruvisApp<T> {
         {
             let _span = tracy_client::span!("OuterApp::draw");
             // 构建出 PipelineContext
-            self.outer_app.get_mut().unwrap().draw();
+            self.outer_app.get_mut().unwrap().draw(&self.renderer.frame_context2, &mut self.renderer.frame_context3);
         }
 
         // Window: Draw Gui ===============================
@@ -203,7 +203,8 @@ impl<T: OuterApp> TruvisApp<T> {
             let _span = tracy_client::span!("Present GUI");
             let present_data = {
                 let render_target_texture =
-                    FrameContext::get().fif_buffers.borrow().render_target_texture_handle(frame_label);
+                    self.renderer.frame_context2.fif_buffers.render_target_texture_handle(frame_label);
+
                 PresentData {
                     render_target: render_target_texture,
                     render_target_barrier: GfxBarrierMask {
@@ -214,7 +215,11 @@ impl<T: OuterApp> TruvisApp<T> {
                     },
                 }
             };
-            self.window_system.get_mut().unwrap().draw_gui(present_data);
+            self.window_system.get_mut().unwrap().draw_gui(
+                &self.renderer.frame_context2,
+                &mut self.renderer.frame_context3,
+                present_data,
+            );
         }
 
         // End Frame ===================================

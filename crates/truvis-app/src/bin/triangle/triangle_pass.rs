@@ -22,8 +22,8 @@ use truvis_model_manager::components::geometry::GeometrySoA3D;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render::core::frame_context::FrameContext;
+use truvis_render::core::renderer::{FrameContext2, FrameContext3};
 use truvis_render::pipeline_settings::{FrameLabel, FrameSettings};
-use truvis_render::resources::fif_buffer::FifBuffers;
 
 const_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {
@@ -70,18 +70,18 @@ impl TriangleSubpass {
 
     pub fn draw(
         &self,
+        frame_context2: &FrameContext2,
         cmd: &GfxCommandBuffer,
         frame_label: FrameLabel,
-        fif_buffers: &FifBuffers,
         frame_settings: &FrameSettings,
         shape: &GeometrySoA3D,
     ) {
         let viewport_extent = frame_settings.frame_extent;
 
-        let gfx_resource_manager = FrameContext::gfx_resource_manager();
-
-        let render_target_texture =
-            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
+        let render_target_texture = frame_context2
+            .gfx_resource_manager
+            .get_texture(frame_context2.fif_buffers.render_target_texture_handle(frame_label))
+            .unwrap();
 
         let rendering_info = GfxRenderingInfo::new(
             vec![render_target_texture.image_view().handle()],
@@ -135,20 +135,18 @@ impl TrianglePass {
         Self { triangle_pass }
     }
 
-    pub fn render(&self, shape: &GeometrySoA3D) {
-        let fif_buffers = FrameContext::get().fif_buffers.borrow();
-
+    pub fn render(&self, frame_context2: &FrameContext2, frame_context3: &mut FrameContext3, shape: &GeometrySoA3D) {
         let frame_label = FrameContext::get().frame_label();
         let frame_settings = FrameContext::get().frame_settings();
 
-        let gfx_resource_manager = FrameContext::gfx_resource_manager();
-
-        let render_target_texture =
-            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
+        let render_target_texture = frame_context2
+            .gfx_resource_manager
+            .get_texture(frame_context2.fif_buffers.render_target_texture_handle(frame_label))
+            .unwrap();
 
         // render triangle
         {
-            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("triangle");
+            let cmd = frame_context3.cmd_allocator.alloc_command_buffer("triangle");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "triangle");
 
             // 将 render target 从 general -> color attachment
@@ -168,7 +166,7 @@ impl TrianglePass {
                     )],
             );
 
-            self.triangle_pass.draw(&cmd, frame_label, &fif_buffers, &frame_settings, shape);
+            self.triangle_pass.draw(frame_context2, &cmd, frame_label, &frame_settings, shape);
 
             // 将 render target 从 color attachment -> general
             cmd.image_memory_barrier(

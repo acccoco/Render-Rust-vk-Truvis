@@ -1,7 +1,8 @@
 use crate::apis::render_pass::RenderSubpass;
 use crate::core::frame_context::FrameContext;
+use crate::core::renderer::FrameContext2;
 use crate::pipeline_settings::{FrameSettings, PipelineSettings};
-use crate::subsystems::bindless_manager::BindlessImageHandle;
+use crate::subsystems::bindless_manager::{BindlessImageHandle, BindlessManager};
 use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::const_map;
@@ -249,14 +250,8 @@ pub struct SimpleRtSubpass {
 
     _sbt: SBTRegions,
 }
-impl Default for SimpleRtSubpass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl SimpleRtSubpass {
-    pub fn new() -> Self {
+    pub fn new(bindless_manager: &BindlessManager) -> Self {
         let mut shader_module_cache = GfxShaderModuleCache::new();
         let stage_infos = ShaderStage::iter()
             .map(|stage| stage.value())
@@ -292,8 +287,6 @@ impl SimpleRtSubpass {
             .size(size_of::<truvisl::rt::PushConstants>() as u32);
 
         let pipeline_layout = {
-            let bindless_manager = FrameContext::bindless_manager();
-
             let descriptor_sets = [bindless_manager.bindless_descriptor_layout.handle()];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
@@ -337,6 +330,7 @@ impl SimpleRtSubpass {
     }
     pub fn ray_trace(
         &self,
+        frame_context2: &FrameContext2,
         cmd: &GfxCommandBuffer,
         framse_settings: &FrameSettings,
         pipeline_settings: &PipelineSettings,
@@ -349,7 +343,7 @@ impl SimpleRtSubpass {
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::RAY_TRACING_KHR, self.pipeline.pipeline);
-        let bindless_manager = FrameContext::bindless_manager();
+        let bindless_manager = &frame_context2.bindless_manager;
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
@@ -360,7 +354,7 @@ impl SimpleRtSubpass {
         let spp = 4;
         let mut push_constant = truvisl::rt::PushConstants {
             frame_data: per_frame_data.device_address(),
-            scene: FrameContext::gpu_scene().scene_device_address(frame_label),
+            scene: frame_context2.gpu_scene.scene_device_address(frame_label),
             rt_render_target: rt_handle.0,
             spp,
             spp_idx: 0,

@@ -23,6 +23,7 @@ use truvis_model_manager::components::geometry::GeometrySoA3D;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render::core::frame_context::FrameContext;
+use truvis_render::core::renderer::{FrameContext2, FrameContext3};
 use truvis_render::pipeline_settings::FrameSettings;
 
 const_map!(ShaderStage<GfxShaderStageInfo>:{
@@ -97,6 +98,7 @@ impl ShaderToySubpass {
 
     pub fn draw(
         &self,
+        frame_context2: &FrameContext2,
         cmd: &GfxCommandBuffer,
         frame_settings: &FrameSettings,
         render_target: vk::ImageView,
@@ -104,12 +106,12 @@ impl ShaderToySubpass {
     ) {
         let viewport_extent = frame_settings.frame_extent;
 
-        let timer = FrameContext::get().timer.borrow();
+        let timer = &frame_context2.timer;
 
         let push_constants = PushConstants {
             time: timer.total_time.as_secs_f32(),
             delta_time: timer.delta_time_s(),
-            frame: FrameContext::get().frame_id() as i32,
+            frame: FrameContext::frame_id() as i32,
             frame_rate: 1.0 / timer.delta_time_s(),
             resolution: glam::Vec2::new(viewport_extent.width as f32, viewport_extent.height as f32),
             mouse: glam::Vec4::new(
@@ -180,20 +182,18 @@ impl ShaderToyPass {
         Self { shader_toy_pass }
     }
 
-    pub fn render(&self, shape: &GeometrySoA3D) {
-        let fif_buffers = FrameContext::get().fif_buffers.borrow();
-
+    pub fn render(&self, frame_context2: &FrameContext2, frame_context3: &mut FrameContext3, shape: &GeometrySoA3D) {
         let frame_label = FrameContext::get().frame_label();
 
-        let gfx_resource_manager = FrameContext::get().gfx_resource_manager.borrow();
-
-        let render_target_texture =
-            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
+        let render_target_texture = frame_context2
+            .gfx_resource_manager
+            .get_texture(frame_context2.fif_buffers.render_target_texture_handle(frame_label))
+            .unwrap();
         let frame_settings = FrameContext::get().frame_settings();
 
         // render shader toy
         {
-            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("shader-toy");
+            let cmd = frame_context3.cmd_allocator.alloc_command_buffer("shader-toy");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "shader-toy");
 
             // 将 render target 从 general -> color attachment
@@ -213,7 +213,13 @@ impl ShaderToyPass {
                     )],
             );
 
-            self.shader_toy_pass.draw(&cmd, &frame_settings, render_target_texture.image_view().handle(), shape);
+            self.shader_toy_pass.draw(
+                frame_context2,
+                &cmd,
+                &frame_settings,
+                render_target_texture.image_view().handle(),
+                shape,
+            );
 
             // 将 render target 从 color attachment -> general
             cmd.image_memory_barrier(

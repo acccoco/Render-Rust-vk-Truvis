@@ -196,7 +196,9 @@ impl BindlessManager {
     }
 }
 // destroy
-impl BindlessManager {}
+impl BindlessManager {
+    pub fn destroy(self) {}
+}
 impl Drop for BindlessManager {
     fn drop(&mut self) {
         log::info!("Dropping BindlessManager");

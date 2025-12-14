@@ -2,7 +2,9 @@ use ash::vk;
 
 use crate::apis::render_pass::RenderPass;
 use crate::core::frame_context::FrameContext;
+use crate::core::renderer::{FrameContext2, FrameContext3};
 use crate::render_pipeline::{compute_subpass::ComputeSubpass, simple_rt_subpass::SimpleRtSubpass};
+use crate::subsystems::bindless_manager::BindlessManager;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, submit_info::GfxSubmitInfo},
@@ -16,23 +18,17 @@ pub struct RtRenderPass {
     blit_pass: ComputeSubpass<truvisl::blit::PushConstant>,
     sdr_pass: ComputeSubpass<truvisl::sdr::PushConstant>,
 }
-impl Default for RtRenderPass {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl RtRenderPass {
-    pub fn new() -> Self {
-        let rt_pass = SimpleRtSubpass::new();
-        let bindless_manager = FrameContext::bindless_manager();
+    pub fn new(bindless_manager: &BindlessManager) -> Self {
+        let rt_pass = SimpleRtSubpass::new(bindless_manager);
         let blit_pass = ComputeSubpass::<truvisl::blit::PushConstant>::new(
-            &bindless_manager,
+            bindless_manager,
             c"main",
             TruvisPath::shader_path("imgui/blit.slang").as_str(),
         );
         let sdr_pass = ComputeSubpass::<truvisl::sdr::PushConstant>::new(
-            &bindless_manager,
+            bindless_manager,
             c"main",
             TruvisPath::shader_path("pass/pp/sdr.slang").as_str(),
         );
@@ -44,20 +40,20 @@ impl RtRenderPass {
         }
     }
 
-    pub fn render(&self) {
+    pub fn render(&self, frame_context2: &FrameContext2, frame_context3: &mut FrameContext3) {
         let frame_label = FrameContext::get().frame_label();
         let frame_settings = FrameContext::get().frame_settings();
 
-        let bindless_manager = FrameContext::bindless_manager();
-        let gfx_resource_manager = FrameContext::gfx_resource_manager();
+        let fif_buffers = &frame_context2.fif_buffers;
+        let bindless_manager = &frame_context2.bindless_manager;
 
-        let fif_buffers = FrameContext::get().fif_buffers.borrow();
-
-        let color_image = gfx_resource_manager.get_image(fif_buffers.color_image_handle()).unwrap();
+        let color_image = frame_context2.gfx_resource_manager.get_image(fif_buffers.color_image_handle()).unwrap();
         let color_image_bindless_handle =
             bindless_manager.get_image_handle2(fif_buffers.color_image_view_handle()).unwrap();
-        let render_target_texture =
-            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
+        let render_target_texture = frame_context2
+            .gfx_resource_manager
+            .get_texture(fif_buffers.render_target_texture_handle(frame_label))
+            .unwrap();
         let render_target_image_bindless_handle = bindless_manager
             .get_image_handle_in_texture(fif_buffers.render_target_texture_handle(frame_label))
             .unwrap();
@@ -65,7 +61,7 @@ impl RtRenderPass {
         let mut submit_cmds = Vec::new();
         // ray tracing
         {
-            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("ray-tracing");
+            let cmd = frame_context3.cmd_allocator.alloc_command_buffer("ray-tracing");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
 
             // RT 的 accum image 在 fif 中只有一个， 因此需要确保之前的 rt 写入已经完成
@@ -82,12 +78,13 @@ impl RtRenderPass {
             );
 
             self.rt_pass.ray_trace(
+                frame_context2,
                 &cmd,
                 &frame_settings,
                 &FrameContext::get().pipeline_settings(),
                 color_image.handle(),
                 color_image_bindless_handle,
-                &FrameContext::get().per_frame_data_buffers[*frame_label],
+                &frame_context2.per_frame_data_buffers[*frame_label],
             );
 
             cmd.end();
@@ -97,7 +94,7 @@ impl RtRenderPass {
 
         // blit
         {
-            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("blit");
+            let cmd = frame_context3.cmd_allocator.alloc_command_buffer("blit");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit");
 
             // 等待 ray-tracing 执行完成
@@ -110,7 +107,7 @@ impl RtRenderPass {
 
             self.blit_pass.exec(
                 &cmd,
-                &bindless_manager,
+                bindless_manager,
                 &truvisl::blit::PushConstant {
                     src_image: color_image_bindless_handle.0,
                     dst_image: render_target_image_bindless_handle.0,
@@ -131,7 +128,7 @@ impl RtRenderPass {
 
         // hdr -> sdr
         {
-            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("hdr2sdr");
+            let cmd = frame_context3.cmd_allocator.alloc_command_buffer("hdr2sdr");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "hdr2sdr");
 
             // 等待之前的 compute shader 执行完成
@@ -150,7 +147,7 @@ impl RtRenderPass {
 
             self.sdr_pass.exec(
                 &cmd,
-                &bindless_manager,
+                bindless_manager,
                 &truvisl::sdr::PushConstant {
                     src_image: color_image_bindless_handle.0,
                     dst_image: render_target_image_bindless_handle.0,

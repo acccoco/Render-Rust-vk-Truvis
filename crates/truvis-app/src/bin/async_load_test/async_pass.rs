@@ -22,8 +22,9 @@ use truvis_model_manager::components::geometry::GeometrySoA3D;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render::core::frame_context::FrameContext;
+use truvis_render::core::renderer::{FrameContext2, FrameContext3};
 use truvis_render::pipeline_settings::{FrameLabel, FrameSettings};
-use truvis_render::resources::fif_buffer::FifBuffers;
+use truvis_render::subsystems::bindless_manager::BindlessManager;
 
 const_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {
@@ -44,7 +45,7 @@ pub struct AsyncSubpass {
 }
 impl RenderSubpass for AsyncSubpass {}
 impl AsyncSubpass {
-    pub fn new(frame_settings: &FrameSettings) -> Self {
+    pub fn new(bindless_manager: &BindlessManager, frame_settings: &FrameSettings) -> Self {
         let mut pipeline_ci = GfxGraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![frame_settings.color_format], None, Some(vk::Format::UNDEFINED));
@@ -60,7 +61,7 @@ impl AsyncSubpass {
         );
 
         // Bindless Layout
-        let bindless_layout = &FrameContext::bindless_manager().bindless_descriptor_layout;
+        let bindless_layout = &bindless_manager.bindless_descriptor_layout;
 
         // Push Constants
         let push_constant_range =
@@ -79,19 +80,19 @@ impl AsyncSubpass {
 
     pub fn draw(
         &self,
+        frame_context2: &FrameContext2,
         cmd: &GfxCommandBuffer,
         frame_label: FrameLabel,
-        fif_buffers: &FifBuffers,
         frame_settings: &FrameSettings,
         shape: &GeometrySoA3D,
         texture_id: u32,
     ) {
         let viewport_extent = frame_settings.frame_extent;
 
-        let gfx_resource_manager = FrameContext::gfx_resource_manager();
-
-        let render_target_texture =
-            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
+        let render_target_texture = frame_context2
+            .gfx_resource_manager
+            .get_texture(frame_context2.fif_buffers.render_target_texture_handle(frame_label))
+            .unwrap();
 
         let rendering_info = GfxRenderingInfo::new(
             vec![render_target_texture.image_view().handle()],
@@ -126,7 +127,7 @@ impl AsyncSubpass {
             );
 
             // Bind Bindless Descriptor Set
-            let bindless_set = FrameContext::bindless_manager().current_descriptor_set().handle();
+            let bindless_set = frame_context2.bindless_manager.current_descriptor_set().handle();
             cmd.bind_descriptor_sets(
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout.handle(),
@@ -158,25 +159,30 @@ pub struct AsyncPass {
 impl RenderPass for AsyncPass {}
 
 impl AsyncPass {
-    pub fn new(frame_settings: &FrameSettings) -> Self {
-        let async_pass = AsyncSubpass::new(frame_settings);
+    pub fn new(bindless_manager: &BindlessManager, frame_settings: &FrameSettings) -> Self {
+        let async_pass = AsyncSubpass::new(bindless_manager, frame_settings);
         Self { async_pass }
     }
 
-    pub fn render(&self, shape: &GeometrySoA3D, texture_id: u32) {
-        let fif_buffers = FrameContext::get().fif_buffers.borrow();
+    pub fn render(
+        &self,
+        frame_context2: &FrameContext2,
+        frame_context3: &mut FrameContext3,
+        shape: &GeometrySoA3D,
+        texture_id: u32,
+    ) {
         let frame_label = FrameContext::get().frame_label();
 
-        let gfx_resource_manager = FrameContext::gfx_resource_manager();
-
-        let render_target_texture =
-            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
+        let render_target_texture = frame_context2
+            .gfx_resource_manager
+            .get_texture(frame_context2.fif_buffers.render_target_texture_handle(frame_label))
+            .unwrap();
 
         let frame_settings = FrameContext::get().frame_settings();
 
         // render
         {
-            let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("async-test");
+            let cmd = frame_context3.cmd_allocator.alloc_command_buffer("async-test");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "async-test");
 
             // Barrier: Render Target -> Color Attachment
@@ -196,7 +202,7 @@ impl AsyncPass {
                     )],
             );
 
-            self.async_pass.draw(&cmd, frame_label, &fif_buffers, &frame_settings, shape, texture_id);
+            self.async_pass.draw(frame_context2, &cmd, frame_label, &frame_settings, shape, texture_id);
 
             // Barrier: Color Attachment -> General
             cmd.image_memory_barrier(

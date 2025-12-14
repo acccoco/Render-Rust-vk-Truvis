@@ -1,5 +1,4 @@
-use crate::core::frame_context::FrameContext;
-use crate::subsystems::subsystem::Subsystem;
+use crate::subsystems::bindless_manager::BindlessManager;
 use slotmap::SlotMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -8,6 +7,7 @@ use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;
 use truvis_model_manager::components::mesh::Mesh;
 use truvis_model_manager::guid_new_type::{InstanceHandle, LightHandle, MaterialHandle, MeshHandle};
+use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::{GfxTexture2, ImageLoader};
 use truvis_shader_binding::truvisl;
@@ -19,10 +19,15 @@ pub struct SceneManager {
     all_instances: SlotMap<InstanceHandle, Instance>,
     all_meshes: SlotMap<MeshHandle, Mesh>,
 
-    // all_textures: HashMap<>
     all_point_lights: SlotMap<LightHandle, truvisl::PointLight>,
 
     texture_map: HashMap<String, GfxTextureHandle>,
+}
+// new & init
+impl SceneManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 // getter
 impl SceneManager {
@@ -50,15 +55,6 @@ impl SceneManager {
             && self.all_point_lights.is_empty()
     }
 }
-// init & destroy
-impl SceneManager {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-impl Subsystem for SceneManager {
-    fn before_render(&mut self) {}
-}
 // tools
 impl SceneManager {
     #[inline]
@@ -82,7 +78,13 @@ impl SceneManager {
     }
 
     /// 向世界中添加一个外部场景
-    pub fn load_scene(&mut self, model_path: &std::path::Path, _transform: &glam::Mat4) -> Vec<InstanceHandle> {
+    pub fn load_scene(
+        &mut self,
+        gfx_resource_manager: &mut GfxResourceManager,
+        bindless_manager: &mut BindlessManager,
+        model_path: &std::path::Path,
+        _transform: &glam::Mat4,
+    ) -> Vec<InstanceHandle> {
         AssimpSceneLoader::load_scene(
             model_path,
             |ins| {
@@ -95,9 +97,6 @@ impl SceneManager {
                 self.all_meshes.insert(mesh)
             },
             |mat| {
-                let mut bindless_manager = FrameContext::get().bindless_manager.borrow_mut();
-                let mut gfx_resource_manager = FrameContext::get().gfx_resource_manager.borrow_mut();
-
                 // 注册纹理
                 if !mat.diffuse_map.is_empty() {
                     let entry = self.texture_map.entry(mat.diffuse_map.clone()).or_insert_with(|| {
@@ -134,9 +133,19 @@ impl SceneManager {
         self.all_point_lights.insert(light)
     }
 }
-
 impl Drop for SceneManager {
     fn drop(&mut self) {
         log::info!("SceneManager dropped.");
+    }
+}
+// destroy
+impl SceneManager {
+    pub fn destroy(self) {}
+    pub fn destroy_mut(&mut self) {
+        self.all_mats.clear();
+        self.all_instances.clear();
+        self.all_meshes.clear();
+        self.all_point_lights.clear();
+        self.texture_map.clear();
     }
 }

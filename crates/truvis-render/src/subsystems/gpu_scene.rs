@@ -1,5 +1,4 @@
 use crate::core::frame_context::FrameContext;
-use crate::subsystems::subsystem::Subsystem;
 use crate::{
     pipeline_settings::FrameLabel,
     subsystems::{bindless_manager::BindlessManager, scene_manager::SceneManager},
@@ -129,7 +128,7 @@ impl GpuScene {
         self.gpu_scene_buffers[*frame_idx].scene_buffer.device_address()
     }
 }
-// init & destroy
+// new & init
 impl GpuScene {
     pub fn new(
         fif_count: usize,
@@ -163,9 +162,13 @@ impl GpuScene {
         }
     }
 }
-
-impl Subsystem for GpuScene {
-    fn before_render(&mut self) {}
+impl Drop for GpuScene {
+    fn drop(&mut self) {}
+}
+// destroy
+impl GpuScene {
+    pub fn destroy(self) {}
+    pub fn destroy_mut(&mut self) {}
 }
 
 // tools
@@ -196,18 +199,18 @@ impl GpuScene {
         cmd: &GfxCommandBuffer,
         barrier_mask: GfxBarrierMask,
         scene_manager: &SceneManager,
+        bindless_manager: &BindlessManager,
     ) {
         let _span = tracy_client::span!("GpuScene::upload_to_buffer");
-        let bindless_manager = FrameContext::bindless_manager();
         self.upload_mesh_buffer(cmd, barrier_mask, scene_manager);
         self.upload_instance_buffer(cmd, barrier_mask, scene_manager);
-        self.upload_material_buffer(cmd, barrier_mask, scene_manager, &bindless_manager);
+        self.upload_material_buffer(cmd, barrier_mask, scene_manager, bindless_manager);
         self.upload_light_buffer(cmd, barrier_mask, scene_manager);
 
         // 需要确保 instance 先与 tlas 构建
         self.build_tlas(scene_manager);
 
-        self.upload_scene_buffer(cmd, barrier_mask, scene_manager, &bindless_manager);
+        self.upload_scene_buffer(cmd, barrier_mask, scene_manager, bindless_manager);
     }
 
     /// 绘制场景中的所有实例

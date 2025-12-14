@@ -2,7 +2,6 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::core::frame_context::FrameContext;
-use crate::subsystems::subsystem::Subsystem;
 use truvis_gfx::{
     commands::{command_buffer::GfxCommandBuffer, command_pool::GfxCommandPool},
     gfx::Gfx,
@@ -26,7 +25,7 @@ pub struct CmdAllocator {
     allocated_command_buffers: Vec<Vec<GfxCommandBuffer>>,
 }
 
-// init & desotry
+// new & init
 impl CmdAllocator {
     pub fn new(fif_count: usize) -> Self {
         let graphics_command_pools = (0..fif_count)
@@ -45,11 +44,18 @@ impl CmdAllocator {
         }
     }
 }
-
-impl Subsystem for CmdAllocator {
-    fn before_render(&mut self) {}
+impl Drop for CmdAllocator {
+    fn drop(&mut self) {
+        log::info!("Dropping CmdAllocator and destroying command pools.");
+        for pool in &mut self.graphics_command_pools {
+            pool.destroy()
+        }
+    }
 }
-
+// destroy
+impl CmdAllocator {
+    pub fn destroy(self) {}
+}
 // tools
 impl CmdAllocator {
     /// 分配 command buffer，在当前 frame 使用
@@ -67,7 +73,7 @@ impl CmdAllocator {
     }
 
     pub fn free_all(&mut self) {
-        for i in 0..FrameContext::get().fif_count() {
+        for i in 0..FrameContext::fif_count() {
             self.free_frame_commands_internal(i);
         }
     }
@@ -81,14 +87,5 @@ impl CmdAllocator {
 
         // 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
         self.graphics_command_pools[frame_label].reset_all_buffers();
-    }
-}
-
-impl Drop for CmdAllocator {
-    fn drop(&mut self) {
-        log::info!("Dropping CmdAllocator and destroying command pools.");
-        for pool in &mut self.graphics_command_pools {
-            pool.destroy()
-        }
     }
 }

@@ -12,6 +12,7 @@ use truvis_gfx::{
     swapchain::render_swapchain::GfxRenderSwapchain,
 };
 use truvis_render::core::frame_context::FrameContext;
+use truvis_render::core::renderer::{FrameContext2, FrameContext3, Renderer};
 use truvis_render::pipeline_settings::{DefaultRendererSettings, FrameLabel};
 use truvis_resource::handles::GfxTextureHandle;
 
@@ -66,7 +67,12 @@ pub struct MainWindow {
 
 // ctor
 impl MainWindow {
-    pub fn new(event_loop: &ActiveEventLoop, window_title: String, window_extent: vk::Extent2D) -> Self {
+    pub fn new(
+        renderer: &mut Renderer,
+        event_loop: &ActiveEventLoop,
+        window_title: String,
+        window_extent: vk::Extent2D,
+    ) -> Self {
         let icon_data = std::fs::read(TruvisPath::resources_path("DruvisIII.png")).expect("Failed to read icon file");
         let icon = helper::load_icon(icon_data.as_ref());
         let window_attr = Window::default_attributes()
@@ -86,10 +92,10 @@ impl MainWindow {
 
         let swapchain_image_infos = swapchain.image_infos();
 
-        let gui = Gui::new(&window, FrameContext::get().fif_count(), &swapchain_image_infos);
-        let gui_pass = GuiPass::new(swapchain_image_infos.image_format);
+        let gui = Gui::new(renderer, &window, FrameContext::fif_count(), &swapchain_image_infos);
+        let gui_pass = GuiPass::new(&renderer.frame_context2.bindless_manager, swapchain_image_infos.image_format);
 
-        let present_complete_semaphores = (0..FrameContext::get().fif_count())
+        let present_complete_semaphores = (0..FrameContext::fif_count())
             .map(|i| GfxSemaphore::new(&format!("window-present-complete-{}", i)))
             .collect_vec();
         let render_complete_semaphores = (0..swapchain_image_infos.image_cnt)
@@ -111,16 +117,15 @@ impl MainWindow {
         &self.winit_window
     }
 
-    fn draw(&mut self, renderer_data: PresentData) {
+    fn draw(&mut self, frame_context2: &FrameContext2, frame_context3: &mut FrameContext3, renderer_data: PresentData) {
         let swapchain = self.swapchain.as_ref().unwrap();
         let swapchain_image_idx = swapchain.current_image_index();
         let frame_label = FrameContext::get().frame_label();
 
-        let gfx_resource_manager = FrameContext::gfx_resource_manager();
+        let render_target_texture =
+            frame_context2.gfx_resource_manager.get_texture(renderer_data.render_target).unwrap();
 
-        let render_target_texture = gfx_resource_manager.get_texture(renderer_data.render_target).unwrap();
-
-        let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("window-present");
+        let cmd = frame_context3.cmd_allocator.alloc_command_buffer("window-present");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         {
             // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
@@ -148,6 +153,8 @@ impl MainWindow {
             );
 
             self.gui_pass.draw(
+                frame_context2,
+                frame_context3,
                 swapchain.current_image_view().handle(),
                 swapchain.extent(),
                 &cmd,
@@ -235,9 +242,14 @@ impl MainWindow {
         );
     }
 
-    pub fn draw_gui(&mut self, renderer_data: PresentData) {
+    pub fn draw_gui(
+        &mut self,
+        frame_context2: &FrameContext2,
+        frame_context3: &mut FrameContext3,
+        renderer_data: PresentData,
+    ) {
         self.gui.register_render_texture(renderer_data.render_target);
-        self.draw(renderer_data);
+        self.draw(frame_context2, frame_context3, renderer_data);
     }
 
     pub fn handle_event<T>(&mut self, event: &winit::event::Event<T>) {

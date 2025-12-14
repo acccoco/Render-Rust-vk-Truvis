@@ -27,6 +27,7 @@ pub enum LoadResult {
     Failure(AssetTextureHandle, String),
 }
 
+// TODO 一句话解释：这就是线程池：crossbeam 提供消息队列；rayon 提供线程池
 /// IO 工作器
 ///
 /// 负责管理后台 IO 任务。

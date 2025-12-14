@@ -60,7 +60,7 @@ impl FifBuffers {
         frame_settings: &FrameSettings,
     ) {
         self.destroy_mut(bindless_manager, gfx_resource_manager);
-        *self = Self::new(frame_settings, bindless_manager, gfx_resource_manager, FrameContext::get().fif_count());
+        *self = Self::new(frame_settings, bindless_manager, gfx_resource_manager, FrameContext::fif_count());
     }
 
     fn register_bindless(&self, bindless_manager: &mut BindlessManager) {

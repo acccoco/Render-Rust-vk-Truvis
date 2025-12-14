@@ -1,24 +1,28 @@
 use itertools::Itertools;
 
 use crate::core::frame_context::FrameContext;
-use crate::subsystems::subsystem::Subsystem;
 use truvis_gfx::resources::buffer::GfxBuffer;
 
 pub struct StageBufferManager {
     buffers: Vec<Vec<GfxBuffer>>,
 }
 
-// init & destroy
+// new & init
 impl StageBufferManager {
     pub fn new(fif_count: usize) -> Self {
         let buffers = (0..fif_count).map(|_| Vec::new()).collect_vec();
         Self { buffers }
     }
 }
-impl Subsystem for StageBufferManager {
-    fn before_render(&mut self) {}
+impl Drop for StageBufferManager {
+    fn drop(&mut self) {
+        log::info!("UploadBufferManager dropped.");
+    }
 }
-
+// destory
+impl StageBufferManager {
+    pub fn destroy(self) {}
+}
 // tools
 impl StageBufferManager {
     pub fn alloc_buffer(&mut self, size: u64, debug_name: &str) -> &mut GfxBuffer {
@@ -37,11 +41,5 @@ impl StageBufferManager {
         let frame_idx = *FrameContext::get().frame_label();
 
         self.buffers[frame_idx].clear();
-    }
-}
-
-impl Drop for StageBufferManager {
-    fn drop(&mut self) {
-        log::info!("UploadBufferManager dropped.");
     }
 }
