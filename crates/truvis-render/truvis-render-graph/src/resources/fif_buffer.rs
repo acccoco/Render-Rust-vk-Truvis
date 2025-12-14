@@ -7,12 +7,9 @@ use truvis_gfx::{
     gfx::Gfx,
     resources::image::{GfxImage, GfxImageCreateInfo},
 };
-
-use crate::core::frame_context::FrameContext;
-use crate::{
-    pipeline_settings::{FrameLabel, FrameSettings},
-    subsystems::bindless_manager::BindlessManager,
-};
+use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::frame_context::FrameContext;
+use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::{GfxImageHandle, GfxImageViewHandle, GfxTextureHandle};
 use truvis_resource::texture::GfxTexture2;

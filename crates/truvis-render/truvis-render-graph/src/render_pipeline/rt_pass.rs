@@ -1,15 +1,15 @@
 use ash::vk;
 
 use crate::apis::render_pass::RenderPass;
-use crate::core::frame_context::FrameContext;
-use crate::core::renderer::{RenderContext, RenderContextMut};
+use crate::render_context::{RenderContext, RenderContextMut};
 use crate::render_pipeline::{compute_subpass::ComputeSubpass, simple_rt_subpass::SimpleRtSubpass};
-use crate::subsystems::bindless_manager::BindlessManager;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, submit_info::GfxSubmitInfo},
     gfx::Gfx,
 };
+use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::frame_context::FrameContext;
 use truvis_shader_binding::truvisl;
 
 /// 整个 RT 管线

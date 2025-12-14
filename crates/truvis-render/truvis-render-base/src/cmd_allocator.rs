@@ -1,7 +1,7 @@
 use ash::vk;
 use itertools::Itertools;
 
-use crate::core::frame_context::FrameContext;
+use crate::frame_context::FrameContext;
 use truvis_gfx::{
     commands::{command_buffer::GfxCommandBuffer, command_pool::GfxCommandPool},
     gfx::Gfx,

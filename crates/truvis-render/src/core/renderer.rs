@@ -11,41 +11,20 @@ use truvis_gfx::{
     },
     gfx::Gfx,
 };
+use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::cmd_allocator::CmdAllocator;
+use truvis_render_base::frame_context::FrameContext;
+use truvis_render_base::pipeline_settings::AccumData;
+use truvis_render_base::stage_buffer_manager::StageBufferManager;
+use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::resources::fif_buffer::FifBuffers;
+use truvis_render_scene::gpu_scene::GpuScene;
+use truvis_render_scene::scene_manager::SceneManager;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_shader_binding::truvisl;
 
-use crate::core::frame_context::FrameContext;
-use crate::pipeline_settings::AccumData;
 use crate::platform::timer::Timer;
 use crate::platform::{camera::Camera, input_manager::InputState};
-use crate::resources::fif_buffer::FifBuffers;
-use crate::subsystems::bindless_manager::BindlessManager;
-use crate::subsystems::cmd_allocator::CmdAllocator;
-use crate::subsystems::gpu_scene::GpuScene;
-use crate::subsystems::scene_manager::SceneManager;
-use crate::subsystems::stage_buffer_manager::StageBufferManager;
-
-// Render 期间不可变
-pub struct RenderContext {
-    pub scene_manager: SceneManager,
-    pub asset_hub: AssetHub,
-    pub gpu_scene: GpuScene,
-    pub fif_buffers: FifBuffers,
-    pub bindless_manager: BindlessManager,
-    pub per_frame_data_buffers: Vec<GfxStructuredBuffer<truvisl::PerFrameData>>,
-    pub gfx_resource_manager: GfxResourceManager,
-    pub timer: Timer,
-    pub accum_data: AccumData,
-
-    /// fif 相关的 timeline semaphore，value 就等于 frame_id
-    fif_timeline_semaphore: GfxSemaphore,
-}
-
-// Render 期间可变
-pub struct RenderContextMut {
-    pub cmd_allocator: CmdAllocator,
-    pub stage_buffer_manager: StageBufferManager,
-}
 
 /// 渲染器核心
 ///
@@ -63,6 +42,8 @@ pub struct RenderContextMut {
 pub struct Renderer {
     pub render_context: RenderContext,
     pub render_context_mut: RenderContextMut,
+    pub asset_hub: AssetHub,
+    pub timer: Timer,
 }
 
 // new & init
@@ -100,19 +81,21 @@ impl Renderer {
             render_context: RenderContext {
                 fif_timeline_semaphore,
                 scene_manager,
-                asset_hub,
                 gpu_scene,
                 fif_buffers,
                 bindless_manager,
                 per_frame_data_buffers,
                 gfx_resource_manager,
-                timer,
+                delta_time_s: 0.0,
+                total_time_s: 0.0,
                 accum_data,
             },
             render_context_mut: RenderContextMut {
                 cmd_allocator,
                 stage_buffer_manager,
             },
+            asset_hub,
+            timer,
         }
     }
 }
@@ -128,7 +111,7 @@ impl Renderer {
         FrameContext::destroy();
         self.render_context.bindless_manager.destroy();
         self.render_context.scene_manager.destroy();
-        self.render_context.asset_hub.destroy();
+        self.asset_hub.destroy();
         self.render_context.gpu_scene.destroy();
         self.render_context_mut.cmd_allocator.destroy();
         self.render_context_mut.stage_buffer_manager.destroy();
@@ -142,7 +125,7 @@ impl Renderer {
         let _span = tracy_client::span!("Renderer::begin_frame");
 
         // Update AssetHub
-        self.render_context.asset_hub.update();
+        self.asset_hub.update();
 
         // 等待 fif 的同一帧渲染完成
         {
@@ -156,7 +139,9 @@ impl Renderer {
 
         self.render_context_mut.cmd_allocator.free_frame_commands();
         self.render_context_mut.stage_buffer_manager.clear_fif_buffers();
-        self.render_context.timer.tic();
+        self.timer.tic();
+        self.render_context.delta_time_s = self.timer.delta_time_s();
+        self.render_context.total_time_s = self.timer.total_time.as_secs_f32();
     }
 
     pub fn end_frame(&mut self) {
@@ -178,16 +163,14 @@ impl Renderer {
 
     pub fn time_to_render(&mut self) -> bool {
         let limit_elapsed_us = 1000.0 * 1000.0 / FrameContext::frame_limit();
-        limit_elapsed_us < self.render_context.timer.toc().as_micros() as f32
+        limit_elapsed_us < self.timer.toc().as_micros() as f32
     }
 
     pub fn before_render(&mut self, input_state: &InputState, camera: &Camera) {
         let _span = tracy_client::span!("Renderer::before_render");
         let current_camera_dir = glam::vec3(camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg);
 
-        let mut accum_data = self.render_context.accum_data;
-        accum_data.update_accum_frames(current_camera_dir, camera.position);
-
+        self.render_context.accum_data.update_accum_frames(current_camera_dir, camera.position);
         self.update_gpu_scene(input_state, camera);
     }
 
@@ -252,8 +235,8 @@ impl Renderer {
                 inv_projection: projection.inverse().into(),
                 camera_pos: camera.position.into(),
                 camera_forward: camera.camera_forward().into(),
-                time_ms: self.render_context.timer.total_time.as_micros() as f32 / 1000.0,
-                delta_time_ms: self.render_context.timer.delte_time_ms(),
+                time_ms: self.timer.total_time.as_micros() as f32 / 1000.0,
+                delta_time_ms: self.timer.delte_time_ms(),
                 frame_id: FrameContext::frame_id() as u64,
                 mouse_pos: truvisl::Float2 {
                     x: mouse_pos.x as f32,

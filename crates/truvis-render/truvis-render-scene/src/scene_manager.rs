@@ -1,4 +1,3 @@
-use crate::subsystems::bindless_manager::BindlessManager;
 use slotmap::SlotMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -7,6 +6,7 @@ use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::components::material::Material;
 use truvis_model_manager::components::mesh::Mesh;
 use truvis_model_manager::guid_new_type::{InstanceHandle, LightHandle, MaterialHandle, MeshHandle};
+use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::{GfxTexture2, ImageLoader};

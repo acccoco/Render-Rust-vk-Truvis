@@ -5,7 +5,6 @@ edition = "2024"
 description = "Truvis 的 GFX 层，提供 Vulkan 的封装和抽象"
 
 [dependencies]
-truvis-shader-layout-macro = { workspace = true }
 truvis-shader-layout-trait = { workspace = true }
 
 
@@ -16,15 +15,10 @@ ash = { workspace = true }
 ash-window = { workspace = true }
 winit = { workspace = true }
 raw-window-handle = { workspace = true }
-derive-getters = { workspace = true }
-uuid = { workspace = true }
 # graphics math
 # bytemuck：可以转换为 bytes slices
 glam = { workspace = true }
 itertools = { workspace = true }
 vk-mem = { workspace = true }
 log = { workspace = true }
-image = { workspace = true }
 bytemuck = { workspace = true }
-slotmap = { workspace = true }
-tracy-client = { workspace = true }

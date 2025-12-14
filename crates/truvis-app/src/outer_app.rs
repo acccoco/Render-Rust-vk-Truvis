@@ -1,5 +1,6 @@
-use truvis_render::core::renderer::{RenderContext, RenderContextMut, Renderer};
+use truvis_render::core::renderer::Renderer;
 use truvis_render::platform::camera::Camera;
+use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 
 /// 外部应用接口 trait
 ///

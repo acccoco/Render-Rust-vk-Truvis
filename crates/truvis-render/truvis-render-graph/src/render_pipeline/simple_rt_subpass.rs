@@ -1,8 +1,5 @@
 use crate::apis::render_pass::RenderSubpass;
-use crate::core::frame_context::FrameContext;
-use crate::core::renderer::RenderContext;
-use crate::pipeline_settings::{FrameSettings, PipelineSettings};
-use crate::subsystems::bindless_manager::{BindlessImageHandle, BindlessManager};
+use crate::render_context::RenderContext;
 use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::const_map;
@@ -14,6 +11,9 @@ use truvis_gfx::{
     pipelines::shader::{GfxShaderGroupInfo, GfxShaderModuleCache, GfxShaderStageInfo},
     resources::special_buffers::{sbt_buffer::GfxSBTBuffer, structured_buffer::GfxStructuredBuffer},
 };
+use truvis_render_base::bindless_manager::{BindlessImageHandle, BindlessManager};
+use truvis_render_base::frame_context::FrameContext;
+use truvis_render_base::pipeline_settings::{FrameSettings, PipelineSettings};
 use truvis_shader_binding::truvisl;
 
 pub struct GfxRtPipeline {

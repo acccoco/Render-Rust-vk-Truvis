@@ -11,9 +11,10 @@ use truvis_gfx::{
     gfx::Gfx,
     swapchain::render_swapchain::GfxRenderSwapchain,
 };
-use truvis_render::core::frame_context::FrameContext;
-use truvis_render::core::renderer::{RenderContext, RenderContextMut, Renderer};
-use truvis_render::pipeline_settings::{DefaultRendererSettings, FrameLabel};
+use truvis_render::core::renderer::Renderer;
+use truvis_render_base::frame_context::FrameContext;
+use truvis_render_base::pipeline_settings::{DefaultRendererSettings, FrameLabel};
+use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 use truvis_resource::handles::GfxTextureHandle;
 
 /// 渲染演示数据结构

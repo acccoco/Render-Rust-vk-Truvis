@@ -13,9 +13,9 @@ use truvis_gfx::{
         shader::GfxShaderStageInfo,
     },
 };
-use truvis_render::core::renderer::{RenderContext, RenderContextMut};
-use truvis_render::pipeline_settings::FrameLabel;
-use truvis_render::subsystems::bindless_manager::BindlessManager;
+use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::pipeline_settings::FrameLabel;
+use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 use truvis_shader_binding::{truvisl, truvisl::TextureHandle};
 
 use crate::gui::core::Gui;

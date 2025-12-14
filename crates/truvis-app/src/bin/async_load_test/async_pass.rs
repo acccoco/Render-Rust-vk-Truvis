@@ -20,11 +20,11 @@ use truvis_gfx::{
 };
 use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
-use truvis_render::apis::render_pass::{RenderPass, RenderSubpass};
-use truvis_render::core::frame_context::FrameContext;
-use truvis_render::core::renderer::{RenderContext, RenderContextMut};
-use truvis_render::pipeline_settings::{FrameLabel, FrameSettings};
-use truvis_render::subsystems::bindless_manager::BindlessManager;
+use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::frame_context::FrameContext;
+use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
+use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
+use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 
 const_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {

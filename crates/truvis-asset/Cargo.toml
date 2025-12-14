@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 truvis-gfx = { workspace = true }
-truvis-crate-tools = { workspace = true }
 truvis-resource = { workspace = true }
 
 ash = { workspace = true }

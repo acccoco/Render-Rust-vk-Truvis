@@ -8,7 +8,7 @@ use truvis_gfx::{
     basic::color::LabelColor,
     commands::{barrier::GfxBufferBarrier, command_buffer::GfxCommandBuffer},
 };
-use truvis_render::core::renderer::RenderContextMut;
+use truvis_render_graph::render_context::RenderContextMut;
 
 /// imgui 绘制所需的 vertex buffer 和 index buffer
 pub struct GuiMesh {

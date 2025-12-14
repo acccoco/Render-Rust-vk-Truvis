@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::core::frame_context::FrameContext;
+use crate::frame_context::FrameContext;
 use truvis_gfx::resources::buffer::GfxBuffer;
 
 pub struct StageBufferManager {

@@ -15,9 +15,9 @@ use crate::window_system::main_window::{MainWindow, PresentData};
 use truvis_crate_tools::init_log::init_log;
 use truvis_gfx::commands::barrier::GfxBarrierMask;
 use truvis_gfx::gfx::Gfx;
-use truvis_render::core::frame_context::FrameContext;
 use truvis_render::core::renderer::Renderer;
 use truvis_render::platform::input_manager::InputManager;
+use truvis_render_base::frame_context::FrameContext;
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     log::error!("{}", info);
@@ -117,7 +117,7 @@ impl<T: OuterApp> TruvisApp<T> {
 
         self.renderer.begin_frame();
         let frame_label = FrameContext::get().frame_label();
-        let elapsed = self.renderer.render_context.timer.delta_time;
+        let elapsed = self.renderer.timer.delta_time;
 
         {
             let _span = tracy_client::span!("Acquire Image");
@@ -180,7 +180,7 @@ impl<T: OuterApp> TruvisApp<T> {
                 self.camera_controller.update(
                     &self.input_manager,
                     glam::vec2(extent.width as f32, extent.height as f32),
-                    self.renderer.render_context.timer.delta_time,
+                    self.renderer.timer.delta_time,
                 );
             }
 

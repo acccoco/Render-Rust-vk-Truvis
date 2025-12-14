@@ -1,8 +1,4 @@
-use crate::core::frame_context::FrameContext;
-use crate::{
-    pipeline_settings::FrameLabel,
-    subsystems::{bindless_manager::BindlessManager, scene_manager::SceneManager},
-};
+use crate::scene_manager::SceneManager;
 use ash::vk;
 use glam::Vec4Swizzles;
 use indexmap::IndexSet;
@@ -20,6 +16,9 @@ use truvis_gfx::{
 };
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::guid_new_type::{InstanceHandle, MaterialHandle, MeshHandle};
+use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::frame_context::FrameContext;
+use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::{GfxTexture2, ImageLoader};

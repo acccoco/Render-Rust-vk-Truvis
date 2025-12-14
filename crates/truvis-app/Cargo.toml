@@ -8,18 +8,16 @@ description = "app"
 [dependencies]
 truvis-gfx = { workspace = true }
 truvis-render = { workspace = true }
-truvis-shader-layout-trait = { workspace = true }
-truvis-shader-layout-macro = { workspace = true }
 truvis-model-manager = { workspace = true }
-truvis-cxx-binding = { workspace = true }
 truvis-shader-binding = { workspace = true }
 truvis-crate-tools = { workspace = true }
 truvis-asset = { workspace = true }
 truvis-resource = { workspace = true }
+truvis-render-base = { workspace = true }
+truvis-render-graph = { workspace = true }
 
 log = { workspace = true }
 ash = { workspace = true }
-uuid = { workspace = true }
 glam = { workspace = true }
 bytemuck = { workspace = true }
 itertools = { workspace = true }
@@ -30,5 +28,4 @@ imgui-winit-support = { workspace = true }
 raw-window-handle = { workspace = true }
 tracy-client = { workspace = true }
 image = { workspace = true }
-
 

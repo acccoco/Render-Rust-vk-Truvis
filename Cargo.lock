@@ -31,7 +31,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
 dependencies = [
  "cfg-if",
- "getrandom 0.2.15",
+ "getrandom",
  "once_cell",
  "version_check",
  "zerocopy",
@@ -164,7 +164,7 @@ checksum = "0ae92a5119aa49cdbcf6b9f893fe4e1d98b04ccbf82ee0584ad948a44a734dea"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -257,7 +257,7 @@ dependencies = [
  "regex",
  "rustc-hash",
  "shlex",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -328,7 +328,7 @@ checksum = "3fa76293b4f7bb636ab88fd78228235b5248b4d05cc589aed610f954af5d7c7a"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -611,17 +611,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
 
 [[package]]
-name = "derive-getters"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0122f262bf9c9a367829da84f808d9fb128c10ef283bbe7b0922a77cf07b2747"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -745,7 +734,7 @@ checksum = "1a5c6c585bc94aaf2c7b51dd4c2ba22680844aba4c687be581871a6f518c5742"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -786,19 +775,7 @@ checksum = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7"
 dependencies = [
  "cfg-if",
  "libc",
- "wasi 0.11.0+wasi-snapshot-preview1",
-]
-
-[[package]]
-name = "getrandom"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73fea8450eea4bac3940448fb7ae50d91f034f941199fcd9d909a5a07aa455f0"
-dependencies = [
- "cfg-if",
- "libc",
- "r-efi",
- "wasi 0.14.2+wasi-0.2.4",
+ "wasi",
 ]
 
 [[package]]
@@ -971,7 +948,7 @@ checksum = "c34819042dc3d3971c46c2190835914dfbe0c3c13f61449b2997f4e9722dfa60"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -1019,7 +996,7 @@ checksum = "f3c30758ddd7188629c6713fc45d1188af4f44c90582311d0c8d8c9907f60c48"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -1306,7 +1283,7 @@ checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -1356,7 +1333,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -1647,7 +1624,7 @@ checksum = "d56a66c0c55993aa927429d0f8a0abfd74f084e4d9c192cffed01e418d83eefb"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -1721,7 +1698,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "664ec5419c51e34154eec046ebcba56312d5a2fc3b09a06da188e1ad21afadf6"
 dependencies = [
  "proc-macro2",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -1758,7 +1735,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a65f2e60fbf1063868558d69c6beacf412dc755f9fc020f514b7955fc914fe30"
 dependencies = [
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -1795,12 +1772,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "r-efi"
-version = "5.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74765f6d916ee2faa39bc8e68e4f3ed8949b48cccdac59983d287a7cb71ce9c5"
-
-[[package]]
 name = "rand"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1827,7 +1798,7 @@ version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
- "getrandom 0.2.15",
+ "getrandom",
 ]
 
 [[package]]
@@ -2047,7 +2018,7 @@ checksum = "5a9bf7cf98d04a2b28aead066b7496853d4779c9cc183c440dbac457641e19a0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -2155,17 +2126,6 @@ checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
 
 [[package]]
 name = "syn"
-version = "1.0.109"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
-dependencies = [
- "proc-macro2",
- "quote",
- "unicode-ident",
-]
-
-[[package]]
-name = "syn"
 version = "2.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b09a44accad81e1ba1cd74a32461ba89dee89095ba17b32f5d03683b1b1fc2a0"
@@ -2211,7 +2171,7 @@ checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -2380,15 +2340,13 @@ dependencies = [
  "tracy-client",
  "truvis-asset",
  "truvis-crate-tools",
- "truvis-cxx-binding",
  "truvis-gfx",
  "truvis-model-manager",
  "truvis-render",
+ "truvis-render-base",
+ "truvis-render-graph",
  "truvis-resource",
  "truvis-shader-binding",
- "truvis-shader-layout-macro",
- "truvis-shader-layout-trait",
- "uuid",
  "winit",
 ]
 
@@ -2405,7 +2363,6 @@ dependencies = [
  "rayon",
  "slotmap",
  "tracy-client",
- "truvis-crate-tools",
  "truvis-gfx",
  "truvis-resource",
  "vk-mem",
@@ -2419,8 +2376,6 @@ dependencies = [
  "chrono",
  "env_logger",
  "log",
- "rayon",
- "walkdir",
 ]
 
 [[package]]
@@ -2434,13 +2389,8 @@ dependencies = [
 name = "truvis-cxx-build"
 version = "0.1.0"
 dependencies = [
- "anstyle",
- "chrono",
- "env_logger",
  "log",
- "rayon",
  "truvis-crate-tools",
- "walkdir",
 ]
 
 [[package]]
@@ -2450,17 +2400,11 @@ dependencies = [
  "ash",
  "ash-window",
  "bytemuck",
- "derive-getters",
  "glam",
- "image",
  "itertools 0.10.5",
  "log",
  "raw-window-handle",
- "slotmap",
- "tracy-client",
- "truvis-shader-layout-macro",
  "truvis-shader-layout-trait",
- "uuid",
  "vk-mem",
  "winit",
 ]
@@ -2477,8 +2421,6 @@ dependencies = [
  "tracy-client",
  "truvis-cxx-binding",
  "truvis-gfx",
- "truvis-resource",
- "uuid",
 ]
 
 [[package]]
@@ -2488,39 +2430,82 @@ dependencies = [
  "ash",
  "bytemuck",
  "glam",
- "image",
+ "tracy-client",
+ "truvis-asset",
+ "truvis-gfx",
+ "truvis-render-base",
+ "truvis-render-graph",
+ "truvis-render-scene",
+ "truvis-resource",
+ "truvis-shader-binding",
+ "winit",
+]
+
+[[package]]
+name = "truvis-render-base"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "glam",
+ "itertools 0.10.5",
+ "log",
+ "slotmap",
+ "tracy-client",
+ "truvis-gfx",
+ "truvis-resource",
+ "truvis-shader-binding",
+ "truvis-shader-layout-macro",
+ "truvis-shader-layout-trait",
+]
+
+[[package]]
+name = "truvis-render-graph"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "bytemuck",
+ "glam",
+ "itertools 0.10.5",
+ "log",
+ "slotmap",
+ "truvis-crate-tools",
+ "truvis-gfx",
+ "truvis-model-manager",
+ "truvis-render-base",
+ "truvis-render-scene",
+ "truvis-resource",
+ "truvis-shader-binding",
+ "vk-mem",
+]
+
+[[package]]
+name = "truvis-render-scene"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "bytemuck",
+ "glam",
  "indexmap",
  "itertools 0.10.5",
  "log",
  "slotmap",
  "tracy-client",
- "truvis-asset",
  "truvis-crate-tools",
- "truvis-cxx-binding",
  "truvis-gfx",
  "truvis-model-manager",
+ "truvis-render-base",
  "truvis-resource",
  "truvis-shader-binding",
- "truvis-shader-layout-macro",
- "truvis-shader-layout-trait",
- "vk-mem",
- "winit",
 ]
 
 [[package]]
 name = "truvis-resource"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "ash",
- "crossbeam-channel",
- "crossbeam-utils",
  "image",
- "log",
- "rayon",
  "slotmap",
  "tracy-client",
- "truvis-crate-tools",
  "truvis-gfx",
  "vk-mem",
 ]
@@ -2538,9 +2523,6 @@ dependencies = [
 name = "truvis-shader-build"
 version = "0.1.0"
 dependencies = [
- "anstyle",
- "chrono",
- "env_logger",
  "log",
  "rayon",
  "truvis-crate-tools",
@@ -2552,9 +2534,8 @@ name = "truvis-shader-layout-macro"
 version = "0.1.0"
 dependencies = [
  "ash",
- "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
  "truvis-shader-layout-trait",
 ]
 
@@ -2588,15 +2569,6 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
-
-[[package]]
-name = "uuid"
-version = "1.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "458f7a779bf54acc9f347480ac654f68407d3aab21269a6e3c9f922acd9e2da9"
-dependencies = [
- "getrandom 0.3.2",
-]
 
 [[package]]
 name = "v_frame"
@@ -2655,15 +2627,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
-name = "wasi"
-version = "0.14.2+wasi-0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9683f9a5a998d873c0d21fcbe3c083009670149a8fab228644b8bd36b2c48cb3"
-dependencies = [
- "wit-bindgen-rt",
-]
-
-[[package]]
 name = "wasm-bindgen"
 version = "0.2.99"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2684,7 +2647,7 @@ dependencies = [
  "log",
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
  "wasm-bindgen-shared",
 ]
 
@@ -2719,7 +2682,7 @@ checksum = "30d7a95b763d3c45903ed6c81f156801839e5ee968bb07e534c44df0fcd330c2"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -2937,7 +2900,7 @@ checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -2948,7 +2911,7 @@ checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]
@@ -3261,15 +3224,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wit-bindgen-rt"
-version = "0.39.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
-dependencies = [
- "bitflags 2.6.0",
-]
-
-[[package]]
 name = "x11-dl"
 version = "2.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3344,7 +3298,7 @@ checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn",
 ]
 
 [[package]]

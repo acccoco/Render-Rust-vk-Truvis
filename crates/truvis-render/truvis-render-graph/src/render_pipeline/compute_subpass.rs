@@ -1,9 +1,9 @@
 use std::ffi::CStr;
 
 use crate::apis::render_pass::RenderSubpass;
-use crate::subsystems::bindless_manager::BindlessManager;
 use ash::vk;
 use truvis_gfx::{commands::command_buffer::GfxCommandBuffer, gfx::Gfx, pipelines::shader::GfxShaderModule};
+use truvis_render_base::bindless_manager::BindlessManager;
 
 /// 泛型参数 P 表示 compute shader 的参数，以 push constant 的形式传入 shader
 pub struct ComputeSubpass<P: bytemuck::Pod> {

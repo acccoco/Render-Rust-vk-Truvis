@@ -7,8 +7,6 @@ use truvis_gfx::gfx::Gfx;
 pub struct FrameContext {
     /// 当前的帧序号，一直累加，初始序号是 1
     frame_id: Cell<usize>,
-    /// 当前处在 in-flight 的第几帧：A, B, C
-    frame_label: Cell<FrameLabel>,
     frame_limit: Cell<f32>,
 
     frame_settings: Cell<FrameSettings>,
@@ -39,7 +37,6 @@ impl FrameContext {
 
         Self {
             frame_id: Cell::new(init_frame_id),
-            frame_label: Cell::new(FrameLabel::from_usize(init_frame_id)),
             frame_limit: Cell::new(60.0),
 
             frame_settings: Cell::new(frame_settings),
@@ -92,7 +89,7 @@ impl FrameContext {
 impl FrameContext {
     #[inline]
     pub fn frame_label(&self) -> FrameLabel {
-        self.frame_label.get()
+        FrameLabel::from_usize(self.frame_id.get() % Self::fif_count())
     }
     #[inline]
     pub fn fif_count() -> usize {
@@ -113,7 +110,7 @@ impl FrameContext {
 
     #[inline]
     pub fn frame_name(&self) -> String {
-        format!("[F{}{}]", self.frame_id.get(), self.frame_label.get())
+        format!("[F{}{}]", self.frame_id.get(), self.frame_label())
     }
 
     #[inline]

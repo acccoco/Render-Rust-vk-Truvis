@@ -8,9 +8,10 @@ use truvis_gfx::swapchain::render_swapchain::GfxSwapchainImageInfo;
 use truvis_gfx::{
     basic::color::LabelColor, commands::command_buffer::GfxCommandBuffer, gfx::Gfx, resources::image::GfxImage,
 };
-use truvis_render::core::renderer::{RenderContextMut, Renderer};
-use truvis_render::pipeline_settings::FrameLabel;
-use truvis_render::subsystems::bindless_manager::BindlessManager;
+use truvis_render::core::renderer::Renderer;
+use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::pipeline_settings::FrameLabel;
+use truvis_render_graph::render_context::RenderContextMut;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::GfxTexture2;

@@ -1,9 +1,4 @@
-use crate::core::frame_context::FrameContext;
 use crate::resources::fif_buffer::FifBuffers;
-use crate::{
-    pipeline_settings::{FrameLabel, FrameSettings},
-    subsystems::{bindless_manager::BindlessManager, gpu_scene::GpuScene, scene_manager::SceneManager},
-};
 use ash::vk;
 use std::{cell::RefCell, mem::offset_of, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;
@@ -18,6 +13,11 @@ use truvis_gfx::{
     resources::special_buffers::structured_buffer::GfxStructuredBuffer,
 };
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::frame_context::FrameContext;
+use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
+use truvis_render_scene::gpu_scene::GpuScene;
+use truvis_render_scene::scene_manager::SceneManager;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_shader_binding::truvisl;
 
