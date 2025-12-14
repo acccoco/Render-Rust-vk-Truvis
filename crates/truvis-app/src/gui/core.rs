@@ -11,7 +11,7 @@ use truvis_gfx::{
 use truvis_render::core::renderer::Renderer;
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::pipeline_settings::FrameLabel;
-use truvis_render_graph::render_context::RenderContextMut;
+use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::GfxTexture2;
@@ -296,6 +296,7 @@ impl Gui {
     /// 使用 imgui 将 ui 操作编译为 draw data；构建 draw 需要的 mesh 数据
     pub fn imgui_render(
         &mut self,
+        render_context: &RenderContext,
         render_context_mut: &mut RenderContextMut,
         cmd: &GfxCommandBuffer,
         frame_label: FrameLabel,
@@ -306,7 +307,13 @@ impl Gui {
         }
 
         Gfx::get().gfx_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
-        self.meshes[*frame_label].replace(GuiMesh::new(render_context_mut, cmd, &format!("{frame_label}"), draw_data));
+        self.meshes[*frame_label].replace(GuiMesh::new(
+            render_context,
+            render_context_mut,
+            cmd,
+            &format!("{frame_label}"),
+            draw_data,
+        ));
         Gfx::get().gfx_queue().end_label();
 
         Some((

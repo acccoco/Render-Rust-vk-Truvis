@@ -1,4 +1,5 @@
 use crate::apis::render_pass::RenderSubpass;
+use crate::graph::node::ImageNode;
 use crate::render_context::RenderContext;
 use ash::vk;
 use itertools::Itertools;
@@ -9,11 +10,10 @@ use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, command_buffer::GfxCommandBuffer},
     gfx::Gfx,
     pipelines::shader::{GfxShaderGroupInfo, GfxShaderModuleCache, GfxShaderStageInfo},
-    resources::special_buffers::{sbt_buffer::GfxSBTBuffer, structured_buffer::GfxStructuredBuffer},
+    resources::special_buffers::sbt_buffer::GfxSBTBuffer,
 };
-use truvis_render_base::bindless_manager::{BindlessImageHandle, BindlessManager};
-use truvis_render_base::frame_context::FrameContext;
-use truvis_render_base::pipeline_settings::{FrameSettings, PipelineSettings};
+use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_resource::handles::{GfxImageHandle, GfxImageViewHandle};
 use truvis_shader_binding::truvisl;
 
 pub struct GfxRtPipeline {
@@ -245,9 +245,27 @@ impl Drop for SBTRegions {
     }
 }
 
+pub struct SimpleRtPassDep {
+    pub accum_image: ImageNode,
+}
+impl Default for SimpleRtPassDep {
+    fn default() -> Self {
+        Self {
+            accum_image: ImageNode {
+                stage: vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+                access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
+                layout: vk::ImageLayout::GENERAL,
+            },
+        }
+    }
+}
+pub struct SimpleRtPassData {
+    pub accum_image: GfxImageHandle,
+    pub accum_image_view: GfxImageViewHandle,
+}
+
 pub struct SimpleRtSubpass {
     pipeline: GfxRtPipeline,
-
     _sbt: SBTRegions,
 }
 impl SimpleRtSubpass {
@@ -328,17 +346,12 @@ impl SimpleRtSubpass {
             _sbt: sbt,
         }
     }
-    pub fn ray_trace(
-        &self,
-        render_context: &RenderContext,
-        cmd: &GfxCommandBuffer,
-        framse_settings: &FrameSettings,
-        pipeline_settings: &PipelineSettings,
-        rt_image: vk::Image,
-        rt_handle: BindlessImageHandle,
-        per_frame_data: &GfxStructuredBuffer<truvisl::PerFrameData>,
-    ) {
-        let frame_label = FrameContext::get().frame_label();
+    pub fn ray_trace(&self, render_context: &RenderContext, cmd: &GfxCommandBuffer, pass_data: SimpleRtPassData) {
+        let frame_label = render_context.frame_counter.frame_label();
+
+        let rt_handle = render_context.bindless_manager.get_image_handle2(pass_data.accum_image_view).unwrap();
+        let rt_image = render_context.gfx_resource_manager.get_image(pass_data.accum_image).unwrap().handle();
+        let per_frame_data = &render_context.per_frame_data_buffers[*frame_label];
 
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
@@ -358,7 +371,7 @@ impl SimpleRtSubpass {
             rt_render_target: rt_handle.0,
             spp,
             spp_idx: 0,
-            channel: pipeline_settings.channel,
+            channel: render_context.pipeline_settings.channel,
         };
         for spp_idx in 0..spp {
             push_constant.spp_idx = spp_idx;
@@ -397,8 +410,8 @@ impl SimpleRtSubpass {
                 &self._sbt.sbt_region_hit,
                 &self._sbt.sbt_region_callable,
                 [
-                    framse_settings.frame_extent.width,
-                    framse_settings.frame_extent.height,
+                    render_context.frame_settings.frame_extent.width,
+                    render_context.frame_settings.frame_extent.height,
                     1,
                 ],
             );

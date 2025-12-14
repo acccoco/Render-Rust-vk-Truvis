@@ -11,7 +11,6 @@ use truvis_render::platform::camera::Camera;
 
 mod async_pass;
 use async_pass::AsyncPass;
-use truvis_render_base::frame_context::FrameContext;
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 
 struct AsyncLoadTest {
@@ -57,7 +56,10 @@ impl OuterApp for AsyncLoadTest {
         let texture_handle = renderer.asset_hub.load_texture(texture_path.into());
 
         Self {
-            pipeline: AsyncPass::new(&renderer.render_context.bindless_manager, &FrameContext::get().frame_settings()),
+            pipeline: AsyncPass::new(
+                &renderer.render_context.bindless_manager,
+                &renderer.render_context.frame_settings,
+            ),
             quad: Self::create_quad(),
             texture_handle,
         }

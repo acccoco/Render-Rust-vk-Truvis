@@ -17,7 +17,7 @@ use truvis_gfx::{
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::guid_new_type::{InstanceHandle, MaterialHandle, MeshHandle};
 use truvis_render_base::bindless_manager::BindlessManager;
-use truvis_render_base::frame_context::FrameContext;
+use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
@@ -180,10 +180,11 @@ impl GpuScene {
         scene_manager: &SceneManager,
         bindless_manager: &mut BindlessManager,
         gfx_resource_manager: &GfxResourceManager,
+        frame_counter: &FrameCounter,
     ) {
         let _span = tracy_client::span!("GpuScene::prepare_render_data");
 
-        bindless_manager.prepare_render_data(gfx_resource_manager, FrameContext::get().frame_label());
+        bindless_manager.prepare_render_data(gfx_resource_manager, frame_counter.frame_label());
 
         self.flatten_material_data(scene_manager);
         self.flatten_mesh_data(scene_manager);
@@ -197,19 +198,20 @@ impl GpuScene {
         &mut self,
         cmd: &GfxCommandBuffer,
         barrier_mask: GfxBarrierMask,
+        frame_counter: &FrameCounter,
         scene_manager: &SceneManager,
         bindless_manager: &BindlessManager,
     ) {
         let _span = tracy_client::span!("GpuScene::upload_to_buffer");
-        self.upload_mesh_buffer(cmd, barrier_mask, scene_manager);
-        self.upload_instance_buffer(cmd, barrier_mask, scene_manager);
-        self.upload_material_buffer(cmd, barrier_mask, scene_manager, bindless_manager);
-        self.upload_light_buffer(cmd, barrier_mask, scene_manager);
+        self.upload_mesh_buffer(cmd, barrier_mask, scene_manager, frame_counter);
+        self.upload_instance_buffer(cmd, barrier_mask, scene_manager, frame_counter);
+        self.upload_material_buffer(cmd, barrier_mask, scene_manager, bindless_manager, frame_counter);
+        self.upload_light_buffer(cmd, barrier_mask, scene_manager, frame_counter);
 
         // 需要确保 instance 先与 tlas 构建
-        self.build_tlas(scene_manager);
+        self.build_tlas(scene_manager, frame_counter);
 
-        self.upload_scene_buffer(cmd, barrier_mask, scene_manager, bindless_manager);
+        self.upload_scene_buffer(cmd, frame_counter, barrier_mask, scene_manager, bindless_manager);
     }
 
     /// 绘制场景中的所有实例
@@ -274,11 +276,12 @@ impl GpuScene {
     fn upload_scene_buffer(
         &mut self,
         cmd: &GfxCommandBuffer,
+        frame_counter: &FrameCounter,
         barrier_mask: GfxBarrierMask,
         scene_manager: &SceneManager,
         bindless_manager: &BindlessManager,
     ) {
-        let crt_gpu_buffers = &self.gpu_scene_buffers[*FrameContext::get().frame_label()];
+        let crt_gpu_buffers = &self.gpu_scene_buffers[*frame_counter.frame_label()];
         let scene_data = truvisl::Scene {
             all_instances: crt_gpu_buffers.instance_buffer.device_address(),
             all_mats: crt_gpu_buffers.material_buffer.device_address(),
@@ -314,9 +317,10 @@ impl GpuScene {
         cmd: &GfxCommandBuffer,
         barrier_mask: GfxBarrierMask,
         scene_manager: &SceneManager,
+        frame_counter: &FrameCounter,
     ) {
         let _span = tracy_client::span!("upload_instance_buffer");
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_counter.frame_label()];
 
         let crt_instance_stage_buffer = &mut crt_gpu_buffers.instance_stage_buffer;
         let crt_geometry_indirect_stage_buffer = &mut crt_gpu_buffers.geometry_indirect_stage_buffer;
@@ -397,9 +401,10 @@ impl GpuScene {
         barrier_mask: GfxBarrierMask,
         scene_manager: &SceneManager,
         bindless_manager: &BindlessManager,
+        frame_counter: &FrameCounter,
     ) {
         let _span = tracy_client::span!("upload_material_buffer");
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_counter.frame_label()];
         let crt_material_stage_buffer = &mut crt_gpu_buffers.material_stage_buffer;
         let material_buffer_slices = crt_material_stage_buffer.mapped_slice();
         if material_buffer_slices.len() < self.flatten_materials.len() {
@@ -443,9 +448,10 @@ impl GpuScene {
         cmd: &GfxCommandBuffer,
         barrier_mask: GfxBarrierMask,
         scene_manager: &SceneManager,
+        frame_counter: &FrameCounter,
     ) {
         let _span = tracy_client::span!("upload_light_buffer");
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_counter.frame_label()];
         let crt_light_stage_buffer = &mut crt_gpu_buffers.light_stage_buffer;
         let light_buffer_slices = crt_light_stage_buffer.mapped_slice();
         if light_buffer_slices.len() < scene_manager.point_light_map().len() {
@@ -471,9 +477,10 @@ impl GpuScene {
         cmd: &GfxCommandBuffer,
         barrier_mask: GfxBarrierMask,
         scene_manager: &SceneManager,
+        frame_counter: &FrameCounter,
     ) {
         let _span = tracy_client::span!("upload_mesh_buffer");
-        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*FrameContext::get().frame_label()];
+        let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_counter.frame_label()];
         let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         // let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         let geometry_buffer_slices = crt_geometry_stage_buffer.mapped_slice();
@@ -528,14 +535,14 @@ impl GpuScene {
         }
     }
 
-    fn build_tlas(&mut self, scene_manager: &SceneManager) {
+    fn build_tlas(&mut self, scene_manager: &SceneManager, frame_counter: &FrameCounter) {
         let _span = tracy_client::span!("build_tlas");
         if self.flatten_instances.is_empty() {
             // 没有实例数据，直接返回
             return;
         }
 
-        if self.gpu_scene_buffers[*FrameContext::get().frame_label()].tlas.is_some() {
+        if self.gpu_scene_buffers[*frame_counter.frame_label()].tlas.is_some() {
             // 已经构建过 tlas，直接返回
             return;
         }
@@ -554,7 +561,7 @@ impl GpuScene {
             "scene tlas",
         );
 
-        self.gpu_scene_buffers[*FrameContext::get().frame_label()].tlas = Some(tlas);
+        self.gpu_scene_buffers[*frame_counter.frame_label()].tlas = Some(tlas);
     }
 }
 

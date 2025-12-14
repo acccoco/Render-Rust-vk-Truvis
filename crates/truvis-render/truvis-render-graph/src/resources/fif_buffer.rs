@@ -8,7 +8,7 @@ use truvis_gfx::{
     resources::image::{GfxImage, GfxImageCreateInfo},
 };
 use truvis_render_base::bindless_manager::BindlessManager;
-use truvis_render_base::frame_context::FrameContext;
+use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::{GfxImageHandle, GfxImageViewHandle, GfxTextureHandle};
@@ -57,7 +57,7 @@ impl FifBuffers {
         frame_settings: &FrameSettings,
     ) {
         self.destroy_mut(bindless_manager, gfx_resource_manager);
-        *self = Self::new(frame_settings, bindless_manager, gfx_resource_manager, FrameContext::fif_count());
+        *self = Self::new(frame_settings, bindless_manager, gfx_resource_manager, FrameCounter::fif_count());
     }
 
     fn register_bindless(&self, bindless_manager: &mut BindlessManager) {

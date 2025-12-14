@@ -21,7 +21,6 @@ use truvis_gfx::{
 };
 use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
-use truvis_render_base::frame_context::FrameContext;
 use truvis_render_base::pipeline_settings::FrameSettings;
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
@@ -109,7 +108,7 @@ impl ShaderToySubpass {
         let push_constants = PushConstants {
             time: render_context.total_time_s,
             delta_time: render_context.delta_time_s,
-            frame: FrameContext::frame_id() as i32,
+            frame: render_context.frame_counter.frame_id as i32,
             frame_rate: 1.0 / render_context.delta_time_s,
             resolution: glam::Vec2::new(viewport_extent.width as f32, viewport_extent.height as f32),
             mouse: glam::Vec4::new(
@@ -186,17 +185,17 @@ impl ShaderToyPass {
         render_context_mut: &mut RenderContextMut,
         shape: &RtGeometry,
     ) {
-        let frame_label = FrameContext::get().frame_label();
+        let frame_label = render_context.frame_counter.frame_label();
 
         let render_target_texture = render_context
             .gfx_resource_manager
             .get_texture(render_context.fif_buffers.render_target_texture_handle(frame_label))
             .unwrap();
-        let frame_settings = FrameContext::get().frame_settings();
 
         // render shader toy
         {
-            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("shader-toy");
+            let cmd =
+                render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "shader-toy");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "shader-toy");
 
             // 将 render target 从 general -> color attachment
@@ -219,7 +218,7 @@ impl ShaderToyPass {
             self.shader_toy_pass.draw(
                 render_context,
                 &cmd,
-                &frame_settings,
+                &render_context.frame_settings,
                 render_target_texture.image_view().handle(),
                 shape,
             );

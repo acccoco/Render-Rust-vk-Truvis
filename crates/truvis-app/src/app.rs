@@ -17,7 +17,6 @@ use truvis_gfx::commands::barrier::GfxBarrierMask;
 use truvis_gfx::gfx::Gfx;
 use truvis_render::core::renderer::Renderer;
 use truvis_render::platform::input_manager::InputManager;
-use truvis_render_base::frame_context::FrameContext;
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     log::error!("{}", info);
@@ -116,7 +115,7 @@ impl<T: OuterApp> TruvisApp<T> {
         }
 
         self.renderer.begin_frame();
-        let frame_label = FrameContext::get().frame_label();
+        let frame_label = self.renderer.render_context.frame_counter.frame_label();
         let elapsed = self.renderer.timer.delta_time;
 
         {
@@ -148,11 +147,10 @@ impl<T: OuterApp> TruvisApp<T> {
                     ui.text(format!("CameraAspect: {:.2}", camera.asp));
                     ui.text(format!("CameraFov(Vertical): {:.2}°", camera.fov_deg_vertical));
                     {
-                        let mut pipeline_settings = FrameContext::get().pipeline_settings();
+                        let pipeline_settings = &mut self.renderer.render_context.pipeline_settings;
                         ui.slider("channel", 0, 3, &mut pipeline_settings.channel);
-                        FrameContext::get().set_pipeline_settings(pipeline_settings);
                     }
-                    ui.text(format!("Accum Frames: {}", self.renderer.render_context.accum_data.accum_frames_num));
+                    ui.text(format!("Accum Frames: {}", self.renderer.render_context.accum_data.accum_frames_num()));
                     ui.new_line();
                 }
 

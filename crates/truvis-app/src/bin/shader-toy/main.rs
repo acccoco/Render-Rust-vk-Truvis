@@ -9,7 +9,6 @@ mod shader_toy_pass;
 use shader_toy_pass::ShaderToyPass;
 use truvis_model_manager::shapes::rect::RectSoA;
 use truvis_render::core::renderer::Renderer;
-use truvis_render_base::frame_context::FrameContext;
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 
 struct ShaderToy {
@@ -17,10 +16,10 @@ struct ShaderToy {
     pipeline: ShaderToyPass,
 }
 impl OuterApp for ShaderToy {
-    fn init(_renderer: &mut Renderer, _camera: &mut Camera) -> Self {
+    fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {
         log::info!("shader toy.");
         Self {
-            pipeline: ShaderToyPass::new(FrameContext::get().frame_settings().color_format),
+            pipeline: ShaderToyPass::new(renderer.render_context.frame_settings.color_format),
             rectangle: RectSoA::create_mesh(),
         }
     }

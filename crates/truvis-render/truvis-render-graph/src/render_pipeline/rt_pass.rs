@@ -2,6 +2,7 @@ use ash::vk;
 
 use crate::apis::render_pass::RenderPass;
 use crate::render_context::{RenderContext, RenderContextMut};
+use crate::render_pipeline::simple_rt_subpass::{SimpleRtPassData, SimpleRtPassDep};
 use crate::render_pipeline::{compute_subpass::ComputeSubpass, simple_rt_subpass::SimpleRtSubpass};
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
@@ -9,7 +10,6 @@ use truvis_gfx::{
     gfx::Gfx,
 };
 use truvis_render_base::bindless_manager::BindlessManager;
-use truvis_render_base::frame_context::FrameContext;
 use truvis_shader_binding::truvisl;
 
 /// 整个 RT 管线
@@ -41,8 +41,7 @@ impl RtRenderPass {
     }
 
     pub fn render(&self, render_context: &RenderContext, render_context_mut: &mut RenderContextMut) {
-        let frame_label = FrameContext::get().frame_label();
-        let frame_settings = FrameContext::get().frame_settings();
+        let frame_label = render_context.frame_counter.frame_label();
 
         let fif_buffers = &render_context.fif_buffers;
         let bindless_manager = &render_context.bindless_manager;
@@ -61,8 +60,12 @@ impl RtRenderPass {
         let mut submit_cmds = Vec::new();
         // ray tracing
         {
-            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("ray-tracing");
+            let cmd =
+                render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "ray-tracing");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
+
+            let pre_usage = SimpleRtPassDep::default().accum_image;
+            let crt_usage = SimpleRtPassDep::default().accum_image;
 
             // RT 的 accum image 在 fif 中只有一个， 因此需要确保之前的 rt 写入已经完成
             cmd.image_memory_barrier(
@@ -70,21 +73,18 @@ impl RtRenderPass {
                 &[GfxImageBarrier::new()
                     .image(color_image.handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                    .src_mask(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, vk::AccessFlags2::SHADER_STORAGE_WRITE)
-                    .dst_mask(
-                        vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
-                        vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
-                    )],
+                    .layout_transfer(pre_usage.layout, crt_usage.layout)
+                    .src_mask(pre_usage.stage, pre_usage.src_access())
+                    .dst_mask(crt_usage.stage, crt_usage.dst_access())],
             );
 
             self.rt_pass.ray_trace(
                 render_context,
                 &cmd,
-                &frame_settings,
-                &FrameContext::get().pipeline_settings(),
-                color_image.handle(),
-                color_image_bindless_handle,
-                &render_context.per_frame_data_buffers[*frame_label],
+                SimpleRtPassData {
+                    accum_image_view: fif_buffers.color_image_view_handle(),
+                    accum_image: fif_buffers.color_image_handle(),
+                },
             );
 
             cmd.end();
@@ -92,9 +92,11 @@ impl RtRenderPass {
             submit_cmds.push(cmd);
         }
 
+        let frame_settings = &render_context.frame_settings;
+
         // blit
         {
-            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("blit");
+            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "blit");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit");
 
             // 等待 ray-tracing 执行完成
@@ -128,7 +130,7 @@ impl RtRenderPass {
 
         // hdr -> sdr
         {
-            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("hdr2sdr");
+            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "hdr2sdr");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "hdr2sdr");
 
             // 等待之前的 compute shader 执行完成
@@ -153,7 +155,7 @@ impl RtRenderPass {
                     dst_image: render_target_image_bindless_handle.0,
                     image_size: glam::uvec2(frame_settings.frame_extent.width, frame_settings.frame_extent.height)
                         .into(),
-                    channel: FrameContext::get().pipeline_settings().channel,
+                    channel: render_context.pipeline_settings.channel,
                     _padding_1: Default::default(),
                 },
                 glam::uvec3(

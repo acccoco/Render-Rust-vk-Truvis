@@ -1,4 +1,4 @@
-use crate::resources::fif_buffer::FifBuffers;
+use crate::render_context::RenderContext;
 use ash::vk;
 use std::{cell::RefCell, mem::offset_of, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;
@@ -10,15 +10,10 @@ use truvis_gfx::{
         graphics_pipeline::{GfxGraphicsPipeline, GfxGraphicsPipelineCreateInfo, GfxPipelineLayout},
         rendering_info::GfxRenderingInfo,
     },
-    resources::special_buffers::structured_buffer::GfxStructuredBuffer,
 };
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render_base::bindless_manager::BindlessManager;
-use truvis_render_base::frame_context::FrameContext;
-use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
-use truvis_render_scene::gpu_scene::GpuScene;
-use truvis_render_scene::scene_manager::SceneManager;
-use truvis_resource::gfx_resource_manager::GfxResourceManager;
+use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_shader_binding::truvisl;
 
 pub struct PhongSubpass {
@@ -101,28 +96,24 @@ impl PhongSubpass {
         );
     }
 
-    pub fn draw(
-        &self,
-        cmd: &GfxCommandBuffer,
-        per_frame_data: &GfxStructuredBuffer<truvisl::PerFrameData>,
-        gpu_scene: &GpuScene,
-        scene_manager: &SceneManager,
-        gfx_resource_manager: &GfxResourceManager,
-        fif_buffers: &FifBuffers,
-        frame_settings: &FrameSettings,
-    ) {
-        let frame_label = FrameContext::get().frame_label();
+    pub fn draw(&self, cmd: &GfxCommandBuffer, render_context: &RenderContext) {
+        let frame_label = render_context.frame_counter.frame_label();
 
-        let render_target_texture =
-            gfx_resource_manager.get_texture(fif_buffers.render_target_texture_handle(frame_label)).unwrap();
-        let depth_image_view = gfx_resource_manager.get_image_view(fif_buffers.depth_image_view_handle()).unwrap();
+        let render_target_texture = render_context
+            .gfx_resource_manager
+            .get_texture(render_context.fif_buffers.render_target_texture_handle(frame_label))
+            .unwrap();
+        let depth_image_view = render_context
+            .gfx_resource_manager
+            .get_image_view(render_context.fif_buffers.depth_image_view_handle())
+            .unwrap();
 
         let rendering_info = GfxRenderingInfo::new(
             vec![render_target_texture.image_view().handle()],
             Some(depth_image_view.handle()),
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
-                extent: frame_settings.frame_extent,
+                extent: render_context.frame_settings.frame_extent,
             },
         );
 
@@ -131,10 +122,10 @@ impl PhongSubpass {
 
         self.bind(
             cmd,
-            &frame_settings.frame_extent.into(),
+            &render_context.frame_settings.frame_extent.into(),
             &truvisl::raster::PushConstants {
-                frame_data: per_frame_data.device_address(),
-                scene: gpu_scene.scene_device_address(frame_label),
+                frame_data: render_context.per_frame_data_buffers[*frame_label].device_address(),
+                scene: render_context.gpu_scene.scene_device_address(frame_label),
 
                 submesh_idx: 0,  // 这个值在 draw 时会被更新
                 instance_idx: 0, // 这个值在 draw 时会被更新
@@ -144,7 +135,7 @@ impl PhongSubpass {
             },
             frame_label,
         );
-        gpu_scene.draw(cmd, scene_manager, &mut |ins_idx, submesh_idx| {
+        render_context.gpu_scene.draw(cmd, &render_context.scene_manager, &mut |ins_idx, submesh_idx| {
             // NOTE 这个数据和 PushConstant 中的内存布局是一致的
             let data = [ins_idx, submesh_idx];
             cmd.cmd_push_constants(

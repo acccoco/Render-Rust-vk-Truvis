@@ -12,7 +12,7 @@ use truvis_gfx::{
     swapchain::render_swapchain::GfxRenderSwapchain,
 };
 use truvis_render::core::renderer::Renderer;
-use truvis_render_base::frame_context::FrameContext;
+use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{DefaultRendererSettings, FrameLabel};
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 use truvis_resource::handles::GfxTextureHandle;
@@ -93,10 +93,10 @@ impl MainWindow {
 
         let swapchain_image_infos = swapchain.image_infos();
 
-        let gui = Gui::new(renderer, &window, FrameContext::fif_count(), &swapchain_image_infos);
+        let gui = Gui::new(renderer, &window, FrameCounter::fif_count(), &swapchain_image_infos);
         let gui_pass = GuiPass::new(&renderer.render_context.bindless_manager, swapchain_image_infos.image_format);
 
-        let present_complete_semaphores = (0..FrameContext::fif_count())
+        let present_complete_semaphores = (0..FrameCounter::fif_count())
             .map(|i| GfxSemaphore::new(&format!("window-present-complete-{}", i)))
             .collect_vec();
         let render_complete_semaphores = (0..swapchain_image_infos.image_cnt)
@@ -126,12 +126,13 @@ impl MainWindow {
     ) {
         let swapchain = self.swapchain.as_ref().unwrap();
         let swapchain_image_idx = swapchain.current_image_index();
-        let frame_label = FrameContext::get().frame_label();
+        let frame_label = render_context.frame_counter.frame_label();
 
         let render_target_texture =
             render_context.gfx_resource_manager.get_texture(renderer_data.render_target).unwrap();
 
-        let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("window-present");
+        let cmd =
+            render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "window-present");
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         {
             // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL

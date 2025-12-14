@@ -1,7 +1,7 @@
 use ash::vk;
 use itertools::Itertools;
 
-use crate::frame_context::FrameContext;
+use crate::frame_counter::FrameCounter;
 use truvis_gfx::{
     commands::{command_buffer::GfxCommandBuffer, command_pool::GfxCommandPool},
     gfx::Gfx,
@@ -59,21 +59,21 @@ impl CmdAllocator {
 // tools
 impl CmdAllocator {
     /// 分配 command buffer，在当前 frame 使用
-    pub fn alloc_command_buffer(&mut self, debug_name: &str) -> GfxCommandBuffer {
-        let name = format!("[{}]{}", FrameContext::get().frame_name(), debug_name);
-        let cmd = GfxCommandBuffer::new(&self.graphics_command_pools[*FrameContext::get().frame_label()], &name);
+    pub fn alloc_command_buffer(&mut self, frame_counter: &FrameCounter, debug_name: &str) -> GfxCommandBuffer {
+        let name = format!("[{}]{}", frame_counter.frame_name(), debug_name);
+        let cmd = GfxCommandBuffer::new(&self.graphics_command_pools[*frame_counter.frame_label()], &name);
 
-        self.allocated_command_buffers[*FrameContext::get().frame_label()].push(cmd.clone());
+        self.allocated_command_buffers[*frame_counter.frame_label()].push(cmd.clone());
         cmd
     }
 
-    pub fn free_frame_commands(&mut self) {
+    pub fn free_frame_commands(&mut self, frame_counter: &FrameCounter) {
         let _span = tracy_client::span!("free_frame_commands");
-        self.free_frame_commands_internal(*FrameContext::get().frame_label());
+        self.free_frame_commands_internal(*frame_counter.frame_label());
     }
 
     pub fn free_all(&mut self) {
-        for i in 0..FrameContext::fif_count() {
+        for i in 0..FrameCounter::fif_count() {
             self.free_frame_commands_internal(i);
         }
     }

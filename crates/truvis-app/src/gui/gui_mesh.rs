@@ -8,7 +8,7 @@ use truvis_gfx::{
     basic::color::LabelColor,
     commands::{barrier::GfxBufferBarrier, command_buffer::GfxCommandBuffer},
 };
-use truvis_render_graph::render_context::RenderContextMut;
+use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 
 /// imgui 绘制所需的 vertex buffer 和 index buffer
 pub struct GuiMesh {
@@ -20,13 +20,15 @@ pub struct GuiMesh {
 
 impl GuiMesh {
     pub fn new(
+        render_context: &RenderContext,
         render_context_mut: &mut RenderContextMut,
         cmd: &GfxCommandBuffer,
         frame_name: &str,
         draw_data: &imgui::DrawData,
     ) -> Self {
-        let (vertex_buffer, vertex_cnt) = Self::create_vertex_buffer(render_context_mut, frame_name, cmd, draw_data);
-        let index_buffer = Self::create_index_buffer(render_context_mut, frame_name, cmd, draw_data);
+        let (vertex_buffer, vertex_cnt) =
+            Self::create_vertex_buffer(render_context, render_context_mut, frame_name, cmd, draw_data);
+        let index_buffer = Self::create_index_buffer(render_context, render_context_mut, frame_name, cmd, draw_data);
 
         cmd.begin_label("uipass-mesh-transfer-barrier", LabelColor::COLOR_CMD);
         {
@@ -59,6 +61,7 @@ impl GuiMesh {
     /// ## Return
     /// `(vertex buffer, vertex count)`
     fn create_vertex_buffer(
+        render_context: &RenderContext,
         render_context_mut: &mut RenderContextMut,
         frame_name: &str,
         cmd: &GfxCommandBuffer,
@@ -73,9 +76,11 @@ impl GuiMesh {
         let vertices_size = vertex_count * size_of::<imgui::DrawVert>();
         let vertex_buffer =
             GfxVertexBuffer::<ImGuiVertexLayoutAoS>::new(vertex_count, format!("{}-imgui-vertex", frame_name));
-        let stage_buffer = render_context_mut
-            .stage_buffer_manager
-            .alloc_buffer(vertices_size as vk::DeviceSize, &format!("{}-imgui-vertex-stage", frame_name));
+        let stage_buffer = render_context_mut.stage_buffer_manager.alloc_buffer(
+            &render_context.frame_counter,
+            vertices_size as vk::DeviceSize,
+            &format!("{}-imgui-vertex-stage", frame_name),
+        );
         stage_buffer.transfer_data_by_mmap(&vertices);
 
         cmd.begin_label("uipass-vertex-buffer-transfer", LabelColor::COLOR_CMD);
@@ -99,6 +104,7 @@ impl GuiMesh {
     /// # return
     /// (index buffer, index count, stage buffer)
     fn create_index_buffer(
+        render_context: &RenderContext,
         render_context_mut: &mut RenderContextMut,
         frame_name: &str,
         cmd: &GfxCommandBuffer,
@@ -132,7 +138,7 @@ impl GuiMesh {
         }
         cmd.end_label();
 
-        render_context_mut.stage_buffer_manager.register_stage_buffer(stage_buffer);
+        render_context_mut.stage_buffer_manager.register_stage_buffer(&render_context.frame_counter, stage_buffer);
 
         index_buffer
     }

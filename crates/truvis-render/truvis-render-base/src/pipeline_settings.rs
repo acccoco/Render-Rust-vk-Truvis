@@ -91,10 +91,10 @@ impl FrameLabel {
 /// 用于逐帧累积的数据
 #[derive(Copy, Clone, Default)]
 pub struct AccumData {
-    pub last_camera_pos: glam::Vec3,
-    pub last_camera_dir: glam::Vec3,
+    last_camera_pos: glam::Vec3,
+    last_camera_dir: glam::Vec3,
 
-    pub accum_frames_num: usize,
+    accum_frames_num: usize,
 }
 impl AccumData {
     /// call phase: BeforeRender-CollectData
@@ -113,5 +113,10 @@ impl AccumData {
         self.last_camera_pos = glam::Vec3::ZERO;
         self.last_camera_dir = glam::Vec3::ZERO;
         self.accum_frames_num = 0;
+    }
+
+    #[inline]
+    pub fn accum_frames_num(&self) -> usize {
+        self.accum_frames_num
     }
 }

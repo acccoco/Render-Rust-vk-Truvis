@@ -21,7 +21,6 @@ use truvis_gfx::{
 use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render_base::bindless_manager::BindlessManager;
-use truvis_render_base::frame_context::FrameContext;
 use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
@@ -171,18 +170,17 @@ impl AsyncPass {
         shape: &RtGeometry,
         texture_id: u32,
     ) {
-        let frame_label = FrameContext::get().frame_label();
+        let frame_label = render_context.frame_counter.frame_label();
 
         let render_target_texture = render_context
             .gfx_resource_manager
             .get_texture(render_context.fif_buffers.render_target_texture_handle(frame_label))
             .unwrap();
 
-        let frame_settings = FrameContext::get().frame_settings();
-
         // render
         {
-            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer("async-test");
+            let cmd =
+                render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "async-test");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "async-test");
 
             // Barrier: Render Target -> Color Attachment
@@ -202,7 +200,7 @@ impl AsyncPass {
                     )],
             );
 
-            self.async_pass.draw(render_context, &cmd, frame_label, &frame_settings, shape, texture_id);
+            self.async_pass.draw(render_context, &cmd, frame_label, &render_context.frame_settings, shape, texture_id);
 
             // Barrier: Color Attachment -> General
             cmd.image_memory_barrier(

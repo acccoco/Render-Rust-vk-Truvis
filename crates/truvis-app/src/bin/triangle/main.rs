@@ -9,7 +9,6 @@ mod triangle_pass;
 use triangle_pass::TrianglePass;
 use truvis_model_manager::shapes::triangle::TriangleSoA;
 use truvis_render::core::renderer::Renderer;
-use truvis_render_base::frame_context::FrameContext;
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 
 struct HelloTriangle {
@@ -17,11 +16,11 @@ struct HelloTriangle {
     triangle: RtGeometry,
 }
 impl OuterApp for HelloTriangle {
-    fn init(_renderer: &mut Renderer, _camera: &mut Camera) -> Self {
+    fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {
         log::info!("hello triangle init.");
 
         Self {
-            triangle_pipeline: TrianglePass::new(&FrameContext::get().frame_settings()),
+            triangle_pipeline: TrianglePass::new(&renderer.render_context.frame_settings),
             triangle: TriangleSoA::create_mesh(),
         }
     }
