@@ -55,14 +55,7 @@ pub struct MainWindow {
     /// 数量和 fif num 相同
     present_complete_semaphores: Vec<GfxSemaphore>,
 
-    /// 表示 gui 的绘制已经完成；
-    ///
-    /// 数量和 swapchain 的 image 数量相同，
-    /// 因为每个 image 都需要一个对应的 semaphore 来等待 gui
-    /// 绘制完成后再进行呈现
-    ///
-    /// renderer 的 wait timeline 可以确保 signal 操作已经完成，但是无法 wait
-    /// 操作已经完成
+    /// 数量和 swapchain image num 相同
     render_complete_semaphores: Vec<GfxSemaphore>,
 }
 

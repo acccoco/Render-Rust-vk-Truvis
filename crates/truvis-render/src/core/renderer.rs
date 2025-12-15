@@ -150,24 +150,29 @@ impl Renderer {
     pub fn begin_frame(&mut self) {
         let _span = tracy_client::span!("Renderer::begin_frame");
 
-        // Update AssetHub
-        self.asset_hub.update();
-
         // 等待 fif 的同一帧渲染完成
         {
             let _span = tracy_client::span!("wait fif timeline");
-            let frame_id = self.render_context.frame_counter.frame_id;
-            let wait_frame = if frame_id > 3 { frame_id as u64 - 3 } else { 0 };
-            let wait_timeline_value = if wait_frame == 0 { 0 } else { wait_frame };
-            let timeout_ns = 30 * 1000 * 1000 * 1000;
-            self.fif_timeline_semaphore.wait_timeline(wait_timeline_value, timeout_ns);
+
+            let current_frame_id = self.render_context.frame_counter.frame_id;
+            let fif_count = FrameCounter::fif_count();
+            let wait_frame_id = current_frame_id.saturating_sub(fif_count);
+            const WAIT_SEMAPHORE_TIMEOUT_NS: u64 = 30 * 1000 * 1000 * 1000; // 30s
+            self.fif_timeline_semaphore.wait_timeline(wait_frame_id as u64, WAIT_SEMAPHORE_TIMEOUT_NS);
         }
 
-        self.render_context_mut.cmd_allocator.free_frame_commands(&self.render_context.frame_counter);
-        self.render_context_mut.stage_buffer_manager.clear_fif_buffers(&self.render_context.frame_counter);
+        // 清理 fif 资源
+        {
+            self.render_context_mut.cmd_allocator.free_frame_commands(&self.render_context.frame_counter);
+            self.render_context_mut.stage_buffer_manager.clear_fif_buffers(&self.render_context.frame_counter);
+        }
+
         self.timer.tic();
         self.render_context.delta_time_s = self.timer.delta_time_s();
         self.render_context.total_time_s = self.timer.total_time.as_secs_f32();
+
+        // Update AssetHub
+        self.asset_hub.update();
     }
 
     pub fn end_frame(&mut self) {

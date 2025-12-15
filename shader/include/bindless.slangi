@@ -10,6 +10,7 @@ RWTexture2D<float4> bindless_images[];
 #endif
 
 const static int INVALID_TEX_ID = -1;
+const static float4 INVALID_TEX_COLOR = float4{1.0f, 0.0f, 1.0f, 1.0f};
 
 struct TextureHandle
 {
@@ -22,12 +23,22 @@ struct TextureHandle
     {
         if (index == INVALID_TEX_ID)
         {
-            // 返回一个默认颜色，表示访问错误
-            return float4(1.0f, 0.0f, 1.0f, 1.0f); // 紫色
+            return INVALID_TEX_COLOR;
         }
         else
         {
             return bindless_textures[NonUniformResourceIndex(index)].Sample(uv);
+        }
+    }
+    float4 sample_level(float2 uv, float level)
+    {
+        if (index == INVALID_TEX_ID)
+        {
+            return INVALID_TEX_COLOR;
+        }
+        else
+        {
+            return bindless_textures[NonUniformResourceIndex(index)].SampleLevel(uv, level);
         }
     }
 

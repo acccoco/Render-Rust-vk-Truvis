@@ -209,7 +209,7 @@ impl ShaderCompileTask {
                 "-matrix-layout-column-major", // 列主序
                 "-fvk-use-entrypoint-name",    // 具有多个 entry 时，需要这个选项
                 "-target",
-                "spirv",
+                "spirv", // 如果想要输出字节码：spirv-asm
                 "-o",
                 self.output_path.to_str().unwrap(),
                 self.shader_path.to_str().unwrap(),

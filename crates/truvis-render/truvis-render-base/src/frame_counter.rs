@@ -1,13 +1,13 @@
 use crate::pipeline_settings::FrameLabel;
 
 pub struct FrameCounter {
-    /// 当前的帧序号，一直累加，初始序号是 1
+    /// 当前的帧序号，一直累加
     pub frame_id: usize,
     pub frame_limit: f32,
 }
 impl FrameCounter {
     #[inline]
-    pub fn fif_count() -> usize {
+    pub const fn fif_count() -> usize {
         3
     }
     #[inline]
