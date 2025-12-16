@@ -10,7 +10,7 @@ RWTexture2D<float4> bindless_images[];
 #endif
 
 const static int INVALID_TEX_ID = -1;
-const static float4 INVALID_TEX_COLOR = float4{1.0f, 0.0f, 1.0f, 1.0f};
+const static float4 INVALID_TEX_COLOR = float4(1.0f, 0.0f, 1.0f, 1.0f);
 
 struct TextureHandle
 {
