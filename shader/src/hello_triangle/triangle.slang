@@ -17,6 +17,7 @@ soa::PS_OUTPUT psmain(soa::CoarseVertex input)
     soa::PS_OUTPUT output = (soa::PS_OUTPUT)0;
     output.Color = float4(
         float3(input.UV, 0.0) * 0.7 + input.Normal * 0.15 + input.Tangent * 0.15,
-        1.0);
+        1.0
+    );
     return output;
 }

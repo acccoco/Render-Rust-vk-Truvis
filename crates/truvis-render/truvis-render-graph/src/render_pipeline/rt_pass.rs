@@ -3,7 +3,7 @@ use ash::vk;
 use crate::apis::render_pass::RenderPass;
 use crate::render_context::{RenderContext, RenderContextMut};
 use crate::render_pipeline::blit_subpass::{BlitSubpass, BlitSubpassData, BlitSubpassDep};
-use crate::render_pipeline::sdr_subpass::SdrSubpass;
+use crate::render_pipeline::sdr_subpass::{SdrSubpass, SdrSubpassData, SdrSubpassDep};
 use crate::render_pipeline::simple_rt_subpass::{SimpleRtPassData, SimpleRtPassDep};
 use crate::render_pipeline::{compute_subpass::ComputeSubpass, simple_rt_subpass::SimpleRtSubpass};
 use truvis_crate_tools::resource::TruvisPath;
@@ -42,7 +42,7 @@ impl RtRenderPass {
 
         let color_image = render_context.gfx_resource_manager.get_image(fif_buffers.color_image_handle()).unwrap();
         let color_image_bindless_handle =
-            bindless_manager.get_image_handle2(fif_buffers.color_image_view_handle()).unwrap();
+            bindless_manager.get_image_handle(fif_buffers.color_image_view_handle()).unwrap();
         let render_target_texture = render_context
             .gfx_resource_manager
             .get_texture(fif_buffers.render_target_texture_handle(frame_label))
@@ -105,7 +105,7 @@ impl RtRenderPass {
                 .dst_mask(src_image_crt_usage.stage, src_image_crt_usage.dst_access());
             cmd.image_memory_barrier(vk::DependencyFlags::empty(), &[rt_barrier]);
 
-            self.blit_subpass.draw(
+            self.blit_subpass.exec(
                 &cmd,
                 BlitSubpassData {
                     src_image: fif_buffers.color_image_view_handle(),
@@ -120,41 +120,33 @@ impl RtRenderPass {
             submit_cmds.push(cmd);
         }
 
+        // TODO 上面的 blit 似乎没有任何作用，下面的 hdr -> sdr 也是在做同样的事情
+
         // hdr -> sdr
         {
             let cmd = render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "hdr2sdr");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "hdr2sdr");
 
+            let dst_image_pre_usage = BlitSubpassDep::default().dst_image;
+            let dst_image_crt_usage = SdrSubpassDep::default().dst_image;
+
             // 等待之前的 compute shader 执行完成
             let rt_barrier = GfxImageBarrier::new()
                 .image(render_target_texture.image().handle())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                .src_mask(
-                    vk::PipelineStageFlags2::COMPUTE_SHADER,
-                    vk::AccessFlags2::SHADER_WRITE | vk::AccessFlags2::SHADER_READ,
-                )
-                .dst_mask(
-                    vk::PipelineStageFlags2::COMPUTE_SHADER,
-                    vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
-                );
+                .src_mask(dst_image_pre_usage.stage, dst_image_pre_usage.src_access())
+                .dst_mask(dst_image_crt_usage.stage, dst_image_pre_usage.dst_access());
             cmd.image_memory_barrier(vk::DependencyFlags::empty(), &[rt_barrier]);
 
-            self.sdr_pass.exec(
+            self.sdr_subpass.exec(
                 &cmd,
-                bindless_manager,
-                &truvisl::sdr::PushConstant {
-                    src_image: color_image_bindless_handle.0,
-                    dst_image: render_target_image_bindless_handle.0,
-                    image_size: glam::uvec2(frame_settings.frame_extent.width, frame_settings.frame_extent.height)
-                        .into(),
-                    channel: render_context.pipeline_settings.channel,
-                    _padding_1: Default::default(),
+                SdrSubpassData {
+                    src_image: fif_buffers.color_image_view_handle(),
+                    dst_image: fif_buffers.render_target_texture_handle(frame_label),
+                    src_image_size: frame_settings.frame_extent,
+                    dst_image_size: frame_settings.frame_extent,
                 },
-                glam::uvec3(
-                    frame_settings.frame_extent.width.div_ceil(truvisl::blit::SHADER_X as u32),
-                    frame_settings.frame_extent.height.div_ceil(truvisl::blit::SHADER_Y as u32),
-                    1,
-                ),
+                render_context,
             );
 
             cmd.end();

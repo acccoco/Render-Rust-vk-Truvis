@@ -51,8 +51,8 @@ impl BlitSubpass {
         Self { blit_pass }
     }
 
-    pub fn draw(&self, cmd: &GfxCommandBuffer, data: BlitSubpassData, render_context: &RenderContext) {
-        let src_image_bindless_handle = render_context.bindless_manager.get_image_handle2(data.src_image).unwrap();
+    pub fn exec(&self, cmd: &GfxCommandBuffer, data: BlitSubpassData, render_context: &RenderContext) {
+        let src_image_bindless_handle = render_context.bindless_manager.get_image_handle(data.src_image).unwrap();
         let dst_image_bindless_handle =
             render_context.bindless_manager.get_image_handle_in_texture(data.dst_image).unwrap();
         self.blit_pass.exec(

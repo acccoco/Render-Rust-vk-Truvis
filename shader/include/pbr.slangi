@@ -90,8 +90,8 @@ struct SpecularBrdf
 
         // Get our GGX NDF sample (i.e., the half vector)
         return tangent * (sin_theta_h * cos(phi_h)) +
-               bitangent * (sin_theta_h * sin(phi_h)) +
-               normal * cos_theta_h;
+            bitangent * (sin_theta_h * sin(phi_h)) +
+            normal * cos_theta_h;
     }
 
     float ggx_pdf()

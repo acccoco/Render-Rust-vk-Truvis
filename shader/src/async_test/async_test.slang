@@ -21,7 +21,8 @@ soa::VsOutput vsmain(soa::VsInput input)
 }
 
 [shader("fragment")]
-float4 psmain(soa::VsOutput input) : SV_Target
+float4 psmain(soa::VsOutput input)
+    : SV_Target
 {
     uint idx = pc.texture_id;
     // Use NonUniformResourceIndex to handle divergent indexing

@@ -2,7 +2,6 @@
 #include "phong.slangi"
 #include "scene.slangi"
 
-
 struct VsInput
 {
     [[vk::location(0)]]
@@ -34,8 +33,8 @@ raster::PushConstants push_const;
 [shader("vertex")]
 VsOutput main(VsInput input)
 {
-    Instance *instance = push_const.scene.all_instances + push_const.instance_idx;
-    PerFrameData *frame_data = push_const.frame_data;
+    Instance* instance = push_const.scene.all_instances + push_const.instance_idx;
+    PerFrameData* frame_data = push_const.frame_data;
 
     VsOutput output = (VsOutput)0;
 

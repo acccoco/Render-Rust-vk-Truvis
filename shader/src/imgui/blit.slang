@@ -15,5 +15,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     g_params.dst_image.store(
         dispatchThreadID.xy + g_params.offset,
-        g_params.src_image.load(dispatchThreadID.xy));
+        // g_params.src_image.load(dispatchThreadID.xy)
+        float4(1.0, 0.0, 0.0, 1.0)
+    );
 }

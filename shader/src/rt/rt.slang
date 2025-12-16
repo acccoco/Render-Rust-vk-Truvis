@@ -47,7 +47,7 @@ struct MatPayload
 [shader("raygeneration")]
 void main_ray_gen()
 {
-    PerFrameData *frame_data = push_const.frame_data;
+    PerFrameData* frame_data = push_const.frame_data;
     const uint accum_samples = frame_data.accum_frames * push_const.spp + push_const.spp_idx;
     if (accum_samples >= max_accum_samples)
     {
@@ -59,9 +59,7 @@ void main_ray_gen()
 
     // 下方的 0.375 来自于 Blender 的 Cycles
     uint random_seed = Random::tea(thread_id.y * DispatchRaysDimensions().x + thread_id.x, accum_samples);
-    const float2 subpixel_jitter = (accum_samples == 0 || push_const.channel != 0)
-                                       ? float2(0.5f)
-                                       : float2(0.5) + 0.375 * Random::rand_gaussian(random_seed);
+    const float2 subpixel_jitter = (accum_samples == 0 || push_const.channel != 0) ? float2(0.5f) : float2(0.5) + 0.375 * Random::rand_gaussian(random_seed);
 
     // 以 thread_id + 0.5 为中心，进行子像素抖动
     const float2 pixel_center = float2(thread_id) + subpixel_jitter;
@@ -83,7 +81,7 @@ void main_ray_gen()
     payload.section_stack = 0;
     payload.object_stack = 0;
 
-    Scene *scene = push_const.scene;
+    Scene* scene = push_const.scene;
     RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
 
     // E 直接光照
@@ -126,15 +124,15 @@ static const float3 directional_light = normalize(float3(0.1f, -0.98995f, -0.1f)
 [shader("closesthit")]
 void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    PerFrameData *frame_data = push_const.frame_data;
-    Scene *scene = push_const.scene;
+    PerFrameData* frame_data = push_const.frame_data;
+    Scene* scene = push_const.scene;
 
     const uint instance_id = InstanceIndex();
     const uint geometry_id = GeometryIndex();
     const uint primitive_id = PrimitiveIndex();
 
-    PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
-    Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
+    PBRMaterial* mat = scene.get_material(instance_id, geometry_id);
+    Geometry* geometry = scene.get_geometry(instance_id, geometry_id);
     const uint3 triangle = geometry.get_triangle(primitive_id);
     const float3 interp_pos = geometry.get_interp_position(triangle, attr.barycentrics);
     const float3 interp_normal = geometry.get_interp_normal(triangle, attr.barycentrics);
@@ -146,7 +144,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     float3 origin_world_normal;
     {
         // normal mat = obejct mat 的逆转置
-        Instance *instance = scene.get_instance(instance_id);
+        Instance* instance = scene.get_instance(instance_id);
         const float4x4 normal_matrix = transpose(instance.inv_model);
         origin_world_normal = normalize(mul(normal_matrix, float4(interp_normal, 0.f)).xyz);
     }
@@ -287,7 +285,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
 [shader("callable")]
 void diffuse_callable(inout MatPayload payload)
 {
-    PBRMaterial *mat = push_const.scene.get_material(payload.instance_id, payload.geometry_id);
+    PBRMaterial* mat = push_const.scene.get_material(payload.instance_id, payload.geometry_id);
     if (mat.diffuse_map.is_valid())
     {
         payload.out_color = mat.diffuse_map.sample_level(payload.uv, 0.0).xyz;
@@ -302,15 +300,15 @@ void diffuse_callable(inout MatPayload payload)
 [shader("anyhit")]
 void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    PerFrameData *frame_data = push_const.frame_data;
-    Scene *scene = push_const.scene;
+    PerFrameData* frame_data = push_const.frame_data;
+    Scene* scene = push_const.scene;
 
     const uint instance_id = InstanceIndex();
     const uint geometry_id = GeometryIndex();
     const uint primitive_id = PrimitiveIndex();
 
-    PBRMaterial *mat = scene.get_material(instance_id, geometry_id);
-    Geometry *geometry = scene.get_geometry(instance_id, geometry_id);
+    PBRMaterial* mat = scene.get_material(instance_id, geometry_id);
+    Geometry* geometry = scene.get_geometry(instance_id, geometry_id);
     const uint3 triangle = geometry.get_triangle(primitive_id);
     const float2 interp_uv = geometry.get_interp_uv(triangle, attr.barycentrics);
 

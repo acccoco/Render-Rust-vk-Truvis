@@ -210,7 +210,7 @@ impl GuiPass {
                         if Some(texture_id) != last_texture_id {
                             let texture_handle = get_texture_handle(texture_id);
                             let texture_bindless_handle = bindless_manager
-                                .get_texture_handle2(texture_handle)
+                                .get_texture_handle(texture_handle)
                                 .unwrap_or_else(|| panic!("Texture not found: {:?}", texture_id));
 
                             cmd.cmd_push_constants(

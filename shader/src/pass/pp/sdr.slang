@@ -32,5 +32,6 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     g_params.dst_image.store(
         dispatchThreadID.xy,
-        float4(sdr_color, hdr_color.a));
+        float4(sdr_color, hdr_color.a)
+    );
 }

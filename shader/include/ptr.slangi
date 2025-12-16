@@ -1,9 +1,9 @@
 #pragma once
 
-#ifndef PTR 
+#ifndef PTR
     #ifdef __SLANG__
         #define PTR(T, ident) T* ident
     #else
         #define PTR(T, ident) uint64_t ident
-    #endif 
-#endif 
+    #endif
+#endif

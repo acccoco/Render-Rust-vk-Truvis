@@ -294,8 +294,8 @@ impl GpuScene {
             spot_light_count: 0, // TODO 暂时无用
             tlas: crt_gpu_buffers.tlas.as_ref().map_or(vk::DeviceAddress::default(), |tlas| tlas.device_address()),
 
-            sky: bindless_manager.get_texture_handle2(self.sky_texture_handle).unwrap().0,
-            uv_checker: bindless_manager.get_texture_handle2(self.uv_checker_texture_handle).unwrap().0,
+            sky: bindless_manager.get_texture_handle(self.sky_texture_handle).unwrap().0,
+            uv_checker: bindless_manager.get_texture_handle(self.uv_checker_texture_handle).unwrap().0,
         };
 
         cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.vk_buffer(), 0, bytemuck::bytes_of(&scene_data));
@@ -416,11 +416,11 @@ impl GpuScene {
 
             let diffuse_bindless_handle = scene_manager
                 .get_texture(&mat.diffuse_map)
-                .and_then(|tex_handle| bindless_manager.get_texture_handle2(tex_handle))
+                .and_then(|tex_handle| bindless_manager.get_texture_handle(tex_handle))
                 .unwrap_or_default();
             let normal_bindless_handle = scene_manager
                 .get_texture(&mat.normal_map)
-                .and_then(|tex_handle| bindless_manager.get_texture_handle2(tex_handle))
+                .and_then(|tex_handle| bindless_manager.get_texture_handle(tex_handle))
                 .unwrap_or_default();
 
             material_buffer_slices[mat_idx] = truvisl::PBRMaterial {

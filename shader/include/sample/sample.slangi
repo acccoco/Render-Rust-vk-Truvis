@@ -16,7 +16,8 @@ struct Sample
         float3 direction = float3(
             radius * cos(phi),
             radius * sin(phi),
-            sqrt(1.f - rand_val.x));
+            sqrt(1.f - rand_val.x)
+        );
         return direction;
     }
 

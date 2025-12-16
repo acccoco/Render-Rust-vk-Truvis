@@ -352,7 +352,7 @@ impl SimpleRtSubpass {
     pub fn ray_trace(&self, render_context: &RenderContext, cmd: &GfxCommandBuffer, pass_data: SimpleRtPassData) {
         let frame_label = render_context.frame_counter.frame_label();
 
-        let rt_handle = render_context.bindless_manager.get_image_handle2(pass_data.accum_image_view).unwrap();
+        let rt_handle = render_context.bindless_manager.get_image_handle(pass_data.accum_image_view).unwrap();
         let rt_image = render_context.gfx_resource_manager.get_image(pass_data.accum_image).unwrap().handle();
         let per_frame_data = &render_context.per_frame_data_buffers[*frame_label];
 

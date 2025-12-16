@@ -325,14 +325,14 @@ impl BindlessManager {
     }
 
     /// 获得纹理在当前帧的 bindless 索引
-    pub fn get_texture_handle2(&self, texture_handle: GfxTextureHandle) -> Option<BindlessTextureHandle> {
+    pub fn get_texture_handle(&self, texture_handle: GfxTextureHandle) -> Option<BindlessTextureHandle> {
         debug_assert!(!texture_handle.is_null());
 
         self.textures.get(texture_handle).copied()
     }
 
     /// 获得图像在当前帧的 bindless 索引
-    pub fn get_image_handle2(&self, image_view_handle: GfxImageViewHandle) -> Option<BindlessImageHandle> {
+    pub fn get_image_handle(&self, image_view_handle: GfxImageViewHandle) -> Option<BindlessImageHandle> {
         debug_assert!(!image_view_handle.is_null());
 
         self.images.get(image_view_handle).copied()
