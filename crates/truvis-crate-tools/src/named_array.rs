@@ -1,6 +1,6 @@
-/// 创建一个带有索引的常量数组宏
+/// 创建一个带有索引的常量数组
 #[macro_export]
-macro_rules! const_map {
+macro_rules! enumed_map {
     ($enum_name:ident<$vtype:ty>: { $($variant:ident: $value:expr),* $(,)? }) => {
         // 定义枚举
         #[repr(usize)]

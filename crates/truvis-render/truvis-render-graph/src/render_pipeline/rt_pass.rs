@@ -2,6 +2,8 @@ use ash::vk;
 
 use crate::apis::render_pass::RenderPass;
 use crate::render_context::{RenderContext, RenderContextMut};
+use crate::render_pipeline::blit_subpass::{BlitSubpass, BlitSubpassData, BlitSubpassDep};
+use crate::render_pipeline::sdr_subpass::SdrSubpass;
 use crate::render_pipeline::simple_rt_subpass::{SimpleRtPassData, SimpleRtPassDep};
 use crate::render_pipeline::{compute_subpass::ComputeSubpass, simple_rt_subpass::SimpleRtSubpass};
 use truvis_crate_tools::resource::TruvisPath;
@@ -14,29 +16,21 @@ use truvis_shader_binding::truvisl;
 
 /// 整个 RT 管线
 pub struct RtRenderPass {
-    rt_pass: SimpleRtSubpass,
-    blit_pass: ComputeSubpass<truvisl::blit::PushConstant>,
-    sdr_pass: ComputeSubpass<truvisl::sdr::PushConstant>,
+    simple_rt_subpass: SimpleRtSubpass,
+    blit_subpass: BlitSubpass,
+    sdr_subpass: SdrSubpass,
 }
 
 impl RtRenderPass {
     pub fn new(bindless_manager: &BindlessManager) -> Self {
         let rt_pass = SimpleRtSubpass::new(bindless_manager);
-        let blit_pass = ComputeSubpass::<truvisl::blit::PushConstant>::new(
-            bindless_manager,
-            c"main",
-            TruvisPath::shader_path("imgui/blit.slang").as_str(),
-        );
-        let sdr_pass = ComputeSubpass::<truvisl::sdr::PushConstant>::new(
-            bindless_manager,
-            c"main",
-            TruvisPath::shader_path("pass/pp/sdr.slang").as_str(),
-        );
+        let blit_subpass = BlitSubpass::new(bindless_manager);
+        let sdr_subpass = SdrSubpass::new(bindless_manager);
 
         Self {
-            rt_pass,
-            blit_pass,
-            sdr_pass,
+            simple_rt_subpass: rt_pass,
+            blit_subpass,
+            sdr_subpass,
         }
     }
 
@@ -78,7 +72,7 @@ impl RtRenderPass {
                     .dst_mask(crt_usage.stage, crt_usage.dst_access())],
             );
 
-            self.rt_pass.ray_trace(
+            self.simple_rt_subpass.ray_trace(
                 render_context,
                 &cmd,
                 SimpleRtPassData {
@@ -99,29 +93,27 @@ impl RtRenderPass {
             let cmd = render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "blit");
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit");
 
+            let src_image_pre_usage = SimpleRtPassDep::default().accum_image;
+            let src_image_crt_usage = BlitSubpassDep::default().src_image;
+
             // 等待 ray-tracing 执行完成
             let rt_barrier = GfxImageBarrier::new()
                 .image(color_image.handle())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                .src_mask(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, vk::AccessFlags2::SHADER_STORAGE_WRITE)
-                .dst_mask(vk::PipelineStageFlags2::COMPUTE_SHADER, vk::AccessFlags2::SHADER_READ);
+                .layout_transfer(src_image_pre_usage.layout, src_image_crt_usage.layout)
+                .src_mask(src_image_pre_usage.stage, src_image_pre_usage.src_access())
+                .dst_mask(src_image_crt_usage.stage, src_image_crt_usage.dst_access());
             cmd.image_memory_barrier(vk::DependencyFlags::empty(), &[rt_barrier]);
 
-            self.blit_pass.exec(
+            self.blit_subpass.draw(
                 &cmd,
-                bindless_manager,
-                &truvisl::blit::PushConstant {
-                    src_image: color_image_bindless_handle.0,
-                    dst_image: render_target_image_bindless_handle.0,
-                    src_image_size: glam::uvec2(frame_settings.frame_extent.width, frame_settings.frame_extent.height)
-                        .into(),
-                    offset: glam::uvec2(0, 0).into(),
+                BlitSubpassData {
+                    src_image: fif_buffers.color_image_view_handle(),
+                    dst_image: fif_buffers.render_target_texture_handle(frame_label),
+                    src_image_size: frame_settings.frame_extent,
+                    dst_image_size: frame_settings.frame_extent,
                 },
-                glam::uvec3(
-                    frame_settings.frame_extent.width.div_ceil(truvisl::blit::SHADER_X as u32),
-                    frame_settings.frame_extent.height.div_ceil(truvisl::blit::SHADER_Y as u32),
-                    1,
-                ),
+                render_context,
             );
 
             cmd.end();

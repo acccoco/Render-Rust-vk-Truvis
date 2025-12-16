@@ -1,6 +1,7 @@
 use imgui::Ui;
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_render::core::renderer::Renderer;
 use truvis_render::platform::camera::Camera;
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
@@ -47,7 +48,7 @@ impl CornellApp {
         renderer.render_context.scene_manager.load_scene(
             &mut renderer.render_context.gfx_resource_manager,
             &mut renderer.render_context.bindless_manager,
-            std::path::Path::new("C:/Users/bigso/Downloads/coord.fbx"),
+            TruvisPath::assets_path("blender/coord.fbx").as_ref(),
             &glam::Mat4::IDENTITY,
         );
         log::info!("Scene loaded.");

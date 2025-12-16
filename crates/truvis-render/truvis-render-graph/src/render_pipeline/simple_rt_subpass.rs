@@ -3,8 +3,8 @@ use crate::graph::node::ImageNode;
 use crate::render_context::RenderContext;
 use ash::vk;
 use itertools::Itertools;
-use truvis_crate_tools::const_map;
 use truvis_crate_tools::count_indexed_array;
+use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, command_buffer::GfxCommandBuffer},
@@ -30,7 +30,7 @@ impl Drop for GfxRtPipeline {
     }
 }
 
-const_map!(ShaderStage<GfxShaderStageInfo>: {
+enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     RayGen: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::RAYGEN_KHR,
         entry_point: c"main_ray_gen",
@@ -63,7 +63,7 @@ const_map!(ShaderStage<GfxShaderStageInfo>: {
     },
 });
 
-const_map!(ShaderGroups<GfxShaderGroupInfo>: {
+enumed_map!(ShaderGroups<GfxShaderGroupInfo>: {
     RayGen: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
         general: ShaderStage::RayGen.index() as u32,
@@ -245,6 +245,7 @@ impl Drop for SBTRegions {
     }
 }
 
+/// pass 的依赖信息
 pub struct SimpleRtPassDep {
     pub accum_image: ImageNode,
 }
@@ -259,6 +260,8 @@ impl Default for SimpleRtPassDep {
         }
     }
 }
+
+/// 传入 pass 的数据
 pub struct SimpleRtPassData {
     pub accum_image: GfxImageHandle,
     pub accum_image_view: GfxImageViewHandle,

@@ -3,7 +3,7 @@ use truvis_crate_tools::count_indexed_array;
 
 use ash::vk;
 use itertools::Itertools;
-use truvis_crate_tools::const_map;
+use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
@@ -21,7 +21,7 @@ use truvis_shader_binding::{truvisl, truvisl::TextureHandle};
 use crate::gui::core::Gui;
 use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
 
-const_map!(ShaderStage<GfxShaderStageInfo>: {
+enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: c"vsmain",

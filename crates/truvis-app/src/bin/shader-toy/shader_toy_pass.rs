@@ -4,7 +4,7 @@ use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
 
-use truvis_crate_tools::const_map;
+use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxImageBarrier;
@@ -25,7 +25,7 @@ use truvis_render_base::pipeline_settings::FrameSettings;
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
 
-const_map!(ShaderStage<GfxShaderStageInfo>:{
+enumed_map!(ShaderStage<GfxShaderStageInfo>:{
     Vertex: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: c"main",
