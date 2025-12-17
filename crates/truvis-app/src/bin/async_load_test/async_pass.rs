@@ -25,7 +25,7 @@ use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 
 enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {
@@ -156,7 +156,7 @@ impl AsyncSubpass {
 pub struct AsyncPass {
     async_pass: AsyncSubpass,
 
-    cmds: Vec<GfxCommandBuffer>,
+    cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 }
 
 impl RenderPass for AsyncPass {}
@@ -170,20 +170,12 @@ impl AsyncPass {
         let async_pass = AsyncSubpass::new(bindless_manager, frame_settings);
 
         let cmds = FrameCounter::frame_labes()
-            .into_iter()
-            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "async-test"))
-            .collect_vec();
+            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "async-test"));
 
         Self { async_pass, cmds }
     }
 
-    pub fn render(
-        &self,
-        render_context: &RenderContext,
-        render_context_mut: &mut RenderContextMut,
-        shape: &RtGeometry,
-        texture_id: u32,
-    ) {
+    pub fn render(&self, render_context: &RenderContext, shape: &RtGeometry, texture_id: u32) {
         let frame_label = render_context.frame_counter.frame_label();
 
         let render_target_texture = render_context

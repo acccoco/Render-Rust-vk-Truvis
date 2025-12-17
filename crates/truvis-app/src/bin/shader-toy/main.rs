@@ -9,7 +9,7 @@ mod shader_toy_pass;
 use shader_toy_pass::ShaderToyPass;
 use truvis_model_manager::shapes::rect::RectSoA;
 use truvis_render::core::renderer::Renderer;
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 
 struct ShaderToy {
     rectangle: RtGeometry,
@@ -32,8 +32,8 @@ impl OuterApp for ShaderToy {
         ui.text_wrapped("こんにちは世界！");
     }
 
-    fn draw(&self, render_context: &RenderContext, render_context_mut: &mut RenderContextMut) {
-        self.pipeline.render(render_context, render_context_mut, &self.rectangle);
+    fn draw(&self, render_context: &RenderContext) {
+        self.pipeline.render(render_context, &self.rectangle);
     }
 }
 

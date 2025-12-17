@@ -13,10 +13,9 @@ use truvis_gfx::{
     swapchain::render_swapchain::GfxRenderSwapchain,
 };
 use truvis_render::core::renderer::Renderer;
-use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{DefaultRendererSettings, FrameLabel};
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 use truvis_resource::handles::GfxTextureHandle;
 
 /// 渲染演示数据结构
@@ -53,7 +52,7 @@ pub struct MainWindow {
     swapchain: Option<GfxRenderSwapchain>,
     gui: Gui,
     gui_pass: GuiPass,
-    cmds: Vec<GfxCommandBuffer>,
+    cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 
     /// 数量和 fif num 相同
     present_complete_semaphores: Vec<GfxSemaphore>,
@@ -89,7 +88,7 @@ impl MainWindow {
 
         let swapchain_image_infos = swapchain.image_infos();
 
-        let gui = Gui::new(renderer, &window, FrameCounter::fif_count(), &swapchain_image_infos);
+        let gui = Gui::new(renderer, &window, &swapchain_image_infos);
         let gui_pass = GuiPass::new(&renderer.render_context.bindless_manager, swapchain_image_infos.image_format);
 
         let present_complete_semaphores = (0..FrameCounter::fif_count())
@@ -100,9 +99,7 @@ impl MainWindow {
             .collect_vec();
 
         let cmds = FrameCounter::frame_labes()
-            .into_iter()
-            .map(|frame_label| renderer.cmd_allocator.alloc_command_buffer(frame_label, "window-present"))
-            .collect_vec();
+            .map(|frame_label| renderer.cmd_allocator.alloc_command_buffer(frame_label, "window-present"));
 
         Self {
             winit_window: window,
@@ -120,12 +117,7 @@ impl MainWindow {
         &self.winit_window
     }
 
-    fn draw(
-        &mut self,
-        render_context: &RenderContext,
-        render_context_mut: &mut RenderContextMut,
-        renderer_data: PresentData,
-    ) {
+    fn draw(&mut self, render_context: &RenderContext, renderer_data: PresentData) {
         let swapchain = self.swapchain.as_ref().unwrap();
         let swapchain_image_idx = swapchain.current_image_index();
         let frame_label = render_context.frame_counter.frame_label();
@@ -162,7 +154,6 @@ impl MainWindow {
 
             self.gui_pass.draw(
                 render_context,
-                render_context_mut,
                 swapchain.current_image_view().handle(),
                 swapchain.extent(),
                 &cmd,
@@ -250,14 +241,9 @@ impl MainWindow {
         );
     }
 
-    pub fn draw_gui(
-        &mut self,
-        render_context: &RenderContext,
-        render_context_mut: &mut RenderContextMut,
-        renderer_data: PresentData,
-    ) {
+    pub fn draw_gui(&mut self, render_context: &RenderContext, renderer_data: PresentData) {
         self.gui.register_render_texture(renderer_data.render_target);
-        self.draw(render_context, render_context_mut, renderer_data);
+        self.draw(render_context, renderer_data);
     }
 
     pub fn handle_event<T>(&mut self, event: &winit::event::Event<T>) {

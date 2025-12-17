@@ -15,7 +15,7 @@ use truvis_gfx::{
 };
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::pipeline_settings::FrameLabel;
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 use truvis_shader_binding::{truvisl, truvisl::TextureHandle};
 
 use crate::gui::core::Gui;
@@ -89,7 +89,6 @@ impl GuiPass {
     pub fn draw(
         &self,
         render_context: &RenderContext,
-        render_context_mut: &mut RenderContextMut,
         canvas_color_view: vk::ImageView,
         canvas_extent: vk::Extent2D,
         cmd: &GfxCommandBuffer,
@@ -116,7 +115,7 @@ impl GuiPass {
         let mesh;
         let draw_data;
         let get_texture_handle;
-        if let Some(res) = gui.imgui_render(render_context, render_context_mut, cmd, frame_label) {
+        if let Some(res) = gui.imgui_render(frame_label) {
             (mesh, draw_data, get_texture_handle) = res;
         } else {
             log::warn!("No ImGui draw data available, skipping GUI pass.");

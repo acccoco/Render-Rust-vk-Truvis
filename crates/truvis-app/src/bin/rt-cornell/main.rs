@@ -4,7 +4,7 @@ use truvis_app::outer_app::OuterApp;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_render::core::renderer::Renderer;
 use truvis_render::platform::camera::Camera;
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_pipeline::rt_pass::RtRenderPass;
 use truvis_shader_binding::truvisl;
 
@@ -66,8 +66,8 @@ impl OuterApp for CornellApp {
 
     fn draw_ui(&mut self, _ui: &Ui) {}
 
-    fn draw(&self, render_context: &RenderContext, render_context_mut: &mut RenderContextMut) {
-        self.rt_pipeline.render(render_context, render_context_mut);
+    fn draw(&self, render_context: &RenderContext) {
+        self.rt_pipeline.render(render_context);
     }
 }
 

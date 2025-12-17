@@ -26,8 +26,3 @@ pub struct RenderContext {
     pub frame_settings: FrameSettings,
     pub pipeline_settings: PipelineSettings,
 }
-
-// Render 期间可变
-pub struct RenderContextMut {
-    pub stage_buffer_manager: StageBufferManager,
-}

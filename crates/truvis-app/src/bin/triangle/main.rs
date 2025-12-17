@@ -9,7 +9,7 @@ mod triangle_pass;
 use triangle_pass::TrianglePass;
 use truvis_model_manager::shapes::triangle::TriangleSoA;
 use truvis_render::core::renderer::Renderer;
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 
 struct HelloTriangle {
     triangle_pipeline: TrianglePass,
@@ -29,8 +29,8 @@ impl OuterApp for HelloTriangle {
         static mut _UI_VALUE: usize = 0;
     }
 
-    fn draw(&self, render_context: &RenderContext, render_context_mut: &mut RenderContextMut) {
-        self.triangle_pipeline.render(render_context, render_context_mut, &self.triangle);
+    fn draw(&self, render_context: &RenderContext) {
+        self.triangle_pipeline.render(render_context, &self.triangle);
     }
 }
 

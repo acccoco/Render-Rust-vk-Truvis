@@ -1,7 +1,7 @@
 use ash::vk;
 
 use crate::apis::render_pass::RenderPass;
-use crate::render_context::{RenderContext, RenderContextMut};
+use crate::render_context::RenderContext;
 use crate::render_pipeline::blit_subpass::{BlitSubpass, BlitSubpassData, BlitSubpassDep};
 use crate::render_pipeline::sdr_subpass::{SdrSubpass, SdrSubpassData, SdrSubpassDep};
 use crate::render_pipeline::simple_rt_subpass::{SimpleRtPassData, SimpleRtPassDep};
@@ -23,9 +23,9 @@ pub struct RtRenderPass {
     blit_subpass: BlitSubpass,
     sdr_subpass: SdrSubpass,
 
-    rt_cmds: Vec<GfxCommandBuffer>,
-    blit_cmds: Vec<GfxCommandBuffer>,
-    sdr_cmds: Vec<GfxCommandBuffer>,
+    rt_cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
+    blit_cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
+    sdr_cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 }
 
 impl RtRenderPass {
@@ -34,14 +34,12 @@ impl RtRenderPass {
         let blit_subpass = BlitSubpass::new(bindless_manager);
         let sdr_subpass = SdrSubpass::new(bindless_manager);
 
-        let mut rt_cmds = Vec::new();
-        let mut blit_cmds = Vec::new();
-        let mut sdr_cmds = Vec::new();
-        for frame_label in FrameCounter::frame_labes() {
-            rt_cmds.push(cmd_allocator.alloc_command_buffer(frame_label, "ray-tracing"));
-            blit_cmds.push(cmd_allocator.alloc_command_buffer(frame_label, "blit"));
-            sdr_cmds.push(cmd_allocator.alloc_command_buffer(frame_label, "hdr-to-sdr"));
-        }
+        let rt_cmds = FrameCounter::frame_labes()
+            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "ray-tracing"));
+        let blit_cmds =
+            FrameCounter::frame_labes().map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "blit"));
+        let sdr_cmds = FrameCounter::frame_labes()
+            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "hdr-to-sdr"));
 
         Self {
             simple_rt_subpass: rt_pass,
@@ -54,7 +52,7 @@ impl RtRenderPass {
         }
     }
 
-    pub fn render(&self, render_context: &RenderContext, render_context_mut: &mut RenderContextMut) {
+    pub fn render(&self, render_context: &RenderContext) {
         let frame_label = render_context.frame_counter.frame_label();
 
         let fif_buffers = &render_context.fif_buffers;

@@ -24,7 +24,7 @@ use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 
 enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {
@@ -127,7 +127,7 @@ impl TriangleSubpass {
 pub struct TrianglePass {
     triangle_pass: TriangleSubpass,
 
-    cmds: Vec<GfxCommandBuffer>,
+    cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 }
 
 impl RenderPass for TrianglePass {}
@@ -135,19 +135,12 @@ impl RenderPass for TrianglePass {}
 impl TrianglePass {
     pub fn new(frame_settings: &FrameSettings, cmd_allocator: &mut CmdAllocator) -> Self {
         let triangle_pass = TriangleSubpass::new(frame_settings);
-        let cmds = FrameCounter::frame_labes()
-            .into_iter()
-            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "triangle"))
-            .collect_vec();
+        let cmds =
+            FrameCounter::frame_labes().map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "triangle"));
         Self { triangle_pass, cmds }
     }
 
-    pub fn render(
-        &self,
-        render_context: &RenderContext,
-        render_context_mut: &mut RenderContextMut,
-        shape: &RtGeometry,
-    ) {
+    pub fn render(&self, render_context: &RenderContext, shape: &RtGeometry) {
         let frame_label = render_context.frame_counter.frame_label();
 
         let render_target_texture = render_context

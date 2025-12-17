@@ -193,10 +193,7 @@ impl<T: OuterApp> TruvisApp<T> {
         {
             let _span = tracy_client::span!("OuterApp::draw");
             // 构建出 PipelineContext
-            self.outer_app
-                .get_mut()
-                .unwrap()
-                .draw(&self.renderer.render_context, &mut self.renderer.render_context_mut);
+            self.outer_app.get_mut().unwrap().draw(&self.renderer.render_context);
         }
 
         // Window: Draw Gui ===============================
@@ -216,11 +213,7 @@ impl<T: OuterApp> TruvisApp<T> {
                     },
                 }
             };
-            self.window_system.get_mut().unwrap().draw_gui(
-                &self.renderer.render_context,
-                &mut self.renderer.render_context_mut,
-                present_data,
-            );
+            self.window_system.get_mut().unwrap().draw_gui(&self.renderer.render_context, present_data);
         }
 
         // End Frame ===================================

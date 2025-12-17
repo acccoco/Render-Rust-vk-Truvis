@@ -25,7 +25,7 @@ use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::FrameSettings;
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 
 enumed_map!(ShaderStage<GfxShaderStageInfo>:{
     Vertex: GfxShaderStageInfo {
@@ -172,7 +172,7 @@ impl ShaderToySubpass {
 pub struct ShaderToyPass {
     shader_toy_pass: ShaderToySubpass,
 
-    shader_toy_cmds: Vec<GfxCommandBuffer>,
+    shader_toy_cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 }
 
 impl RenderPass for ShaderToyPass {}
@@ -181,21 +181,14 @@ impl ShaderToyPass {
     pub fn new(color_format: vk::Format, cmd_allocator: &mut CmdAllocator) -> Self {
         let shader_toy_pass = ShaderToySubpass::new(color_format);
         let shader_toy_cmds = FrameCounter::frame_labes()
-            .into_iter()
-            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "shader-toy"))
-            .collect_vec();
+            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "shader-toy"));
         Self {
             shader_toy_pass,
             shader_toy_cmds,
         }
     }
 
-    pub fn render(
-        &self,
-        render_context: &RenderContext,
-        render_context_mut: &mut RenderContextMut,
-        shape: &RtGeometry,
-    ) {
+    pub fn render(&self, render_context: &RenderContext, shape: &RtGeometry) {
         let frame_label = render_context.frame_counter.frame_label();
 
         let render_target_texture = render_context

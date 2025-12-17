@@ -17,7 +17,7 @@ use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings, PipelineSettings};
 use truvis_render_base::stage_buffer_manager::StageBufferManager;
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::resources::fif_buffer::FifBuffers;
 use truvis_render_scene::gpu_scene::GpuScene;
 use truvis_render_scene::scene_manager::SceneManager;
@@ -42,7 +42,6 @@ use crate::platform::{camera::Camera, input_manager::InputState};
 /// ```
 pub struct Renderer {
     pub render_context: RenderContext,
-    pub render_context_mut: RenderContextMut,
 
     pub cmd_allocator: CmdAllocator,
 
@@ -78,7 +77,6 @@ impl Renderer {
 
         let mut gfx_resource_manager = GfxResourceManager::new();
         let mut cmd_allocator = CmdAllocator::new(fif_count);
-        let stage_buffer_manager = StageBufferManager::new(fif_count);
 
         let scene_manager = SceneManager::new();
         let asset_hub = AssetHub::new();
@@ -114,7 +112,6 @@ impl Renderer {
                 frame_settings,
                 pipeline_settings: PipelineSettings::default(),
             },
-            render_context_mut: RenderContextMut { stage_buffer_manager },
             asset_hub,
             cmd_allocator,
             timer,
@@ -150,7 +147,6 @@ impl Renderer {
         self.asset_hub.destroy();
         self.render_context.gpu_scene.destroy();
         self.cmd_allocator.destroy();
-        self.render_context_mut.stage_buffer_manager.destroy();
         self.render_context.gfx_resource_manager.destroy();
         self.fif_timeline_semaphore.destroy();
     }
@@ -174,7 +170,6 @@ impl Renderer {
         // 清理 fif 资源
         {
             self.cmd_allocator.reset_frame_commands(self.render_context.frame_counter.frame_label());
-            self.render_context_mut.stage_buffer_manager.clear_fif_buffers(&self.render_context.frame_counter);
         }
 
         self.timer.tic();

@@ -1,6 +1,6 @@
 use truvis_render::core::renderer::Renderer;
 use truvis_render::platform::camera::Camera;
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 
 /// 外部应用接口 trait
 ///
@@ -35,7 +35,7 @@ pub trait OuterApp {
     fn update(&mut self, _renderer: &mut Renderer) {}
 
     /// 渲染主逻辑（发生于 acquire_frame 之后，submit_frame 之前）
-    fn draw(&self, _frame_context2: &RenderContext, _frame_context3: &mut RenderContextMut) {}
+    fn draw(&self, _render_context: &RenderContext) {}
 
     /// 窗口大小改变后重建资源（可选）
     fn rebuild(&mut self, _renderer: &mut Renderer) {}

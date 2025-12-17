@@ -10,8 +10,9 @@ use truvis_gfx::{
 };
 use truvis_render::core::renderer::Renderer;
 use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::FrameLabel;
-use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
+use truvis_render_graph::render_context::RenderContext;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::GfxTexture2;
@@ -24,7 +25,7 @@ pub struct Gui {
     render_region: vk::Rect2D,
 
     /// 存放多帧 imgui 的 mesh 数据
-    gui_meshes: Vec<Option<GuiMesh>>,
+    gui_meshes: [GuiMesh; FrameCounter::fif_count()],
 
     render_texture_handle: Option<GfxTextureHandle>,
     font_texture_handle: GfxTextureHandle,
@@ -37,7 +38,6 @@ impl Gui {
     pub fn new(
         renderer: &mut Renderer,
         window: &winit::window::Window,
-        fif_num: usize,
         swapchain_image_infos: &GfxSwapchainImageInfo,
     ) -> Self {
         let mut imgui_ctx = imgui::Context::create();
@@ -61,6 +61,8 @@ impl Gui {
             &mut renderer.render_context.gfx_resource_manager,
         );
 
+        let gui_meshes = FrameCounter::frame_labes().map(|frame_label| GuiMesh::new(frame_label));
+
         Self {
             imgui_ctx,
             platform,
@@ -70,7 +72,7 @@ impl Gui {
                 extent: swapchain_image_infos.image_extent,
             },
 
-            gui_meshes: (0..fif_num).map(|_| None).collect(),
+            gui_meshes,
 
             render_texture_handle: None,
             font_texture_handle,
@@ -296,9 +298,6 @@ impl Gui {
     /// 使用 imgui 将 ui 操作编译为 draw data；构建 draw 需要的 mesh 数据
     pub fn imgui_render(
         &mut self,
-        render_context: &RenderContext,
-        render_context_mut: &mut RenderContextMut,
-        cmd: &GfxCommandBuffer,
         frame_label: FrameLabel,
     ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> GfxTextureHandle + use<'_>)> {
         let draw_data = self.imgui_ctx.render();
@@ -307,17 +306,13 @@ impl Gui {
         }
 
         Gfx::get().gfx_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
-        self.gui_meshes[*frame_label].replace(GuiMesh::new_2(
-            render_context,
-            render_context_mut,
-            cmd,
-            &format!("{frame_label}"),
-            draw_data,
-        ));
+        self.gui_meshes[*frame_label].grow_if_needed(draw_data);
+        self.gui_meshes[*frame_label].fill_vertex_buffer(draw_data);
+        self.gui_meshes[*frame_label].fill_index_buffer(draw_data);
         Gfx::get().gfx_queue().end_label();
 
         Some((
-            self.gui_meshes[*frame_label].as_ref().unwrap(), //
+            &self.gui_meshes[*frame_label], //
             draw_data,
             |texture_id: imgui::TextureId| match texture_id.id() {
                 Self::RENDER_IMAGE_ID => *self.render_texture_handle.as_ref().unwrap(),

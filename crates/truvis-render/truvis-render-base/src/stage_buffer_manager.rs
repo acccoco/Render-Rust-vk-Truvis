@@ -1,16 +1,14 @@
-use itertools::Itertools;
-
 use crate::frame_counter::FrameCounter;
 use truvis_gfx::resources::buffer::GfxBuffer;
 
 pub struct StageBufferManager {
-    buffers: Vec<Vec<GfxBuffer>>,
+    buffers: [Vec<GfxBuffer>; FrameCounter::fif_count()],
 }
 
 // new & init
 impl StageBufferManager {
-    pub fn new(fif_count: usize) -> Self {
-        let buffers = (0..fif_count).map(|_| Vec::new()).collect_vec();
+    pub fn new() -> Self {
+        let buffers = FrameCounter::frame_labes().map(|_| Vec::new());
         Self { buffers }
     }
 }
