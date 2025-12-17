@@ -24,7 +24,7 @@ pub struct Gui {
     render_region: vk::Rect2D,
 
     /// 存放多帧 imgui 的 mesh 数据
-    meshes: Vec<Option<GuiMesh>>,
+    gui_meshes: Vec<Option<GuiMesh>>,
 
     render_texture_handle: Option<GfxTextureHandle>,
     font_texture_handle: GfxTextureHandle,
@@ -70,7 +70,7 @@ impl Gui {
                 extent: swapchain_image_infos.image_extent,
             },
 
-            meshes: (0..fif_num).map(|_| None).collect(),
+            gui_meshes: (0..fif_num).map(|_| None).collect(),
 
             render_texture_handle: None,
             font_texture_handle,
@@ -307,7 +307,7 @@ impl Gui {
         }
 
         Gfx::get().gfx_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
-        self.meshes[*frame_label].replace(GuiMesh::new(
+        self.gui_meshes[*frame_label].replace(GuiMesh::new_2(
             render_context,
             render_context_mut,
             cmd,
@@ -317,7 +317,7 @@ impl Gui {
         Gfx::get().gfx_queue().end_label();
 
         Some((
-            self.meshes[*frame_label].as_ref().unwrap(), //
+            self.gui_meshes[*frame_label].as_ref().unwrap(), //
             draw_data,
             |texture_id: imgui::TextureId| match texture_id.id() {
                 Self::RENDER_IMAGE_ID => *self.render_texture_handle.as_ref().unwrap(),

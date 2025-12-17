@@ -63,7 +63,7 @@ impl GfxVertexLayout for VertexLayoutAoSPosNormalUv {
 impl VertexLayoutAoSPosNormalUv {
     #[deprecated]
     pub fn create_vertex_buffer2(data: &[VertexPosNormalUv], name: impl AsRef<str>) -> GfxVertexBuffer<Self> {
-        let vertex_buffer = GfxVertexBuffer::new(data.len(), name.as_ref());
+        let vertex_buffer = GfxVertexBuffer::new_device_local(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(data);
 
         vertex_buffer

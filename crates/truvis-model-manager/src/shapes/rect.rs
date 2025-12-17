@@ -69,7 +69,7 @@ impl RectSoA {
             "rect-vertex-buffer",
         );
 
-        let index_buffer = GfxIndex32Buffer::new(Self::INDICES.len(), "rect-index-buffer");
+        let index_buffer = GfxIndex32Buffer::new_device_local(Self::INDICES.len(), "rect-index-buffer");
         index_buffer.transfer_data_sync(&Self::INDICES);
 
         RtGeometry {

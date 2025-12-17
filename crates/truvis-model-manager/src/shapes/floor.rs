@@ -52,7 +52,7 @@ impl FloorSoA {
             "floor-vertex-buffer",
         );
 
-        let index_buffer = GfxIndex32Buffer::new(Self::INDICES.len(), "floor-index-buffer");
+        let index_buffer = GfxIndex32Buffer::new_device_local(Self::INDICES.len(), "floor-index-buffer");
         index_buffer.transfer_data_sync(&Self::INDICES);
 
         RtGeometry {

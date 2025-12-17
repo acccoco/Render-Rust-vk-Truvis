@@ -55,7 +55,7 @@ impl GfxVertexLayout for VertexLayoutAoSPosColor {
 impl VertexLayoutAoSPosColor {
     #[deprecated]
     pub fn create_vertex_buffer2(data: &[VertexPosColor], name: impl AsRef<str>) -> GfxVertexBuffer<Self> {
-        let vertex_buffer = GfxVertexBuffer::new(data.len(), name.as_ref());
+        let vertex_buffer = GfxVertexBuffer::new_device_local(data.len(), name.as_ref());
         vertex_buffer.transfer_data_sync(data);
 
         vertex_buffer

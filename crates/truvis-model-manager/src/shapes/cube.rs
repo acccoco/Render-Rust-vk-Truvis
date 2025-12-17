@@ -162,7 +162,7 @@ impl CubeSoA {
             "cube-vertex-buffer",
         );
 
-        let index_buffer = GfxIndex32Buffer::new(Self::INDICES.len(), "cube-index-buffer");
+        let index_buffer = GfxIndex32Buffer::new_device_local(Self::INDICES.len(), "cube-index-buffer");
         index_buffer.transfer_data_sync(&Self::INDICES);
 
         RtGeometry {

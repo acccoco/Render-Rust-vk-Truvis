@@ -16,7 +16,11 @@ pub struct GfxVertexBuffer<L: GfxVertexLayout> {
 }
 impl_derive_buffer!(GfxVertexBuffer<L: GfxVertexLayout>, GfxBuffer, inner);
 impl<L: GfxVertexLayout> GfxVertexBuffer<L> {
-    pub fn new(vertex_cnt: usize, debug_name: impl AsRef<str>) -> Self {
+    pub fn new_device_local(vertex_cnt: usize, debug_name: impl AsRef<str>) -> Self {
+        Self::new(vertex_cnt, false, debug_name)
+    }
+
+    pub fn new(vertex_cnt: usize, mmap: bool, debug_name: impl AsRef<str>) -> Self {
         let buffer_size = L::buffer_size(vertex_cnt);
         let buffer = GfxBuffer::new(
             buffer_size as vk::DeviceSize,
@@ -25,7 +29,7 @@ impl<L: GfxVertexLayout> GfxVertexBuffer<L> {
                 | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
                 | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR,
             None,
-            false,
+            mmap,
             debug_name.as_ref(),
         );
 

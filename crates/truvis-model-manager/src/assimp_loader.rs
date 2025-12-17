@@ -103,7 +103,7 @@ impl AssimpSceneLoader {
             let indices = std::slice::from_raw_parts(indices_ptr, mesh_info.index_count as usize);
 
             let index_buffer =
-                GfxIndex32Buffer::new(indices.len(), format!("{}-mesh-{}-indices", model_name, mesh_idx));
+                GfxIndex32Buffer::new_device_local(indices.len(), format!("{}-mesh-{}-indices", model_name, mesh_idx));
             index_buffer.transfer_data_sync(indices);
 
             // 只有 single geometry 的 mesh
