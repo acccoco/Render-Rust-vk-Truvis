@@ -19,7 +19,10 @@ impl OuterApp for ShaderToy {
     fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {
         log::info!("shader toy.");
         Self {
-            pipeline: ShaderToyPass::new(renderer.render_context.frame_settings.color_format),
+            pipeline: ShaderToyPass::new(
+                renderer.render_context.frame_settings.color_format,
+                &mut renderer.cmd_allocator,
+            ),
             rectangle: RectSoA::create_mesh(),
         }
     }

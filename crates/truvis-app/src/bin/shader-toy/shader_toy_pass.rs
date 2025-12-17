@@ -4,8 +4,8 @@ use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use itertools::Itertools;
 
-use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::count_indexed_array;
+use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxImageBarrier;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
@@ -21,6 +21,8 @@ use truvis_gfx::{
 };
 use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_render_base::cmd_allocator::CmdAllocator;
+use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::FrameSettings;
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
@@ -169,14 +171,23 @@ impl ShaderToySubpass {
 
 pub struct ShaderToyPass {
     shader_toy_pass: ShaderToySubpass,
+
+    shader_toy_cmds: Vec<GfxCommandBuffer>,
 }
 
 impl RenderPass for ShaderToyPass {}
 
 impl ShaderToyPass {
-    pub fn new(color_format: vk::Format) -> Self {
+    pub fn new(color_format: vk::Format, cmd_allocator: &mut CmdAllocator) -> Self {
         let shader_toy_pass = ShaderToySubpass::new(color_format);
-        Self { shader_toy_pass }
+        let shader_toy_cmds = FrameCounter::frame_labes()
+            .into_iter()
+            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "shader-toy"))
+            .collect_vec();
+        Self {
+            shader_toy_pass,
+            shader_toy_cmds,
+        }
     }
 
     pub fn render(
@@ -194,8 +205,7 @@ impl ShaderToyPass {
 
         // render shader toy
         {
-            let cmd =
-                render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "shader-toy");
+            let cmd = self.shader_toy_cmds[*frame_label].clone();
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "shader-toy");
 
             // 将 render target 从 general -> color attachment

@@ -2,6 +2,7 @@ use std::ffi::CStr;
 
 use ash::vk;
 use truvis_asset::asset_hub::AssetHub;
+use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
 use truvis_gfx::{
@@ -42,9 +43,14 @@ use crate::platform::{camera::Camera, input_manager::InputState};
 pub struct Renderer {
     pub render_context: RenderContext,
     pub render_context_mut: RenderContextMut,
+
+    pub cmd_allocator: CmdAllocator,
+
     pub asset_hub: AssetHub,
     pub timer: Timer,
     pub fif_timeline_semaphore: GfxSemaphore,
+
+    gpu_scene_update_cmds: Vec<GfxCommandBuffer>,
 }
 
 // new & init
@@ -71,7 +77,7 @@ impl Renderer {
         let fif_timeline_semaphore = GfxSemaphore::new_timeline(0, "render-timeline");
 
         let mut gfx_resource_manager = GfxResourceManager::new();
-        let cmd_allocator = CmdAllocator::new(fif_count);
+        let mut cmd_allocator = CmdAllocator::new(fif_count);
         let stage_buffer_manager = StageBufferManager::new(fif_count);
 
         let scene_manager = SceneManager::new();
@@ -82,6 +88,11 @@ impl Renderer {
 
         let per_frame_data_buffers = (0..fif_count)
             .map(|idx| GfxStructuredBuffer::<truvisl::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{idx}")))
+            .collect();
+
+        let cmds = FrameCounter::frame_labes()
+            .into_iter()
+            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "gpu-scene-update"))
             .collect();
 
         Self {
@@ -103,13 +114,12 @@ impl Renderer {
                 frame_settings,
                 pipeline_settings: PipelineSettings::default(),
             },
-            render_context_mut: RenderContextMut {
-                cmd_allocator,
-                stage_buffer_manager,
-            },
+            render_context_mut: RenderContextMut { stage_buffer_manager },
             asset_hub,
+            cmd_allocator,
             timer,
             fif_timeline_semaphore,
+            gpu_scene_update_cmds: cmds,
         }
     }
 
@@ -139,7 +149,7 @@ impl Renderer {
         self.render_context.scene_manager.destroy();
         self.asset_hub.destroy();
         self.render_context.gpu_scene.destroy();
-        self.render_context_mut.cmd_allocator.destroy();
+        self.cmd_allocator.destroy();
         self.render_context_mut.stage_buffer_manager.destroy();
         self.render_context.gfx_resource_manager.destroy();
         self.fif_timeline_semaphore.destroy();
@@ -163,7 +173,7 @@ impl Renderer {
 
         // 清理 fif 资源
         {
-            self.render_context_mut.cmd_allocator.free_frame_commands(&self.render_context.frame_counter);
+            self.cmd_allocator.reset_frame_commands(self.render_context.frame_counter.frame_label());
             self.render_context_mut.stage_buffer_manager.clear_fif_buffers(&self.render_context.frame_counter);
         }
 
@@ -222,13 +232,10 @@ impl Renderer {
     fn update_gpu_scene(&mut self, input_state: &InputState, camera: &Camera) {
         let _span = tracy_client::span!("update_gpu_scene");
         let frame_extent = self.render_context.frame_settings.frame_extent;
-        let crt_frame_label = self.render_context.frame_counter.frame_label();
+        let frame_label = self.render_context.frame_counter.frame_label();
 
         // 将数据上传到 gpu buffer 中
-        let cmd = self
-            .render_context_mut
-            .cmd_allocator
-            .alloc_command_buffer(&self.render_context.frame_counter, "update-draw-buffer");
+        let cmd = self.gpu_scene_update_cmds[*frame_label].clone();
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "[update-draw-buffer]stage-to-ubo");
 
         let transfer_barrier_mask = GfxBarrierMask {
@@ -284,7 +291,7 @@ impl Renderer {
                 _padding_0: Default::default(),
             }
         };
-        let crt_frame_data_buffer = &self.render_context.per_frame_data_buffers[*crt_frame_label];
+        let crt_frame_data_buffer = &self.render_context.per_frame_data_buffers[*frame_label];
         cmd.cmd_update_buffer(crt_frame_data_buffer.vk_buffer(), 0, bytemuck::bytes_of(&per_frame_data));
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),

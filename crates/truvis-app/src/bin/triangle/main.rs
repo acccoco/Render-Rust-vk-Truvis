@@ -20,7 +20,7 @@ impl OuterApp for HelloTriangle {
         log::info!("hello triangle init.");
 
         Self {
-            triangle_pipeline: TrianglePass::new(&renderer.render_context.frame_settings),
+            triangle_pipeline: TrianglePass::new(&renderer.render_context.frame_settings, &mut renderer.cmd_allocator),
             triangle: TriangleSoA::create_mesh(),
         }
     }

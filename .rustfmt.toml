@@ -34,4 +34,4 @@ imports_granularity = "Crate"      # 按 crate 级别合并导入
 reorder_imports = true             # 自动排序导入语句
 
 # ===== 系统设置 =====
-newline_style = "Unix" # 使用 Unix 换行符 (\n)
+newline_style = "Windows" # 使用 Unix 换行符 (\n)

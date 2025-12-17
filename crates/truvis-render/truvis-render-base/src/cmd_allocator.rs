@@ -2,6 +2,7 @@ use ash::vk;
 use itertools::Itertools;
 
 use crate::frame_counter::FrameCounter;
+use crate::pipeline_settings::FrameLabel;
 use truvis_gfx::{
     commands::{command_buffer::GfxCommandBuffer, command_pool::GfxCommandPool},
     gfx::Gfx,
@@ -59,23 +60,26 @@ impl CmdAllocator {
 // tools
 impl CmdAllocator {
     /// 分配 command buffer，在当前 frame 使用
-    pub fn alloc_command_buffer(&mut self, frame_counter: &FrameCounter, debug_name: &str) -> GfxCommandBuffer {
-        let name = format!("[{}]{}", frame_counter.frame_name(), debug_name);
-        let cmd = GfxCommandBuffer::new(&self.graphics_command_pools[*frame_counter.frame_label()], &name);
+    pub fn alloc_command_buffer(&mut self, frame_label: FrameLabel, debug_name: &str) -> GfxCommandBuffer {
+        let name = format!("[{}]{}", frame_label, debug_name);
+        let cmd = GfxCommandBuffer::new(&self.graphics_command_pools[*frame_label], &name);
 
-        self.allocated_command_buffers[*frame_counter.frame_label()].push(cmd.clone());
+        self.allocated_command_buffers[*frame_label].push(cmd.clone());
         cmd
     }
 
-    pub fn free_frame_commands(&mut self, frame_counter: &FrameCounter) {
-        let _span = tracy_client::span!("free_frame_commands");
-        self.free_frame_commands_internal(*frame_counter.frame_label());
+    /// 重置当前 frame 的 command buffers，这些 command buffers 可以重新录制
+    pub fn reset_frame_commands(&mut self, frame_label: FrameLabel) {
+        let _span = tracy_client::span!("reset_frame_commands");
+
+        self.graphics_command_pools[*frame_label].reset_command_pool();
     }
 
-    pub fn free_all(&mut self) {
-        for i in 0..FrameCounter::fif_count() {
-            self.free_frame_commands_internal(i);
-        }
+    /// 释放当前 frame 的 command buffers，这些 commands 无法再使用
+    pub fn free_frame_commands(&mut self, frame_label: FrameLabel) {
+        let _span = tracy_client::span!("free_frame_commands");
+
+        self.free_frame_commands_internal(*frame_label);
     }
 
     fn free_frame_commands_internal(&mut self, frame_label: usize) {
@@ -86,6 +90,6 @@ impl CmdAllocator {
         }
 
         // 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
-        self.graphics_command_pools[frame_label].reset_all_buffers();
+        self.graphics_command_pools[frame_label].reset_command_pool();
     }
 }

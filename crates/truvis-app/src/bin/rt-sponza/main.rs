@@ -54,7 +54,7 @@ impl SponzaApp {
 
 impl OuterApp for SponzaApp {
     fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self {
-        let rt_pipeline = RtRenderPass::new(&renderer.render_context.bindless_manager);
+        let rt_pipeline = RtRenderPass::new(&renderer.render_context.bindless_manager, &mut renderer.cmd_allocator);
 
         Self::create_scene(renderer, camera);
 

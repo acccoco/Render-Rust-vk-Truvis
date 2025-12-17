@@ -6,9 +6,14 @@ pub struct FrameCounter {
     pub frame_limit: f32,
 }
 impl FrameCounter {
+    const FIF_COUNT: usize = 3;
     #[inline]
     pub const fn fif_count() -> usize {
-        3
+        Self::FIF_COUNT
+    }
+    #[inline]
+    pub const fn frame_labes() -> [FrameLabel; Self::FIF_COUNT] {
+        [FrameLabel::A, FrameLabel::B, FrameLabel::C]
     }
     #[inline]
     pub fn frame_label(&self) -> FrameLabel {

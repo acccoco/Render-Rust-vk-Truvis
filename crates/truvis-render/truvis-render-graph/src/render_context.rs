@@ -29,6 +29,5 @@ pub struct RenderContext {
 
 // Render 期间可变
 pub struct RenderContextMut {
-    pub cmd_allocator: CmdAllocator,
     pub stage_buffer_manager: StageBufferManager,
 }

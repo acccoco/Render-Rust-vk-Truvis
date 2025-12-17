@@ -33,9 +33,11 @@ use crate::{
 pub struct GfxCommandBuffer {
     vk_handle: vk::CommandBuffer,
     _command_pool_handle: vk::CommandPool,
-}
 
-// 创建与销毁
+    #[cfg(debug_assertions)]
+    name: String,
+}
+// new & init
 impl GfxCommandBuffer {
     pub fn new(command_pool: &GfxCommandPool, debug_name: &str) -> Self {
         let info = vk::CommandBufferAllocateInfo::default()
@@ -47,12 +49,14 @@ impl GfxCommandBuffer {
         let cmd_buffer = GfxCommandBuffer {
             vk_handle: command_buffer,
             _command_pool_handle: command_pool.handle(),
+
+            #[cfg(debug_assertions)]
+            name: debug_name.to_string(),
         };
         Gfx::get().gfx_device().set_debug_name(&cmd_buffer, debug_name);
         cmd_buffer
     }
 }
-
 // Basic 命令
 impl GfxCommandBuffer {
     /// 开始录制 command
@@ -78,7 +82,6 @@ impl GfxCommandBuffer {
         unsafe { Gfx::get().gfx_device().end_command_buffer(self.vk_handle).unwrap() }
     }
 }
-
 // getters
 impl GfxCommandBuffer {
     /// getter
@@ -87,7 +90,6 @@ impl GfxCommandBuffer {
         self.vk_handle
     }
 }
-
 // 数据传输类型
 impl GfxCommandBuffer {
     /// - command type: action
@@ -136,7 +138,6 @@ impl GfxCommandBuffer {
         }
     }
 }
-
 // 绘制类型的命令
 impl GfxCommandBuffer {
     /// - command type: action, state
@@ -273,7 +274,6 @@ impl GfxCommandBuffer {
         }
     }
 }
-
 // 光追相关
 impl GfxCommandBuffer {
     /// - command type: action
@@ -350,7 +350,6 @@ impl GfxCommandBuffer {
         }
     }
 }
-
 // 计算着色器相关命令
 impl GfxCommandBuffer {
     #[inline]
@@ -360,7 +359,6 @@ impl GfxCommandBuffer {
         }
     }
 }
-
 // 同步相关命令
 impl GfxCommandBuffer {
     /// - command type: synchronize
@@ -397,7 +395,6 @@ impl GfxCommandBuffer {
         }
     }
 }
-
 // debug 相关命令
 impl GfxCommandBuffer {
     /// - command type: state, action
@@ -435,7 +432,6 @@ impl GfxCommandBuffer {
         }
     }
 }
-
 impl DebugType for GfxCommandBuffer {
     fn debug_type_name() -> &'static str {
         "GfxCommandBuffer"

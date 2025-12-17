@@ -59,6 +59,7 @@ impl OuterApp for AsyncLoadTest {
             pipeline: AsyncPass::new(
                 &renderer.render_context.bindless_manager,
                 &renderer.render_context.frame_settings,
+                &mut renderer.cmd_allocator,
             ),
             quad: Self::create_quad(),
             texture_handle,

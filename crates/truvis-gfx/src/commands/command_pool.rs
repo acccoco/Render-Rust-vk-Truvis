@@ -11,7 +11,7 @@ pub struct GfxCommandPool {
     _debug_name: String,
     valid: bool,
 }
-// init & destory
+// new & init
 impl GfxCommandPool {
     // TODO 使用 new_internal 简化
     #[inline]
@@ -67,7 +67,9 @@ impl GfxCommandPool {
         gfx_device.set_debug_name(&command_pool, debug_name);
         command_pool
     }
-
+}
+// destory
+impl GfxCommandPool {
     pub fn destroy(&mut self) {
         let gfx_device = Gfx::get().gfx_device();
         unsafe {
@@ -83,7 +85,6 @@ impl GfxCommandPool {
         self.valid = false;
     }
 }
-
 // getters
 impl GfxCommandPool {
     /// getter
@@ -97,7 +98,7 @@ impl GfxCommandPool {
     /// 这个调用并不会释放资源，而是将 pool 内的 command buffer 设置到初始状态
     ///
     /// reset 之后，pool 内的 command buffer 又可以重新录制命令
-    pub fn reset_all_buffers(&self) {
+    pub fn reset_command_pool(&self) {
         let gfx_device = Gfx::get().gfx_device();
         unsafe {
             gfx_device.reset_command_pool(self.handle, vk::CommandPoolResetFlags::RELEASE_RESOURCES).unwrap();
@@ -115,7 +116,6 @@ impl GfxCommandPool {
         }
     }
 }
-
 impl DebugType for GfxCommandPool {
     fn debug_type_name() -> &'static str {
         "GfxCommandPool"
@@ -125,7 +125,6 @@ impl DebugType for GfxCommandPool {
         self.handle
     }
 }
-
 impl Drop for GfxCommandPool {
     fn drop(&mut self) {
         assert!(!self.valid, "CommandPool must be destroyed manually.");

@@ -7,11 +7,14 @@ use crate::render_pipeline::sdr_subpass::{SdrSubpass, SdrSubpassData, SdrSubpass
 use crate::render_pipeline::simple_rt_subpass::{SimpleRtPassData, SimpleRtPassDep};
 use crate::render_pipeline::{compute_subpass::ComputeSubpass, simple_rt_subpass::SimpleRtSubpass};
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, submit_info::GfxSubmitInfo},
     gfx::Gfx,
 };
 use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::cmd_allocator::CmdAllocator;
+use truvis_render_base::frame_counter::FrameCounter;
 use truvis_shader_binding::truvisl;
 
 /// 整个 RT 管线
@@ -19,18 +22,35 @@ pub struct RtRenderPass {
     simple_rt_subpass: SimpleRtSubpass,
     blit_subpass: BlitSubpass,
     sdr_subpass: SdrSubpass,
+
+    rt_cmds: Vec<GfxCommandBuffer>,
+    blit_cmds: Vec<GfxCommandBuffer>,
+    sdr_cmds: Vec<GfxCommandBuffer>,
 }
 
 impl RtRenderPass {
-    pub fn new(bindless_manager: &BindlessManager) -> Self {
+    pub fn new(bindless_manager: &BindlessManager, cmd_allocator: &mut CmdAllocator) -> Self {
         let rt_pass = SimpleRtSubpass::new(bindless_manager);
         let blit_subpass = BlitSubpass::new(bindless_manager);
         let sdr_subpass = SdrSubpass::new(bindless_manager);
+
+        let mut rt_cmds = Vec::new();
+        let mut blit_cmds = Vec::new();
+        let mut sdr_cmds = Vec::new();
+        for frame_label in FrameCounter::frame_labes() {
+            rt_cmds.push(cmd_allocator.alloc_command_buffer(frame_label, "ray-tracing"));
+            blit_cmds.push(cmd_allocator.alloc_command_buffer(frame_label, "blit"));
+            sdr_cmds.push(cmd_allocator.alloc_command_buffer(frame_label, "hdr-to-sdr"));
+        }
 
         Self {
             simple_rt_subpass: rt_pass,
             blit_subpass,
             sdr_subpass,
+
+            rt_cmds,
+            blit_cmds,
+            sdr_cmds,
         }
     }
 
@@ -54,8 +74,7 @@ impl RtRenderPass {
         let mut submit_cmds = Vec::new();
         // ray tracing
         {
-            let cmd =
-                render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "ray-tracing");
+            let cmd = self.rt_cmds[*frame_label].clone();
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
 
             let pre_usage = SimpleRtPassDep::default().accum_image;
@@ -90,7 +109,7 @@ impl RtRenderPass {
 
         // blit
         {
-            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "blit");
+            let cmd = self.blit_cmds[*frame_label].clone();
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "blit");
 
             let src_image_pre_usage = SimpleRtPassDep::default().accum_image;
@@ -117,14 +136,14 @@ impl RtRenderPass {
             );
 
             cmd.end();
-            submit_cmds.push(cmd);
+            submit_cmds.push(cmd.clone());
         }
 
         // TODO 上面的 blit 似乎没有任何作用，下面的 hdr -> sdr 也是在做同样的事情
 
         // hdr -> sdr
         {
-            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "hdr2sdr");
+            let cmd = self.sdr_cmds[*frame_label].clone();
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "hdr2sdr");
 
             let dst_image_pre_usage = BlitSubpassDep::default().dst_image;
@@ -150,7 +169,7 @@ impl RtRenderPass {
             );
 
             cmd.end();
-            submit_cmds.push(cmd);
+            submit_cmds.push(cmd.clone());
         }
 
         Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(&submit_cmds)], None);

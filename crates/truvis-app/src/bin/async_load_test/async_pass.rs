@@ -3,8 +3,8 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
-use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::count_indexed_array;
+use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxImageBarrier;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
@@ -21,6 +21,8 @@ use truvis_gfx::{
 use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::cmd_allocator::CmdAllocator;
+use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
@@ -153,14 +155,26 @@ impl AsyncSubpass {
 
 pub struct AsyncPass {
     async_pass: AsyncSubpass,
+
+    cmds: Vec<GfxCommandBuffer>,
 }
 
 impl RenderPass for AsyncPass {}
 
 impl AsyncPass {
-    pub fn new(bindless_manager: &BindlessManager, frame_settings: &FrameSettings) -> Self {
+    pub fn new(
+        bindless_manager: &BindlessManager,
+        frame_settings: &FrameSettings,
+        cmd_allocator: &mut CmdAllocator,
+    ) -> Self {
         let async_pass = AsyncSubpass::new(bindless_manager, frame_settings);
-        Self { async_pass }
+
+        let cmds = FrameCounter::frame_labes()
+            .into_iter()
+            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "async-test"))
+            .collect_vec();
+
+        Self { async_pass, cmds }
     }
 
     pub fn render(
@@ -179,8 +193,7 @@ impl AsyncPass {
 
         // render
         {
-            let cmd =
-                render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "async-test");
+            let cmd = self.cmds[*frame_label].clone();
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "async-test");
 
             // Barrier: Render Target -> Color Attachment

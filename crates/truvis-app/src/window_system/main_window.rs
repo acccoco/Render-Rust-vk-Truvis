@@ -6,12 +6,14 @@ use crate::gui::core::Gui;
 use crate::gui::gui_pass::GuiPass;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxBarrierMask;
+use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, semaphore::GfxSemaphore, submit_info::GfxSubmitInfo},
     gfx::Gfx,
     swapchain::render_swapchain::GfxRenderSwapchain,
 };
 use truvis_render::core::renderer::Renderer;
+use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{DefaultRendererSettings, FrameLabel};
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
@@ -51,6 +53,7 @@ pub struct MainWindow {
     swapchain: Option<GfxRenderSwapchain>,
     gui: Gui,
     gui_pass: GuiPass,
+    cmds: Vec<GfxCommandBuffer>,
 
     /// 数量和 fif num 相同
     present_complete_semaphores: Vec<GfxSemaphore>,
@@ -96,6 +99,11 @@ impl MainWindow {
             .map(|i| GfxSemaphore::new(&format!("window-render-complete-{}", i)))
             .collect_vec();
 
+        let cmds = FrameCounter::frame_labes()
+            .into_iter()
+            .map(|frame_label| renderer.cmd_allocator.alloc_command_buffer(frame_label, "window-present"))
+            .collect_vec();
+
         Self {
             winit_window: window,
             swapchain: Some(swapchain),
@@ -103,6 +111,7 @@ impl MainWindow {
             render_complete_semaphores,
             gui,
             gui_pass,
+            cmds,
         }
     }
 
@@ -124,8 +133,7 @@ impl MainWindow {
         let render_target_texture =
             render_context.gfx_resource_manager.get_texture(renderer_data.render_target).unwrap();
 
-        let cmd =
-            render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "window-present");
+        let cmd = self.cmds[*frame_label].clone();
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         {
             // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL

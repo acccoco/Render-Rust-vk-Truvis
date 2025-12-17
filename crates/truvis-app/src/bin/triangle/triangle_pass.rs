@@ -3,8 +3,8 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
-use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::count_indexed_array;
+use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxImageBarrier;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
@@ -20,6 +20,8 @@ use truvis_gfx::{
 };
 use truvis_model_manager::components::geometry::RtGeometry;
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_render_base::cmd_allocator::CmdAllocator;
+use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::{RenderContext, RenderContextMut};
@@ -124,14 +126,20 @@ impl TriangleSubpass {
 
 pub struct TrianglePass {
     triangle_pass: TriangleSubpass,
+
+    cmds: Vec<GfxCommandBuffer>,
 }
 
 impl RenderPass for TrianglePass {}
 
 impl TrianglePass {
-    pub fn new(frame_settings: &FrameSettings) -> Self {
+    pub fn new(frame_settings: &FrameSettings, cmd_allocator: &mut CmdAllocator) -> Self {
         let triangle_pass = TriangleSubpass::new(frame_settings);
-        Self { triangle_pass }
+        let cmds = FrameCounter::frame_labes()
+            .into_iter()
+            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "triangle"))
+            .collect_vec();
+        Self { triangle_pass, cmds }
     }
 
     pub fn render(
@@ -149,7 +157,7 @@ impl TrianglePass {
 
         // render triangle
         {
-            let cmd = render_context_mut.cmd_allocator.alloc_command_buffer(&render_context.frame_counter, "triangle");
+            let cmd = self.cmds[*frame_label].clone();
             cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "triangle");
 
             // 将 render target 从 general -> color attachment
