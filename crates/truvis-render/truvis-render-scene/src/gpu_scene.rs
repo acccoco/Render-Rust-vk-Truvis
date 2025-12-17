@@ -3,7 +3,7 @@ use ash::vk;
 use glam::Vec4Swizzles;
 use indexmap::IndexSet;
 use itertools::Itertools;
-use slotmap::SecondaryMap;
+use slotmap::{Key, SecondaryMap};
 use std::path::PathBuf;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
@@ -550,10 +550,9 @@ impl GpuScene {
         let instance_infos = self
             .flatten_instances
             .iter()
-            .map(|ins_handle| scene_manager.get_instance(*ins_handle).unwrap())
-            .enumerate()
-            // TODO 这里暂时将 instance 的 index 作为 custom index
-            .map(|(ins_idx, ins)| self.get_as_instance_info(ins, ins_idx as u32, scene_manager))
+            .map(|ins_handle| (ins_handle, scene_manager.get_instance(*ins_handle).unwrap()))
+            // BUG custom idx 的有效位数只有 24 位，如果场景内 instance 过多，可能会溢出
+            .map(|(ins_handle, ins)| self.get_as_instance_info(ins, ins_handle.data().as_ffi() as u32, scene_manager))
             .collect_vec();
         let tlas = GfxAcceleration::build_tlas_sync(
             &instance_infos,
