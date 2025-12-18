@@ -4,7 +4,6 @@
 //! 开发者只需实现 [`OuterApp`] trait，即可快速构建渲染应用。
 
 pub mod app;
-pub mod gui;
 pub mod outer_app;
 pub mod platform;
 pub mod window_system;

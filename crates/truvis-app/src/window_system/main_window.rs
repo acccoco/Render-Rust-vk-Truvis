@@ -2,8 +2,8 @@ use ash::vk;
 use itertools::Itertools;
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
-use crate::gui::core::Gui;
-use crate::gui::gui_pass::GuiPass;
+use truvis_gui::gui::core::Gui;
+use truvis_gui::gui::gui_pass::GuiPass;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxBarrierMask;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
@@ -55,13 +55,12 @@ pub struct MainWindow {
     cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 
     /// 数量和 fif num 相同
-    present_complete_semaphores: Vec<GfxSemaphore>,
+    present_complete_semaphores: [GfxSemaphore; FrameCounter::fif_count()],
 
     /// 数量和 swapchain image num 相同
     render_complete_semaphores: Vec<GfxSemaphore>,
 }
-
-// ctor
+// new & init
 impl MainWindow {
     pub fn new(
         renderer: &mut Renderer,
@@ -91,9 +90,8 @@ impl MainWindow {
         let gui = Gui::new(renderer, &window, &swapchain_image_infos);
         let gui_pass = GuiPass::new(&renderer.render_context.bindless_manager, swapchain_image_infos.image_format);
 
-        let present_complete_semaphores = (0..FrameCounter::fif_count())
-            .map(|i| GfxSemaphore::new(&format!("window-present-complete-{}", i)))
-            .collect_vec();
+        let present_complete_semaphores = FrameCounter::frame_labes()
+            .map(|frame_label| GfxSemaphore::new(&format!("window-present-complete-{}", frame_label)));
         let render_complete_semaphores = (0..swapchain_image_infos.image_cnt)
             .map(|i| GfxSemaphore::new(&format!("window-render-complete-{}", i)))
             .collect_vec();
@@ -111,12 +109,30 @@ impl MainWindow {
             cmds,
         }
     }
-
+}
+// destroy
+impl MainWindow {
+    pub fn destroy(self) {
+        for semaphore in self.present_complete_semaphores {
+            semaphore.destroy();
+        }
+        for semaphore in self.render_complete_semaphores {
+            semaphore.destroy();
+        }
+        if let Some(swapchain) = self.swapchain {
+            swapchain.destroy();
+        }
+    }
+}
+// getters
+impl MainWindow {
     #[inline]
     pub fn window(&self) -> &Window {
         &self.winit_window
     }
-
+}
+// tools
+impl MainWindow {
     fn draw(&mut self, render_context: &RenderContext, renderer_data: PresentData) {
         let swapchain = self.swapchain.as_ref().unwrap();
         let swapchain_image_idx = swapchain.current_image_index();
@@ -194,22 +210,6 @@ impl MainWindow {
         Gfx::get().gfx_queue().submit(vec![submit_info], None);
     }
 }
-
-// destroy
-impl MainWindow {
-    pub fn destroy(self) {
-        for semaphore in self.present_complete_semaphores {
-            semaphore.destroy();
-        }
-        for semaphore in self.render_complete_semaphores {
-            semaphore.destroy();
-        }
-        if let Some(swapchain) = self.swapchain {
-            swapchain.destroy();
-        }
-    }
-}
-
 // phase
 impl MainWindow {
     pub fn acquire_image(&mut self, frame_label: FrameLabel) {
