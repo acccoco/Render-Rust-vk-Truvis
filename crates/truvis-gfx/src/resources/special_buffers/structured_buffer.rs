@@ -21,7 +21,7 @@ impl<T: bytemuck::Pod> GfxStructuredBuffer<T> {
         Self::new(
             debug_name,
             len,
-            vk::BufferUsageFlags::UNIFORM_BUFFER
+            vk::BufferUsageFlags::STORAGE_BUFFER
                 | vk::BufferUsageFlags::TRANSFER_DST
                 | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
             false,
