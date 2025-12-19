@@ -1,9 +1,11 @@
-use std::rc::Rc;
-
+use crate::frame_counter::FrameCounter;
+use crate::pipeline_settings::FrameLabel;
+use crate::render_descriptor_sets::{BindlessDescriptorBinding, RenderDescriptorSets};
 use ash::vk;
+use ash::vk::DescriptorType;
 use itertools::Itertools;
-
 use slotmap::{Key, SecondaryMap};
+use std::rc::Rc;
 use truvis_gfx::descriptors::descriptor_pool::GfxDescriptorPoolCreateInfo;
 use truvis_gfx::{
     descriptors::{
@@ -13,12 +15,10 @@ use truvis_gfx::{
     gfx::Gfx,
     utilities::shader_cursor::GfxShaderCursor,
 };
-use truvis_shader_binding::truvisl;
-use truvis_shader_layout_macro::DescriptorLayout;
-
-use crate::pipeline_settings::FrameLabel;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::{GfxImageViewHandle, GfxTextureHandle};
+use truvis_shader_binding::truvisl;
+use truvis_shader_layout_macro::DescriptorBinding;
 
 #[derive(Copy, Clone)]
 pub struct BindlessTextureHandle(pub truvisl::TextureHandle);
@@ -67,23 +67,6 @@ impl Default for BindlessImageHandle {
     }
 }
 
-#[derive(DescriptorLayout)]
-pub struct BindlessDescriptorBinding {
-    #[binding = 0]
-    #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]
-    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR | COMPUTE"]
-    #[count = 128]
-    #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
-    _textures: (),
-
-    #[binding = 1]
-    #[descriptor_type = "STORAGE_IMAGE"]
-    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR | COMPUTE"]
-    #[count = 128]
-    #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
-    _images: (),
-}
-
 /// Bindless 描述符管理器
 ///
 /// 管理 Bindless 纹理和存储图像，通过数组索引访问资源。
@@ -100,13 +83,6 @@ pub struct BindlessDescriptorBinding {
 /// // 在着色器中: textures[key]
 /// ```
 pub struct BindlessManager {
-    _descriptor_pool: GfxDescriptorPool,
-
-    pub bindless_descriptor_layout: GfxDescriptorSetLayout<BindlessDescriptorBinding>,
-
-    /// 每一个 frame in flights 都有一个 descriptor set
-    pub bindless_descriptor_sets: Vec<GfxDescriptorSet<BindlessDescriptorBinding>>,
-
     /// 每一帧都需要重新构建的映射
     textures: SecondaryMap<GfxTextureHandle, BindlessTextureHandle>,
 
@@ -120,79 +96,14 @@ pub struct BindlessManager {
 }
 // new & init
 impl BindlessManager {
-    pub fn new(fif_count: usize) -> Self {
-        let descriptor_pool = Self::init_descriptor_pool();
-        let bindless_layout = GfxDescriptorSetLayout::<BindlessDescriptorBinding>::new(
-            vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
-            "bindless-layout",
-        );
-        let bindless_descriptor_sets = (0..fif_count)
-            .map(|idx| {
-                GfxDescriptorSet::<BindlessDescriptorBinding>::new(
-                    &descriptor_pool,
-                    &bindless_layout,
-                    format!("bindless-descriptor-set-{idx}"),
-                )
-            })
-            .collect_vec();
-
+    pub fn new() -> Self {
         Self {
-            _descriptor_pool: descriptor_pool,
-
-            bindless_descriptor_layout: bindless_layout,
-            bindless_descriptor_sets,
-
             textures: SecondaryMap::new(),
             images: SecondaryMap::new(),
             texture_images: SecondaryMap::new(),
 
             frame_label: FrameLabel::A,
         }
-    }
-
-    const DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT: u32 = 256;
-    const DESCRIPTOR_POOL_MAX_MATERIAL_CNT: u32 = 256;
-    const DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT: u32 = 128;
-
-    fn init_descriptor_pool() -> GfxDescriptorPool {
-        let pool_size = vec![
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER_DYNAMIC,
-                descriptor_count: 128,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: Self::DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                descriptor_count: Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::INPUT_ATTACHMENT,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
-                descriptor_count: 32,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_IMAGE,
-                descriptor_count: Self::DESCRIPTOR_POOL_MAX_BINDLESS_TEXTURE_CNT + 32,
-            },
-        ];
-
-        let pool_ci = Rc::new(GfxDescriptorPoolCreateInfo::new(
-            vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET | vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND,
-            Self::DESCRIPTOR_POOL_MAX_MATERIAL_CNT + Self::DESCRIPTOR_POOL_MAX_VERTEX_BLENDING_MESH_CNT + 32,
-            pool_size,
-        ));
-
-        GfxDescriptorPool::new(pool_ci, "renderer")
     }
 }
 // destroy
@@ -204,19 +115,17 @@ impl Drop for BindlessManager {
         log::info!("Dropping BindlessManager");
     }
 }
-// getters
-impl BindlessManager {
-    #[inline]
-    pub fn current_descriptor_set(&self) -> &GfxDescriptorSet<BindlessDescriptorBinding> {
-        &self.bindless_descriptor_sets[*self.frame_label]
-    }
-}
 // tools
 impl BindlessManager {
     /// # Phase: Before Render
     ///
     /// 在每一帧绘制之前，将纹理数据绑定到 descriptor set 中
-    pub fn prepare_render_data(&mut self, gfx_resource_manager: &GfxResourceManager, frame_label: FrameLabel) {
+    pub fn prepare_render_data(
+        &mut self,
+        gfx_resource_manager: &GfxResourceManager,
+        render_descriptor_sets: &RenderDescriptorSets,
+        frame_label: FrameLabel,
+    ) {
         let _span = tracy_client::span!("BindlessManager::prepare_render_data");
         self.frame_label = frame_label;
 
@@ -258,12 +167,12 @@ impl BindlessManager {
         // 将 images 和 textures 信息写入 descriptor set
         let writes = [
             BindlessDescriptorBinding::textures().write_image(
-                self.bindless_descriptor_sets[*frame_label].handle(),
+                render_descriptor_sets.set_0_bindless[*frame_label].handle(),
                 0,
                 texture_infos,
             ),
             BindlessDescriptorBinding::images().write_image(
-                self.bindless_descriptor_sets[*frame_label].handle(),
+                render_descriptor_sets.set_0_bindless[*frame_label].handle(),
                 0,
                 image_infos,
             ),

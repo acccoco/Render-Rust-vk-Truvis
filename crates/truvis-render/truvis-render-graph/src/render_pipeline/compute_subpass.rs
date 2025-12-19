@@ -1,9 +1,11 @@
 use std::ffi::CStr;
 
 use crate::apis::render_pass::RenderSubpass;
+use crate::render_context::RenderContext;
 use ash::vk;
 use truvis_gfx::{commands::command_buffer::GfxCommandBuffer, gfx::Gfx, pipelines::shader::GfxShaderModule};
 use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 
 /// 泛型参数 P 表示 compute shader 的参数，以 push constant 的形式传入 shader
 pub struct ComputeSubpass<P: bytemuck::Pod> {
@@ -13,7 +15,7 @@ pub struct ComputeSubpass<P: bytemuck::Pod> {
     _phantom: std::marker::PhantomData<P>,
 }
 impl<P: bytemuck::Pod> ComputeSubpass<P> {
-    pub fn new(bindless_manager: &BindlessManager, entry_point: &CStr, shader_path: &str) -> Self {
+    pub fn new(render_descriptor_sets: &RenderDescriptorSets, entry_point: &CStr, shader_path: &str) -> Self {
         let shader_module = GfxShaderModule::new(std::path::Path::new(shader_path));
         let stage_info = vk::PipelineShaderStageCreateInfo::default()
             .module(shader_module.handle())
@@ -26,7 +28,7 @@ impl<P: bytemuck::Pod> ComputeSubpass<P> {
                 .offset(0)
                 .size(size_of::<P>() as u32);
 
-            let descriptor_sets = [bindless_manager.bindless_descriptor_layout.handle()];
+            let descriptor_sets = [render_descriptor_sets.layout_0_bindless.handle()];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
@@ -52,7 +54,8 @@ impl<P: bytemuck::Pod> ComputeSubpass<P> {
         }
     }
 
-    pub fn exec(&self, cmd: &GfxCommandBuffer, bindless_manager: &BindlessManager, params: &P, group_cnt: glam::UVec3) {
+    pub fn exec(&self, cmd: &GfxCommandBuffer, render_context: &RenderContext, params: &P, group_cnt: glam::UVec3) {
+        let frame_label = render_context.frame_counter.frame_label();
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::COMPUTE, self.pipeline);
 
         cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::COMPUTE, 0, bytemuck::bytes_of(params));
@@ -60,7 +63,7 @@ impl<P: bytemuck::Pod> ComputeSubpass<P> {
             vk::PipelineBindPoint::COMPUTE,
             self.pipeline_layout,
             0,
-            &[bindless_manager.current_descriptor_set().handle()],
+            &[render_context.render_descriptor_sets.set_0_bindless[*frame_label].handle()],
             None,
         );
 

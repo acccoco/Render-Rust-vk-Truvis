@@ -2,8 +2,6 @@ use ash::vk;
 use itertools::Itertools;
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
-use truvis_gui::gui::core::Gui;
-use truvis_gui::gui::gui_pass::GuiPass;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::barrier::GfxBarrierMask;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
@@ -12,6 +10,8 @@ use truvis_gfx::{
     gfx::Gfx,
     swapchain::render_swapchain::GfxRenderSwapchain,
 };
+use truvis_gui::gui::core::Gui;
+use truvis_gui::gui::gui_pass::GuiPass;
 use truvis_render::core::renderer::Renderer;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{DefaultRendererSettings, FrameLabel};
@@ -88,7 +88,8 @@ impl MainWindow {
         let swapchain_image_infos = swapchain.image_infos();
 
         let gui = Gui::new(renderer, &window, &swapchain_image_infos);
-        let gui_pass = GuiPass::new(&renderer.render_context.bindless_manager, swapchain_image_infos.image_format);
+        let gui_pass =
+            GuiPass::new(&renderer.render_context.render_descriptor_sets, swapchain_image_infos.image_format);
 
         let present_complete_semaphores = FrameCounter::frame_labes()
             .map(|frame_label| GfxSemaphore::new(&format!("window-present-complete-{}", frame_label)));

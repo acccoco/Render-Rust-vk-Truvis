@@ -24,7 +24,7 @@ pub struct FifBuffers {
     depth_image_view: GfxImageViewHandle,
 
     /// 离屏渲染的结果，数量和 fif 相同
-    off_screen_targets: Vec<GfxTextureHandle>,
+    off_screen_targets: [GfxTextureHandle; FrameCounter::fif_count()],
 }
 // new & init
 impl FifBuffers {
@@ -32,11 +32,10 @@ impl FifBuffers {
         frame_settigns: &FrameSettings,
         bindless_manager: &mut BindlessManager,
         gfx_resource_manager: &mut GfxResourceManager,
-        fif_count: usize,
     ) -> Self {
         let (color_image, color_image_view) = Self::create_color_image(gfx_resource_manager, frame_settigns);
         let (depth_image, depth_image_view) = Self::create_depth_image(gfx_resource_manager, frame_settigns);
-        let render_targets = Self::create_render_targets(gfx_resource_manager, frame_settigns, fif_count);
+        let render_targets = Self::create_render_targets(gfx_resource_manager, frame_settigns);
 
         let fif_buffers = Self {
             accum_image: color_image,
@@ -57,7 +56,7 @@ impl FifBuffers {
         frame_settings: &FrameSettings,
     ) {
         self.destroy_mut(bindless_manager, gfx_resource_manager);
-        *self = Self::new(frame_settings, bindless_manager, gfx_resource_manager, FrameCounter::fif_count());
+        *self = Self::new(frame_settings, bindless_manager, gfx_resource_manager);
     }
 
     fn register_bindless(&self, bindless_manager: &mut BindlessManager) {
@@ -152,8 +151,7 @@ impl FifBuffers {
     fn create_render_targets(
         gfx_resource_manager: &mut GfxResourceManager,
         frame_settings: &FrameSettings,
-        fif_count: usize,
-    ) -> Vec<GfxTextureHandle> {
+    ) -> [GfxTextureHandle; FrameCounter::fif_count()] {
         let mut create_texture = |fif_labe: FrameLabel| {
             let name = format!("render-target-{}", fif_labe);
 
@@ -178,7 +176,7 @@ impl FifBuffers {
             gfx_resource_manager.register_texture(texture)
         };
 
-        (0..fif_count).map(|fif_label| create_texture(FrameLabel::from_usize(fif_label))).collect_vec()
+        FrameCounter::frame_labes().map(|frame_label| create_texture(frame_label))
     }
 }
 // destroy
@@ -206,7 +204,7 @@ impl FifBuffers {
 }
 impl Drop for FifBuffers {
     fn drop(&mut self) {
-        debug_assert!(self.off_screen_targets.is_empty());
+        debug_assert!(self.off_screen_targets.iter().all(|target| target.is_null()));
         debug_assert!(self.depth_image.is_null());
         debug_assert!(self.depth_image_view.is_null());
         debug_assert!(self.accum_image.is_null());

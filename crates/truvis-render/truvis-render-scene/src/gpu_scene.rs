@@ -19,6 +19,7 @@ use truvis_model_manager::guid_new_type::{InstanceHandle, MaterialHandle, MeshHa
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::FrameLabel;
+use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::{GfxTexture2, ImageLoader};
@@ -110,7 +111,7 @@ pub struct GpuScene {
     /// mesh 在 geometry buffer 中的 idx
     mesh_geometry_map: SecondaryMap<MeshHandle, usize>,
 
-    gpu_scene_buffers: Vec<GpuSceneBuffers>,
+    gpu_scene_buffers: [GpuSceneBuffers; FrameCounter::fif_count()],
 
     sky_texture_handle: GfxTextureHandle,
     uv_checker_texture_handle: GfxTextureHandle,
@@ -129,11 +130,7 @@ impl GpuScene {
 }
 // new & init
 impl GpuScene {
-    pub fn new(
-        fif_count: usize,
-        gfx_resource_manager: &mut GfxResourceManager,
-        bindless_manager: &mut BindlessManager,
-    ) -> Self {
+    pub fn new(gfx_resource_manager: &mut GfxResourceManager, bindless_manager: &mut BindlessManager) -> Self {
         let sky_path = TruvisPath::resources_path("sky.jpg");
         let uv_checker_path = TruvisPath::resources_path("uv_checker.png");
         let sky_image = ImageLoader::load_image(&PathBuf::from(&sky_path));
@@ -154,7 +151,7 @@ impl GpuScene {
             flatten_meshes: IndexSet::default(),
             mesh_geometry_map: SecondaryMap::new(),
 
-            gpu_scene_buffers: (0..fif_count).map(GpuSceneBuffers::new).collect(),
+            gpu_scene_buffers: FrameCounter::frame_labes().map(|frame_label| GpuSceneBuffers::new(*frame_label)),
 
             sky_texture_handle,
             uv_checker_texture_handle,
@@ -180,11 +177,12 @@ impl GpuScene {
         scene_manager: &SceneManager,
         bindless_manager: &mut BindlessManager,
         gfx_resource_manager: &GfxResourceManager,
+        render_descriptor_sets: &RenderDescriptorSets,
         frame_counter: &FrameCounter,
     ) {
         let _span = tracy_client::span!("GpuScene::prepare_render_data");
 
-        bindless_manager.prepare_render_data(gfx_resource_manager, frame_counter.frame_label());
+        bindless_manager.prepare_render_data(gfx_resource_manager, render_descriptor_sets, frame_counter.frame_label());
 
         self.flatten_material_data(scene_manager);
         self.flatten_mesh_data(scene_manager);

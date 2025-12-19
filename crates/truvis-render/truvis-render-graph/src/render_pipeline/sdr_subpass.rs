@@ -5,6 +5,7 @@ use ash::vk;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_resource::handles::{GfxImageViewHandle, GfxTextureHandle};
 use truvis_shader_binding::truvisl;
 
@@ -41,9 +42,9 @@ pub struct SdrSubpass {
     sdr_pass: ComputeSubpass<truvisl::sdr::PushConstant>,
 }
 impl SdrSubpass {
-    pub fn new(bindless_manager: &BindlessManager) -> Self {
+    pub fn new(render_descriptor_sets: &RenderDescriptorSets) -> Self {
         let sdr_pass = ComputeSubpass::<truvisl::sdr::PushConstant>::new(
-            bindless_manager,
+            render_descriptor_sets,
             c"main",
             TruvisPath::shader_path("pass/pp/sdr.slang").as_str(),
         );
@@ -58,7 +59,7 @@ impl SdrSubpass {
 
         self.sdr_pass.exec(
             &cmd,
-            &render_context.bindless_manager,
+            &render_context,
             &truvisl::sdr::PushConstant {
                 src_image: src_image_bindless_handle.0,
                 dst_image: dst_image_bindless_handle.0,

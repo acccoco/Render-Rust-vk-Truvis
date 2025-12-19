@@ -19,29 +19,28 @@ use truvis_gfx::{
 /// - 命令缓冲自动添加帧标签：`[F42A]my-pass`
 pub struct CmdAllocator {
     /// 为每个 frame 分配一个 command pool
-    graphics_command_pools: Vec<GfxCommandPool>,
+    graphics_command_pools: [GfxCommandPool; FrameCounter::fif_count()],
 
     /// 每个 command pool 已经分配出去的 command buffer，用于集中 free
     /// 或其他操作
-    allocated_command_buffers: Vec<Vec<GfxCommandBuffer>>,
+    allocated_command_buffers: [Vec<GfxCommandBuffer>; FrameCounter::fif_count()],
 }
 
 // new & init
 impl CmdAllocator {
-    pub fn new(fif_count: usize) -> Self {
-        let graphics_command_pools = (0..fif_count)
-            .map(|i| {
-                GfxCommandPool::new(
-                    Gfx::get().gfx_queue_family(),
-                    vk::CommandPoolCreateFlags::TRANSIENT,
-                    &format!("render_context_graphics_command_pool_{}", i),
-                )
-            })
-            .collect_vec();
+    pub fn new() -> Self {
+        let graphics_command_pools = FrameCounter::frame_labes().map(|i| {
+            GfxCommandPool::new(
+                Gfx::get().gfx_queue_family(),
+                vk::CommandPoolCreateFlags::TRANSIENT,
+                &format!("render_context_graphics_command_pool_{}", i),
+            )
+        });
+        let allocated_command_buffers = FrameCounter::frame_labes().map(|_| Vec::new());
 
         Self {
             graphics_command_pools,
-            allocated_command_buffers: vec![Vec::new(); fif_count],
+            allocated_command_buffers,
         }
     }
 }

@@ -15,6 +15,7 @@ use truvis_gfx::{
 };
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::pipeline_settings::FrameLabel;
+use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_shader_binding::{truvisl, truvisl::TextureHandle};
 
@@ -39,9 +40,9 @@ pub struct GuiPass {
     pipeline_layout: Rc<GfxPipelineLayout>,
 }
 impl GuiPass {
-    pub fn new(bindless_manager: &BindlessManager, color_format: vk::Format) -> Self {
+    pub fn new(render_descriptor_sets: &RenderDescriptorSets, color_format: vk::Format) -> Self {
         let pipeline_layout = Rc::new(GfxPipelineLayout::new(
-            &[bindless_manager.bindless_descriptor_layout.handle()],
+            &[render_descriptor_sets.layout_0_bindless.handle()],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 offset: 0,
@@ -147,12 +148,12 @@ impl GuiPass {
             _padding_0: 0,
         };
 
-        let bindless_manager = &render_context.bindless_manager;
+        let render_descriptor_sets = &render_context.render_descriptor_sets;
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),
             0,
-            &[bindless_manager.bindless_descriptor_sets[*frame_label].handle()],
+            &[render_descriptor_sets.set_0_bindless[*frame_label].handle()],
             None,
         );
 
@@ -172,6 +173,8 @@ impl GuiPass {
         let mut last_texture_id: Option<imgui::TextureId> = None;
         let clip_offset = draw_data.display_pos;
         let clip_scale = draw_data.framebuffer_scale;
+
+        let bindless_manager = &render_context.bindless_manager;
 
         // 简而言之：对于每个 command，设置正确的 vertex, index, texture, scissor 即可
         for draw_list in draw_data.draw_lists() {

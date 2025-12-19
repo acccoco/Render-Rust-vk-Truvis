@@ -5,6 +5,7 @@ use ash::vk;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_resource::handles::{GfxImageViewHandle, GfxTextureHandle};
 use truvis_shader_binding::truvisl;
 
@@ -41,9 +42,9 @@ pub struct BlitSubpass {
     blit_pass: ComputeSubpass<truvisl::blit::PushConstant>,
 }
 impl BlitSubpass {
-    pub fn new(bindless_manager: &BindlessManager) -> Self {
+    pub fn new(render_descriptor_sets: &RenderDescriptorSets) -> Self {
         let blit_pass = ComputeSubpass::<truvisl::blit::PushConstant>::new(
-            bindless_manager,
+            render_descriptor_sets,
             c"main",
             TruvisPath::shader_path("imgui/blit.slang").as_str(),
         );
@@ -57,7 +58,7 @@ impl BlitSubpass {
             render_context.bindless_manager.get_image_handle_in_texture(data.dst_image).unwrap();
         self.blit_pass.exec(
             cmd,
-            &render_context.bindless_manager,
+            &render_context,
             &truvisl::blit::PushConstant {
                 src_image: src_image_bindless_handle.0,
                 dst_image: dst_image_bindless_handle.0,

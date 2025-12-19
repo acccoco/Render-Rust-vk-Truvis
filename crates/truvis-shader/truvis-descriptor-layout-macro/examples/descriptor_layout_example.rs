@@ -1,15 +1,15 @@
 use ash::vk;
 
-use truvis_shader_layout_macro::DescriptorLayout;
+use truvis_shader_layout_macro::DescriptorBinding;
 use truvis_shader_layout_trait::DescriptorBindingLayout;
 
-/// 示例：使用 DescriptorLayout 派生宏定义着色器布局
+/// 示例：使用 DescriptorBinding 派生宏定义着色器布局
 ///
 /// 这个结构体定义了着色器需要的所有资源绑定：
 /// - 统一缓冲区 (Uniform Buffer)
 /// - 纹理采样器 (Combined Image Sampler)
 /// - 独立采样器 (Sampler)
-#[derive(DescriptorLayout)]
+#[derive(DescriptorBinding)]
 struct MyShader {
     /// 统一缓冲区，绑定到绑定点 0
     /// 用于顶点和片段着色器

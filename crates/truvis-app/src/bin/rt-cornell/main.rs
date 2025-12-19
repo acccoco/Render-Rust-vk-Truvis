@@ -57,7 +57,8 @@ impl CornellApp {
 
 impl OuterApp for CornellApp {
     fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self {
-        let rt_pipeline = RtRenderPass::new(&renderer.render_context.bindless_manager, &mut renderer.cmd_allocator);
+        let rt_pipeline =
+            RtRenderPass::new(&renderer.render_context.render_descriptor_sets, &mut renderer.cmd_allocator);
 
         Self::create_scene(renderer, camera);
 

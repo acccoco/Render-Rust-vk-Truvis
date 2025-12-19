@@ -13,6 +13,7 @@ use truvis_gfx::{
     resources::special_buffers::sbt_buffer::GfxSBTBuffer,
 };
 use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_resource::handles::{GfxImageHandle, GfxImageViewHandle};
 use truvis_shader_binding::truvisl;
 
@@ -272,7 +273,7 @@ pub struct SimpleRtSubpass {
     _sbt: SBTRegions,
 }
 impl SimpleRtSubpass {
-    pub fn new(bindless_manager: &BindlessManager) -> Self {
+    pub fn new(render_descriptor_sets: &RenderDescriptorSets) -> Self {
         let mut shader_module_cache = GfxShaderModuleCache::new();
         let stage_infos = ShaderStage::iter()
             .map(|stage| stage.value())
@@ -308,7 +309,7 @@ impl SimpleRtSubpass {
             .size(size_of::<truvisl::rt::PushConstants>() as u32);
 
         let pipeline_layout = {
-            let descriptor_sets = [bindless_manager.bindless_descriptor_layout.handle()];
+            let descriptor_sets = [render_descriptor_sets.layout_0_bindless.handle()];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
@@ -359,12 +360,12 @@ impl SimpleRtSubpass {
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::RAY_TRACING_KHR, self.pipeline.pipeline);
-        let bindless_manager = &render_context.bindless_manager;
+        let render_descriptor_sets = &render_context.render_descriptor_sets;
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
             0,
-            &[bindless_manager.bindless_descriptor_sets[*frame_label].handle()],
+            &[render_descriptor_sets.set_0_bindless[*frame_label].handle()],
             None,
         );
         let spp = 4;

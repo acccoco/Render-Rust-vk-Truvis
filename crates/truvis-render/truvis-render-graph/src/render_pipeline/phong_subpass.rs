@@ -14,17 +14,17 @@ use truvis_gfx::{
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::pipeline_settings::FrameLabel;
+use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_shader_binding::truvisl;
 
 pub struct PhongSubpass {
     pipeline: GfxGraphicsPipeline,
-    bindless_manager: Rc<RefCell<BindlessManager>>,
 }
 impl PhongSubpass {
     pub fn new(
         color_format: vk::Format,
         depth_format: vk::Format,
-        bindless_manager: Rc<RefCell<BindlessManager>>,
+        render_descriptor_sets: &RenderDescriptorSets,
     ) -> Self {
         let mut ci = GfxGraphicsPipelineCreateInfo::default();
         ci.vertex_shader_stage(&TruvisPath::shader_path("phong/phong3d.vs.slang"), c"main");
@@ -44,7 +44,7 @@ impl PhongSubpass {
         );
 
         let pipeline_layout = Rc::new(GfxPipelineLayout::new(
-            &[bindless_manager.borrow().bindless_descriptor_layout.handle()],
+            &[render_descriptor_sets.layout_0_bindless.handle()],
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .offset(0)
@@ -54,15 +54,13 @@ impl PhongSubpass {
 
         let d3_pipe = GfxGraphicsPipeline::new(&ci, pipeline_layout, "phong-d3-pipe");
 
-        Self {
-            pipeline: d3_pipe,
-            bindless_manager,
-        }
+        Self { pipeline: d3_pipe }
     }
 
     fn bind(
         &self,
         cmd: &GfxCommandBuffer,
+        render_context: &RenderContext,
         viewport: &vk::Rect2D,
         push_constant: &truvisl::raster::PushConstants,
         frame_idx: FrameLabel,
@@ -87,11 +85,12 @@ impl PhongSubpass {
             bytemuck::bytes_of(push_constant),
         );
 
+        let render_descriptor_sets = &render_context.render_descriptor_sets;
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline.layout(),
             0,
-            &[self.bindless_manager.borrow().bindless_descriptor_sets[*frame_idx].handle()],
+            &[render_descriptor_sets.set_0_bindless[*frame_idx].handle()],
             None,
         );
     }
@@ -122,6 +121,7 @@ impl PhongSubpass {
 
         self.bind(
             cmd,
+            render_context,
             &render_context.frame_settings.frame_extent.into(),
             &truvisl::raster::PushConstants {
                 frame_data: render_context.per_frame_data_buffers[*frame_label].device_address(),

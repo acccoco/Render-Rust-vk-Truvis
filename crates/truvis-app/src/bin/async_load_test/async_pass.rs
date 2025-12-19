@@ -24,6 +24,7 @@ use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
+use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::RenderContext;
 
@@ -46,7 +47,7 @@ pub struct AsyncSubpass {
 }
 impl RenderSubpass for AsyncSubpass {}
 impl AsyncSubpass {
-    pub fn new(bindless_manager: &BindlessManager, frame_settings: &FrameSettings) -> Self {
+    pub fn new(render_descriptor_sets: &RenderDescriptorSets, frame_settings: &FrameSettings) -> Self {
         let mut pipeline_ci = GfxGraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![frame_settings.color_format], None, Some(vk::Format::UNDEFINED));
@@ -62,7 +63,7 @@ impl AsyncSubpass {
         );
 
         // Bindless Layout
-        let bindless_layout = &bindless_manager.bindless_descriptor_layout;
+        let bindless_layout = &render_descriptor_sets.layout_0_bindless;
 
         // Push Constants
         let push_constant_range =
@@ -128,7 +129,8 @@ impl AsyncSubpass {
             );
 
             // Bind Bindless Descriptor Set
-            let bindless_set = render_context.bindless_manager.current_descriptor_set().handle();
+            let frame_label = render_context.frame_counter.frame_label();
+            let bindless_set = render_context.render_descriptor_sets.set_0_bindless[*frame_label].handle();
             cmd.bind_descriptor_sets(
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout.handle(),
@@ -163,11 +165,11 @@ impl RenderPass for AsyncPass {}
 
 impl AsyncPass {
     pub fn new(
-        bindless_manager: &BindlessManager,
+        render_descriptor_sets: &RenderDescriptorSets,
         frame_settings: &FrameSettings,
         cmd_allocator: &mut CmdAllocator,
     ) -> Self {
-        let async_pass = AsyncSubpass::new(bindless_manager, frame_settings);
+        let async_pass = AsyncSubpass::new(render_descriptor_sets, frame_settings);
 
         let cmds = FrameCounter::frame_labes()
             .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "async-test"));

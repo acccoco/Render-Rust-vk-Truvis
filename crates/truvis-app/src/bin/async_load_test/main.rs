@@ -57,7 +57,7 @@ impl OuterApp for AsyncLoadTest {
 
         Self {
             pipeline: AsyncPass::new(
-                &renderer.render_context.bindless_manager,
+                &renderer.render_context.render_descriptor_sets,
                 &renderer.render_context.frame_settings,
                 &mut renderer.cmd_allocator,
             ),

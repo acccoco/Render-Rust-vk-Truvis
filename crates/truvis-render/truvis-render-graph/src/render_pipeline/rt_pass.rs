@@ -15,6 +15,7 @@ use truvis_gfx::{
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
+use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_shader_binding::truvisl;
 
 /// 整个 RT 管线
@@ -29,10 +30,10 @@ pub struct RtRenderPass {
 }
 
 impl RtRenderPass {
-    pub fn new(bindless_manager: &BindlessManager, cmd_allocator: &mut CmdAllocator) -> Self {
-        let rt_pass = SimpleRtSubpass::new(bindless_manager);
-        let blit_subpass = BlitSubpass::new(bindless_manager);
-        let sdr_subpass = SdrSubpass::new(bindless_manager);
+    pub fn new(render_descriptor_sets: &RenderDescriptorSets, cmd_allocator: &mut CmdAllocator) -> Self {
+        let rt_pass = SimpleRtSubpass::new(render_descriptor_sets);
+        let blit_subpass = BlitSubpass::new(render_descriptor_sets);
+        let sdr_subpass = SdrSubpass::new(render_descriptor_sets);
 
         let rt_cmds = FrameCounter::frame_labes()
             .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "ray-tracing"));

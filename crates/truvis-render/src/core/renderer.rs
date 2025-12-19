@@ -16,6 +16,7 @@ use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings, PipelineSettings};
+use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_render_base::stage_buffer_manager::StageBufferManager;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::resources::fif_buffer::FifBuffers;
@@ -70,23 +71,24 @@ impl Renderer {
             },
         };
 
-        let fif_count = FrameCounter::fif_count();
         let timer = Timer::default();
         let accum_data = AccumData::default();
         let fif_timeline_semaphore = GfxSemaphore::new_timeline(0, "render-timeline");
 
         let mut gfx_resource_manager = GfxResourceManager::new();
-        let mut cmd_allocator = CmdAllocator::new(fif_count);
+        let mut cmd_allocator = CmdAllocator::new();
 
         let scene_manager = SceneManager::new();
         let asset_hub = AssetHub::new();
-        let mut bindless_manager = BindlessManager::new(fif_count);
-        let gpu_scene = GpuScene::new(fif_count, &mut gfx_resource_manager, &mut bindless_manager);
-        let fif_buffers = FifBuffers::new(&frame_settings, &mut bindless_manager, &mut gfx_resource_manager, fif_count);
+        let mut bindless_manager = BindlessManager::new();
+        let gpu_scene = GpuScene::new(&mut gfx_resource_manager, &mut bindless_manager);
+        let fif_buffers = FifBuffers::new(&frame_settings, &mut bindless_manager, &mut gfx_resource_manager);
 
-        let per_frame_data_buffers = (0..fif_count)
-            .map(|idx| GfxStructuredBuffer::<truvisl::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{idx}")))
-            .collect();
+        let render_descriptor_sets = RenderDescriptorSets::new();
+
+        let per_frame_data_buffers = FrameCounter::frame_labes().map(|frame_label| {
+            GfxStructuredBuffer::<truvisl::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{frame_label}"))
+        });
 
         let cmds = FrameCounter::frame_labes()
             .into_iter()
@@ -101,6 +103,7 @@ impl Renderer {
                 bindless_manager,
                 per_frame_data_buffers,
                 gfx_resource_manager,
+                render_descriptor_sets,
                 delta_time_s: 0.0,
                 total_time_s: 0.0,
                 accum_data,
@@ -149,6 +152,7 @@ impl Renderer {
         self.cmd_allocator.destroy();
         self.render_context.gfx_resource_manager.destroy();
         self.fif_timeline_semaphore.destroy();
+        self.render_context.render_descriptor_sets.destroy();
     }
 }
 // phase call
@@ -247,6 +251,7 @@ impl Renderer {
             &self.render_context.scene_manager,
             &mut self.render_context.bindless_manager,
             &self.render_context.gfx_resource_manager,
+            &self.render_context.render_descriptor_sets,
             &self.render_context.frame_counter,
         );
         self.render_context.gpu_scene.upload_to_buffer(
