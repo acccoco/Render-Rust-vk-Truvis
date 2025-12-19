@@ -53,6 +53,13 @@ impl GfxBuffer {
         mem_map: bool,
         name: impl AsRef<str>,
     ) -> Self {
+        // 不允许 UNIFORM + DBA 的组合，会有隐患
+        if buffer_usage.contains(vk::BufferUsageFlags::UNIFORM_BUFFER)
+            && buffer_usage.contains(vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS)
+        {
+            panic!("GfxBuffer::new: UNIFORM_BUFFER + SHADER_DEVICE_ADDRESS is not allowed!");
+        }
+
         let buffer_ci = vk::BufferCreateInfo::default().size(buffer_size).usage(buffer_usage);
         let alloc_ci = vk_mem::AllocationCreateInfo {
             usage: vk_mem::MemoryUsage::AutoPreferDevice,

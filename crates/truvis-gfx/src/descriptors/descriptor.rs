@@ -1,5 +1,5 @@
 use ash::vk;
-use truvis_shader_layout_trait::ShaderBindingLayout;
+use truvis_shader_layout_trait::DescriptorBindingLayout;
 
 use crate::gfx::Gfx;
 use crate::{descriptors::descriptor_pool::GfxDescriptorPool, foundation::debug_messenger::DebugType};
@@ -16,13 +16,13 @@ use crate::{descriptors::descriptor_pool::GfxDescriptorPool, foundation::debug_m
 ///
 /// # 泛型参数
 /// - T: 实现了 ShaderBindingLayout trait 的类型，定义了具体的绑定布局
-pub struct GfxDescriptorSetLayout<T: ShaderBindingLayout> {
+pub struct GfxDescriptorSetLayout<T: DescriptorBindingLayout> {
     /// Vulkan 描述符集布局句柄
     layout: vk::DescriptorSetLayout,
     /// 用于在编译时关联泛型参数 T
     phantom_data: std::marker::PhantomData<T>,
 }
-impl<T: ShaderBindingLayout> GfxDescriptorSetLayout<T> {
+impl<T: DescriptorBindingLayout> GfxDescriptorSetLayout<T> {
     /// 创建新的描述符集布局
     ///
     /// # 参数
@@ -61,14 +61,14 @@ impl<T: ShaderBindingLayout> GfxDescriptorSetLayout<T> {
         // drop
     }
 }
-impl<T: ShaderBindingLayout> Drop for GfxDescriptorSetLayout<T> {
+impl<T: DescriptorBindingLayout> Drop for GfxDescriptorSetLayout<T> {
     fn drop(&mut self) {
         unsafe {
             Gfx::get().gfx_device().destroy_descriptor_set_layout(self.layout, None);
         }
     }
 }
-impl<T: ShaderBindingLayout> DebugType for GfxDescriptorSetLayout<T> {
+impl<T: DescriptorBindingLayout> DebugType for GfxDescriptorSetLayout<T> {
     fn debug_type_name() -> &'static str {
         "GfxDescriptorSetLayout"
     }
@@ -89,7 +89,7 @@ impl<T: ShaderBindingLayout> DebugType for GfxDescriptorSetLayout<T> {
 /// # Destroy
 ///
 /// 跟随 descriptor pool 一起销毁
-pub struct GfxDescriptorSet<T: ShaderBindingLayout> {
+pub struct GfxDescriptorSet<T: DescriptorBindingLayout> {
     /// Vulkan 描述符集句柄
     handle: vk::DescriptorSet,
     /// 用于在编译时关联泛型参数 T
@@ -97,7 +97,7 @@ pub struct GfxDescriptorSet<T: ShaderBindingLayout> {
 
     _descriptor_pool: vk::DescriptorPool,
 }
-impl<T: ShaderBindingLayout> GfxDescriptorSet<T> {
+impl<T: DescriptorBindingLayout> GfxDescriptorSet<T> {
     /// 创建新的描述符集
     ///
     /// # 参数
@@ -132,12 +132,12 @@ impl<T: ShaderBindingLayout> GfxDescriptorSet<T> {
         self.handle
     }
 }
-impl<T: ShaderBindingLayout> Drop for GfxDescriptorSet<T> {
+impl<T: DescriptorBindingLayout> Drop for GfxDescriptorSet<T> {
     fn drop(&mut self) {
         // 无需手动释放，会跟随 DescriptorPool 一起释放
     }
 }
-impl<T: ShaderBindingLayout> DebugType for GfxDescriptorSet<T> {
+impl<T: DescriptorBindingLayout> DebugType for GfxDescriptorSet<T> {
     fn debug_type_name() -> &'static str {
         "GfxDescriptorSet"
     }

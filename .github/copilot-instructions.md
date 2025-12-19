@@ -143,7 +143,7 @@ use truvis_shader_binding::truvisl::PerFrameData;
 
 ### 描述符布局简化（关键宏）
 ```rust
-#[shader_layout]  // 来自 truvis-shader-layout-macro
+#[shader_layout]  // 来自 truvis-descriptor-layout-macro
 struct MyLayout {
     #[binding = 0] uniforms: PerFrameData,
     #[texture(binding = 1)] diffuse: TextureHandle,

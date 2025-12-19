@@ -14,7 +14,7 @@ use truvis_gfx::{
     utilities::shader_cursor::GfxShaderCursor,
 };
 use truvis_shader_binding::truvisl;
-use truvis_shader_layout_macro::ShaderLayout;
+use truvis_shader_layout_macro::DescriptorLayout;
 
 use crate::pipeline_settings::FrameLabel;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
@@ -67,7 +67,7 @@ impl Default for BindlessImageHandle {
     }
 }
 
-#[derive(ShaderLayout)]
+#[derive(DescriptorLayout)]
 pub struct BindlessDescriptorBinding {
     #[binding = 0]
     #[descriptor_type = "COMBINED_IMAGE_SAMPLER"]

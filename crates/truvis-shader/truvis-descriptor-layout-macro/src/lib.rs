@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Attribute, Data, DeriveInput, Fields, Meta, parse_macro_input};
 
-/// 为结构体实现 ShaderLayout 派生宏
+/// 为结构体实现 DescriptorLayout 派生宏
 ///
 /// 支持的属性：
 /// - binding: 指定绑定点编号
@@ -10,8 +10,8 @@ use syn::{Attribute, Data, DeriveInput, Fields, Meta, parse_macro_input};
 /// - count: 指定描述符数量
 /// - stage: 指定着色器阶段（如 VERTEX, FRAGMENT 等）
 /// - flags: 指定描述符绑定标志（如 UPDATE_AFTER_BIND, PARTIALLY_BOUND 等）
-#[proc_macro_derive(ShaderLayout, attributes(binding, descriptor_type, count, stage, flags))]
-pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(DescriptorLayout, attributes(binding, descriptor_type, count, stage, flags))]
+pub fn derive_descriptor_layout(input: TokenStream) -> TokenStream {
     // 解析输入为 DeriveInput 结构
     let input = parse_macro_input!(input as DeriveInput);
     let struct_name = &input.ident;
@@ -54,13 +54,13 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
 
     // 生成代码：
     // 1. 实现 get_shader_bindings 方法，返回字段名和绑定值的元组数组
-    // 2. 实现 ShaderBindingLayout trait，返回完整的 ShaderBindingItem 数组
+    // 2. 实现 DescriptorBindingLayout trait，返回完整的 DescriptorBindingItem 数组
     let expanded = quote! {
         impl #struct_name {
             #(
-                pub fn #method_names() -> &'static truvis_shader_layout_trait::ShaderBindingItem {
-                    static CURSOR: std::sync::OnceLock<truvis_shader_layout_trait::ShaderBindingItem> = std::sync::OnceLock::new();
-                    CURSOR.get_or_init(|| truvis_shader_layout_trait::ShaderBindingItem{
+                pub fn #method_names() -> &'static truvis_shader_layout_trait::DescriptorBindingItem {
+                    static CURSOR: std::sync::OnceLock<truvis_shader_layout_trait::DescriptorBindingItem> = std::sync::OnceLock::new();
+                    CURSOR.get_or_init(|| truvis_shader_layout_trait::DescriptorBindingItem{
                         name: stringify!(#field_names).trim_matches('_'),
                         binding: #binding_values,
                         descriptor_type: #descriptor_types,
@@ -72,10 +72,10 @@ pub fn derive_shader_layout(input: TokenStream) -> TokenStream {
             )*
         }
 
-        impl truvis_shader_layout_trait::ShaderBindingLayout for #struct_name {
-            fn get_shader_bindings() -> Vec<truvis_shader_layout_trait::ShaderBindingItem> {
+        impl truvis_shader_layout_trait::DescriptorBindingLayout for #struct_name {
+            fn get_shader_bindings() -> Vec<truvis_shader_layout_trait::DescriptorBindingItem> {
                 vec![
-                    #(truvis_shader_layout_trait::ShaderBindingItem {
+                    #(truvis_shader_layout_trait::DescriptorBindingItem {
                         name: stringify!(#field_names).trim_matches('_'),
                         binding: #binding_values,
                         descriptor_type: #descriptor_types,
