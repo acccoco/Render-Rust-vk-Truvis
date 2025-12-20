@@ -145,28 +145,31 @@ impl MainWindow {
         let cmd = self.cmds[*frame_label].clone();
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         {
-            // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
-            // 注1: 可能有 blend 操作，因此需要 COLOR_ATTACHMENT_READ
-            // 注2: 这里的 bottom 表示 layout transfer 等待 present 完成
-            let swapchain_image_layout_transfer_barrier = GfxImageBarrier::new()
-                .image(swapchain.current_image())
-                .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
-                .dst_mask(
-                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                    vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-                );
-
-            let render_target_barrier = GfxImageBarrier::new()
-                .image(render_target_texture.image().handle())
-                .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                .src_mask(renderer_data.render_target_barrier.src_stage, renderer_data.render_target_barrier.src_access)
-                .dst_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ);
-
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[swapchain_image_layout_transfer_barrier, render_target_barrier],
+                &[
+                    // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
+                    // 注1: 可能有 blend 操作，因此需要 COLOR_ATTACHMENT_READ
+                    // 注2: 这里的 bottom 表示 layout transfer 等待 present 完成
+                    GfxImageBarrier::new()
+                        .image(swapchain.current_image())
+                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                        .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                        .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
+                        .dst_mask(
+                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
+                        ),
+                    GfxImageBarrier::new()
+                        .image(render_target_texture.image().handle())
+                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                        .layout_transfer(vk::ImageLayout::GENERAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                        .src_mask(
+                            renderer_data.render_target_barrier.src_stage,
+                            renderer_data.render_target_barrier.src_access,
+                        )
+                        .dst_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ),
+                ],
             );
 
             self.gui_pass.draw(
@@ -178,19 +181,27 @@ impl MainWindow {
                 frame_label,
             );
 
-            // 将 swapchain image layout 转换为 PRESENT_SRC_KHR
-            // 注1: 这里的 top 表示 present 需要等待 layout transfer 完成
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
-                &[GfxImageBarrier::new()
-                    .image(swapchain.current_image())
-                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                    .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
-                    .src_mask(
-                        vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                        vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-                    )
-                    .dst_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())],
+                &[
+                    // 将 swapchain image layout 转换为 PRESENT_SRC_KHR
+                    // 注1: 这里的 top 表示 present 需要等待 layout transfer 完成
+                    GfxImageBarrier::new()
+                        .image(swapchain.current_image())
+                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                        .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
+                        .src_mask(
+                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
+                        )
+                        .dst_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty()),
+                    GfxImageBarrier::new()
+                        .image(render_target_texture.image().handle())
+                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                        .layout_transfer(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL, vk::ImageLayout::GENERAL)
+                        .src_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ)
+                        .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty()),
+                ],
             );
         }
         cmd.end();

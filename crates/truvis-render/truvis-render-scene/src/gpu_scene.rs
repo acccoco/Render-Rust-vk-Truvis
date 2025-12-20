@@ -16,7 +16,7 @@ use truvis_gfx::{
 };
 use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::guid_new_type::{InstanceHandle, MaterialHandle, MeshHandle};
-use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_render_base::bindless_manager::{BindlessManager, BindlessSrvHandle};
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
@@ -153,8 +153,8 @@ impl GpuScene {
         let sky_texture_handle = gfx_resource_manager.register_texture(sky_texture);
         let uv_checker_texture_handle = gfx_resource_manager.register_texture(uv_checker_texture);
 
-        bindless_manager.register_texture2(sky_texture_handle);
-        bindless_manager.register_texture2(uv_checker_texture_handle);
+        bindless_manager.register_srv_with_texture(sky_texture_handle);
+        bindless_manager.register_srv_with_texture(uv_checker_texture_handle);
 
         Self {
             flatten_instances: vec![],
@@ -301,8 +301,10 @@ impl GpuScene {
             point_light_count: scene_manager.point_light_map().len() as u32,
             spot_light_count: 0, // TODO 暂时无用
 
-            sky: bindless_manager.get_texture_handle(self.sky_texture_handle).unwrap().0,
-            uv_checker: bindless_manager.get_texture_handle(self.uv_checker_texture_handle).unwrap().0,
+            sky: bindless_manager.get_shader_srv_handle_with_texture(self.sky_texture_handle).0,
+            sky_sampler_type: truvisl::ESamplerType_LinearClamp,
+            uv_checker: bindless_manager.get_shader_srv_handle_with_texture(self.uv_checker_texture_handle).0,
+            uv_checker_sampler_type: truvisl::ESamplerType_LinearClamp,
         };
 
         cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.vk_buffer(), 0, bytemuck::bytes_of(&scene_data));
@@ -421,14 +423,14 @@ impl GpuScene {
         for (mat_idx, mat_handle) in self.flatten_materials.iter().enumerate() {
             let mat = scene_manager.mat_map().get(*mat_handle).unwrap();
 
-            let diffuse_bindless_handle = scene_manager
-                .get_texture(&mat.diffuse_map)
-                .and_then(|tex_handle| bindless_manager.get_texture_handle(tex_handle))
-                .unwrap_or_default();
-            let normal_bindless_handle = scene_manager
-                .get_texture(&mat.normal_map)
-                .and_then(|tex_handle| bindless_manager.get_texture_handle(tex_handle))
-                .unwrap_or_default();
+            let diffuse_bindless_handle =
+                scene_manager.get_texture(&mat.diffuse_map).map_or(BindlessSrvHandle::null(), |tex_handle| {
+                    bindless_manager.get_shader_srv_handle_with_texture(tex_handle)
+                });
+            let normal_bindless_handle =
+                scene_manager.get_texture(&mat.normal_map).map_or(BindlessSrvHandle::null(), |tex_handle| {
+                    bindless_manager.get_shader_srv_handle_with_texture(tex_handle)
+                });
 
             material_buffer_slices[mat_idx] = truvisl::PBRMaterial {
                 base_color: mat.base_color.xyz().into(),
@@ -436,9 +438,13 @@ impl GpuScene {
                 metallic: mat.metallic,
                 roughness: mat.roughness,
                 diffuse_map: diffuse_bindless_handle.0,
+                diffuse_map_sampler_type: truvisl::ESamplerType_LinearRepeat,
                 normal_map: normal_bindless_handle.0,
+                normal_map_sampler_type: truvisl::ESamplerType_LinearRepeat,
                 opaque: mat.opaque,
                 _padding_1: Default::default(),
+                _padding_2: Default::default(),
+                _padding_3: Default::default(),
             };
         }
 
@@ -564,7 +570,7 @@ impl GpuScene {
         let tlas = GfxAcceleration::build_tlas_sync(
             &instance_infos,
             vk::BuildAccelerationStructureFlagsKHR::empty(),
-            "scene tlas",
+            format!("scene-{}-{}", frame_counter.frame_label(), frame_counter.frame_id),
         );
 
         self.gpu_scene_buffers[*frame_counter.frame_label()].tlas = Some(tlas);

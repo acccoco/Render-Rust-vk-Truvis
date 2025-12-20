@@ -1,4 +1,5 @@
 use ash::vk;
+use itertools::Itertools;
 use slotmap::Key;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_gfx::{
@@ -31,10 +32,13 @@ impl FifBuffers {
         frame_settigns: &FrameSettings,
         bindless_manager: &mut BindlessManager,
         gfx_resource_manager: &mut GfxResourceManager,
+        frame_counter: &FrameCounter,
     ) -> Self {
-        let (color_image, color_image_view) = Self::create_color_image(gfx_resource_manager, frame_settigns);
-        let (depth_image, depth_image_view) = Self::create_depth_image(gfx_resource_manager, frame_settigns);
-        let render_targets = Self::create_render_targets(gfx_resource_manager, frame_settigns);
+        let (color_image, color_image_view) =
+            Self::create_color_image(gfx_resource_manager, frame_settigns, frame_counter);
+        let (depth_image, depth_image_view) =
+            Self::create_depth_image(gfx_resource_manager, frame_settigns, frame_counter);
+        let render_targets = Self::create_render_targets(gfx_resource_manager, frame_settigns, frame_counter);
 
         let fif_buffers = Self {
             accum_image: color_image,
@@ -53,24 +57,25 @@ impl FifBuffers {
         bindless_manager: &mut BindlessManager,
         gfx_resource_manager: &mut GfxResourceManager,
         frame_settings: &FrameSettings,
+        frame_counter: &FrameCounter,
     ) {
         self.destroy_mut(bindless_manager, gfx_resource_manager);
-        *self = Self::new(frame_settings, bindless_manager, gfx_resource_manager);
+        *self = Self::new(frame_settings, bindless_manager, gfx_resource_manager, frame_counter);
     }
 
     fn register_bindless(&self, bindless_manager: &mut BindlessManager) {
-        bindless_manager.register_image2(self.accum_image_view);
+        bindless_manager.register_uav(self.accum_image_view);
         for render_target in &self.off_screen_targets {
-            bindless_manager.register_texture2(*render_target);
-            bindless_manager.register_image_in_texture(*render_target);
+            bindless_manager.register_srv_with_texture(*render_target);
+            bindless_manager.register_uav_with_texture(*render_target);
         }
     }
 
     fn unregister_bindless(&self, bindless_manager: &mut BindlessManager) {
-        bindless_manager.unregister_image(self.accum_image_view);
+        bindless_manager.unregister_uav(self.accum_image_view);
         for render_target in &self.off_screen_targets {
-            bindless_manager.unregister_texture2(*render_target);
-            bindless_manager.unregister_image_in_texture(*render_target);
+            bindless_manager.unregister_srv_with_texture(*render_target);
+            bindless_manager.unregister_uav_with_texture(*render_target);
         }
     }
 
@@ -78,6 +83,7 @@ impl FifBuffers {
     fn create_color_image(
         gfx_resource_manager: &mut GfxResourceManager,
         frame_settings: &FrameSettings,
+        frame_counter: &FrameCounter,
     ) -> (GfxImageHandle, GfxImageViewHandle) {
         let color_image_create_info = GfxImageCreateInfo::new_image_2d_info(
             frame_settings.frame_extent,
@@ -91,10 +97,10 @@ impl FifBuffers {
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
             },
-            "fif-buffer-color",
+            &format!("fif-buffer-color-{}", frame_counter.frame_id),
         );
 
-        // layout transfer
+        // 将 layout 设置为 general
         Gfx::get().one_time_exec(
             |cmd| {
                 cmd.image_memory_barrier(
@@ -114,7 +120,7 @@ impl FifBuffers {
         let color_image_view_handle = gfx_resource_manager.try_create_image_view(
             color_image_handle,
             GfxImageViewDesc::new_2d(frame_settings.color_format, vk::ImageAspectFlags::COLOR),
-            "fif-buffer-color",
+            format!("fif-buffer-color-{}", frame_counter.frame_id),
         );
 
         (color_image_handle, color_image_view_handle)
@@ -123,6 +129,7 @@ impl FifBuffers {
     fn create_depth_image(
         gfx_resource_manager: &mut GfxResourceManager,
         frame_settings: &FrameSettings,
+        frame_counter: &FrameCounter,
     ) -> (GfxImageHandle, GfxImageViewHandle) {
         let depth_image_create_info = GfxImageCreateInfo::new_image_2d_info(
             frame_settings.frame_extent,
@@ -135,13 +142,13 @@ impl FifBuffers {
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
             },
-            "fif-buffer-depth",
+            &format!("fif-buffer-depth-{}", frame_counter.frame_id),
         );
         let depth_image_handle = gfx_resource_manager.register_image(depth_image);
         let depth_image_view_handle = gfx_resource_manager.try_create_image_view(
             depth_image_handle,
             GfxImageViewDesc::new_2d(frame_settings.depth_format, vk::ImageAspectFlags::DEPTH),
-            "fif-buffer-depth",
+            format!("fif-buffer-depth-{}", frame_counter.frame_id),
         );
 
         (depth_image_handle, depth_image_view_handle)
@@ -150,9 +157,10 @@ impl FifBuffers {
     fn create_render_targets(
         gfx_resource_manager: &mut GfxResourceManager,
         frame_settings: &FrameSettings,
+        frame_counter: &FrameCounter,
     ) -> [GfxTextureHandle; FrameCounter::fif_count()] {
-        let mut create_texture = |fif_labe: FrameLabel| {
-            let name = format!("render-target-{}", fif_labe);
+        let create_texture = |fif_labe: FrameLabel| {
+            let name = format!("render-target-{}-{}", fif_labe, frame_counter.frame_id);
 
             let image_create_info = GfxImageCreateInfo::new_image_2d_info(
                 frame_settings.frame_extent,
@@ -171,11 +179,31 @@ impl FifBuffers {
                 },
                 &name,
             );
-            let texture = GfxTexture::new(color_image, &name);
-            gfx_resource_manager.register_texture(texture)
+            GfxTexture::new(color_image, &name)
         };
+        let textures = FrameCounter::frame_labes().map(create_texture);
 
-        FrameCounter::frame_labes().map(create_texture)
+        // 将 layout 设置为 general
+        Gfx::get().one_time_exec(
+            |cmd| {
+                let image_barriers = textures
+                    .iter()
+                    .map(|texture| {
+                        GfxImageBarrier::default()
+                            .image(texture.image().handle())
+                            .src_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())
+                            .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
+                            .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL)
+                            .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    })
+                    .collect_vec();
+
+                cmd.image_memory_barrier(vk::DependencyFlags::empty(), &image_barriers);
+            },
+            "transfer-fif-buffer-render-target-layout",
+        );
+
+        textures.map(|texture| gfx_resource_manager.register_texture(texture))
     }
 }
 // destroy

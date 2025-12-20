@@ -125,7 +125,7 @@ impl Gui {
             GfxTexture::new(image, "imgui-fonts")
         };
         let fonts_texture_handle = gfx_resource_manager.register_texture(fonts_texture);
-        bindless_manager.register_texture2(fonts_texture_handle);
+        bindless_manager.register_srv_with_texture(fonts_texture_handle);
         imgui_ctx.fonts().tex_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);
 
         fonts_texture_handle

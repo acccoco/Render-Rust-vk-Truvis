@@ -62,7 +62,7 @@ impl AsyncSubpass {
         );
 
         // Bindless Layout
-        let bindless_layout = &render_descriptor_sets.layout_0_bindless;
+        let bindless_layout = &render_descriptor_sets.layout_1_bindless;
 
         // Push Constants
         let push_constant_range =
@@ -129,7 +129,7 @@ impl AsyncSubpass {
 
             // Bind Bindless Descriptor Set
             let frame_label = render_context.frame_counter.frame_label();
-            let bindless_set = render_context.render_descriptor_sets.set_0_bindless[*frame_label].handle();
+            let bindless_set = render_context.render_descriptor_sets.set_1_bindless[*frame_label].handle();
             cmd.bind_descriptor_sets(
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout.handle(),

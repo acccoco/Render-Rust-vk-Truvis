@@ -27,7 +27,10 @@ impl<P: bytemuck::Pod> ComputeSubpass<P> {
                 .offset(0)
                 .size(size_of::<P>() as u32);
 
-            let descriptor_sets = [render_descriptor_sets.layout_0_bindless.handle()];
+            let descriptor_sets = [
+                render_descriptor_sets.layout_0_global.handle(),
+                render_descriptor_sets.layout_1_bindless.handle(),
+            ];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
@@ -62,7 +65,10 @@ impl<P: bytemuck::Pod> ComputeSubpass<P> {
             vk::PipelineBindPoint::COMPUTE,
             self.pipeline_layout,
             0,
-            &[render_context.render_descriptor_sets.current_bindless_descriptor_set(frame_label).handle()],
+            &[
+                render_context.render_descriptor_sets.set_0_global.handle(),
+                render_context.render_descriptor_sets.current_bindless_descriptor_set(frame_label).handle(),
+            ],
             None,
         );
 

@@ -19,6 +19,7 @@ use truvis_render_base::pipeline_settings::{
     AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings,
 };
 use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
+use truvis_render_base::sampler_manager::RenderSamplerManager;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::resources::fif_buffer::FifBuffers;
 use truvis_render_scene::gpu_scene::GpuScene;
@@ -79,13 +80,20 @@ impl Renderer {
         let mut gfx_resource_manager = GfxResourceManager::new();
         let mut cmd_allocator = CmdAllocator::new();
 
+        let frame_counter = FrameCounter {
+            frame_id: init_frame_id,
+            frame_limit: 60.0,
+        };
+
         let scene_manager = SceneManager::new();
         let asset_hub = AssetHub::new();
         let mut bindless_manager = BindlessManager::new();
         let gpu_scene = GpuScene::new(&mut gfx_resource_manager, &mut bindless_manager);
-        let fif_buffers = FifBuffers::new(&frame_settings, &mut bindless_manager, &mut gfx_resource_manager);
+        let fif_buffers =
+            FifBuffers::new(&frame_settings, &mut bindless_manager, &mut gfx_resource_manager, &frame_counter);
 
         let render_descriptor_sets = RenderDescriptorSets::new();
+        let sampler_manager = RenderSamplerManager::new(&render_descriptor_sets);
 
         let per_frame_data_buffers = FrameCounter::frame_labes().map(|frame_label| {
             GfxStructuredBuffer::<truvisl::PerFrameData>::new_ssbo(1, format!("per-frame-data-buffer-{frame_label}"))
@@ -105,14 +113,13 @@ impl Renderer {
                 per_frame_data_buffers,
                 gfx_resource_manager,
                 render_descriptor_sets,
+                sampler_manager,
+
                 delta_time_s: 0.0,
                 total_time_s: 0.0,
                 accum_data,
 
-                frame_counter: FrameCounter {
-                    frame_id: init_frame_id,
-                    frame_limit: 60.0,
-                },
+                frame_counter,
                 frame_settings,
                 pipeline_settings: PipelineSettings::default(),
             },
@@ -226,6 +233,7 @@ impl Renderer {
             &mut self.render_context.bindless_manager,
             &mut self.render_context.gfx_resource_manager,
             &self.render_context.frame_settings,
+            &self.render_context.frame_counter,
         );
     }
 

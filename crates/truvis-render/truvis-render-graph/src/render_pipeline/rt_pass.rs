@@ -58,14 +58,13 @@ impl RtRenderPass {
 
         let color_image = render_context.gfx_resource_manager.get_image(fif_buffers.color_image_handle()).unwrap();
         let _color_image_bindless_handle =
-            bindless_manager.get_image_handle(fif_buffers.color_image_view_handle()).unwrap();
+            bindless_manager.get_shader_uav_handle(fif_buffers.color_image_view_handle());
         let render_target_texture = render_context
             .gfx_resource_manager
             .get_texture(fif_buffers.render_target_texture_handle(frame_label))
             .unwrap();
-        let _render_target_image_bindless_handle = bindless_manager
-            .get_image_handle_in_texture(fif_buffers.render_target_texture_handle(frame_label))
-            .unwrap();
+        let _render_target_image_bindless_handle =
+            bindless_manager.get_shader_uav_handle_with_texture(fif_buffers.render_target_texture_handle(frame_label));
 
         let mut submit_cmds = Vec::new();
         // ray tracing

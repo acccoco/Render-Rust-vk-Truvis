@@ -1,15 +1,14 @@
 use ash::vk;
-use ash::vk::Handle;
-use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::image::GfxImage;
 use truvis_gfx::resources::image_view::GfxImageView;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
-use truvis_gfx::sampler_manager::GfxSamplerDesc;
+use truvis_shader_binding::truvisl;
 
 pub struct GfxTexture {
     image: GfxImage,
     image_view: GfxImageView,
-    sampler: vk::Sampler,
+    sampler_type: truvisl::ESamplerType,
+    sampler: Option<vk::Sampler>,
 
     #[cfg(debug_assertions)]
     _name: String,
@@ -17,7 +16,6 @@ pub struct GfxTexture {
 // new & init
 impl GfxTexture {
     pub fn new(image: GfxImage, name: &str) -> Self {
-        let sampler = Gfx::get().sampler_manager().get_sampler(&GfxSamplerDesc::default());
         let image_view = GfxImageView::new(
             image.handle(),
             GfxImageViewDesc::new_2d(image.format(), vk::ImageAspectFlags::COLOR),
@@ -27,7 +25,8 @@ impl GfxTexture {
         Self {
             image,
             image_view,
-            sampler,
+            sampler_type: truvisl::ESamplerType_LinearRepeat,
+            sampler: None,
 
             #[cfg(debug_assertions)]
             _name: name.to_string(),
@@ -42,19 +41,22 @@ impl GfxTexture {
     pub fn destroy_mut(&mut self) {
         self.image.destroy_mut();
         self.image_view.destroy_mut();
-        self.sampler = vk::Sampler::null();
     }
 }
 impl Drop for GfxTexture {
     fn drop(&mut self) {
-        debug_assert!(self.sampler.is_null(), "GfxTexture2 was not destroyed before drop");
+        assert!(self.sampler.is_none());
     }
 }
 // getters
 impl GfxTexture {
     #[inline]
     pub fn sampler(&self) -> vk::Sampler {
-        self.sampler
+        self.sampler.unwrap()
+    }
+    #[inline]
+    pub fn sampler_type(&self) -> truvisl::ESamplerType {
+        self.sampler_type
     }
 
     #[inline]

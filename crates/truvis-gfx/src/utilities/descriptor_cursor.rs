@@ -28,10 +28,12 @@ impl GfxWriteDescriptorSet {
             descriptor_count = 1;
             valid_count += 1;
         }
+
         assert_eq!(
             valid_count, 1,
             "Only one of buffer_infos, image_infos, or acceleration_structures should be set in GfxWriteDescriptorSet"
         );
+
         vk::WriteDescriptorSet {
             dst_set: self.dst_set,
             dst_binding: self.dst_binding,

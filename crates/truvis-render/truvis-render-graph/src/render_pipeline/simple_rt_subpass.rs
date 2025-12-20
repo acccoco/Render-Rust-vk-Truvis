@@ -333,7 +333,8 @@ impl SimpleRtSubpass {
 
         let pipeline_layout = {
             let descriptor_sets = [
-                render_descriptor_sets.layout_0_bindless.handle(),
+                render_descriptor_sets.layout_0_global.handle(),
+                render_descriptor_sets.layout_1_bindless.handle(),
                 rt_descriptor_set_layout.handle(),
             ];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
@@ -382,7 +383,7 @@ impl SimpleRtSubpass {
     pub fn ray_trace(&self, render_context: &RenderContext, cmd: &GfxCommandBuffer, pass_data: SimpleRtPassData) {
         let frame_label = render_context.frame_counter.frame_label();
 
-        let _rt_handle = render_context.bindless_manager.get_image_handle(pass_data.accum_image_view).unwrap();
+        let _rt_handle = render_context.bindless_manager.get_shader_uav_handle(pass_data.accum_image_view);
         let rt_image = render_context.gfx_resource_manager.get_image(pass_data.accum_image).unwrap().handle();
         let rt_image_view =
             render_context.gfx_resource_manager.get_image_view(pass_data.accum_image_view).unwrap().handle();
@@ -394,7 +395,7 @@ impl SimpleRtSubpass {
         cmd.push_descriptor_set(
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
-            1,
+            2,
             &[
                 SimpleRtDescriptorBinding::tlas().write_tals(
                     vk::DescriptorSet::null(),
@@ -418,7 +419,10 @@ impl SimpleRtSubpass {
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
             0,
-            &[render_descriptor_sets.current_bindless_descriptor_set(frame_label).handle()],
+            &[
+                render_descriptor_sets.set_0_global.handle(),
+                render_descriptor_sets.current_bindless_descriptor_set(frame_label).handle(),
+            ],
             None,
         );
         let spp = 4;

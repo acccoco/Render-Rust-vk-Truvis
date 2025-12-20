@@ -1,6 +1,8 @@
 use std::{mem::offset_of, rc::Rc};
 use truvis_crate_tools::count_indexed_array;
 
+use crate::gui::core::Gui;
+use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
 use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::enumed_map;
@@ -16,10 +18,8 @@ use truvis_gfx::{
 use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_shader_binding::truvisl::SrvHandle;
 use truvis_shader_binding::{truvisl, truvisl::TextureHandle};
-
-use crate::gui::core::Gui;
-use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
 
 enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {
@@ -38,10 +38,14 @@ pub struct GuiPass {
     pipeline: GfxGraphicsPipeline,
     pipeline_layout: Rc<GfxPipelineLayout>,
 }
+// new & init
 impl GuiPass {
     pub fn new(render_descriptor_sets: &RenderDescriptorSets, color_format: vk::Format) -> Self {
         let pipeline_layout = Rc::new(GfxPipelineLayout::new(
-            &[render_descriptor_sets.layout_0_bindless.handle()],
+            &[
+                render_descriptor_sets.layout_0_global.handle(),
+                render_descriptor_sets.layout_1_bindless.handle(),
+            ],
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 offset: 0,
@@ -85,7 +89,9 @@ impl GuiPass {
             pipeline_layout,
         }
     }
-
+}
+// draw
+impl GuiPass {
     pub fn draw(
         &self,
         render_context: &RenderContext,
@@ -133,7 +139,7 @@ impl GuiPass {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
         cmd.cmd_set_viewport(0, std::slice::from_ref(&viewport));
 
-        let push_constant = truvisl::imgui::PushConstant {
+        let mut push_constant = truvisl::imgui::PushConstant {
             ortho: glam::Mat4::orthographic_rh(
                 0.0,
                 draw_data.display_size[0],
@@ -143,8 +149,12 @@ impl GuiPass {
                 1.0,
             )
             .into(),
-            texture: TextureHandle { index: 0 },
-            _padding_0: 0,
+            texture: SrvHandle {
+                index: truvisl::INVALID_TEX_ID,
+            },
+            texture_sampler_type: truvisl::ESamplerType_LinearRepeat,
+            _padding_0: Default::default(),
+            _padding_1: Default::default(),
         };
 
         let render_descriptor_sets = &render_context.render_descriptor_sets;
@@ -152,7 +162,10 @@ impl GuiPass {
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),
             0,
-            &[render_descriptor_sets.set_0_bindless[*frame_label].handle()],
+            &[
+                render_descriptor_sets.set_0_global.handle(),
+                render_descriptor_sets.set_1_bindless[*frame_label].handle(),
+            ],
             None,
         );
 
@@ -210,15 +223,16 @@ impl GuiPass {
                         // 不是同一个，则需要重新加载
                         if Some(texture_id) != last_texture_id {
                             let texture_handle = get_texture_handle(texture_id);
-                            let texture_bindless_handle = bindless_manager
-                                .get_texture_handle(texture_handle)
-                                .unwrap_or_else(|| panic!("Texture not found: {:?}", texture_id));
+                            let texture_bindless_handle =
+                                bindless_manager.get_shader_srv_handle_with_texture(texture_handle);
+
+                            push_constant.texture = texture_bindless_handle.0;
 
                             cmd.cmd_push_constants(
                                 self.pipeline_layout.handle(),
                                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                                offset_of!(truvisl::imgui::PushConstant, texture) as u32,
-                                bytemuck::bytes_of(&texture_bindless_handle.0),
+                                0,
+                                bytemuck::bytes_of(&push_constant),
                             );
                             last_texture_id = Some(texture_id);
                         }

@@ -4,7 +4,6 @@ use std::ffi::CStr;
 use ash::vk;
 
 use crate::gfx_core::GfxCore;
-use crate::sampler_manager::GfxSamplerManager;
 use crate::{
     commands::{
         command_buffer::GfxCommandBuffer,
@@ -35,8 +34,6 @@ pub struct Gfx {
 
     /// 临时的 graphics command pool，主要用于临时的命令缓冲区
     pub(crate) temp_graphics_command_pool: GfxCommandPool,
-
-    pub(crate) sampler_manager: RefCell<GfxSamplerManager>,
 }
 
 // 创建与销毁
@@ -62,13 +59,10 @@ impl Gfx {
             &gfx_core.gfx_device,
         );
 
-        let sampler_manager = GfxSamplerManager::new(gfx_core.gfx_device.clone());
-
         Self {
             gfx_core,
             vm_allocator: allocator,
             temp_graphics_command_pool: gfx_command_pool,
-            sampler_manager: RefCell::new(sampler_manager),
         }
     }
 }
@@ -128,7 +122,6 @@ impl Gfx {
             let ptr = std::ptr::addr_of_mut!(G_GFX);
             let context = (*ptr).take().expect("RenderContext not initialized");
 
-            context.sampler_manager.borrow_mut().destroy();
             context.vm_allocator.destroy();
             context.temp_graphics_command_pool.destroy_internal(&context.gfx_core.gfx_device);
             context.gfx_core.destroy();
@@ -186,11 +179,6 @@ impl Gfx {
     #[inline]
     pub fn transfer_queue(&self) -> &GfxCommandQueue {
         &self.gfx_core.transfer_queue
-    }
-
-    #[inline]
-    pub fn sampler_manager(&self) -> RefMut<'_, GfxSamplerManager> {
-        self.sampler_manager.borrow_mut()
     }
 
     /// 当 uniform buffer 的 descriptor 在更新时，其 offset 必须是这个值的整数倍

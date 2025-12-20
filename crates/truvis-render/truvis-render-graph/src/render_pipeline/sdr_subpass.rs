@@ -52,9 +52,9 @@ impl SdrSubpass {
     }
 
     pub fn exec(&self, cmd: &GfxCommandBuffer, data: SdrSubpassData, render_context: &RenderContext) {
-        let src_image_bindless_handle = render_context.bindless_manager.get_image_handle(data.src_image).unwrap();
+        let src_image_bindless_handle = render_context.bindless_manager.get_shader_uav_handle(data.src_image);
         let dst_image_bindless_handle =
-            render_context.bindless_manager.get_image_handle_in_texture(data.dst_image).unwrap();
+            render_context.bindless_manager.get_shader_uav_handle_with_texture(data.dst_image);
 
         self.sdr_pass.exec(
             cmd,

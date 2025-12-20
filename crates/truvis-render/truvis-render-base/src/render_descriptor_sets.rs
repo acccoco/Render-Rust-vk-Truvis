@@ -21,9 +21,19 @@ pub struct BindlessDescriptorBinding {
     #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR | COMPUTE"]
     #[count = 128]
     #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
-    _images: (),
+    _uavs: (),
 
     #[binding = 2]
+    #[descriptor_type = "SAMPLED_IMAGE"]
+    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR | COMPUTE"]
+    #[count = 128]
+    #[flags = "PARTIALLY_BOUND | UPDATE_AFTER_BIND"]
+    _srvs: (),
+}
+
+#[derive(DescriptorBinding)]
+pub struct GlobalDescriptorBinding {
+    #[binding = 0]
     #[descriptor_type = "SAMPLER"]
     #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR | COMPUTE"]
     #[count = 32]
@@ -32,8 +42,11 @@ pub struct BindlessDescriptorBinding {
 }
 
 pub struct RenderDescriptorSets {
-    pub layout_0_bindless: GfxDescriptorSetLayout<BindlessDescriptorBinding>,
-    pub set_0_bindless: [GfxDescriptorSet<BindlessDescriptorBinding>; FrameCounter::fif_count()],
+    pub layout_0_global: GfxDescriptorSetLayout<GlobalDescriptorBinding>,
+    pub set_0_global: GfxDescriptorSet<GlobalDescriptorBinding>,
+
+    pub layout_1_bindless: GfxDescriptorSetLayout<BindlessDescriptorBinding>,
+    pub set_1_bindless: [GfxDescriptorSet<BindlessDescriptorBinding>; FrameCounter::fif_count()],
 
     _descriptor_pool: GfxDescriptorPool,
 }
@@ -54,9 +67,20 @@ impl RenderDescriptorSets {
             )
         });
 
+        let global_layout = GfxDescriptorSetLayout::<GlobalDescriptorBinding>::new(
+            vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
+            "global-layout",
+        );
+        let global_descriptor_set =
+            GfxDescriptorSet::<GlobalDescriptorBinding>::new(&descriptor_pool, &global_layout, "global-descriptor-set");
+
         Self {
-            layout_0_bindless: bindless_layout,
-            set_0_bindless: bindless_descriptor_sets,
+            layout_0_global: global_layout,
+            set_0_global: global_descriptor_set,
+
+            layout_1_bindless: bindless_layout,
+            set_1_bindless: bindless_descriptor_sets,
+
             _descriptor_pool: descriptor_pool,
         }
     }
@@ -65,6 +89,7 @@ impl RenderDescriptorSets {
         let pool_size = [
             (vk::DescriptorType::COMBINED_IMAGE_SAMPLER, 512),
             (vk::DescriptorType::STORAGE_IMAGE, 512),
+            (vk::DescriptorType::SAMPLED_IMAGE, 512),
             (vk::DescriptorType::SAMPLER, 32),
         ]
         .iter()
@@ -109,6 +134,6 @@ impl RenderDescriptorSets {
         &self,
         frame_label: FrameLabel,
     ) -> &GfxDescriptorSet<BindlessDescriptorBinding> {
-        &self.set_0_bindless[*frame_label]
+        &self.set_1_bindless[*frame_label]
     }
 }

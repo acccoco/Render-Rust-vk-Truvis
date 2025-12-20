@@ -287,7 +287,7 @@ void diffuse_callable(inout MatPayload payload)
     PBRMaterial* mat = push_const.scene.get_material(payload.instance_id, payload.geometry_id);
     if (mat.diffuse_map.is_valid())
     {
-        payload.out_color = mat.diffuse_map.sample_level(payload.uv, 0.0).xyz;
+        payload.out_color = mat.diffuse_map.sample_level(payload.uv, mat.diffuse_map_sampler_type, 0.0).xyz;
     }
     else
     {
@@ -312,7 +312,7 @@ void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttribute
     const float2 interp_uv = geometry.get_interp_uv(triangle, attr.barycentrics);
 
     // 当前命中位置 diffuse 贴图是透的，直接忽略该命中
-    const float4 base_color = mat.diffuse_map.sample_level(interp_uv, 0.0);
+    const float4 base_color = mat.diffuse_map.sample_level(interp_uv, mat.diffuse_map_sampler_type, 0.0);
     if (base_color.w == 0.f)
     {
         IgnoreHit();
@@ -338,7 +338,7 @@ void sky_miss(inout HitPayload payload)
     // phi: [-pi, pi] -> [0, 1]
     // theta: [-pi/2, pi/2] -> [1, 0]
     const float2 uv = float2(angle.x / M_PI * 0.5 + 0.5, 0.5 - angle.y / M_PI);
-    payload.radiance = float3(push_const.scene.sky.sample_level(uv, 0.0).xyz) * 8.f;
+    payload.radiance = float3(push_const.scene.sky.sample_level(uv, push_const.scene.sky_sampler_type, 0.0).xyz) * 8.f;
     payload.done = true;
 }
 

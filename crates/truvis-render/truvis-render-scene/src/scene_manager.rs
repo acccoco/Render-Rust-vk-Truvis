@@ -105,7 +105,7 @@ impl SceneManager {
                         let texture = GfxTexture::new(image, &mat.diffuse_map);
                         gfx_resource_manager.register_texture(texture)
                     });
-                    bindless_manager.register_texture2(*entry);
+                    bindless_manager.register_srv_with_texture(*entry);
                 }
 
                 self.all_mats.insert(mat)

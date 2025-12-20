@@ -43,7 +43,7 @@ impl PhongSubpass {
         );
 
         let pipeline_layout = Rc::new(GfxPipelineLayout::new(
-            &[render_descriptor_sets.layout_0_bindless.handle()],
+            &[render_descriptor_sets.layout_1_bindless.handle()],
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .offset(0)
@@ -89,7 +89,7 @@ impl PhongSubpass {
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline.layout(),
             0,
-            &[render_descriptor_sets.set_0_bindless[*frame_idx].handle()],
+            &[render_descriptor_sets.set_1_bindless[*frame_idx].handle()],
             None,
         );
     }

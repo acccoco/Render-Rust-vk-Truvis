@@ -1,9 +1,10 @@
 use crate::foundation::device::GfxDevice;
+use crate::gfx::Gfx;
 use ash::vk;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::rc::Rc;
 
-// TODO Sampler manager 应该放到 renderer 层级，而不是 GFX 层级
 // Sampler descriptor
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct GfxSamplerDesc {
@@ -16,7 +17,6 @@ pub struct GfxSamplerDesc {
     pub compare_op: Option<vk::CompareOp>,
     pub mipmap_mode: vk::SamplerMipmapMode,
 }
-
 impl Default for GfxSamplerDesc {
     fn default() -> Self {
         Self {
@@ -32,40 +32,12 @@ impl Default for GfxSamplerDesc {
     }
 }
 
-// Sampler manager
-pub struct GfxSamplerManager {
-    samplers: HashMap<GfxSamplerDesc, vk::Sampler>, // deduplicate identical sampler
-
-    device: Rc<GfxDevice>,
+pub struct GfxSampler {
+    handle: vk::Sampler,
 }
-
-impl GfxSamplerManager {
-    pub fn new(device: Rc<GfxDevice>) -> Self {
-        Self {
-            samplers: HashMap::new(),
-            device,
-        }
-    }
-
-    pub fn get_sampler(&mut self, desc: &GfxSamplerDesc) -> vk::Sampler {
-        if let Some(&sampler) = self.samplers.get(desc) {
-            sampler
-        } else {
-            let vk_sampler = Self::create_vk_sampler(&self.device, desc);
-            self.samplers.insert(*desc, vk_sampler);
-            vk_sampler
-        }
-    }
-
-    pub fn destroy(&mut self) {
-        for (_, sampler) in self.samplers.drain() {
-            unsafe {
-                self.device.destroy_sampler(sampler, None);
-            }
-        }
-    }
-
-    fn create_vk_sampler(device: &GfxDevice, desc: &GfxSamplerDesc) -> vk::Sampler {
+// new & init
+impl GfxSampler {
+    pub fn new(desc: &GfxSamplerDesc, name: impl AsRef<str>) -> Self {
         let mut create_info = vk::SamplerCreateInfo::default()
             .mag_filter(desc.mag_filter)
             .min_filter(desc.min_filter)
@@ -89,6 +61,24 @@ impl GfxSamplerManager {
             create_info = create_info.compare_enable(false);
         }
 
-        unsafe { device.create_sampler(&create_info, None).expect("Failed to create sampler") }
+        let sampler =
+            unsafe { Gfx::get().gfx_device().create_sampler(&create_info, None).expect("Failed to create sampler") };
+        Gfx::get().gfx_device().set_object_debug_name(sampler, name.as_ref());
+
+        Self { handle: sampler }
+    }
+}
+// getters
+impl GfxSampler {
+    #[inline]
+    pub fn handle(&self) -> vk::Sampler {
+        self.handle
+    }
+}
+impl Drop for GfxSampler {
+    fn drop(&mut self) {
+        unsafe {
+            Gfx::get().gfx_device().destroy_sampler(self.handle, None);
+        }
     }
 }

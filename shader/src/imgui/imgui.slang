@@ -58,6 +58,6 @@ PsOutput psmain(PsInput input)
 {
     PsOutput output = (PsOutput)0;
 
-    output.color = input.coarse_vertex.color * push_constant.texture.sample(input.coarse_vertex.uv);
+    output.color = input.coarse_vertex.color * push_constant.texture.sample(input.coarse_vertex.uv, push_constant.texture_sampler_type);
     return output;
 }
