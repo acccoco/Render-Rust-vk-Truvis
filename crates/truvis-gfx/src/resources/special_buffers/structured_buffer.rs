@@ -17,7 +17,7 @@ pub struct GfxStructuredBuffer<T: bytemuck::Pod> {
 impl_derive_buffer!(GfxStructuredBuffer<T: bytemuck::Pod>, GfxBuffer, inner);
 impl<T: bytemuck::Pod> GfxStructuredBuffer<T> {
     #[inline]
-    pub fn new_ubo(len: usize, debug_name: impl AsRef<str>) -> Self {
+    pub fn new_ssbo(len: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new(
             debug_name,
             len,
@@ -26,6 +26,11 @@ impl<T: bytemuck::Pod> GfxStructuredBuffer<T> {
                 | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
             false,
         )
+    }
+
+    #[inline]
+    pub fn new_ubo(len: usize, debug_name: impl AsRef<str>) -> Self {
+        Self::new(debug_name, len, vk::BufferUsageFlags::UNIFORM_BUFFER | vk::BufferUsageFlags::TRANSFER_DST, false)
     }
 
     #[inline]
@@ -62,7 +67,7 @@ impl<T: bytemuck::Pod> DebugType for GfxStructuredBuffer<T> {
     }
 
     #[inline]
-    fn vk_handle(&self) -> impl Handle {
+    fn vk_handle(&self) -> impl vk::Handle {
         self.vk_buffer()
     }
 }

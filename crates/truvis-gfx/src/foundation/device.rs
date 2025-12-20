@@ -6,7 +6,7 @@ use std::{
     ops::Deref,
 };
 
-use crate::{foundation::debug_messenger::DebugType, utilities::shader_cursor::GfxWriteDescriptorSet};
+use crate::{foundation::debug_messenger::DebugType, utilities::descriptor_cursor::GfxWriteDescriptorSet};
 
 /// Vulkan 逻辑设备封装
 ///
@@ -84,13 +84,17 @@ impl GfxDevice {
             debug_utils: vk_debug_utils_device,
             swapchain: _vk_swapchain,
 
+            #[cfg(debug_assertions)]
             destroyed: Cell::new(false),
         }
     }
 
     pub fn destroy(&self) {
         log::info!("destroying device");
+
+        #[cfg(debug_assertions)]
         self.destroyed.set(true);
+
         unsafe {
             self.device.destroy_device(None);
         }
@@ -126,6 +130,7 @@ impl GfxDevice {
                     .descriptor_binding_storage_image_update_after_bind(true)
                     .descriptor_binding_variable_descriptor_count(true),
             ),
+            Box::new(vk::PhysicalDeviceShaderDrawParametersFeatures::default().shader_draw_parameters(true)),
         ]
     }
 
@@ -138,20 +143,22 @@ impl GfxDevice {
 
         // dynamic rendering
         exts.append(&mut vec![
-            ash::khr::depth_stencil_resolve::NAME,
-            ash::khr::create_renderpass2::NAME,
+            // 已经提升到 core-1.2.0
+            // ash::khr::depth_stencil_resolve::NAME,
+            // ash::khr::create_renderpass2::NAME,
             ash::khr::dynamic_rendering::NAME,
         ]);
 
         // RayTracing 相关的
         exts.append(&mut vec![
             ash::khr::acceleration_structure::NAME, // 主要的 ext
-            ash::ext::descriptor_indexing::NAME,
-            ash::khr::buffer_device_address::NAME,
+            // 已经提升到 core-1.2.0
+            // ash::ext::descriptor_indexing::NAME,
+            // ash::khr::buffer_device_address::NAME,
+            // ash::khr::spirv_1_4::NAME,
+            // ash::khr::shader_float_controls::NAME,
             ash::khr::ray_tracing_pipeline::NAME, // 主要的 ext
             ash::khr::deferred_host_operations::NAME,
-            ash::khr::spirv_1_4::NAME,
-            ash::khr::shader_float_controls::NAME,
         ]);
 
         exts

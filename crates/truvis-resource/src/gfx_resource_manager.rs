@@ -103,7 +103,10 @@ impl GfxResourceManager {
 }
 impl Drop for GfxResourceManager {
     fn drop(&mut self) {
-        debug_assert!(self.destroyed);
+        #[cfg(debug_assertions)]
+        {
+            assert!(self.destroyed);
+        }
     }
 }
 // Subsystem API

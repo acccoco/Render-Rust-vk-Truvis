@@ -40,39 +40,50 @@ struct GpuSceneBuffers {
     material_indirect_stage_buffer: GfxStructuredBuffer<u32>,
     geometry_indirect_buffer: GfxStructuredBuffer<u32>,
     geometry_indirect_stage_buffer: GfxStructuredBuffer<u32>,
+
+    // TODO 使用 frame id 来标记是否过期，scene manager 里面也需要有相应的标记
     tlas: Option<GfxAcceleration>,
 }
 // init & destroy
 impl GpuSceneBuffers {
-    fn new(frame_label: usize) -> Self {
+    fn new(frame_label: FrameLabel) -> Self {
         let max_light_cnt = 512;
         let max_material_cnt = 1024;
         let max_geometry_cnt = 1024 * 8;
         let max_instance_cnt = 1024;
 
         GpuSceneBuffers {
-            scene_buffer: GfxStructuredBuffer::new_ubo(1, format!("scene buffer-{}", frame_label)),
-            light_buffer: GfxStructuredBuffer::new_ubo(max_light_cnt, format!("light buffer-{}", frame_label)),
+            scene_buffer: GfxStructuredBuffer::new_ssbo(1, format!("scene buffer-{}", frame_label)),
+            light_buffer: GfxStructuredBuffer::new_ssbo(max_light_cnt, format!("light buffer-{}", frame_label)),
             light_stage_buffer: GfxStructuredBuffer::new_stage_buffer(
                 max_light_cnt,
                 format!("light stage buffer-{}", frame_label),
             ),
-            material_buffer: GfxStructuredBuffer::new_ubo(max_material_cnt, format!("material buffer-{}", frame_label)),
+            material_buffer: GfxStructuredBuffer::new_ssbo(
+                max_material_cnt,
+                format!("material buffer-{}", frame_label),
+            ),
             material_stage_buffer: GfxStructuredBuffer::new_stage_buffer(
                 max_material_cnt,
                 format!("material stage buffer-{}", frame_label),
             ),
-            geometry_buffer: GfxStructuredBuffer::new_ubo(max_geometry_cnt, format!("geometry buffer-{}", frame_label)),
+            geometry_buffer: GfxStructuredBuffer::new_ssbo(
+                max_geometry_cnt,
+                format!("geometry buffer-{}", frame_label),
+            ),
             geometry_stage_buffer: GfxStructuredBuffer::new_stage_buffer(
                 max_geometry_cnt,
                 format!("geometry stage buffer-{}", frame_label),
             ),
-            instance_buffer: GfxStructuredBuffer::new_ubo(max_instance_cnt, format!("instance buffer-{}", frame_label)),
+            instance_buffer: GfxStructuredBuffer::new_ssbo(
+                max_instance_cnt,
+                format!("instance buffer-{}", frame_label),
+            ),
             instance_stage_buffer: GfxStructuredBuffer::new_stage_buffer(
                 max_instance_cnt,
                 format!("instance stage buffer-{}", frame_label),
             ),
-            material_indirect_buffer: GfxStructuredBuffer::new_ubo(
+            material_indirect_buffer: GfxStructuredBuffer::new_ssbo(
                 max_instance_cnt * 8,
                 format!("instance material buffer-{}", frame_label),
             ),
@@ -80,7 +91,7 @@ impl GpuSceneBuffers {
                 max_instance_cnt * 8,
                 format!("instance material stage buffer-{}", frame_label),
             ),
-            geometry_indirect_buffer: GfxStructuredBuffer::new_ubo(
+            geometry_indirect_buffer: GfxStructuredBuffer::new_ssbo(
                 max_instance_cnt * 8,
                 format!("instance geometry buffer-{}", frame_label),
             ),
@@ -124,8 +135,8 @@ impl GpuScene {
     }
 
     #[inline]
-    pub fn scene_device_address(&self, frame_idx: FrameLabel) -> vk::DeviceAddress {
-        self.gpu_scene_buffers[*frame_idx].scene_buffer.device_address()
+    pub fn scene_buffer(&self, frame_label: FrameLabel) -> &GfxStructuredBuffer<truvisl::Scene> {
+        &self.gpu_scene_buffers[*frame_label].scene_buffer
     }
 }
 // new & init
@@ -151,7 +162,7 @@ impl GpuScene {
             flatten_meshes: IndexSet::default(),
             mesh_geometry_map: SecondaryMap::new(),
 
-            gpu_scene_buffers: FrameCounter::frame_labes().map(|frame_label| GpuSceneBuffers::new(*frame_label)),
+            gpu_scene_buffers: FrameCounter::frame_labes().map(GpuSceneBuffers::new),
 
             sky_texture_handle,
             uv_checker_texture_handle,
@@ -166,7 +177,6 @@ impl GpuScene {
     pub fn destroy(self) {}
     pub fn destroy_mut(&mut self) {}
 }
-
 // tools
 impl GpuScene {
     /// # Phase: Before Render

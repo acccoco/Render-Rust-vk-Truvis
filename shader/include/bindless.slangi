@@ -7,6 +7,9 @@ Sampler2D<float4> bindless_textures[];
 
 [[vk::binding(1, 0)]]
 RWTexture2D<float4> bindless_images[];
+
+[[vk::binding(2, 0)]]
+SamplerState bindless_samplers[];
 #endif
 
 const static int INVALID_TEX_ID = -1;

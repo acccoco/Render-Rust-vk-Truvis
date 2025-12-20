@@ -11,10 +11,11 @@ pub struct GfxBuffer {
 
     size: vk::DeviceSize,
 
+    /// 在初始化阶段写死
     map_ptr: Option<*mut u8>,
+    /// 只有在 buffer usage 包含 SHADER_DEVICE_ADDRESS 时才有值
     device_addr: Option<vk::DeviceAddress>,
 
-    #[cfg(debug_assertions)]
     debug_name: String,
 
     #[cfg(debug_assertions)]
@@ -100,10 +101,10 @@ impl GfxBuffer {
             map_ptr: mapped_ptr,
             device_addr,
 
+            debug_name: name.as_ref().to_string(),
+
             #[cfg(debug_assertions)]
             usage: buffer_usage,
-            #[cfg(debug_assertions)]
-            debug_name: name.as_ref().to_string(),
         }
     }
 
@@ -111,7 +112,9 @@ impl GfxBuffer {
     pub fn new_stage_buffer(size: vk::DeviceSize, debug_name: impl AsRef<str>) -> Self {
         Self::new(size, vk::BufferUsageFlags::TRANSFER_SRC, None, true, debug_name)
     }
-
+}
+// destroy
+impl GfxBuffer {
     #[inline]
     pub fn destroy(self) {
         drop(self)
@@ -126,10 +129,9 @@ impl GfxBuffer {
 
     #[inline]
     pub fn device_address(&self) -> vk::DeviceAddress {
-        self.device_addr.unwrap_or_else(|| {
-            let gfx_device = Gfx::get().gfx_device();
-            unsafe { gfx_device.get_buffer_device_address(&vk::BufferDeviceAddressInfo::default().buffer(self.handle)) }
-        })
+        self.device_addr.expect(
+            "Buffer does not have device address, please make sure the buffer usage contains SHADER_DEVICE_ADDRESS",
+        )
     }
 
     #[inline]

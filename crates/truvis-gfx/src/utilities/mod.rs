@@ -1,1 +1,1 @@
-pub mod shader_cursor;
+pub mod descriptor_cursor;

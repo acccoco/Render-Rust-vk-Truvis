@@ -3,6 +3,7 @@ use crate::graph::node::ImageNode;
 use crate::render_context::RenderContext;
 use ash::vk;
 use itertools::Itertools;
+use std::ops::Deref;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
@@ -316,6 +317,7 @@ impl SimpleRtSubpass {
 
             unsafe { Gfx::get().gfx_device().create_pipeline_layout(&pipeline_layout_ci, None).unwrap() }
         };
+        Gfx::get().gfx_device().set_object_debug_name(pipeline_layout, "simple-rt-pipeline-layout");
         let pipeline_ci = vk::RayTracingPipelineCreateInfoKHR::default()
             .stages(&stage_infos)
             .groups(&shader_groups)
@@ -365,13 +367,13 @@ impl SimpleRtSubpass {
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
             0,
-            &[render_descriptor_sets.set_0_bindless[*frame_label].handle()],
+            &[render_descriptor_sets.current_bindless_descriptor_set(frame_label).handle()],
             None,
         );
         let spp = 4;
         let mut push_constant = truvisl::rt::PushConstants {
-            frame_data: per_frame_data.device_address(),
-            scene: render_context.gpu_scene.scene_device_address(frame_label),
+            frame_data: render_context.per_frame_data_buffers[*frame_label].device_address(),
+            scene: render_context.gpu_scene.scene_buffer(frame_label).device_address(),
             rt_render_target: rt_handle.0,
             spp,
             spp_idx: 0,

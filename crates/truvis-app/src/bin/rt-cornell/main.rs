@@ -48,7 +48,7 @@ impl CornellApp {
         renderer.render_context.scene_manager.load_scene(
             &mut renderer.render_context.gfx_resource_manager,
             &mut renderer.render_context.bindless_manager,
-            TruvisPath::assets_path("blender/coord.fbx").as_ref(),
+            TruvisPath::assets_path("fbx/cube-coord.fbx").as_ref(),
             &glam::Mat4::IDENTITY,
         );
         log::info!("Scene loaded.");

@@ -19,7 +19,9 @@ pub struct RenderContext {
     pub bindless_manager: BindlessManager,
     pub per_frame_data_buffers: [GfxStructuredBuffer<truvisl::PerFrameData>; FrameCounter::fif_count()],
     pub gfx_resource_manager: GfxResourceManager,
+
     pub render_descriptor_sets: RenderDescriptorSets,
+
     pub delta_time_s: f32,
     pub total_time_s: f32,
     pub accum_data: AccumData,

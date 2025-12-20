@@ -90,7 +90,10 @@ impl GfxPhysicalDevice {
             log::debug!("physical device supports extensions: {}", device_extension_strs);
 
             // 找到所有的队列信息并打印出来
-            let queue_familiy_props = instance.get_physical_device_queue_family_properties(pdevice);
+
+            let props_cnt = instance.get_physical_device_queue_family_properties2_len(pdevice);
+            let mut queue_familiy_props = vec![vk::QueueFamilyProperties2::default(); props_cnt];
+            instance.get_physical_device_queue_family_properties2(pdevice, &mut queue_familiy_props);
             log::info!("physical device: queue family props:\n{:#?}", queue_familiy_props);
 
             // 找到符合条的 queue family
@@ -99,14 +102,14 @@ impl GfxPhysicalDevice {
                     .iter()
                     .enumerate()
                     .find(|(_, props)| {
-                        !(props.queue_flags & include_flags).is_empty()
-                            && (props.queue_flags & exclude_flags).is_empty()
+                        !(props.queue_family_properties.queue_flags & include_flags).is_empty()
+                            && (props.queue_family_properties.queue_flags & exclude_flags).is_empty()
                     })
                     .map(|(family_idx, props)| GfxQueueFamily {
                         name,
                         queue_family_index: family_idx as u32,
-                        queue_flags: props.queue_flags,
-                        queue_count: props.queue_count,
+                        queue_flags: props.queue_family_properties.queue_flags,
+                        queue_count: props.queue_family_properties.queue_count,
                     })
             };
 

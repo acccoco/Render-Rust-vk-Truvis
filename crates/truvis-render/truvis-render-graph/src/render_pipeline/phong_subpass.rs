@@ -125,7 +125,7 @@ impl PhongSubpass {
             &render_context.frame_settings.frame_extent.into(),
             &truvisl::raster::PushConstants {
                 frame_data: render_context.per_frame_data_buffers[*frame_label].device_address(),
-                scene: render_context.gpu_scene.scene_device_address(frame_label),
+                scene: render_context.gpu_scene.scene_buffer(frame_label).device_address(),
 
                 submesh_idx: 0,  // 这个值在 draw 时会被更新
                 instance_idx: 0, // 这个值在 draw 时会被更新

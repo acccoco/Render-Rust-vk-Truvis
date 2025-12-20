@@ -7,7 +7,6 @@ pub struct GfxImageView {
 
     desc: GfxImageViewDesc,
 
-    #[cfg(debug_assertions)]
     name: String,
 }
 impl DebugType for GfxImageView {
@@ -38,13 +37,12 @@ impl GfxImageView {
             ..Default::default()
         };
 
-        let handle = unsafe { gfx_device.create_image_view(&info, None).unwrap() };
+        let handle = unsafe { gfx_device.create_image_view(&info, None).expect("Failed to create GfxImageView") };
         let image_view = Self {
             handle,
 
             desc: view_desc,
 
-            #[cfg(debug_assertions)]
             name: name.as_ref().to_string(),
         };
         gfx_device.set_debug_name(&image_view, &name);

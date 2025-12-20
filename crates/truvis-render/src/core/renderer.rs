@@ -4,7 +4,9 @@ use ash::vk;
 use truvis_asset::asset_hub::AssetHub;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
+use truvis_gfx::foundation::debug_messenger::DebugType;
 use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
+use truvis_gfx::utilities::descriptor_cursor::GfxDescriptorCursor;
 use truvis_gfx::{
     commands::{
         barrier::{GfxBarrierMask, GfxBufferBarrier},
@@ -15,7 +17,9 @@ use truvis_gfx::{
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
-use truvis_render_base::pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings, PipelineSettings};
+use truvis_render_base::pipeline_settings::{
+    AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings,
+};
 use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_render_base::stage_buffer_manager::StageBufferManager;
 use truvis_render_graph::render_context::RenderContext;
@@ -87,7 +91,7 @@ impl Renderer {
         let render_descriptor_sets = RenderDescriptorSets::new();
 
         let per_frame_data_buffers = FrameCounter::frame_labes().map(|frame_label| {
-            GfxStructuredBuffer::<truvisl::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{frame_label}"))
+            GfxStructuredBuffer::<truvisl::PerFrameData>::new_ssbo(1, format!("per-frame-data-buffer-{frame_label}"))
         });
 
         let cmds = FrameCounter::frame_labes()
@@ -301,5 +305,16 @@ impl Renderer {
         );
         cmd.end();
         Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(std::slice::from_ref(&cmd))], None);
+    }
+}
+// getters
+impl Renderer {
+    #[inline]
+    pub fn frame_label(&self) -> FrameLabel {
+        self.render_context.frame_counter.frame_label()
+    }
+    #[inline]
+    pub fn frame_id(&self) -> usize {
+        self.render_context.frame_counter.frame_id
     }
 }

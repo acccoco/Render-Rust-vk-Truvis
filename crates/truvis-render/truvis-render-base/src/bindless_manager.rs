@@ -13,7 +13,7 @@ use truvis_gfx::{
         descriptor_pool::GfxDescriptorPool,
     },
     gfx::Gfx,
-    utilities::shader_cursor::GfxShaderCursor,
+    utilities::descriptor_cursor::GfxDescriptorCursor,
 };
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::{GfxImageViewHandle, GfxTextureHandle};
@@ -106,6 +106,11 @@ impl BindlessManager {
         }
     }
 }
+impl Default for BindlessManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 // destroy
 impl BindlessManager {
     pub fn destroy(self) {}
@@ -115,7 +120,7 @@ impl Drop for BindlessManager {
         log::info!("Dropping BindlessManager");
     }
 }
-// tools
+// update
 impl BindlessManager {
     /// # Phase: Before Render
     ///

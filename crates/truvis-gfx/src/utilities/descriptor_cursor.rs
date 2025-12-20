@@ -10,7 +10,6 @@ pub struct GfxWriteDescriptorSet {
     pub buffers: Vec<vk::DescriptorBufferInfo>,
     pub images: Vec<vk::DescriptorImageInfo>,
 }
-
 impl GfxWriteDescriptorSet {
     pub fn to_vk_type(&self) -> vk::WriteDescriptorSet<'_> {
         vk::WriteDescriptorSet {
@@ -28,7 +27,7 @@ impl GfxWriteDescriptorSet {
 }
 
 /// 用于通过 DescriptorBinding Item 来操作对应 descriptor set 的对应 binding
-pub trait GfxShaderCursor {
+pub trait GfxDescriptorCursor {
     fn get_binding(&self) -> &DescriptorBindingItem;
 
     /// 确保当前 descriptor 是 buffer
@@ -68,7 +67,7 @@ pub trait GfxShaderCursor {
     }
 }
 
-impl GfxShaderCursor for DescriptorBindingItem {
+impl GfxDescriptorCursor for DescriptorBindingItem {
     fn get_binding(&self) -> &DescriptorBindingItem {
         self
     }
