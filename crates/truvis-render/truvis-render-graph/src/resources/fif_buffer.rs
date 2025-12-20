@@ -1,5 +1,4 @@
 use ash::vk;
-use itertools::Itertools;
 use slotmap::Key;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_gfx::{
@@ -12,7 +11,7 @@ use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::{GfxImageHandle, GfxImageViewHandle, GfxTextureHandle};
-use truvis_resource::texture::GfxTexture2;
+use truvis_resource::texture::GfxTexture;
 
 /// 所有帧会用到的 buffers
 pub struct FifBuffers {
@@ -172,11 +171,11 @@ impl FifBuffers {
                 },
                 &name,
             );
-            let texture = GfxTexture2::new(color_image, &name);
+            let texture = GfxTexture::new(color_image, &name);
             gfx_resource_manager.register_texture(texture)
         };
 
-        FrameCounter::frame_labes().map(|frame_label| create_texture(frame_label))
+        FrameCounter::frame_labes().map(create_texture)
     }
 }
 // destroy

@@ -1,5 +1,4 @@
 use ash::vk;
-use itertools::Itertools;
 
 use crate::frame_counter::FrameCounter;
 use crate::pipeline_settings::FrameLabel;
@@ -27,6 +26,12 @@ pub struct CmdAllocator {
 }
 
 // new & init
+impl Default for CmdAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CmdAllocator {
     pub fn new() -> Self {
         let graphics_command_pools = FrameCounter::frame_labes().map(|i| {

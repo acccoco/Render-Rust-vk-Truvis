@@ -2,7 +2,6 @@ use crate::frame_counter::FrameCounter;
 use crate::pipeline_settings::FrameLabel;
 use ash::vk;
 use itertools::Itertools;
-use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_gfx::descriptors::descriptor::{GfxDescriptorSet, GfxDescriptorSetLayout};
 use truvis_gfx::descriptors::descriptor_pool::{GfxDescriptorPool, GfxDescriptorPoolCreateInfo};

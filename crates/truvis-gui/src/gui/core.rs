@@ -5,17 +5,14 @@ use ash::vk;
 use crate::gui::gui_mesh::GuiMesh;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::swapchain::render_swapchain::GfxSwapchainImageInfo;
-use truvis_gfx::{
-    basic::color::LabelColor, commands::command_buffer::GfxCommandBuffer, gfx::Gfx, resources::image::GfxImage,
-};
+use truvis_gfx::{basic::color::LabelColor, gfx::Gfx, resources::image::GfxImage};
 use truvis_render::core::renderer::Renderer;
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::FrameLabel;
-use truvis_render_graph::render_context::RenderContext;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
-use truvis_resource::texture::GfxTexture2;
+use truvis_resource::texture::GfxTexture;
 
 pub struct Gui {
     pub imgui_ctx: imgui::Context,
@@ -61,7 +58,7 @@ impl Gui {
             &mut renderer.render_context.gfx_resource_manager,
         );
 
-        let gui_meshes = FrameCounter::frame_labes().map(|frame_label| GuiMesh::new(frame_label));
+        let gui_meshes = FrameCounter::frame_labes().map(GuiMesh::new);
 
         Self {
             imgui_ctx,
@@ -125,7 +122,7 @@ impl Gui {
 
             let image =
                 GfxImage::from_rgba8(atlas_texture.width, atlas_texture.height, atlas_texture.data, "imgui-fonts");
-            GfxTexture2::new(image, "imgui-fonts")
+            GfxTexture::new(image, "imgui-fonts")
         };
         let fonts_texture_handle = gfx_resource_manager.register_texture(fonts_texture);
         bindless_manager.register_texture2(fonts_texture_handle);

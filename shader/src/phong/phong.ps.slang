@@ -22,8 +22,8 @@ PsOutput main(PsInput input)
 {
     const float3 normal = normalize(input.coarse_vertex.frag_normal);
 
-    PerFrameData* frame_data = push_const.frame_data;
-    Scene* scene = push_const.scene;
+    PerFrameData *frame_data = push_const.frame_data;
+    GPUScene* scene = push_const.scene;
     Instance* instance = scene.all_instances + push_const.instance_idx;
     PBRMaterial* mat = scene->get_material(push_const.instance_idx, push_const.submesh_idx);
 

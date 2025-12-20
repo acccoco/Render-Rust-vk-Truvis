@@ -9,7 +9,7 @@ use truvis_model_manager::guid_new_type::{InstanceHandle, LightHandle, MaterialH
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
-use truvis_resource::texture::{GfxTexture2, ImageLoader};
+use truvis_resource::texture::{GfxTexture, ImageLoader};
 use truvis_shader_binding::truvisl;
 
 /// 在 CPU 侧管理场景数据
@@ -102,7 +102,7 @@ impl SceneManager {
                     let entry = self.texture_map.entry(mat.diffuse_map.clone()).or_insert_with(|| {
                         let diffuse_map_path = PathBuf::from(&mat.diffuse_map);
                         let image = ImageLoader::load_image(&diffuse_map_path);
-                        let texture = GfxTexture2::new(image, &mat.diffuse_map);
+                        let texture = GfxTexture::new(image, &mat.diffuse_map);
                         gfx_resource_manager.register_texture(texture)
                     });
                     bindless_manager.register_texture2(*entry);

@@ -3,16 +3,27 @@
 #include "ptr.slangi"
 #include "scene.slangi"
 
+#ifdef __SLANG__
+
+[[vk::binding(0, 1)]]
+RaytracingAccelerationStructure rt_tlas;
+
+[[vk::binding(1, 1)]]
+RWTexture2D<float4> rt_color;
+
+#endif
+
 namespace rt
 {
+
 struct PushConstants
 {
     PTR(PerFrameData, frame_data);
-    PTR(Scene, scene);
+    PTR(GPUScene, scene);
 
-    ImageHandle rt_render_target;
     uint spp;
     uint spp_idx;
     uint channel;
+    uint _padding_1;
 };
 };

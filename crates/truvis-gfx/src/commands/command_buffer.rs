@@ -4,6 +4,7 @@ use itertools::Itertools;
 use crate::gfx::Gfx;
 use crate::resources::layout::GfxIndexType;
 use crate::resources::special_buffers::index_buffer::GfxIndexBuffer;
+use crate::utilities::descriptor_cursor::GfxWriteDescriptorSet;
 use crate::{
     basic::color::LabelColor,
     commands::{
@@ -226,6 +227,25 @@ impl GfxCommandBuffer {
                 dynamic_offsets.unwrap_or(&[]),
             );
         }
+    }
+
+    #[inline]
+    pub fn push_descriptor_set(
+        &self,
+        bind_point: vk::PipelineBindPoint,
+        pipeline_layout: vk::PipelineLayout,
+        set: u32,
+        writes: &[GfxWriteDescriptorSet],
+    ) {
+        GfxWriteDescriptorSet::with_writes(writes, |writes| unsafe {
+            Gfx::get().gfx_device().push_descriptor.cmd_push_descriptor_set(
+                self.vk_handle,
+                bind_point,
+                pipeline_layout,
+                set,
+                writes,
+            );
+        })
     }
 
     /// - command type: state

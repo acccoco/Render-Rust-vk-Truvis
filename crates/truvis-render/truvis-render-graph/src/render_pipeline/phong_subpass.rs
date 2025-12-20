@@ -1,6 +1,6 @@
 use crate::render_context::RenderContext;
 use ash::vk;
-use std::{cell::RefCell, mem::offset_of, rc::Rc};
+use std::{mem::offset_of, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
@@ -12,7 +12,6 @@ use truvis_gfx::{
     },
 };
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
-use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_shader_binding::truvisl;

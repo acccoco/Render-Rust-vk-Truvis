@@ -6,6 +6,12 @@ pub struct StageBufferManager {
 }
 
 // new & init
+impl Default for StageBufferManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StageBufferManager {
     pub fn new() -> Self {
         let buffers = FrameCounter::frame_labes().map(|_| Vec::new());

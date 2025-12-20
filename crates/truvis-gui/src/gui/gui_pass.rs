@@ -13,7 +13,6 @@ use truvis_gfx::{
         shader::GfxShaderStageInfo,
     },
 };
-use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_render_graph::render_context::RenderContext;

@@ -32,6 +32,8 @@ pub struct GfxDevice {
     pub(crate) debug_utils: ash::ext::debug_utils::Device,
     /// 交换链扩展 API
     pub(crate) swapchain: ash::khr::swapchain::Device,
+    /// 推送描述符扩展 API
+    pub(crate) push_descriptor: ash::khr::push_descriptor::Device,
 
     #[cfg(debug_assertions)]
     destroyed: Cell<bool>,
@@ -74,7 +76,8 @@ impl GfxDevice {
         let vk_acceleration_struct_pf = ash::khr::acceleration_structure::Device::new(instance, &device);
         let vk_rt_pipeline_pf = ash::khr::ray_tracing_pipeline::Device::new(instance, &device);
         let vk_debug_utils_device = ash::ext::debug_utils::Device::new(instance, &device);
-        let _vk_swapchain = ash::khr::swapchain::Device::new(instance, &device);
+        let vk_swapchain = ash::khr::swapchain::Device::new(instance, &device);
+        let vk_push_descriptor = ash::khr::push_descriptor::Device::new(instance, &device);
 
         Self {
             device: device.clone(),
@@ -82,7 +85,8 @@ impl GfxDevice {
             acceleration_structure: vk_acceleration_struct_pf,
             ray_tracing_pipeline: vk_rt_pipeline_pf,
             debug_utils: vk_debug_utils_device,
-            swapchain: _vk_swapchain,
+            swapchain: vk_swapchain,
+            push_descriptor: vk_push_descriptor,
 
             #[cfg(debug_assertions)]
             destroyed: Cell::new(false),
@@ -161,6 +165,9 @@ impl GfxDevice {
             ash::khr::deferred_host_operations::NAME,
         ]);
 
+        // push descriptor
+        exts.push(ash::khr::push_descriptor::NAME);
+
         exts
     }
 }
@@ -197,10 +204,9 @@ impl GfxDevice {
 impl GfxDevice {
     #[inline]
     pub fn write_descriptor_sets(&self, writes: &[GfxWriteDescriptorSet]) {
-        let writes = writes.iter().map(|w| w.to_vk_type()).collect_vec();
-        unsafe {
-            self.device.update_descriptor_sets(&writes, &[]);
-        }
+        GfxWriteDescriptorSet::with_writes(writes, |writes| unsafe {
+            self.device.update_descriptor_sets(writes, &[]);
+        })
     }
 
     #[inline]

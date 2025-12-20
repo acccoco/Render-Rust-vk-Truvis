@@ -6,7 +6,7 @@ use truvis_gfx::resources::image_view::GfxImageView;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_gfx::sampler_manager::GfxSamplerDesc;
 
-pub struct GfxTexture2 {
+pub struct GfxTexture {
     image: GfxImage,
     image_view: GfxImageView,
     sampler: vk::Sampler,
@@ -15,7 +15,7 @@ pub struct GfxTexture2 {
     _name: String,
 }
 // new & init
-impl GfxTexture2 {
+impl GfxTexture {
     pub fn new(image: GfxImage, name: &str) -> Self {
         let sampler = Gfx::get().sampler_manager().get_sampler(&GfxSamplerDesc::default());
         let image_view = GfxImageView::new(
@@ -35,7 +35,7 @@ impl GfxTexture2 {
     }
 }
 // destroy
-impl GfxTexture2 {
+impl GfxTexture {
     pub fn destroy(mut self) {
         self.destroy_mut();
     }
@@ -45,13 +45,13 @@ impl GfxTexture2 {
         self.sampler = vk::Sampler::null();
     }
 }
-impl Drop for GfxTexture2 {
+impl Drop for GfxTexture {
     fn drop(&mut self) {
         debug_assert!(self.sampler.is_null(), "GfxTexture2 was not destroyed before drop");
     }
 }
 // getters
-impl GfxTexture2 {
+impl GfxTexture {
     #[inline]
     pub fn sampler(&self) -> vk::Sampler {
         self.sampler

@@ -4,19 +4,16 @@ use crate::apis::render_pass::RenderPass;
 use crate::render_context::RenderContext;
 use crate::render_pipeline::blit_subpass::{BlitSubpass, BlitSubpassData, BlitSubpassDep};
 use crate::render_pipeline::sdr_subpass::{SdrSubpass, SdrSubpassData, SdrSubpassDep};
+use crate::render_pipeline::simple_rt_subpass::SimpleRtSubpass;
 use crate::render_pipeline::simple_rt_subpass::{SimpleRtPassData, SimpleRtPassDep};
-use crate::render_pipeline::{compute_subpass::ComputeSubpass, simple_rt_subpass::SimpleRtSubpass};
-use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, submit_info::GfxSubmitInfo},
     gfx::Gfx,
 };
-use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
-use truvis_shader_binding::truvisl;
 
 /// 整个 RT 管线
 pub struct RtRenderPass {
@@ -60,13 +57,13 @@ impl RtRenderPass {
         let bindless_manager = &render_context.bindless_manager;
 
         let color_image = render_context.gfx_resource_manager.get_image(fif_buffers.color_image_handle()).unwrap();
-        let color_image_bindless_handle =
+        let _color_image_bindless_handle =
             bindless_manager.get_image_handle(fif_buffers.color_image_view_handle()).unwrap();
         let render_target_texture = render_context
             .gfx_resource_manager
             .get_texture(fif_buffers.render_target_texture_handle(frame_label))
             .unwrap();
-        let render_target_image_bindless_handle = bindless_manager
+        let _render_target_image_bindless_handle = bindless_manager
             .get_image_handle_in_texture(fif_buffers.render_target_texture_handle(frame_label))
             .unwrap();
 

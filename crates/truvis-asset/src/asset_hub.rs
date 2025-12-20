@@ -5,7 +5,7 @@ use slotmap::{SecondaryMap, SlotMap};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use truvis_gfx::resources::image::GfxImage;
-use truvis_resource::texture::GfxTexture2;
+use truvis_resource::texture::GfxTexture;
 
 /// 资产中心 (Facade)
 ///
@@ -20,13 +20,13 @@ pub struct AssetHub {
     texture_states: SlotMap<AssetTextureHandle, LoadStatus>,
 
     // 存储实际的纹理资源 (仅 Ready 状态才有)
-    textures: SecondaryMap<AssetTextureHandle, GfxTexture2>,
+    textures: SecondaryMap<AssetTextureHandle, GfxTexture>,
 
     // 路径到句柄的映射，用于去重 (避免重复加载同一文件)
     texture_cache: HashMap<PathBuf, AssetTextureHandle>,
 
     // 默认资源 (1x1 粉色纹理)，用于 Loading/Failed 状态时的占位
-    fallback_texture: GfxTexture2,
+    fallback_texture: GfxTexture,
 
     io_dispather: IoDispather,
     upload_manager: AssetUploadManager,
@@ -53,12 +53,12 @@ impl AssetHub {
 
     /// 创建一个 1x1 的粉色纹理 (同步创建)
     /// 这是一个阻塞操作，只在初始化时执行一次。
-    fn create_fallback_texture() -> GfxTexture2 {
+    fn create_fallback_texture() -> GfxTexture {
         // 1. Create Image (1x1 Pink)
         let pixels: [u8; 4] = [255, 0, 255, 255];
         let image = GfxImage::from_rgba8(1, 1, &pixels, "FallbackTexture");
 
-        GfxTexture2::new(image, "FallbackTexture")
+        GfxTexture::new(image, "FallbackTexture")
     }
 }
 // destroy
@@ -106,7 +106,7 @@ impl AssetHub {
     /// 如果资源已 Ready，返回实际纹理。
     /// 否则 (Loading/Uploading/Failed)，返回 Fallback 纹理。
     /// 这保证了渲染循环永远不会因为资源未就绪而阻塞或崩溃。
-    pub fn get_texture(&self, handle: AssetTextureHandle) -> &GfxTexture2 {
+    pub fn get_texture(&self, handle: AssetTextureHandle) -> &GfxTexture {
         self.textures.get(handle).unwrap_or(&self.fallback_texture)
     }
 
@@ -154,7 +154,7 @@ impl AssetHub {
         for (handle, image) in finished_uploads {
             log::info!("Upload finished for texture handle: {:?}", handle);
 
-            let texture = GfxTexture2::new(image, "TextureView");
+            let texture = GfxTexture::new(image, "TextureView");
 
             self.textures.insert(handle, texture);
 

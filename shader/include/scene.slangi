@@ -16,7 +16,7 @@ struct Instance
     float4x4 inv_model;
 };
 
-struct Scene
+struct GPUScene
 {
     PTR(PBRMaterial, all_mats);
     PTR(Geometry, all_geometries);
@@ -28,10 +28,9 @@ struct Scene
     PTR(SpotLight, spot_lights);
 
     PTR(Instance, all_instances);
-    PTR(RaytracingAccelerationStructure, tlas);
-
     uint point_light_count;
     uint spot_light_count;
+
     TextureHandle sky;
     TextureHandle uv_checker;
 

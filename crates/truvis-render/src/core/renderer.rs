@@ -4,9 +4,7 @@ use ash::vk;
 use truvis_asset::asset_hub::AssetHub;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
-use truvis_gfx::foundation::debug_messenger::DebugType;
 use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
-use truvis_gfx::utilities::descriptor_cursor::GfxDescriptorCursor;
 use truvis_gfx::{
     commands::{
         barrier::{GfxBarrierMask, GfxBufferBarrier},
@@ -21,7 +19,6 @@ use truvis_render_base::pipeline_settings::{
     AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings,
 };
 use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
-use truvis_render_base::stage_buffer_manager::StageBufferManager;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::resources::fif_buffer::FifBuffers;
 use truvis_render_scene::gpu_scene::GpuScene;

@@ -2497,6 +2497,8 @@ dependencies = [
  "truvis-render-scene",
  "truvis-resource",
  "truvis-shader-binding",
+ "truvis-shader-layout-macro",
+ "truvis-shader-layout-trait",
  "vk-mem",
 ]
 

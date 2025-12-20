@@ -22,12 +22,12 @@ use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
-use truvis_resource::texture::{GfxTexture2, ImageLoader};
+use truvis_resource::texture::{GfxTexture, ImageLoader};
 use truvis_shader_binding::truvisl;
 
 /// 构建 Gpu Scene 所需的所有 buffer
 struct GpuSceneBuffers {
-    scene_buffer: GfxStructuredBuffer<truvisl::Scene>,
+    scene_buffer: GfxStructuredBuffer<truvisl::GPUScene>,
     light_buffer: GfxStructuredBuffer<truvisl::PointLight>,
     light_stage_buffer: GfxStructuredBuffer<truvisl::PointLight>,
     material_buffer: GfxStructuredBuffer<truvisl::PBRMaterial>,
@@ -130,12 +130,12 @@ pub struct GpuScene {
 // getter
 impl GpuScene {
     #[inline]
-    pub fn tlas(&self, frame_label: usize) -> Option<&GfxAcceleration> {
-        self.gpu_scene_buffers[frame_label].tlas.as_ref()
+    pub fn tlas(&self, frame_label: FrameLabel) -> Option<&GfxAcceleration> {
+        self.gpu_scene_buffers[*frame_label].tlas.as_ref()
     }
 
     #[inline]
-    pub fn scene_buffer(&self, frame_label: FrameLabel) -> &GfxStructuredBuffer<truvisl::Scene> {
+    pub fn scene_buffer(&self, frame_label: FrameLabel) -> &GfxStructuredBuffer<truvisl::GPUScene> {
         &self.gpu_scene_buffers[*frame_label].scene_buffer
     }
 }
@@ -147,8 +147,8 @@ impl GpuScene {
         let sky_image = ImageLoader::load_image(&PathBuf::from(&sky_path));
         let uv_checker_image = ImageLoader::load_image(&PathBuf::from(&uv_checker_path));
 
-        let sky_texture = GfxTexture2::new(sky_image, &sky_path);
-        let uv_checker_texture = GfxTexture2::new(uv_checker_image, &uv_checker_path);
+        let sky_texture = GfxTexture::new(sky_image, &sky_path);
+        let uv_checker_texture = GfxTexture::new(uv_checker_image, &uv_checker_path);
 
         let sky_texture_handle = gfx_resource_manager.register_texture(sky_texture);
         let uv_checker_texture_handle = gfx_resource_manager.register_texture(uv_checker_texture);
@@ -290,7 +290,7 @@ impl GpuScene {
         bindless_manager: &BindlessManager,
     ) {
         let crt_gpu_buffers = &self.gpu_scene_buffers[*frame_counter.frame_label()];
-        let scene_data = truvisl::Scene {
+        let scene_data = truvisl::GPUScene {
             all_instances: crt_gpu_buffers.instance_buffer.device_address(),
             all_mats: crt_gpu_buffers.material_buffer.device_address(),
             all_geometries: crt_gpu_buffers.geometry_buffer.device_address(),
@@ -300,7 +300,6 @@ impl GpuScene {
             spot_lights: 0, // TODO 暂时无用
             point_light_count: scene_manager.point_light_map().len() as u32,
             spot_light_count: 0, // TODO 暂时无用
-            tlas: crt_gpu_buffers.tlas.as_ref().map_or(vk::DeviceAddress::default(), |tlas| tlas.device_address()),
 
             sky: bindless_manager.get_texture_handle(self.sky_texture_handle).unwrap().0,
             uv_checker: bindless_manager.get_texture_handle(self.uv_checker_texture_handle).unwrap().0,

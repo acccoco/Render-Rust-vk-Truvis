@@ -3,20 +3,21 @@ use crate::graph::node::ImageNode;
 use crate::render_context::RenderContext;
 use ash::vk;
 use itertools::Itertools;
-use std::ops::Deref;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_gfx::descriptors::descriptor::GfxDescriptorSetLayout;
+use truvis_gfx::utilities::descriptor_cursor::GfxDescriptorCursor;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, command_buffer::GfxCommandBuffer},
     gfx::Gfx,
     pipelines::shader::{GfxShaderGroupInfo, GfxShaderModuleCache, GfxShaderStageInfo},
     resources::special_buffers::sbt_buffer::GfxSBTBuffer,
 };
-use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_resource::handles::{GfxImageHandle, GfxImageViewHandle};
 use truvis_shader_binding::truvisl;
+use truvis_shader_layout_macro::DescriptorBinding;
 
 pub struct GfxRtPipeline {
     pub pipeline: vk::Pipeline,
@@ -269,9 +270,25 @@ pub struct SimpleRtPassData {
     pub accum_image_view: GfxImageViewHandle,
 }
 
+#[derive(DescriptorBinding)]
+struct SimpleRtDescriptorBinding {
+    #[binding = 0]
+    #[descriptor_type = "ACCELERATION_STRUCTURE_KHR"]
+    #[stage = "RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR"]
+    #[count = 1]
+    _tlas: (),
+
+    #[binding = 1]
+    #[descriptor_type = "STORAGE_IMAGE"]
+    #[stage = "RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR"]
+    #[count = 1]
+    _rt_color: (),
+}
+
 pub struct SimpleRtSubpass {
     pipeline: GfxRtPipeline,
     _sbt: SBTRegions,
+    rt_descriptor_set_layout: GfxDescriptorSetLayout<SimpleRtDescriptorBinding>,
 }
 impl SimpleRtSubpass {
     pub fn new(render_descriptor_sets: &RenderDescriptorSets) -> Self {
@@ -309,8 +326,16 @@ impl SimpleRtSubpass {
             .offset(0)
             .size(size_of::<truvisl::rt::PushConstants>() as u32);
 
+        let rt_descriptor_set_layout = GfxDescriptorSetLayout::<SimpleRtDescriptorBinding>::new(
+            vk::DescriptorSetLayoutCreateFlags::PUSH_DESCRIPTOR_KHR,
+            "simple-rt-descriptor-set-layout",
+        );
+
         let pipeline_layout = {
-            let descriptor_sets = [render_descriptor_sets.layout_0_bindless.handle()];
+            let descriptor_sets = [
+                render_descriptor_sets.layout_0_bindless.handle(),
+                rt_descriptor_set_layout.handle(),
+            ];
             let pipeline_layout_ci = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&descriptor_sets)
                 .push_constant_ranges(std::slice::from_ref(&push_constant_range));
@@ -338,6 +363,7 @@ impl SimpleRtSubpass {
                 )
                 .unwrap()[0]
         };
+        Gfx::get().gfx_device().set_object_debug_name(pipeline, "simple-rt-pipeline");
 
         shader_module_cache.destroy();
 
@@ -350,18 +376,43 @@ impl SimpleRtSubpass {
         Self {
             pipeline: rt_pipeline,
             _sbt: sbt,
+            rt_descriptor_set_layout,
         }
     }
     pub fn ray_trace(&self, render_context: &RenderContext, cmd: &GfxCommandBuffer, pass_data: SimpleRtPassData) {
         let frame_label = render_context.frame_counter.frame_label();
 
-        let rt_handle = render_context.bindless_manager.get_image_handle(pass_data.accum_image_view).unwrap();
+        let _rt_handle = render_context.bindless_manager.get_image_handle(pass_data.accum_image_view).unwrap();
         let rt_image = render_context.gfx_resource_manager.get_image(pass_data.accum_image).unwrap().handle();
-        let per_frame_data = &render_context.per_frame_data_buffers[*frame_label];
+        let rt_image_view =
+            render_context.gfx_resource_manager.get_image_view(pass_data.accum_image_view).unwrap().handle();
 
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::RAY_TRACING_KHR, self.pipeline.pipeline);
+
+        cmd.push_descriptor_set(
+            vk::PipelineBindPoint::RAY_TRACING_KHR,
+            self.pipeline.pipeline_layout,
+            1,
+            &[
+                SimpleRtDescriptorBinding::tlas().write_tals(
+                    vk::DescriptorSet::null(),
+                    0,
+                    vec![render_context.gpu_scene.tlas(frame_label).unwrap().handle()],
+                ),
+                SimpleRtDescriptorBinding::rt_color().write_image(
+                    vk::DescriptorSet::null(),
+                    0,
+                    vec![
+                        vk::DescriptorImageInfo::default()
+                            .image_layout(vk::ImageLayout::GENERAL)
+                            .image_view(rt_image_view),
+                    ],
+                ),
+            ],
+        );
+
         let render_descriptor_sets = &render_context.render_descriptor_sets;
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::RAY_TRACING_KHR,
@@ -374,10 +425,10 @@ impl SimpleRtSubpass {
         let mut push_constant = truvisl::rt::PushConstants {
             frame_data: render_context.per_frame_data_buffers[*frame_label].device_address(),
             scene: render_context.gpu_scene.scene_buffer(frame_label).device_address(),
-            rt_render_target: rt_handle.0,
             spp,
             spp_idx: 0,
             channel: render_context.pipeline_settings.channel,
+            _padding_1: 0,
         };
         for spp_idx in 0..spp {
             push_constant.spp_idx = spp_idx;

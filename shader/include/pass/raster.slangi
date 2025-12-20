@@ -8,7 +8,7 @@ namespace raster
 struct PushConstants
 {
     PTR(PerFrameData, frame_data);
-    PTR(Scene, scene);
+    PTR(GPUScene, scene);
 
     /// raster only
     uint instance_idx;

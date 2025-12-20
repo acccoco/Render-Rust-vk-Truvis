@@ -1,5 +1,5 @@
 use crate::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle, GfxTextureHandle};
-use crate::texture::GfxTexture2;
+use crate::texture::GfxTexture;
 use ash::vk;
 use slotmap::{SecondaryMap, SlotMap};
 use truvis_gfx::resources::buffer::GfxBuffer;
@@ -20,7 +20,7 @@ pub struct GfxResourceManager {
     image_views: SlotMap<GfxImageViewHandle, GfxImageView>,
     image_view_map: SecondaryMap<GfxImageHandle, Vec<(GfxImageViewDesc, GfxImageViewHandle)>>,
 
-    textures: SlotMap<GfxTextureHandle, GfxTexture2>,
+    textures: SlotMap<GfxTextureHandle, GfxTexture>,
 
     // 待销毁队列 (用于延迟销毁，例如在帧结束时)
     // (handle, frame_index)
@@ -299,11 +299,11 @@ impl GfxResourceManager {
 }
 // Texture API
 impl GfxResourceManager {
-    pub fn register_texture(&mut self, texture: GfxTexture2) -> GfxTextureHandle {
+    pub fn register_texture(&mut self, texture: GfxTexture) -> GfxTextureHandle {
         self.textures.insert(texture)
     }
 
-    pub fn get_texture(&self, handle: GfxTextureHandle) -> Option<&GfxTexture2> {
+    pub fn get_texture(&self, handle: GfxTextureHandle) -> Option<&GfxTexture> {
         self.textures.get(handle)
     }
 

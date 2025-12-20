@@ -81,8 +81,7 @@ void main_ray_gen()
     payload.section_stack = 0;
     payload.object_stack = 0;
 
-    Scene* scene = push_const.scene;
-    RaytracingAccelerationStructure tlas_ = RaytracingAccelerationStructure(scene.tlas);
+    GPUScene* scene = push_const.scene;
 
     // E 直接光照
     // w = BRDF * cos(theta) / pdf
@@ -94,10 +93,10 @@ void main_ray_gen()
     float3 weight = float3(1.f, 1.f, 1.f);
     for (uint depth = 0; depth < max_depth && !payload.done; ++depth)
     {
-        TraceRay(tlas_, RAY_FLAG_NONE, 0xFF, //
-                 0,                          // sbt record offset
-                 0,                          // sbt record stride
-                 0,                          // sky miss shader
+        TraceRay(rt_tlas, RAY_FLAG_NONE, 0xFF, //
+                 0,                            // sbt record offset
+                 0,                            // sbt record stride
+                 0,                            // sky miss shader
                  ray, payload);
 
         color += payload.radiance * weight;
@@ -109,13 +108,13 @@ void main_ray_gen()
     if (accum_samples > 0 && push_const.channel == 0)
     {
         float a = 1.f / float(accum_samples + 1);
-        const float3 old_color = push_const.rt_render_target.load(thread_id).xyz;
+        const float3 old_color = rt_color.Load(thread_id).xyz;
         // const float3 old_color = float3(1.f, 0.f, 0.f);
-        push_const.rt_render_target.store(thread_id, float4(lerp(old_color, color, a), 1.f));
+        rt_color.Store(thread_id, float4(lerp(old_color, color, a), 1.f));
     }
     else
     {
-        push_const.rt_render_target.store(thread_id, float4(color, 1.f));
+        rt_color.Store(thread_id, float4(color, 1.f));
     }
 }
 
@@ -125,7 +124,7 @@ static const float3 directional_light = normalize(float3(0.1f, -0.98995f, -0.1f)
 void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
     PerFrameData* frame_data = push_const.frame_data;
-    Scene* scene = push_const.scene;
+    GPUScene* scene = push_const.scene;
 
     const uint instance_id = InstanceIndex();
     const uint geometry_id = GeometryIndex();
@@ -301,7 +300,7 @@ void diffuse_callable(inout MatPayload payload)
 void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
     PerFrameData* frame_data = push_const.frame_data;
-    Scene* scene = push_const.scene;
+    GPUScene* scene = push_const.scene;
 
     const uint instance_id = InstanceIndex();
     const uint geometry_id = GeometryIndex();

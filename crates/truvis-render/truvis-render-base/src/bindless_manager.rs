@@ -1,24 +1,11 @@
-use crate::frame_counter::FrameCounter;
 use crate::pipeline_settings::FrameLabel;
 use crate::render_descriptor_sets::{BindlessDescriptorBinding, RenderDescriptorSets};
 use ash::vk;
-use ash::vk::DescriptorType;
-use itertools::Itertools;
 use slotmap::{Key, SecondaryMap};
-use std::rc::Rc;
-use truvis_gfx::descriptors::descriptor_pool::GfxDescriptorPoolCreateInfo;
-use truvis_gfx::{
-    descriptors::{
-        descriptor::{GfxDescriptorSet, GfxDescriptorSetLayout},
-        descriptor_pool::GfxDescriptorPool,
-    },
-    gfx::Gfx,
-    utilities::descriptor_cursor::GfxDescriptorCursor,
-};
+use truvis_gfx::{gfx::Gfx, utilities::descriptor_cursor::GfxDescriptorCursor};
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::{GfxImageViewHandle, GfxTextureHandle};
 use truvis_shader_binding::truvisl;
-use truvis_shader_layout_macro::DescriptorBinding;
 
 #[derive(Copy, Clone)]
 pub struct BindlessTextureHandle(pub truvisl::TextureHandle);
