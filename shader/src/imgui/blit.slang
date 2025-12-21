@@ -1,4 +1,5 @@
 #include "pass/blit.slangi"
+#include "bindless_op.slangi"
 
 [push_constant]
 blit::PushConstant g_params;
@@ -13,7 +14,8 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
         return; // Out of bounds
     }
 
-    g_params.dst_image.store(
+    bindless_uav::store(
+        g_params.dst_image,
         dispatchThreadID.xy + g_params.offset,
         // g_params.src_image.load(dispatchThreadID.xy)
         float4(1.0, 0.0, 0.0, 1.0)

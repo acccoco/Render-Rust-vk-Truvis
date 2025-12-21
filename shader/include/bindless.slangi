@@ -1,22 +1,5 @@
 #pragma once
 
-#ifdef __SLANG__
-
-[[vk::binding(0, 0)]]
-SamplerState global_samplers[];
-
-// 注意：需要 nonuniform，表示同一个 wavefront 的下标是不同的
-[[vk::binding(0, 1)]]
-Sampler2D<float4> bindless_textures[];
-
-[[vk::binding(1, 1)]]
-RWTexture2D<float4> bindless_uavs[];
-
-[[vk::binding(2, 1)]]
-Texture2D<float4> bindless_srvs[];
-
-#endif
-
 const static int INVALID_TEX_ID = -1;
 const static float4 INVALID_TEX_COLOR = float4(1.0f, 0.0f, 1.0f, 1.0f);
 
@@ -36,110 +19,15 @@ struct TextureHandle
 {
     /// 纹理的索引
     int index;
-
-#ifdef __SLANG__
-    [ForceInline]
-    float4 sample(float2 uv)
-    {
-        if (index == INVALID_TEX_ID)
-        {
-            return INVALID_TEX_COLOR;
-        }
-        else
-        {
-            return bindless_textures[NonUniformResourceIndex(index)].Sample(uv);
-        }
-    }
-    float4 sample_level(float2 uv, float level)
-    {
-        if (index == INVALID_TEX_ID)
-        {
-            return INVALID_TEX_COLOR;
-        }
-        else
-        {
-            return bindless_textures[NonUniformResourceIndex(index)].SampleLevel(uv, level);
-        }
-    }
-
-    [ForceInline]
-    bool is_valid()
-    {
-        return index != INVALID_TEX_ID;
-    }
-#endif
 };
 
 struct UavHandle
 {
     /// 纹理的索引
     int index;
-
-#ifdef __SLANG__
-    [ForceInline]
-    void store(uint2 coord, float4 value)
-    {
-        bindless_uavs[NonUniformResourceIndex(index)].Store(coord, value);
-    }
-
-    [ForceInline]
-    float4 load(uint2 coord)
-    {
-        return bindless_uavs[NonUniformResourceIndex(index)].Load(coord);
-    }
-
-    [ForceInline]
-    bool is_valid()
-    {
-        return index != INVALID_TEX_ID;
-    }
-#endif
 };
 
 struct SrvHandle
 {
     int index;
-
-#ifdef __SLANG__
-
-    [ForceInline]
-    float4 sample(float2 uv_coord, ESamplerType sampler_type)
-    {
-        if (!is_valid() || sampler_type >= ESamplerType::_Count_)
-        {
-            return INVALID_TEX_COLOR;
-        }
-        else
-        {
-            return bindless_srvs[NonUniformResourceIndex(index)].Sample(
-                global_samplers[NonUniformResourceIndex((int)sampler_type)],
-                uv_coord
-            );
-        }
-    }
-
-    [ForceInline]
-    float4 sample_level(float2 uv_coord, ESamplerType sampler_type, float level)
-    {
-        if (!is_valid() || sampler_type >= ESamplerType::_Count_)
-        {
-            return INVALID_TEX_COLOR;
-        }
-        else
-        {
-            return bindless_srvs[NonUniformResourceIndex(index)].SampleLevel(
-                global_samplers[NonUniformResourceIndex((int)sampler_type)],
-                uv_coord,
-                level
-            );
-        }
-    }
-
-    [ForceInline]
-    bool is_valid()
-    {
-        return index != INVALID_TEX_ID;
-    }
-
-#endif
 };

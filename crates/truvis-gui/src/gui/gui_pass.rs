@@ -1,4 +1,4 @@
-use std::{mem::offset_of, rc::Rc};
+use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
 
 use crate::gui::core::Gui;
@@ -18,8 +18,8 @@ use truvis_gfx::{
 use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_shader_binding::truvisl;
 use truvis_shader_binding::truvisl::SrvHandle;
-use truvis_shader_binding::{truvisl, truvisl::TextureHandle};
 
 enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {

@@ -135,6 +135,10 @@ impl GfxDevice {
                     .descriptor_binding_variable_descriptor_count(true),
             ),
             Box::new(vk::PhysicalDeviceShaderDrawParametersFeatures::default().shader_draw_parameters(true)),
+            // 让 UBO 支持 std430 或者 scalar layout
+            Box::new(
+                vk::PhysicalDeviceUniformBufferStandardLayoutFeatures::default().uniform_buffer_standard_layout(true),
+            ),
         ]
     }
 

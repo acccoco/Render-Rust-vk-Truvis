@@ -2,28 +2,25 @@
 #include "frame_data.slangi"
 #include "ptr.slangi"
 #include "scene.slangi"
-
-#ifdef __SLANG__
-
-[[vk::binding(0, 2)]]
-RaytracingAccelerationStructure rt_tlas;
-
-[[vk::binding(1, 2)]]
-RWTexture2D<float4> rt_color;
-
-[[vk::binding(2, 2)]]
-ConstantBuffer<PerFrameData, ScalarDataLayout> per_frame_data;
-
-#endif
+#include "global_binding_sets.slangi"
 
 namespace rt
 {
 
+#define RT_SET_NUM GLOBAL_SETS_COUNT
+
+#ifdef __SLANG__
+
+[[vk::binding(0, RT_SET_NUM)]]
+RaytracingAccelerationStructure rt_tlas;
+
+[[vk::binding(1, RT_SET_NUM)]]
+RWTexture2D<float4> rt_color;
+
+#endif
+
 struct PushConstants
 {
-    PTR(PerFrameData, frame_data1);
-    PTR(GPUScene, scene);
-
     uint spp;
     uint spp_idx;
     uint channel;

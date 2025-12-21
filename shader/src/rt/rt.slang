@@ -3,6 +3,7 @@
 #include "sample/random.slangi"
 #include "sample/sample.slangi"
 #include "scene.slangi"
+#include "bindless_op.slangi"
 
 const static uint max_depth = 16;
 
@@ -80,8 +81,6 @@ void main_ray_gen()
     payload.section_stack = 0;
     payload.object_stack = 0;
 
-    GPUScene* scene = push_const.scene;
-
     // E 直接光照
     // w = BRDF * cos(theta) / pdf
     // Lo = w_0 * Li_0 + E_0
@@ -92,7 +91,7 @@ void main_ray_gen()
     float3 weight = float3(1.f, 1.f, 1.f);
     for (uint depth = 0; depth < max_depth && !payload.done; ++depth)
     {
-        TraceRay(rt_tlas, RAY_FLAG_NONE, 0xFF, //
+        TraceRay(rt::rt_tlas, RAY_FLAG_NONE, 0xFF, //
                  0,                            // sbt record offset
                  0,                            // sbt record stride
                  0,                            // sky miss shader
@@ -107,13 +106,13 @@ void main_ray_gen()
     if (accum_samples > 0 && push_const.channel == 0)
     {
         float a = 1.f / float(accum_samples + 1);
-        const float3 old_color = rt_color.Load(thread_id).xyz;
+        const float3 old_color = rt::rt_color.Load(thread_id).xyz;
         // const float3 old_color = float3(1.f, 0.f, 0.f);
-        rt_color.Store(thread_id, float4(lerp(old_color, color, a), 1.f));
+        rt::rt_color.Store(thread_id, float4(lerp(old_color, color, a), 1.f));
     }
     else
     {
-        rt_color.Store(thread_id, float4(color, 1.f));
+        rt::rt_color.Store(thread_id, float4(color, 1.f));
     }
 }
 
@@ -122,14 +121,12 @@ static const float3 directional_light = normalize(float3(0.1f, -0.98995f, -0.1f)
 [shader("closesthit")]
 void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    GPUScene* scene = push_const.scene;
-
     const uint instance_id = InstanceIndex();
     const uint geometry_id = GeometryIndex();
     const uint primitive_id = PrimitiveIndex();
 
-    PBRMaterial* mat = scene.get_material(instance_id, geometry_id);
-    Geometry* geometry = scene.get_geometry(instance_id, geometry_id);
+    PBRMaterial* mat = gpu_scene.get_material(instance_id, geometry_id);
+    Geometry* geometry = gpu_scene.get_geometry(instance_id, geometry_id);
     const uint3 triangle = geometry.get_triangle(primitive_id);
     const float3 interp_pos = geometry.get_interp_position(triangle, attr.barycentrics);
     const float3 interp_normal = geometry.get_interp_normal(triangle, attr.barycentrics);
@@ -141,7 +138,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     float3 origin_world_normal;
     {
         // normal mat = obejct mat 的逆转置
-        Instance* instance = scene.get_instance(instance_id);
+        Instance* instance = gpu_scene.get_instance(instance_id);
         const float4x4 normal_matrix = transpose(instance.inv_model);
         origin_world_normal = normalize(mul(normal_matrix, float4(interp_normal, 0.f)).xyz);
     }
@@ -282,10 +279,10 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
 [shader("callable")]
 void diffuse_callable(inout MatPayload payload)
 {
-    PBRMaterial* mat = push_const.scene.get_material(payload.instance_id, payload.geometry_id);
-    if (mat.diffuse_map.is_valid())
+    PBRMaterial* mat = gpu_scene.get_material(payload.instance_id, payload.geometry_id);
+    if (bindless_srv::is_valid(mat.diffuse_map))
     {
-        payload.out_color = mat.diffuse_map.sample_level(payload.uv, mat.diffuse_map_sampler_type, 0.0).xyz;
+        payload.out_color = bindless_srv::sample_level(mat.diffuse_map, payload.uv, mat.diffuse_map_sampler_type, 0.0).xyz;
     }
     else
     {
@@ -297,19 +294,17 @@ void diffuse_callable(inout MatPayload payload)
 [shader("anyhit")]
 void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    GPUScene* scene = push_const.scene;
-
     const uint instance_id = InstanceIndex();
     const uint geometry_id = GeometryIndex();
     const uint primitive_id = PrimitiveIndex();
 
-    PBRMaterial* mat = scene.get_material(instance_id, geometry_id);
-    Geometry* geometry = scene.get_geometry(instance_id, geometry_id);
+    PBRMaterial* mat = gpu_scene.get_material(instance_id, geometry_id);
+    Geometry* geometry = gpu_scene.get_geometry(instance_id, geometry_id);
     const uint3 triangle = geometry.get_triangle(primitive_id);
     const float2 interp_uv = geometry.get_interp_uv(triangle, attr.barycentrics);
 
     // 当前命中位置 diffuse 贴图是透的，直接忽略该命中
-    const float4 base_color = mat.diffuse_map.sample_level(interp_uv, mat.diffuse_map_sampler_type, 0.0);
+    const float4 base_color = bindless_srv::sample_level(mat.diffuse_map, interp_uv, mat.diffuse_map_sampler_type, 0.0);
     if (base_color.w == 0.f)
     {
         IgnoreHit();
@@ -335,7 +330,7 @@ void sky_miss(inout HitPayload payload)
     // phi: [-pi, pi] -> [0, 1]
     // theta: [-pi/2, pi/2] -> [1, 0]
     const float2 uv = float2(angle.x / M_PI * 0.5 + 0.5, 0.5 - angle.y / M_PI);
-    payload.radiance = float3(push_const.scene.sky.sample_level(uv, push_const.scene.sky_sampler_type, 0.0).xyz) * 8.f;
+    payload.radiance = float3(bindless_srv::sample_level(gpu_scene.sky, uv, gpu_scene.sky_sampler_type, 0.0).xyz) * 8.f;
     payload.done = true;
 }
 

@@ -1,5 +1,6 @@
 #include "bindless.slangi"
 #include "vertex_attribute.slangi"
+#include "global_binding_sets.slangi"
 
 struct PushConstants
 {

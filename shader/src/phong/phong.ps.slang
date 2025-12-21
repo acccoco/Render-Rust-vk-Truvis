@@ -2,6 +2,7 @@
 #include "bindless.slangi"
 #include "pass/raster.slangi"
 #include "scene.slangi"
+#include "bindless_op.slangi"
 
 struct PsInput
 {
@@ -22,7 +23,7 @@ PsOutput main(PsInput input)
 {
     const float3 normal = normalize(input.coarse_vertex.frag_normal);
 
-    PerFrameData *frame_data = push_const.frame_data;
+    PerFrameData* frame_data = push_const.frame_data;
     GPUScene* scene = push_const.scene;
     Instance* instance = scene.all_instances + push_const.instance_idx;
     PBRMaterial* mat = scene->get_material(push_const.instance_idx, push_const.submesh_idx);
@@ -31,7 +32,7 @@ PsOutput main(PsInput input)
 
     const float2 delta_uv = frac(frame_data.time_ms / 1000.0f);
     const float2 uv = input.coarse_vertex.uv + delta_uv;
-    const float4 object_color = mat.diffuse_map.sample(uv, mat.diffuse_map_sampler_type);
+    const float4 object_color = bindless_srv::sample(mat.diffuse_map, uv, mat.diffuse_map_sampler_type);
 
     float3 light_term = float3(0.0, 0.0, 0.0);
     for (uint i = 0; i < light_cnt; i++)

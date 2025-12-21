@@ -5,6 +5,7 @@ use truvis_asset::asset_hub::AssetHub;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
+use truvis_gfx::utilities::descriptor_cursor::GfxDescriptorCursor;
 use truvis_gfx::{
     commands::{
         barrier::{GfxBarrierMask, GfxBufferBarrier},
@@ -15,7 +16,7 @@ use truvis_gfx::{
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
-use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
+use truvis_render_base::global_descriptor_sets::{GlobalDescriptorSets, PerFrameDescriptorBinding};
 use truvis_render_base::pipeline_settings::{
     AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings,
 };
@@ -218,6 +219,7 @@ impl Renderer {
 
         self.render_context.accum_data.update_accum_frames(current_camera_dir, camera.position);
         self.update_gpu_scene(input_state, camera);
+        self.update_perframe_descriptor_set();
     }
 
     pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
@@ -311,6 +313,28 @@ impl Renderer {
         );
         cmd.end();
         Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(std::slice::from_ref(&cmd))], None);
+    }
+
+    fn update_perframe_descriptor_set(&mut self) {
+        let frame_label = self.render_context.frame_counter.frame_label();
+        let per_frame_data_buffer = &self.render_context.per_frame_data_buffers[*frame_label];
+        let gpu_scene_buffer = self.render_context.gpu_scene.scene_buffer(frame_label);
+        let perframe_set = self.render_context.render_descriptor_sets.current_perframe_set(frame_label).handle();
+
+        let perframe_data_buffer_info = vec![
+            vk::DescriptorBufferInfo::default()
+                .buffer(per_frame_data_buffer.vk_buffer())
+                .offset(0)
+                .range(vk::WHOLE_SIZE),
+        ];
+        let gpu_scene_buffer_info = vec![
+            vk::DescriptorBufferInfo::default().buffer(gpu_scene_buffer.vk_buffer()).offset(0).range(vk::WHOLE_SIZE),
+        ];
+
+        Gfx::get().gfx_device().write_descriptor_sets(&[
+            PerFrameDescriptorBinding::per_frame_data().write_buffer(perframe_set, 0, perframe_data_buffer_info),
+            PerFrameDescriptorBinding::gpu_scene().write_buffer(perframe_set, 0, gpu_scene_buffer_info),
+        ]);
     }
 }
 // getters

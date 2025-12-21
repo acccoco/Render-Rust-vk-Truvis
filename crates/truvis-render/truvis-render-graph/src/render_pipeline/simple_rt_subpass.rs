@@ -8,7 +8,6 @@ use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_descriptor_layout_macro::DescriptorBinding;
 use truvis_gfx::descriptors::descriptor::GfxDescriptorSetLayout;
-use truvis_gfx::foundation::debug_messenger::DebugType;
 use truvis_gfx::utilities::descriptor_cursor::GfxDescriptorCursor;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, command_buffer::GfxCommandBuffer},
@@ -284,12 +283,6 @@ struct SimpleRtDescriptorBinding {
     #[stage = "RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR"]
     #[count = 1]
     _rt_color: (),
-
-    #[binding = 2]
-    #[descriptor_type = "UNIFORM_BUFFER"]
-    #[stage = "RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR"]
-    #[count = 1]
-    _per_frame_data: (),
 }
 
 pub struct SimpleRtSubpass {
@@ -399,7 +392,7 @@ impl SimpleRtSubpass {
         cmd.push_descriptor_set(
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
-            2,
+            truvisl::RT_SET_NUM,
             &[
                 SimpleRtDescriptorBinding::tlas().write_tals(
                     vk::DescriptorSet::null(),
@@ -415,19 +408,9 @@ impl SimpleRtSubpass {
                             .image_view(rt_image_view),
                     ],
                 ),
-                SimpleRtDescriptorBinding::per_frame_data().write_buffer(
-                    vk::DescriptorSet::null(),
-                    0,
-                    vec![vk::DescriptorBufferInfo {
-                        buffer: render_context.per_frame_data_buffers[*frame_label].vk_buffer(),
-                        offset: 0,
-                        range: vk::WHOLE_SIZE,
-                    }],
-                ),
             ],
         );
 
-        let render_descriptor_sets = &render_context.render_descriptor_sets;
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::RAY_TRACING_KHR,
             self.pipeline.pipeline_layout,
@@ -437,8 +420,6 @@ impl SimpleRtSubpass {
         );
         let spp = 4;
         let mut push_constant = truvisl::rt::PushConstants {
-            frame_data1: 0,
-            scene: render_context.gpu_scene.scene_buffer(frame_label).device_address(),
             spp,
             spp_idx: 0,
             channel: render_context.pipeline_settings.channel,

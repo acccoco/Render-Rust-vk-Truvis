@@ -1,5 +1,6 @@
 #include "pass/pp/sdr.slangi"
 #include "sample/random.slangi"
+#include "bindless_op.slangi"
 
 [push_constant]
 sdr::PushConstant g_params;
@@ -14,7 +15,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
         return; // Out of bounds
     }
 
-    const float4 hdr_color = g_params.src_image.load(dispatchThreadID.xy);
+    const float4 hdr_color = bindless_uav::load(g_params.src_image, dispatchThreadID.xy);
 
     // TODO 引入 accum frame 的参数，增加随机性
     // 引入噪声消除色阶
@@ -30,7 +31,8 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
         sdr_color = hdr_color.rgb;
     }
 
-    g_params.dst_image.store(
+    bindless_uav::store(
+        g_params.dst_image,
         dispatchThreadID.xy,
         float4(sdr_color, hdr_color.a)
     );

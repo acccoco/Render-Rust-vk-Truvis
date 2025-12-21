@@ -2,7 +2,6 @@ use crate::global_descriptor_sets::{BindlessDescriptorBinding, GlobalDescriptorS
 use crate::pipeline_settings::FrameLabel;
 use ash::vk;
 use slotmap::{Key, SecondaryMap};
-use truvis_gfx::sampler::{GfxSampler, GfxSamplerDesc};
 use truvis_gfx::{gfx::Gfx, utilities::descriptor_cursor::GfxDescriptorCursor};
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::{GfxImageViewHandle, GfxTextureHandle};

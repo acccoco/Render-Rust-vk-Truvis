@@ -53,7 +53,7 @@ impl GpuSceneBuffers {
         let max_instance_cnt = 1024;
 
         GpuSceneBuffers {
-            scene_buffer: GfxStructuredBuffer::new_ssbo(1, format!("scene buffer-{}", frame_label)),
+            scene_buffer: GfxStructuredBuffer::new_ubo(1, format!("scene buffer-{}", frame_label)),
             light_buffer: GfxStructuredBuffer::new_ssbo(max_light_cnt, format!("light buffer-{}", frame_label)),
             light_stage_buffer: GfxStructuredBuffer::new_stage_buffer(
                 max_light_cnt,

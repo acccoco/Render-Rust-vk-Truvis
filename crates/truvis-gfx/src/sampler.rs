@@ -1,9 +1,6 @@
-use crate::foundation::device::GfxDevice;
 use crate::gfx::Gfx;
 use ash::vk;
-use std::collections::HashMap;
 use std::hash::Hash;
-use std::rc::Rc;
 
 // Sampler descriptor
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

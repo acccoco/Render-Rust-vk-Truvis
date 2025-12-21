@@ -1,4 +1,5 @@
 #include "pass/imgui.slangi"
+#include "bindless_op.slangi"
 
 [[vk::push_constant]]
 imgui::PushConstant push_constant;
@@ -58,6 +59,13 @@ PsOutput psmain(PsInput input)
 {
     PsOutput output = (PsOutput)0;
 
-    output.color = input.coarse_vertex.color * push_constant.texture.sample(input.coarse_vertex.uv, push_constant.texture_sampler_type);
+    output.color =
+        input.coarse_vertex.color *
+        bindless_srv::sample_level(
+            push_constant.texture,
+            input.coarse_vertex.uv,
+            push_constant.texture_sampler_type,
+            0.0
+        );
     return output;
 }

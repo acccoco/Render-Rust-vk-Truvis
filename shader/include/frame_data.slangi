@@ -1,5 +1,4 @@
 #pragma once
-#include "bindless.slangi"
 
 /// 渲染需要的一些公用参数，每帧更新
 struct PerFrameData

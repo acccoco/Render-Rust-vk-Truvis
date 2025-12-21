@@ -1,4 +1,3 @@
-use std::cell::{RefCell, RefMut};
 use std::ffi::CStr;
 
 use ash::vk;

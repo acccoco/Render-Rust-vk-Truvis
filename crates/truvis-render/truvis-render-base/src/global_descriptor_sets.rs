@@ -41,12 +41,30 @@ pub struct BindlessDescriptorBinding {
     _srvs: (),
 }
 
+#[derive(DescriptorBinding)]
+pub struct PerFrameDescriptorBinding {
+    #[binding = 0]
+    #[descriptor_type = "UNIFORM_BUFFER"]
+    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR | COMPUTE"]
+    #[count = 1]
+    _per_frame_data: (),
+
+    #[binding = 1]
+    #[descriptor_type = "UNIFORM_BUFFER"]
+    #[stage = "FRAGMENT | RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR | COMPUTE"]
+    #[count = 1]
+    _gpu_scene: (),
+}
+
 pub struct GlobalDescriptorSets {
     layout_0_static: GfxDescriptorSetLayout<StaticDescriptorBinding>,
     set_0_static: GfxDescriptorSet<StaticDescriptorBinding>,
 
     layout_1_bindless: GfxDescriptorSetLayout<BindlessDescriptorBinding>,
     set_1_bindless: [GfxDescriptorSet<BindlessDescriptorBinding>; FrameCounter::fif_count()],
+
+    layout_2_perframe: GfxDescriptorSetLayout<PerFrameDescriptorBinding>,
+    set_2_perframe: [GfxDescriptorSet<PerFrameDescriptorBinding>; FrameCounter::fif_count()],
 
     _descriptor_pool: GfxDescriptorPool,
 }
@@ -55,31 +73,49 @@ impl GlobalDescriptorSets {
     pub fn new() -> Self {
         let descriptor_pool = Self::init_descriptor_pool();
 
-        let bindless_layout = GfxDescriptorSetLayout::<BindlessDescriptorBinding>::new(
+        let layout_0_static = GfxDescriptorSetLayout::<StaticDescriptorBinding>::new(
+            vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
+            "global-layout",
+        );
+        let set_0_static = GfxDescriptorSet::<StaticDescriptorBinding>::new(
+            &descriptor_pool,
+            &layout_0_static,
+            "global-descriptor-set",
+        );
+
+        let layout_1_bindless = GfxDescriptorSetLayout::<BindlessDescriptorBinding>::new(
             vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
             "bindless-layout",
         );
-        let bindless_descriptor_sets = FrameCounter::frame_labes().map(|frame_label| {
+        let set_1_bindless = FrameCounter::frame_labes().map(|frame_label| {
             GfxDescriptorSet::<BindlessDescriptorBinding>::new(
                 &descriptor_pool,
-                &bindless_layout,
+                &layout_1_bindless,
                 format!("bindless-descriptor-set-{frame_label}"),
             )
         });
 
-        let global_layout = GfxDescriptorSetLayout::<StaticDescriptorBinding>::new(
-            vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
-            "global-layout",
+        let layout_2_perframe = GfxDescriptorSetLayout::<PerFrameDescriptorBinding>::new(
+            vk::DescriptorSetLayoutCreateFlags::empty(),
+            "perframe-layout",
         );
-        let global_descriptor_set =
-            GfxDescriptorSet::<StaticDescriptorBinding>::new(&descriptor_pool, &global_layout, "global-descriptor-set");
+        let set_2_perframe = FrameCounter::frame_labes().map(|frame_label| {
+            GfxDescriptorSet::<PerFrameDescriptorBinding>::new(
+                &descriptor_pool,
+                &layout_2_perframe,
+                format!("perframe-descriptor-set-{frame_label}"),
+            )
+        });
 
         Self {
-            layout_0_static: global_layout,
-            set_0_static: global_descriptor_set,
+            layout_0_static,
+            set_0_static,
 
-            layout_1_bindless: bindless_layout,
-            set_1_bindless: bindless_descriptor_sets,
+            layout_1_bindless,
+            set_1_bindless,
+
+            layout_2_perframe,
+            set_2_perframe,
 
             _descriptor_pool: descriptor_pool,
         }
@@ -91,6 +127,7 @@ impl GlobalDescriptorSets {
             (vk::DescriptorType::STORAGE_IMAGE, 512),
             (vk::DescriptorType::SAMPLED_IMAGE, 512),
             (vk::DescriptorType::SAMPLER, 32),
+            (vk::DescriptorType::UNIFORM_BUFFER, 32),
         ]
         .iter()
         .map(|(ty, count)| vk::DescriptorPoolSize {
@@ -140,12 +177,25 @@ impl GlobalDescriptorSets {
     }
 
     #[inline]
+    pub fn current_perframe_set(&self, frame_label: FrameLabel) -> &GfxDescriptorSet<PerFrameDescriptorBinding> {
+        &self.set_2_perframe[*frame_label]
+    }
+
+    #[inline]
     pub fn global_set_layouts(&self) -> Vec<vk::DescriptorSetLayout> {
-        vec![self.layout_0_static.handle(), self.layout_1_bindless.handle()]
+        vec![
+            self.layout_0_static.handle(),
+            self.layout_1_bindless.handle(),
+            self.layout_2_perframe.handle(),
+        ]
     }
 
     #[inline]
     pub fn global_sets(&self, frame_label: FrameLabel) -> Vec<vk::DescriptorSet> {
-        vec![self.set_0_static.handle(), self.set_1_bindless[*frame_label].handle()]
+        vec![
+            self.set_0_static.handle(),
+            self.set_1_bindless[*frame_label].handle(),
+            self.set_2_perframe[*frame_label].handle(),
+        ]
     }
 }
