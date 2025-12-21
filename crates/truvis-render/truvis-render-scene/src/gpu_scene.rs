@@ -18,8 +18,8 @@ use truvis_model_manager::components::instance::Instance;
 use truvis_model_manager::guid_new_type::{InstanceHandle, MaterialHandle, MeshHandle};
 use truvis_render_base::bindless_manager::{BindlessManager, BindlessSrvHandle};
 use truvis_render_base::frame_counter::FrameCounter;
+use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_base::pipeline_settings::FrameLabel;
-use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::{GfxTexture, ImageLoader};
@@ -187,7 +187,7 @@ impl GpuScene {
         scene_manager: &SceneManager,
         bindless_manager: &mut BindlessManager,
         gfx_resource_manager: &GfxResourceManager,
-        render_descriptor_sets: &RenderDescriptorSets,
+        render_descriptor_sets: &GlobalDescriptorSets,
         frame_counter: &FrameCounter,
     ) {
         let _span = tracy_client::span!("GpuScene::prepare_render_data");

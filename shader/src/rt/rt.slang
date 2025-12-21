@@ -47,8 +47,7 @@ struct MatPayload
 [shader("raygeneration")]
 void main_ray_gen()
 {
-    PerFrameData* frame_data = push_const.frame_data;
-    const uint accum_samples = frame_data.accum_frames * push_const.spp + push_const.spp_idx;
+    const uint accum_samples = per_frame_data.accum_frames * push_const.spp + push_const.spp_idx;
     if (accum_samples >= max_accum_samples)
     {
         // 达到最大累积帧数，直接返回
@@ -64,11 +63,11 @@ void main_ray_gen()
     // 以 thread_id + 0.5 为中心，进行子像素抖动
     const float2 pixel_center = float2(thread_id) + subpixel_jitter;
     const float2 in_uv = pixel_center / float2(DispatchRaysDimensions().xy);
-    const float4 target_in_view = mul(frame_data.inv_projection, float4(in_uv.x * 2.0 - 1.0, 1.0 - in_uv.y * 2.0, 1.0, 1.0));
-    const float4 direction = mul(frame_data.inv_view, float4(normalize(target_in_view.xyz), 0.0));
+    const float4 target_in_view = mul(per_frame_data.inv_projection, float4(in_uv.x * 2.0 - 1.0, 1.0 - in_uv.y * 2.0, 1.0, 1.0));
+    const float4 direction = mul(per_frame_data.inv_view, float4(normalize(target_in_view.xyz), 0.0));
 
     RayDesc ray;
-    ray.Origin = frame_data.camera_pos;
+    ray.Origin = per_frame_data.camera_pos;
     ray.Direction = direction.xyz;
     ray.TMin = 0.001f;
     ray.TMax = 10000.0f;
@@ -123,7 +122,6 @@ static const float3 directional_light = normalize(float3(0.1f, -0.98995f, -0.1f)
 [shader("closesthit")]
 void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    PerFrameData* frame_data = push_const.frame_data;
     GPUScene* scene = push_const.scene;
 
     const uint instance_id = InstanceIndex();
@@ -299,7 +297,6 @@ void diffuse_callable(inout MatPayload payload)
 [shader("anyhit")]
 void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    PerFrameData* frame_data = push_const.frame_data;
     GPUScene* scene = push_const.scene;
 
     const uint instance_id = InstanceIndex();

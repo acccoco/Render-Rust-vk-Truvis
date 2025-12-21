@@ -13,7 +13,7 @@ use truvis_gfx::{
 };
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
-use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
+use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
 
 /// 整个 RT 管线
 pub struct RtRenderPass {
@@ -27,7 +27,7 @@ pub struct RtRenderPass {
 }
 
 impl RtRenderPass {
-    pub fn new(render_descriptor_sets: &RenderDescriptorSets, cmd_allocator: &mut CmdAllocator) -> Self {
+    pub fn new(render_descriptor_sets: &GlobalDescriptorSets, cmd_allocator: &mut CmdAllocator) -> Self {
         let rt_pass = SimpleRtSubpass::new(render_descriptor_sets);
         let blit_subpass = BlitSubpass::new(render_descriptor_sets);
         let sdr_subpass = SdrSubpass::new(render_descriptor_sets);

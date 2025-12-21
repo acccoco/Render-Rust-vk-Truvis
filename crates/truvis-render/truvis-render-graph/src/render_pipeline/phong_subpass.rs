@@ -12,8 +12,8 @@ use truvis_gfx::{
     },
 };
 use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_base::pipeline_settings::FrameLabel;
-use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_shader_binding::truvisl;
 
 pub struct PhongSubpass {
@@ -23,7 +23,7 @@ impl PhongSubpass {
     pub fn new(
         color_format: vk::Format,
         depth_format: vk::Format,
-        render_descriptor_sets: &RenderDescriptorSets,
+        render_descriptor_sets: &GlobalDescriptorSets,
     ) -> Self {
         let mut ci = GfxGraphicsPipelineCreateInfo::default();
         ci.vertex_shader_stage(&TruvisPath::shader_path("phong/phong3d.vs.slang"), c"main");
@@ -43,7 +43,7 @@ impl PhongSubpass {
         );
 
         let pipeline_layout = Rc::new(GfxPipelineLayout::new(
-            &[render_descriptor_sets.layout_1_bindless.handle()],
+            &render_descriptor_sets.global_set_layouts(),
             &[vk::PushConstantRange::default()
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .offset(0)
@@ -62,7 +62,7 @@ impl PhongSubpass {
         render_context: &RenderContext,
         viewport: &vk::Rect2D,
         push_constant: &truvisl::raster::PushConstants,
-        frame_idx: FrameLabel,
+        frame_label: FrameLabel,
     ) {
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
         cmd.cmd_set_viewport(
@@ -89,7 +89,7 @@ impl PhongSubpass {
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline.layout(),
             0,
-            &[render_descriptor_sets.set_1_bindless[*frame_idx].handle()],
+            &render_descriptor_sets.global_sets(frame_label),
             None,
         );
     }

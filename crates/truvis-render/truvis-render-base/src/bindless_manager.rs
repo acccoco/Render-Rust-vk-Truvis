@@ -1,5 +1,5 @@
+use crate::global_descriptor_sets::{BindlessDescriptorBinding, GlobalDescriptorSets};
 use crate::pipeline_settings::FrameLabel;
-use crate::render_descriptor_sets::{BindlessDescriptorBinding, RenderDescriptorSets};
 use ash::vk;
 use slotmap::{Key, SecondaryMap};
 use truvis_gfx::sampler::{GfxSampler, GfxSamplerDesc};
@@ -141,7 +141,7 @@ impl BindlessManager {
     pub fn prepare_render_data(
         &mut self,
         gfx_resource_manager: &GfxResourceManager,
-        render_descriptor_sets: &RenderDescriptorSets,
+        render_descriptor_sets: &GlobalDescriptorSets,
         frame_label: FrameLabel,
     ) {
         let _span = tracy_client::span!("BindlessManager::prepare_render_data");
@@ -205,21 +205,21 @@ impl BindlessManager {
         let mut writes = Vec::new();
         if !combined_sampler_srvs_inofs.is_empty() {
             writes.push(BindlessDescriptorBinding::textures().write_image(
-                render_descriptor_sets.set_1_bindless[*frame_label].handle(),
+                render_descriptor_sets.current_bindless_set(frame_label).handle(),
                 0,
                 combined_sampler_srvs_inofs,
             ))
         }
         if !uav_infos.is_empty() {
             writes.push(BindlessDescriptorBinding::uavs().write_image(
-                render_descriptor_sets.set_1_bindless[*frame_label].handle(),
+                render_descriptor_sets.current_bindless_set(frame_label).handle(),
                 0,
                 uav_infos,
             ))
         }
         if !srv_infos.is_empty() {
             writes.push(BindlessDescriptorBinding::srvs().write_image(
-                render_descriptor_sets.set_1_bindless[*frame_label].handle(),
+                render_descriptor_sets.current_bindless_set(frame_label).handle(),
                 0,
                 srv_infos,
             ))

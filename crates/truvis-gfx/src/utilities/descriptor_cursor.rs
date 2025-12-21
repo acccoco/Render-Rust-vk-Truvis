@@ -1,6 +1,6 @@
 use ash::vk;
 use itertools::Itertools;
-use truvis_shader_layout_trait::DescriptorBindingItem;
+use truvis_descriptor_layout_trait::DescriptorBindingItem;
 
 pub struct GfxWriteDescriptorSet {
     pub dst_set: vk::DescriptorSet,

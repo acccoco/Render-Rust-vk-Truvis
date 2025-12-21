@@ -26,8 +26,8 @@ truvis-gfx = { path = "crates/truvis-gfx" }
 truvis-model-manager = { path = "crates/truvis-model-manager" }
 truvis-render = { path = "crates/truvis-render" }
 truvis-app = { path = "crates/truvis-app" }
-truvis-shader-layout-macro = { path = "crates/truvis-shader/truvis-descriptor-layout-macro" }
-truvis-shader-layout-trait = { path = "crates/truvis-shader/truvis-descriptor-layout-trait" }
+truvis-descriptor-layout-macro = { path = "crates/truvis-shader/truvis-descriptor-layout-macro" }
+truvis-descriptor-layout-trait = { path = "crates/truvis-shader/truvis-descriptor-layout-trait" }
 truvis-shader-binding = { path = "crates/truvis-shader/truvis-shader-binding" }
 truvis-shader-build = { path = "crates/truvis-shader/truvis-shader-build" }
 truvis-cxx-binding = { path = "crates/truvis-cxx/truvis-cxx-binding" }

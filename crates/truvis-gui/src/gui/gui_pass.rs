@@ -15,8 +15,8 @@ use truvis_gfx::{
         shader::GfxShaderStageInfo,
     },
 };
+use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_base::pipeline_settings::FrameLabel;
-use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_shader_binding::truvisl::SrvHandle;
 use truvis_shader_binding::{truvisl, truvisl::TextureHandle};
@@ -40,12 +40,9 @@ pub struct GuiPass {
 }
 // new & init
 impl GuiPass {
-    pub fn new(render_descriptor_sets: &RenderDescriptorSets, color_format: vk::Format) -> Self {
+    pub fn new(render_descriptor_sets: &GlobalDescriptorSets, color_format: vk::Format) -> Self {
         let pipeline_layout = Rc::new(GfxPipelineLayout::new(
-            &[
-                render_descriptor_sets.layout_0_global.handle(),
-                render_descriptor_sets.layout_1_bindless.handle(),
-            ],
+            &render_descriptor_sets.global_set_layouts(),
             &[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 offset: 0,
@@ -162,10 +159,7 @@ impl GuiPass {
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),
             0,
-            &[
-                render_descriptor_sets.set_0_global.handle(),
-                render_descriptor_sets.set_1_bindless[*frame_label].handle(),
-            ],
+            &render_descriptor_sets.global_sets(frame_label),
             None,
         );
 

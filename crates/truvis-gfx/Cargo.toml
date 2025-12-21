@@ -5,7 +5,7 @@ edition = "2024"
 description = "Truvis 的 GFX 层，提供 Vulkan 的封装和抽象"
 
 [dependencies]
-truvis-shader-layout-trait = { workspace = true }
+truvis-descriptor-layout-trait = { workspace = true }
 
 
 # 默认 features：
@@ -22,3 +22,4 @@ itertools = { workspace = true }
 vk-mem = { workspace = true }
 log = { workspace = true }
 bytemuck = { workspace = true }
+serde_json = { workspace = true }

@@ -1,5 +1,5 @@
 use ash::vk;
-use truvis_shader_layout_trait::DescriptorBindingLayout;
+use truvis_descriptor_layout_trait::DescriptorBindingLayout;
 
 use crate::gfx::Gfx;
 use crate::{descriptors::descriptor_pool::GfxDescriptorPool, foundation::debug_messenger::DebugType};

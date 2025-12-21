@@ -50,7 +50,18 @@ unsafe extern "system" fn vk_debug_callback(
         unsafe { CStr::from_ptr(callback_data.p_message).to_string_lossy() }
     };
 
-    let format_msg = format!("[{:?}]\n{}\n", message_type, msg);
+    // 提取 json 里面的 MainMessage 字段，这个字段里面有换行符，需要单独输出
+    let mut json_value = serde_json::from_str::<serde_json::Value>(msg.as_ref());
+    let mut json_obj = json_value.as_mut().map_or(None, |v| v.as_object_mut());
+    let mut main_msg_value = None;
+    if let Some(obj) = &mut json_obj {
+        main_msg_value = obj.remove("MainMessage");
+    }
+    let main_msg_str = main_msg_value.as_ref().and_then(|value| value.as_str()).unwrap_or_default();
+    let total_msg_str =
+        json_obj.and_then(|obj| serde_json::to_string_pretty(&obj).ok()).unwrap_or_else(|| msg.to_string());
+
+    let format_msg = format!("[{:?}]\n{}\n{}\n", message_type, total_msg_str, main_msg_str);
 
     match message_severity {
         vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {

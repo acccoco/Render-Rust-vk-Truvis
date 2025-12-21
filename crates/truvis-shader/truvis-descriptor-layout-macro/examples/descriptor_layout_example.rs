@@ -1,7 +1,7 @@
 use ash::vk;
 
-use truvis_shader_layout_macro::DescriptorBinding;
-use truvis_shader_layout_trait::DescriptorBindingLayout;
+use truvis_descriptor_layout_macro::DescriptorBinding;
+use truvis_descriptor_layout_trait::DescriptorBindingLayout;
 
 /// 示例：使用 DescriptorBinding 派生宏定义着色器布局
 ///

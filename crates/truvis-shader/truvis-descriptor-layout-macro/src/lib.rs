@@ -58,9 +58,9 @@ pub fn derive_descriptor_binding(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl #struct_name {
             #(
-                pub fn #method_names() -> &'static truvis_shader_layout_trait::DescriptorBindingItem {
-                    static CURSOR: std::sync::OnceLock<truvis_shader_layout_trait::DescriptorBindingItem> = std::sync::OnceLock::new();
-                    CURSOR.get_or_init(|| truvis_shader_layout_trait::DescriptorBindingItem{
+                pub fn #method_names() -> &'static truvis_descriptor_layout_trait::DescriptorBindingItem {
+                    static CURSOR: std::sync::OnceLock<truvis_descriptor_layout_trait::DescriptorBindingItem> = std::sync::OnceLock::new();
+                    CURSOR.get_or_init(|| truvis_descriptor_layout_trait::DescriptorBindingItem{
                         name: stringify!(#field_names).trim_matches('_'),
                         binding: #binding_values,
                         descriptor_type: #descriptor_types,
@@ -72,10 +72,10 @@ pub fn derive_descriptor_binding(input: TokenStream) -> TokenStream {
             )*
         }
 
-        impl truvis_shader_layout_trait::DescriptorBindingLayout for #struct_name {
-            fn get_shader_bindings() -> Vec<truvis_shader_layout_trait::DescriptorBindingItem> {
+        impl truvis_descriptor_layout_trait::DescriptorBindingLayout for #struct_name {
+            fn get_shader_bindings() -> Vec<truvis_descriptor_layout_trait::DescriptorBindingItem> {
                 vec![
-                    #(truvis_shader_layout_trait::DescriptorBindingItem {
+                    #(truvis_descriptor_layout_trait::DescriptorBindingItem {
                         name: stringify!(#field_names).trim_matches('_'),
                         binding: #binding_values,
                         descriptor_type: #descriptor_types,

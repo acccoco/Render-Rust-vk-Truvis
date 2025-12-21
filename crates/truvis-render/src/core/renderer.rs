@@ -15,10 +15,10 @@ use truvis_gfx::{
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
+use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_base::pipeline_settings::{
     AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings,
 };
-use truvis_render_base::render_descriptor_sets::RenderDescriptorSets;
 use truvis_render_base::sampler_manager::RenderSamplerManager;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::resources::fif_buffer::FifBuffers;
@@ -92,11 +92,11 @@ impl Renderer {
         let fif_buffers =
             FifBuffers::new(&frame_settings, &mut bindless_manager, &mut gfx_resource_manager, &frame_counter);
 
-        let render_descriptor_sets = RenderDescriptorSets::new();
+        let render_descriptor_sets = GlobalDescriptorSets::new();
         let sampler_manager = RenderSamplerManager::new(&render_descriptor_sets);
 
         let per_frame_data_buffers = FrameCounter::frame_labes().map(|frame_label| {
-            GfxStructuredBuffer::<truvisl::PerFrameData>::new_ssbo(1, format!("per-frame-data-buffer-{frame_label}"))
+            GfxStructuredBuffer::<truvisl::PerFrameData>::new_ubo(1, format!("per-frame-data-buffer-{frame_label}"))
         });
 
         let cmds = FrameCounter::frame_labes()
@@ -251,8 +251,9 @@ impl Renderer {
             src_access: vk::AccessFlags2::TRANSFER_WRITE,
             dst_stage: vk::PipelineStageFlags2::VERTEX_SHADER
                 | vk::PipelineStageFlags2::FRAGMENT_SHADER
-                | vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
-            dst_access: vk::AccessFlags2::SHADER_READ,
+                | vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR
+                | vk::PipelineStageFlags2::COMPUTE_SHADER,
+            dst_access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::UNIFORM_READ,
         };
 
         // 因为 Bindless RefCel 的问题，所以这里提前结束作用域

@@ -1,5 +1,5 @@
 [package]
-name = "truvis-shader-layout-trait"
+name = "truvis-descriptor-layout-trait"
 version = "0.1.0"
 edition = "2024"
 description = "为 shader-layout-macro 提供 trait 定义"

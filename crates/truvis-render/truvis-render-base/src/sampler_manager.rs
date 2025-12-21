@@ -1,4 +1,4 @@
-use crate::render_descriptor_sets::{GlobalDescriptorBinding, RenderDescriptorSets};
+use crate::global_descriptor_sets::{GlobalDescriptorSets, StaticDescriptorBinding};
 use ash::vk;
 use itertools::Itertools;
 use truvis_gfx::gfx::Gfx;
@@ -12,12 +12,12 @@ pub struct RenderSamplerManager {
 }
 
 impl RenderSamplerManager {
-    pub fn new(render_descriptor_sets: &RenderDescriptorSets) -> Self {
+    pub fn new(render_descriptor_sets: &GlobalDescriptorSets) -> Self {
         let samplers = Self::create_sampler();
 
         // sampler 写入 descriptor set
-        let write_sampler = GlobalDescriptorBinding::samplers().write_image(
-            render_descriptor_sets.set_0_global.handle(),
+        let write_sampler = StaticDescriptorBinding::samplers().write_image(
+            render_descriptor_sets.sampler_set().handle(),
             0,
             samplers.iter().map(|samlper| vk::DescriptorImageInfo::default().sampler(samlper.handle())).collect_vec(),
         );
