@@ -6,18 +6,25 @@
 
 ```
 crates/
-├── truvis-gfx/              # Vulkan RHI 抽象
-├── truvis-app/              # 应用框架（OuterApp trait）
-├── truvis-render/           # 渲染管线、GPU 场景、FrameContext 单例
+├── truvis-gfx/              # Vulkan RHI 抽象（Gfx 单例）
+├── truvis-app/              # 应用框架（TruvisApp + OuterApp trait）
+├── truvis-render/           # 渲染核心 + 子模块
+│   ├── truvis-render-base/  # 基础设施（CmdAllocator、BindlessManager）
+│   ├── truvis-render-graph/ # 渲染管线、RenderContext、Pass/Subpass
+│   └── truvis-render-scene/ # GPU 场景（GpuScene、SceneManager）
 ├── truvis-model-manager/    # 顶点数据和几何体
-├── truvis-cxx/             # C++ 绑定（Assimp）
+├── truvis-cxx/             # C++ 绑定（truvis-cxx-binding + truvis-cxx-build）
 ├── truvis-shader/          # 着色器系统
-└── truvis-crate-tools/     # 工具（shader-build、路径管理）
+│   ├── truvis-shader-binding/  # Slang → Rust 自动绑定
+│   └── truvis-shader-build/    # 着色器编译工具
+├── truvis-asset/           # 资产加载（异步）
+├── truvis-resource/        # 资源管理器
+└── truvis-crate-tools/     # 共享工具（TruvisPath 等）
 
 shader/
-├── src/        # .slang/.glsl/.hlsl 源码
+├── src/       # .slang/.glsl/.hlsl 源码
 ├── include/   # 共享头文件（.slangi）
-└── .build/   # 编译后 .spv 文件
+└── build/     # 编译后 .spv 文件
 ```
 
 **层次关系**: truvis-gfx → truvis-render → truvis-app → 应用 bin (`crates/truvis-app/src/bin/*/main.rs`)
@@ -34,14 +41,15 @@ cargo run --bin shader-build
 # 3. 运行演示
 cargo run --bin triangle
 cargo run --bin rt-sponza    # 需要模型文件
-cargo run --bin shader_toy
+cargo run --bin shader-toy
+cargo run --bin rt-cornell
 ```
 
-**关键**: `shader-build` 位于 `crates/truvis-crate-tools/src/bin/shader-build/`，使用 rayon 并行编译。
+**关键**: `shader-build` 位于 `crates/truvis-shader/truvis-shader-build/src/bin/shader-build/`，使用 rayon 并行编译。
 
 **自动生成系统**:
-- 着色器绑定: `truvis-shader/binding/build.rs` 通过 `bindgen` 从 `.slangi` 生成 Rust 类型
-- C++ 绑定: `truvis-cxx/build.rs` 通过 CMake 构建并复制 DLL
+- 着色器绑定: `truvis-shader-binding/build.rs` 通过 `bindgen` 从 `.slangi` 生成 Rust 类型
+- C++ 绑定: `truvis-cxx-build/build.rs` 通过 CMake 构建并复制 DLL
 - 路径: `TruvisPath` 基于 `CARGO_MANIFEST_DIR` 推导工作区路径
 
 
@@ -52,22 +60,25 @@ cargo run --bin shader_toy
 // crates/truvis-app/src/bin/my_app/main.rs
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
+use truvis_render::core::renderer::Renderer;
+use truvis_render::platform::camera::Camera;
+use truvis_render_graph::render_context::RenderContext;
 
 struct MyApp {
     pipeline: MyPipeline,
-    geometry: Geometry<VertexLayoutAoSPosColor>,
+    geometry: RtGeometry,
 }
 
 impl OuterApp for MyApp {
-    fn init(_renderer: &mut Renderer, _camera: &mut Camera) -> Self {
+    fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {
         Self {
-            pipeline: MyPipeline::new(&FrameContext::get().frame_settings()),
-            geometry: VertexLayoutAoSPosColor::triangle(),
+            pipeline: MyPipeline::new(&renderer.render_context.frame_settings, &mut renderer.cmd_allocator),
+            geometry: TriangleSoA::create_mesh(),
         }
     }
     
-    fn draw(&self) {
-        self.pipeline.render(&self.geometry);
+    fn draw(&self, render_context: &RenderContext) {
+        self.pipeline.render(render_context, &self.geometry);
     }
     
     // 可选方法
@@ -82,40 +93,57 @@ fn main() {
 ```
 
 
-### FrameContext 单例（核心模式）
+### RenderContext（核心渲染状态）
 ```rust
-// 全局访问渲染状态，简化参数传递
-let frame_label = FrameContext::frame_label();  // A/B/C
-let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("pass-name");
+// RenderContext 通过 renderer.render_context 访问，包含所有渲染状态
+// 在 OuterApp::draw() 中作为参数传入
+pub struct RenderContext {
+    pub scene_manager: SceneManager,
+    pub gpu_scene: GpuScene,
+    pub fif_buffers: FifBuffers,
+    pub bindless_manager: BindlessManager,
+    pub frame_counter: FrameCounter,
+    pub frame_settings: FrameSettings,
+    // ...
+}
 
-// 典型渲染管线
-impl MyPipeline {
-    pub fn render(&self, geometry: &Geometry) {
-        let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("my-pass");
+// 典型渲染 Pass（命令缓冲区在 init 时预分配）
+impl MyPass {
+    pub fn new(frame_settings: &FrameSettings, cmd_allocator: &mut CmdAllocator) -> Self {
+        // 每帧一个命令缓冲区，预分配
+        let cmds = FrameCounter::frame_labes()
+            .map(|label| cmd_allocator.alloc_command_buffer(label, "my-pass"));
+        Self { subpass: MySubpass::new(frame_settings), cmds }
+    }
+    
+    pub fn render(&self, render_context: &RenderContext, geometry: &RtGeometry) {
+        let frame_label = render_context.frame_counter.frame_label();
+        let cmd = self.cmds[*frame_label].clone();
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "my-pass");
         // 绘制...
         cmd.end();
-        Gfx::get().gfx_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
+        Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(&[cmd])], None);
     }
 }
 ```
 
-**常用方法**:
-- `FrameContext::frame_label()` - 当前帧标签（A/B/C）
-- `FrameContext::cmd_allocator_mut()` - 命令分配器
-- `FrameContext::bindless_mgr_mut()` - Bindless 管理
-- `FrameContext::gpu_scene_mut()` - GPU 场景
-- `FrameContext::get().frame_settings()` - 帧设置
+**常用字段**:
+- `render_context.frame_counter.frame_label()` - 当前帧标签（A/B/C）
+- `render_context.bindless_manager` - Bindless 管理
+- `render_context.gpu_scene` - GPU 场景
+- `render_context.frame_settings` - 帧设置（分辨率、格式等）
+- `renderer.cmd_allocator` - 命令分配器（在 Renderer 上）
 
 
 ### 渲染管线架构
-- **Pass** (`*_pass.rs`): 封装着色器、描述符布局，提供 `draw()` 或 `exec()` 方法
-- **Pipeline** (`*_pipeline.rs`): 协调命令记录、图像屏障，提供 `render()` 方法
+- **Subpass** (`*_subpass.rs`): 封装着色器、描述符布局，实现 `RenderSubpass` trait
+- **Pass** (`*_pass.rs`): 协调命令记录、图像屏障，提供 `render()` 方法
 
 ```rust
-// Pass 示例
-impl PhongPass {
-    pub fn draw(&self, cmd: &CommandBuffer, /* ... */) {
+// Subpass 示例（位于 truvis-render-graph/src/render_pipeline/）
+impl RenderSubpass for TriangleSubpass {}
+impl TriangleSubpass {
+    pub fn draw(&self, cmd: &GfxCommandBuffer, /* ... */) {
         cmd.cmd_begin_rendering2(&rendering_info);
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
         // 绘制...
@@ -155,7 +183,7 @@ struct MyLayout {
 - **Slang**: `.slang` → `slangc` (主要使用，位于 `tools/slang/slangc.exe`)
 - **GLSL**: `.vert/.frag` → `glslc`  
 - **HLSL**: `.hlsl` → `dxc`
-- 输出: `shader/.build/*.spv` (SPIR-V)
+- 输出: `shader/build/*.spv` (SPIR-V)
 
 ## 📁 资源管理模式
 
@@ -166,17 +194,16 @@ use truvis_crate_tools::resource::TruvisPath;
 // 所有路径基于工作区根目录（通过 CARGO_MANIFEST_DIR 推导）
 let model = TruvisPath::assets_path("sponza.fbx");           // assets/sponza.fbx
 let texture = TruvisPath::resources_path("uv_checker.png");  // resources/uv_checker.png
-let shader = TruvisPath::shader_path("rt/raygen.slang.spv"); // shader/.build/rt/raygen.slang.spv
+let shader = TruvisPath::shader_path("rt/raygen.slang.spv"); // shader/build/rt/raygen.slang.spv
 ```
 
 ### 顶点数据创建（model-manager）
 ```rust
-use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
-use truvis_model_manager::components::geometry::Geometry;
+use truvis_model_manager::shapes::triangle::TriangleSoA;
+use truvis_model_manager::components::geometry::RtGeometry;
 
 // 内置几何体（已包含 GPU 缓冲区）
-let triangle: Geometry<VertexLayoutAoSPosColor> = VertexLayoutAoSPosColor::triangle();
-let quad = VertexLayoutAoSPosColor::quad();
+let triangle: RtGeometry = TriangleSoA::create_mesh();
 
 // 通过 truvis-cxx + Assimp 加载模型（DLL 自动复制到 target/）
 ```
@@ -195,7 +222,7 @@ let quad = VertexLayoutAoSPosColor::quad();
 ```rust
 // 格式: [frame-label]name
 cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
-FrameContext::frame_name()  // 返回 "[F42A]"
+// 帧计数器：render_context.frame_counter.frame_id
 ```
 
 ### 运行时控制
@@ -217,26 +244,28 @@ cargo run --bin my_app
 
 ### 创建新渲染管线
 ```rust
-// crates/truvis-render/src/render_pipeline/my_pass.rs
-pub struct MyPass {
-    pipeline: GraphicsPipeline,
-    descriptor_sets: Vec<DescriptorSet>,
+// crates/truvis-render/truvis-render-graph/src/render_pipeline/my_subpass.rs
+pub struct MySubpass {
+    pipeline: GfxGraphicsPipeline,
+    pipeline_layout: Rc<GfxPipelineLayout>,
 }
+impl RenderSubpass for MySubpass {}
 
-// crates/truvis-render/src/render_pipeline/my_pipeline.rs  
-impl MyPipeline {
-    pub fn render(&self, geometry: &Geometry<T>) {
-        let cmd = FrameContext::cmd_allocator_mut().alloc_command_buffer("my-pass");
+// crates/truvis-app/src/bin/my_app/my_pass.rs
+impl MyPass {
+    pub fn render(&self, render_context: &RenderContext, geometry: &RtGeometry) {
+        let frame_label = render_context.frame_counter.frame_label();
+        let cmd = self.cmds[*frame_label].clone();
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "my-pass");
         
         // 图像屏障
         cmd.image_memory_barrier(vk::DependencyFlags::empty(), &[/* barriers */]);
         
         // 绘制
-        self.my_pass.draw(&cmd, /* params */);
+        self.subpass.draw(&cmd, /* params */);
         
         cmd.end();
-        Gfx::get().gfx_queue().submit(vec![SubmitInfo::new(&[cmd])], None);
+        Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(&[cmd])], None);
     }
 }
 ```
@@ -251,20 +280,17 @@ println!("cargo:rustc-link-lib=static=my-lib");
 
 ## 💡 关键实现细节
 
-### Gfx 和 FrameContext 单例模式
+### Gfx 单例模式
 ```rust
 // Gfx: 底层 Vulkan 抽象单例
 Gfx::init("Truvis".to_string(), extra_instance_ext);
 Gfx::get().gfx_device()  // 访问设备
 Gfx::get().gfx_queue()   // 访问队列
 
-// FrameContext: 渲染状态单例
-FrameContext::init();
-FrameContext::get()      // 访问完整上下文
+// Renderer 管理整个渲染流程
+// RenderContext 包含渲染状态，通过 renderer.render_context 访问
 
-// 销毁顺序（在 Renderer::destroy() 中）
-FrameContext::destroy();
-Gfx::destroy();
+// 销毁顺序（在 Renderer::destroy() 中自动处理）
 ```
 
 ### Frames in Flight (FIF) 模式
@@ -273,8 +299,8 @@ Gfx::destroy();
 - **FifBuffers**: 管理 render target、depth、color images
 
 ```rust
-let frame_label = FrameContext::frame_label();  // A/B/C
-let render_target = fif_buffers.render_target_image(frame_label);
+let frame_label = render_context.frame_counter.frame_label();  // A/B/C
+let render_target = render_context.fif_buffers.render_target_image(frame_label);
 ```
 
 
@@ -313,13 +339,9 @@ let viewport = vk::Viewport {
     ..
 };
 
-// ❌ 错误：OuterApp::draw() 签名（旧版本）
-fn draw(&self, ctx: PipelineContext) { }
-// ✅ 正确：当前版本无参数
-fn draw(&self) { /* 通过 FrameContext 访问 */ }
-
-// ❌ 避免：缓存 RefCell 引用会 panic
-let cmd_allocator = FrameContext::cmd_allocator_mut();
-let bindless = FrameContext::bindless_mgr_mut();  // panic!
+// ❌ 错误：OuterApp::draw() 签名（旧版本无参数）
+fn draw(&self) { }
+// ✅ 正确：当前版本接收 RenderContext
+fn draw(&self, render_context: &RenderContext) { /* 通过 render_context 访问状态 */ }
 ```
 

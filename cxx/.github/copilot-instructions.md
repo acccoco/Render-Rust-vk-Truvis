@@ -1,101 +1,101 @@
 # Truvixx C++ 场景加载器 - AI 编程指南
 
 ## 项目概述
-Truvixx 是为 Rust 渲染引擎 Truvis 提供 3D 资产加载能力的 C++ 库。项目生成两个 DLL：
-- `truvixx-assimp.dll`：基于 Assimp 的场景加载核心
-- `truvixx-interface.dll`：对外暴露 C FFI 接口，供 Rust 调用
+Truvixx 是为 Rust 渲染引擎 Truvis 提供 3D 资产加载能力的 C++ 库。生成一个共享库：
+- `truvixx-interface.dll`：对外暴露 C FFI 接口，供 Rust 通过 FFI 调用
+- `truvixx-assimp` (静态库)：基于 Assimp 的场景加载核心，被 interface 链接
 
 ## 架构设计
 
 ```
-truvixx-interface (C FFI 层)
-    └── truvixx-assimp (场景加载核心)
-            └── Assimp + GLM (第三方依赖)
+truvixx-interface.dll (C FFI 层, SHARED)
+    └── truvixx-assimp (场景加载核心, STATIC)
+            └── Assimp + GLM (vcpkg 依赖)
 ```
 
-### 模块职责
-| 模块 | 目录 | 职责 |
-|------|------|------|
-| `truvixx-assimp` | `truvixx-assimp/` | Assimp 封装、数据结构定义、坐标转换 |
-| `truvixx-interface` | `truvixx-interface/` | C FFI 导出函数、void* 不透明指针封装 |
-
 ### 关键文件
-- `TruvixxInterface/lib.hpp`：FFI 函数声明，`extern "C"` 接口
-- `TruvixxAssimp/c_data_define.hpp`：C 兼容的 POD 结构体（`alignas(4)`）
-- `TruvixxAssimp/scene_loader.hpp`：Assimp 场景处理逻辑
+| 文件 | 职责 |
+|------|------|
+| [truvixx-interface/include/TruvixxInterface/truvixx_api.h](truvixx-interface/include/TruvixxInterface/truvixx_api.h) | **FFI 入口**：所有 `extern "C"` 函数声明，Rust 调用此头文件 |
+| [truvixx-assimp/include/TruvixxAssimp/base_type.h](truvixx-assimp/include/TruvixxAssimp/base_type.h) | C 兼容的 POD 类型：`TruvixxFloat4x4`, `TruvixxFloat3` 等 |
+| [truvixx-assimp/include/TruvixxAssimp/scene_importer.hpp](truvixx-assimp/include/TruvixxAssimp/scene_importer.hpp) | Assimp 封装：`SceneImporter` 类 |
+| [truvixx-assimp/include/TruvixxAssimp/scene_data.hpp](truvixx-assimp/include/TruvixxAssimp/scene_data.hpp) | 内部 C++ 数据结构：`SceneData`, `MeshInfo`, `MaterialData` |
 
 ## 构建命令
 
-使用 CMake Presets（推荐）：
 ```powershell
 # Visual Studio 2022
 cmake --preset vs2022
-cmake --build --preset debug   # 或 --preset release
+cmake --build --preset vs2022-build-debug   # 或 vs2022-build-release
 
-# Clang-cl + Ninja
+# Clang-cl + Ninja (更快)
 cmake --preset clang-cl-debug
-cmake --build --preset clang-debug
+cmake --build --preset clang-cl-build-debug
 ```
 
-输出位置：`build/Debug/` 或 `build/Release/`
+输出位置：`build/output/Debug/` 或 `build/output/Release/`
 
 ## 依赖管理
-项目使用 vcpkg manifest 模式（`vcpkg.json`），**不要**使用 `vcpkg install` 命令。依赖版本已锁定：
-- Assimp 5.4.3
-- GLM 1.0.1#3
+项目使用 vcpkg manifest 模式（`vcpkg.json`），**不要**运行 `vcpkg install`。CMake 配置时自动安装。
+- 需设置环境变量 `VCPKG_ROOT` 指向 vcpkg 安装目录
+- 依赖版本锁定：Assimp 5.4.3, GLM 1.0.1#3
 
-## 编码约定
+## FFI 接口规范
 
-### C FFI 接口规范
+### 句柄模式 (不透明指针)
 ```cpp
-// ✅ 正确：void* + extern "C"，空指针检查
-extern "C" TRUVIXX_INTERFACE_API void* load_scene(const char* path);
-extern "C" TRUVIXX_INTERFACE_API size_t get_mesh_cnt(void* loader);  // loader 为空时返回 0
+// truvixx_api.h - 使用 typedef struct 前向声明
+typedef struct TruvixxScene* TruvixxSceneHandle;
 
-// ❌ 错误：不要在 FFI 层抛异常或返回 C++ 对象
+// truvixx_api.cpp - 实际定义
+struct TruvixxScene {
+    truvixx::SceneImporter importer;
+};
 ```
 
-### 数据结构设计
+### 函数签名约定
 ```cpp
-// C 兼容结构体必须使用 alignas(4)
-struct alignas(4) CxxVec3f { float x, y, z; };
+// ✅ 正确模式
+TruvixxSceneHandle TRUVIXX_INTERFACE_API truvixx_scene_load(const char* path);
+ResType TRUVIXX_INTERFACE_API truvixx_mesh_get_info(TruvixxSceneHandle scene, uint32_t index, TruvixxMeshInfo* out);
 
-// 字符串使用固定大小数组，而非 std::string
-char name[PATH_BUFFER_SIZE];  // PATH_BUFFER_SIZE = 256
+// ❌ 禁止：返回 C++ 对象、抛异常、使用 std::string
+```
 
-// 复杂类型采用仅移动语义，禁止拷贝
-CxxRasterGeometry(CxxRasterGeometry&&) noexcept;           // ✅ 允许移动
-CxxRasterGeometry(const CxxRasterGeometry&) = delete;      // ❌ 禁止拷贝
+### FFI 结构体设计
+```cpp
+// 字符串使用固定大小数组 (256 字节)
+typedef struct {
+    char name[256];           // 不用 std::string
+    TruvixxFloat4 base_color; // 使用 base_type.h 中的 POD 类型
+    float roughness;
+} TruvixxMat;
+```
+
+## 数据访问模式
+
+### 查询-分配-填充模式 (SOA 布局)
+Rust 调用方需预分配缓冲区：
+```cpp
+// 1. 查询元信息
+TruvixxMeshInfo info;
+truvixx_mesh_get_info(scene, mesh_idx, &info);
+
+// 2. 调用方分配 buffer (Rust 侧)
+
+// 3. 填充数据 (两种方式)
+truvixx_mesh_fill_positions(scene, mesh_idx, position_buffer);  // 拷贝到用户 buffer
+const TruvixxFloat3* positions = truvixx_mesh_get_positions(scene, mesh_idx);  // 直接指针
 ```
 
 ### 坐标系约定
 - **右手坐标系**：X-Right, Y-Up, Z-Out
-- **UV 原点**：左上角（通过 `aiProcess_FlipUVs` 实现）
-- **矩阵存储**：列主序（`CxxMat4f.m[0..3]` 是第一列）
-
-## DLL 导出宏
-CMake 自动生成导出头文件，使用 `TRUVIXX_*_API` 宏：
-```cpp
-#include "TruvixxAssimp/truvixx_assimp.export.h"
-struct TRUVIXX_ASSIMP_API CxxMaterial { ... };
-```
-
-## API 使用模式
-```cpp
-void* loader = load_scene("scene.gltf");
-if (!loader) { /* 加载失败 */ }
-
-for (size_t i = 0; i < get_instance_cnt(loader); ++i) {
-    const CxxInstance* inst = get_instance(loader, i);
-    // inst->mesh_indices(), inst->world_transform, inst->name
-}
-
-free_scene(loader);  // 必须手动释放
-```
+- **矩阵存储**：列主序 (`TruvixxFloat4x4.col0[4]` 是第一列)
+- **UV 原点**：左上角
 
 ## 修改检查清单
-- [ ] FFI 函数保持 `extern "C"` 和 void* 签名
-- [ ] 新增结构体使用 `alignas(4)` 和固定大小数组
-- [ ] 复杂类型实现移动语义，删除拷贝构造/赋值
-- [ ] 坐标系注释保持准确："坐标系：右手系，X-Right，Y-Up"
+- [ ] FFI 函数保持 `extern "C"` 和 `TruvixxSceneHandle` 签名
+- [ ] FFI 结构体使用固定大小数组，不用 STL 容器
+- [ ] 新增 FFI 函数添加 `TRUVIXX_INTERFACE_API` 宏
+- [ ] 返回 `ResType` 枚举而非 bool，支持扩展错误码
 - [ ] 同时测试 VS2022 和 Clang-cl 构建
