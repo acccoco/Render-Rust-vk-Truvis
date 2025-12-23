@@ -4,7 +4,6 @@ use crate::present::render_present::{PresentData, RenderPresent};
 use ash::vk;
 use imgui::DrawData;
 use std::ffi::CStr;
-use std::path::PathBuf;
 use truvis_asset::asset_hub::AssetHub;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
@@ -17,7 +16,6 @@ use truvis_gfx::{
     },
     gfx::Gfx,
 };
-use truvis_model::guid_new_type::InstanceHandle;
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
@@ -31,9 +29,7 @@ use truvis_render_graph::resources::fif_buffer::FifBuffers;
 use truvis_render_scene::gpu_scene::GpuScene;
 use truvis_render_scene::scene_manager::SceneManager;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
-use truvis_resource::texture::{GfxTexture, ImageLoader};
 use truvis_shader_binding::truvisl;
-use truvis_shader_binding::truvisl::Instance;
 use winit::raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 
 /// 渲染器核心

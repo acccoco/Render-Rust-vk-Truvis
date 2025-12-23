@@ -2,9 +2,8 @@ use crate::scene_data::SceneRenderData;
 use crate::scene_manager::SceneManager;
 use ash::vk;
 use glam::Vec4Swizzles;
-use indexmap::IndexSet;
 use itertools::Itertools;
-use slotmap::{Key, SecondaryMap};
+use slotmap::Key;
 use std::path::PathBuf;
 use truvis_asset::asset_hub::AssetHub;
 use truvis_crate_tools::resource::TruvisPath;
@@ -17,10 +16,8 @@ use truvis_gfx::{
     resources::special_buffers::structured_buffer::GfxStructuredBuffer,
 };
 use truvis_model::components::instance::Instance;
-use truvis_model::guid_new_type::{InstanceHandle, MaterialHandle, MeshHandle};
 use truvis_render_base::bindless_manager::{BindlessManager, BindlessSrvHandle};
 use truvis_render_base::frame_counter::FrameCounter;
-use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;

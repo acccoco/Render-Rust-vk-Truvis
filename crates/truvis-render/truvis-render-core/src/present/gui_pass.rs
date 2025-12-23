@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
 
-use crate::present::gui_backend::GuiBackend;
 use crate::present::gui_mesh::GuiMesh;
 use crate::present::gui_vertex_layout::ImGuiVertexLayoutAoS;
 use ash::vk;

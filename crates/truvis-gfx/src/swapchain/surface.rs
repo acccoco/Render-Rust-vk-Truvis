@@ -1,7 +1,6 @@
 use crate::foundation::debug_messenger::DebugType;
 use crate::gfx_core::GfxCore;
 use ash::vk;
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 pub struct GfxSurface {
     pub(crate) handle: vk::SurfaceKHR,

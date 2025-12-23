@@ -47,7 +47,7 @@ impl GfxDevice {
         queue_create_info: &[vk::DeviceQueueCreateInfo],
     ) -> Self {
         let _span = tracy_client::span!("GfxDevice::new");
-        
+
         // device 所需的所有 extension
         let device_exts = Self::basic_device_exts().iter().map(|e| e.as_ptr()).collect_vec();
         let mut exts_str = String::new();

@@ -1,25 +1,12 @@
 use ash::vk;
 use itertools::Itertools;
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::commands::barrier::GfxBarrierMask;
-use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
-use truvis_gfx::{
-    commands::{barrier::GfxImageBarrier, semaphore::GfxSemaphore, submit_info::GfxSubmitInfo},
-    gfx::Gfx,
-    swapchain::render_swapchain::GfxRenderSwapchain,
-};
 use truvis_render_base::bindless_manager::BindlessManager;
-use truvis_render_base::frame_counter::FrameCounter;
-use truvis_render_base::pipeline_settings::{DefaultRendererSettings, FrameLabel};
-use truvis_render_core::core::renderer::Renderer;
 use truvis_render_core::present::gui_backend::GuiBackend;
 use truvis_render_core::present::gui_front::GuiHost;
-use truvis_render_graph::render_context::RenderContext;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
-use truvis_resource::handles::GfxTextureHandle;
 
 mod helper {
     pub fn load_icon(bytes: &[u8]) -> winit::window::Icon {
@@ -51,7 +38,7 @@ impl MainWindow {
 
         let window = event_loop.create_window(window_attr).unwrap();
 
-        let mut gui_host = GuiHost::new(&window);
+        let gui_host = GuiHost::new(&window);
 
         Self {
             winit_window: window,

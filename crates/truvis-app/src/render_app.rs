@@ -38,7 +38,7 @@ impl<T: OuterApp> RenderApp<T> {
 impl<T: OuterApp> RenderApp<T> {
     pub fn destroy(self) {
         Gfx::get().wait_idel();
-        
+
         self.renderer.destroy();
     }
 }

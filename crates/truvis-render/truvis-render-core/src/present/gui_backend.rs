@@ -1,13 +1,9 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use crate::core::renderer::Renderer;
 use crate::present::gui_mesh::GuiMesh;
-use ash::vk;
 use imgui::{DrawData, FontAtlasTexture, TextureId};
 use std::collections::HashMap;
-use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
-use truvis_gfx::swapchain::render_swapchain::GfxSwapchainImageInfo;
 use truvis_gfx::{basic::color::LabelColor, gfx::Gfx, resources::image::GfxImage};
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::cmd_allocator::CmdAllocator;

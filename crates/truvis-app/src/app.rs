@@ -14,11 +14,8 @@ use crate::platform::camera_controller::CameraController;
 use crate::render_app::RenderApp;
 use crate::window_system::main_window::MainWindow;
 use truvis_crate_tools::init_log::init_log;
-use truvis_gfx::commands::barrier::GfxBarrierMask;
 use truvis_gfx::gfx::Gfx;
-use truvis_render_core::core::renderer::Renderer;
 use truvis_render_core::platform::input_manager::InputManager;
-use truvis_render_core::present::render_present::PresentData;
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     log::error!("{}", info);
@@ -58,7 +55,7 @@ impl<T: OuterApp> TruvisApp<T> {
         let input_manager = InputManager::new();
 
         // 创建相机控制器
-        let camera_controller = CameraController::new();
+        let _camera_controller = CameraController::new();
 
         let event_loop = winit::event_loop::EventLoop::<UserEvent>::with_user_event().build().unwrap();
 

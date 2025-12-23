@@ -4,7 +4,6 @@ use ash::vk;
 use imgui::DrawData;
 use itertools::Itertools;
 use truvis_gfx::commands::barrier::{GfxBarrierMask, GfxImageBarrier};
-use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
@@ -63,7 +62,7 @@ impl RenderPresent {
         let swapchain_image_infos = swapchain.image_infos();
 
         let gui_backend = GuiBackend::new(cmd_allocator);
-        let gui_pass = GuiPass::new(&global_descriptor_sets, swapchain_image_infos.image_format);
+        let gui_pass = GuiPass::new(global_descriptor_sets, swapchain_image_infos.image_format);
 
         let present_complete_semaphores = FrameCounter::frame_labes()
             .map(|frame_label| GfxSemaphore::new(&format!("window-present-complete-{}", frame_label)));

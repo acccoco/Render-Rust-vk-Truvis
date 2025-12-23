@@ -1,5 +1,5 @@
 use truvis_render_core::platform::camera::Camera;
-use truvis_render_core::platform::input_manager::{InputManager, InputState};
+use truvis_render_core::platform::input_manager::InputState;
 use winit::keyboard::KeyCode;
 
 pub struct CameraController {

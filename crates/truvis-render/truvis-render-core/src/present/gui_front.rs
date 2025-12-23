@@ -1,11 +1,6 @@
-use crate::present::gui_backend::GuiBackend;
 use ash::vk;
 use imgui::{DrawData, FontAtlasTexture, TextureId};
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::resources::image::GfxImage;
-use truvis_render_base::bindless_manager::BindlessManager;
-use truvis_resource::gfx_resource_manager::GfxResourceManager;
-use truvis_resource::texture::GfxTexture;
 
 const FONT_TEXTURE_ID: usize = 0;
 const RENDER_IMAGE_ID: usize = 1;
@@ -41,7 +36,7 @@ impl GuiHost {
         }
     }
 
-    pub fn init_font(&mut self) -> (FontAtlasTexture, TextureId) {
+    pub fn init_font(&mut self) -> (FontAtlasTexture<'_>, TextureId) {
         let hidpi_factor = self.platform.hidpi_factor();
         let font_size = (13.0 * hidpi_factor) as f32;
 
