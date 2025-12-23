@@ -1,42 +1,25 @@
-//! 参考 imgui-rs-vulkan-renderer
-
+use crate::present::gui_backend::GuiBackend;
 use ash::vk;
-
-use crate::gui::gui_mesh::GuiMesh;
+use imgui::{DrawData, FontAtlasTexture, TextureId};
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::swapchain::render_swapchain::GfxSwapchainImageInfo;
-use truvis_gfx::{basic::color::LabelColor, gfx::Gfx, resources::image::GfxImage};
-use truvis_render::core::renderer::Renderer;
+use truvis_gfx::resources::image::GfxImage;
 use truvis_render_base::bindless_manager::BindlessManager;
-use truvis_render_base::frame_counter::FrameCounter;
-use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
-use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::GfxTexture;
 
-pub struct Gui {
+const FONT_TEXTURE_ID: usize = 0;
+const RENDER_IMAGE_ID: usize = 1;
+
+pub struct GuiHost {
     pub imgui_ctx: imgui::Context,
     pub platform: imgui_winit_support::WinitPlatform,
 
     /// 3D 渲染的区域
-    render_region: vk::Rect2D,
-
-    /// 存放多帧 imgui 的 mesh 数据
-    gui_meshes: [GuiMesh; FrameCounter::fif_count()],
-
-    render_texture_handle: Option<GfxTextureHandle>,
-    font_texture_handle: GfxTextureHandle,
+    pub render_region: vk::Rect2D,
 }
-// 创建过程
-impl Gui {
-    const FONT_TEXTURE_ID: usize = 0;
-    const RENDER_IMAGE_ID: usize = 1;
-
-    pub fn new(
-        renderer: &mut Renderer,
-        window: &winit::window::Window,
-        swapchain_image_infos: &GfxSwapchainImageInfo,
-    ) -> Self {
+// new & init
+impl GuiHost {
+    pub fn new(window: &winit::window::Window) -> Self {
         let mut imgui_ctx = imgui::Context::create();
         // disable automatic saving .ini file
         imgui_ctx.set_ini_filename(None);
@@ -51,51 +34,19 @@ impl Gui {
         let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui_ctx);
         platform.attach_window(imgui_ctx.io_mut(), window, imgui_winit_support::HiDpiMode::Rounded);
 
-        let font_texture_handle = Self::init_fonts(
-            &mut imgui_ctx,
-            &platform,
-            &mut renderer.render_context.bindless_manager,
-            &mut renderer.render_context.gfx_resource_manager,
-        );
-
-        let gui_meshes = FrameCounter::frame_labes().map(GuiMesh::new);
-
         Self {
             imgui_ctx,
             platform,
-
-            render_region: vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: swapchain_image_infos.image_extent,
-            },
-
-            gui_meshes,
-
-            render_texture_handle: None,
-            font_texture_handle,
+            render_region: Default::default(),
         }
     }
 
-    /// 初始化的时候注册字体
-    ///
-    /// 1. 首先将字体数据放入 imgui 中，并建立起字体 atlas
-    /// 1. 然后将字体 atlas 转换为 GfxImage2D，并注册到 BindlessManager 中
-    ///
-    /// # Return
-    /// ```
-    ///     "font texture id in imgui"
-    /// ```
-    fn init_fonts(
-        imgui_ctx: &mut imgui::Context,
-        platform: &imgui_winit_support::WinitPlatform,
-        bindless_manager: &mut BindlessManager,
-        gfx_resource_manager: &mut GfxResourceManager,
-    ) -> GfxTextureHandle {
-        let hidpi_factor = platform.hidpi_factor();
+    pub fn init_font(&mut self) -> (FontAtlasTexture, TextureId) {
+        let hidpi_factor = self.platform.hidpi_factor();
         let font_size = (13.0 * hidpi_factor) as f32;
 
         let font_data = std::fs::read(TruvisPath::resources_path("mplus-1p-regular.ttf")).unwrap();
-        imgui_ctx.fonts().add_font(&[
+        self.imgui_ctx.fonts().add_font(&[
             imgui::FontSource::DefaultFontData {
                 config: Some(imgui::FontConfig {
                     size_pixels: font_size,
@@ -112,27 +63,29 @@ impl Gui {
                 }),
             },
         ]);
-        let io = imgui_ctx.io_mut();
+
+        let font_texture_id = imgui::TextureId::from(0);
+        self.imgui_ctx.fonts().tex_id = font_texture_id;
+
+        let io = self.imgui_ctx.io_mut();
         io.font_global_scale = (1.0 / hidpi_factor) as f32;
         io.config_flags |= imgui::ConfigFlags::DOCKING_ENABLE;
 
-        let fonts_texture = {
-            let fonts = imgui_ctx.fonts();
-            let atlas_texture = fonts.build_rgba32_texture();
+        let fonts = self.imgui_ctx.fonts();
+        let atlas_texture = fonts.build_rgba32_texture();
 
-            let image =
-                GfxImage::from_rgba8(atlas_texture.width, atlas_texture.height, atlas_texture.data, "imgui-fonts");
-            GfxTexture::new(image, "imgui-fonts")
-        };
-        let fonts_texture_handle = gfx_resource_manager.register_texture(fonts_texture);
-        bindless_manager.register_srv_with_texture(fonts_texture_handle);
-        imgui_ctx.fonts().tex_id = imgui::TextureId::from(Self::FONT_TEXTURE_ID);
-
-        fonts_texture_handle
+        (atlas_texture, imgui::TextureId::new(FONT_TEXTURE_ID))
     }
 }
-// tools
-impl Gui {
+// getters
+impl GuiHost {
+    #[inline]
+    pub fn get_render_region(&self) -> vk::Rect2D {
+        self.render_region
+    }
+}
+// update
+impl GuiHost {
     /// 接受 window 的事件
     pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>) {
         self.platform.handle_event(self.imgui_ctx.io_mut(), window, event);
@@ -167,14 +120,14 @@ impl Gui {
                 .size([viewport_size.x, viewport_size.y], imgui::Condition::Always)
                 .flags(
                     imgui::WindowFlags::NO_MOVE
-                    | imgui::WindowFlags::NO_TITLE_BAR
-                    // | imgui::WindowFlags::MENU_BAR
-                    | imgui::WindowFlags::NO_COLLAPSE
-                    | imgui::WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS
-                    | imgui::WindowFlags::NO_NAV_FOCUS
-                    | imgui::WindowFlags::NO_DOCKING
-                    | imgui::WindowFlags::NO_BACKGROUND
-                    | imgui::WindowFlags::NO_RESIZE,
+                        | imgui::WindowFlags::NO_TITLE_BAR
+                        // | imgui::WindowFlags::MENU_BAR
+                        | imgui::WindowFlags::NO_COLLAPSE
+                        | imgui::WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS
+                        | imgui::WindowFlags::NO_NAV_FOCUS
+                        | imgui::WindowFlags::NO_DOCKING
+                        | imgui::WindowFlags::NO_BACKGROUND
+                        | imgui::WindowFlags::NO_RESIZE,
                 )
                 .build(|| {
                     if imgui::sys::igDockBuilderGetNode(root_node_id).is_null() {
@@ -256,7 +209,7 @@ impl Gui {
                         height: (window_size[1] * hidpi_factor) as u32,
                     };
 
-                    imgui::Image::new(imgui::TextureId::new(Self::RENDER_IMAGE_ID), [window_size[0], window_size[1]])
+                    imgui::Image::new(imgui::TextureId::new(RENDER_IMAGE_ID), [window_size[0], window_size[1]])
                         .build(ui);
 
                     ui_func_main(ui, window_size);
@@ -285,47 +238,8 @@ impl Gui {
         self.platform.prepare_render(ui, window);
     }
 
-    pub fn register_render_texture(&mut self, texture_handle: GfxTextureHandle) {
-        self.render_texture_handle = Some(texture_handle);
-    }
-
-    // TODO 这个函数设计的非常别扭
-    /// # Phase: Render
-    ///
-    /// 使用 imgui 将 ui 操作编译为 draw data；构建 draw 需要的 mesh 数据
-    pub fn imgui_render(
-        &mut self,
-        frame_label: FrameLabel,
-    ) -> Option<(&GuiMesh, &imgui::DrawData, impl Fn(imgui::TextureId) -> GfxTextureHandle + use<'_>)> {
+    pub fn compile_ui(&mut self) -> Option<&DrawData> {
         let draw_data = self.imgui_ctx.render();
-        if draw_data.total_vtx_count == 0 {
-            return None;
-        }
-
-        Gfx::get().gfx_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
-        self.gui_meshes[*frame_label].grow_if_needed(draw_data);
-        self.gui_meshes[*frame_label].fill_vertex_buffer(draw_data);
-        self.gui_meshes[*frame_label].fill_index_buffer(draw_data);
-        Gfx::get().gfx_queue().end_label();
-
-        Some((
-            &self.gui_meshes[*frame_label], //
-            draw_data,
-            |texture_id: imgui::TextureId| match texture_id.id() {
-                Self::RENDER_IMAGE_ID => *self.render_texture_handle.as_ref().unwrap(),
-                Self::FONT_TEXTURE_ID => self.font_texture_handle,
-                _ => panic!("unknown texture id: {}", texture_id.id()),
-            },
-        ))
-    }
-
-    #[inline]
-    pub fn get_render_region(&self) -> vk::Rect2D {
-        self.render_region
-    }
-}
-impl Drop for Gui {
-    fn drop(&mut self) {
-        // 每个字段都是 RAII 的
+        if draw_data.total_vtx_count == 0 { None } else { Some(draw_data) }
     }
 }

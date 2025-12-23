@@ -1,5 +1,5 @@
-use truvis_render::core::renderer::Renderer;
-use truvis_render::platform::camera::Camera;
+use truvis_render_core::core::renderer::Renderer;
+use truvis_render_core::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
 
 /// 外部应用接口 trait

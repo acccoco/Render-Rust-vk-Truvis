@@ -1,9 +1,9 @@
 use imgui::Ui;
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
-use truvis_render::core::renderer::Renderer;
-use truvis_render::model_loader::assimp_loader::AssimpSceneLoader;
-use truvis_render::platform::camera::Camera;
+use truvis_render_core::core::renderer::Renderer;
+use truvis_render_core::model_loader::assimp_loader::AssimpSceneLoader;
+use truvis_render_core::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_pipeline::rt_pass::RtRenderPass;
 use truvis_shader_binding::truvisl;

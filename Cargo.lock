@@ -1066,9 +1066,9 @@ checksum = "03087c2bad5e1034e8cace5926dec053fb3790248370865f5117a7d0213354c8"
 
 [[package]]
 name = "libc"
-version = "0.2.169"
+version = "0.2.178"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
+checksum = "37c93d8daa9d8a012fd8ab92f088405fb202ea0b6ab73ee2482ae66af4f42091"
 
 [[package]]
 name = "libfuzzer-sys"
@@ -2015,18 +2015,28 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.217"
+version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02fc4265df13d6fa1d00ecff087228cc0a2b5f3c0e87e258d8b94a156e984c70"
+checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
+dependencies = [
+ "serde_core",
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_core"
+version = "1.0.228"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41d385c7d4ca58e59fc732af25c3983b67ac852c1a25000afe1175de458b67ad"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.217"
+version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a9bf7cf98d04a2b28aead066b7496853d4779c9cc183c440dbac457641e19a0"
+checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2035,14 +2045,15 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.143"
+version = "1.0.146"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d401abef1d108fbd9cbaebc3e46611f4b1021f714a0597a71f41ee463f5f4a5a"
+checksum = "217ca874ae0207aac254aa02c957ded05585a90892cc8d87f9e5fa49669dadd8"
 dependencies = [
  "itoa",
  "memchr",
  "ryu",
  "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -2365,10 +2376,9 @@ dependencies = [
  "truvis-asset",
  "truvis-crate-tools",
  "truvis-gfx",
- "truvis-gui",
  "truvis-model",
- "truvis-render",
  "truvis-render-base",
+ "truvis-render-core",
  "truvis-render-graph",
  "truvis-resource",
  "truvis-shader-binding",
@@ -2455,27 +2465,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "truvis-gui"
-version = "0.1.0"
-dependencies = [
- "ash",
- "bytemuck",
- "glam",
- "imgui",
- "imgui-winit-support",
- "itertools 0.10.5",
- "log",
- "truvis-crate-tools",
- "truvis-gfx",
- "truvis-render",
- "truvis-render-base",
- "truvis-render-graph",
- "truvis-resource",
- "truvis-shader-binding",
- "winit",
-]
-
-[[package]]
 name = "truvis-model"
 version = "0.1.0"
 dependencies = [
@@ -2488,27 +2477,6 @@ dependencies = [
  "truvis-asset",
  "truvis-cxx-binding",
  "truvis-gfx",
-]
-
-[[package]]
-name = "truvis-render"
-version = "0.1.0"
-dependencies = [
- "ash",
- "bytemuck",
- "glam",
- "itertools 0.10.5",
- "tracy-client",
- "truvis-asset",
- "truvis-cxx-binding",
- "truvis-gfx",
- "truvis-model",
- "truvis-render-base",
- "truvis-render-graph",
- "truvis-render-scene",
- "truvis-resource",
- "truvis-shader-binding",
- "winit",
 ]
 
 [[package]]
@@ -2526,6 +2494,31 @@ dependencies = [
  "truvis-gfx",
  "truvis-resource",
  "truvis-shader-binding",
+]
+
+[[package]]
+name = "truvis-render-core"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "bytemuck",
+ "glam",
+ "imgui",
+ "imgui-winit-support",
+ "itertools 0.10.5",
+ "log",
+ "tracy-client",
+ "truvis-asset",
+ "truvis-crate-tools",
+ "truvis-cxx-binding",
+ "truvis-gfx",
+ "truvis-model",
+ "truvis-render-base",
+ "truvis-render-graph",
+ "truvis-render-scene",
+ "truvis-resource",
+ "truvis-shader-binding",
+ "winit",
 ]
 
 [[package]]

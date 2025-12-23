@@ -11,15 +11,19 @@ pub struct GfxSurface {
 }
 
 impl GfxSurface {
-    pub fn new(vk_core: &GfxCore, window: &winit::window::Window) -> Self {
+    pub fn new(
+        vk_core: &GfxCore,
+        raw_display_handle: raw_window_handle::RawDisplayHandle,
+        raw_window_handle: raw_window_handle::RawWindowHandle,
+    ) -> Self {
         let surface_pf = ash::khr::surface::Instance::new(&vk_core.vk_entry, &vk_core.instance.ash_instance);
 
         let surface = unsafe {
             ash_window::create_surface(
                 &vk_core.vk_entry,
                 &vk_core.instance.ash_instance,
-                window.display_handle().unwrap().as_raw(),
-                window.window_handle().unwrap().as_raw(),
+                raw_display_handle,
+                raw_window_handle,
                 None,
             )
             .unwrap()

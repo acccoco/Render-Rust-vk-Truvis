@@ -1,5 +1,5 @@
 [package]
-name = "truvis-render"
+name = "truvis-render-core"
 version = "0.1.0"
 edition = "2024"
 
@@ -13,6 +13,10 @@ truvis-render-base = { workspace = true }
 truvis-render-scene = { workspace = true }
 truvis-model = { workspace = true }
 truvis-cxx-binding = { workspace = true }
+truvis-crate-tools = { workspace = true }
+
+
+
 
 # 默认 features：
 # - debug 表示 vulkan 结构体实现了 Debut Trait
@@ -25,3 +29,7 @@ glam = { workspace = true }
 bytemuck = { workspace = true }
 tracy-client = { workspace = true }
 itertools = { workspace = true }
+log = { workspace = true }
+imgui = { workspace = true }
+imgui-winit-support = { workspace = true }
+

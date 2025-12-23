@@ -122,26 +122,6 @@ impl InputManager {
             }
         }
     }
-
-    /// 检查键盘按键是否被按下
-    pub fn is_key_pressed(&self, key_code: KeyCode) -> bool {
-        self.state.key_pressed.get(&key_code).copied().unwrap_or(false)
-    }
-
-    /// 获取鼠标位置
-    pub fn get_mouse_position(&self) -> glam::DVec2 {
-        self.state.crt_mouse_pos
-    }
-
-    /// 获取鼠标位置变化
-    pub fn get_mouse_delta(&self) -> glam::DVec2 {
-        self.state.crt_mouse_pos - self.state.last_mouse_pos
-    }
-
-    /// 检查鼠标右键是否被按下
-    pub fn is_right_button_pressed(&self) -> bool {
-        self.state.right_button_pressed
-    }
 }
 
 /// 记录输入信息
@@ -153,4 +133,25 @@ pub struct InputState {
     pub last_mouse_pos: glam::DVec2,
     pub right_button_pressed: bool,
     pub key_pressed: HashMap<KeyCode, bool>,
+}
+impl InputState {
+    /// 检查键盘按键是否被按下
+    pub fn is_key_pressed(&self, key_code: KeyCode) -> bool {
+        self.key_pressed.get(&key_code).copied().unwrap_or(false)
+    }
+
+    /// 获取鼠标位置
+    pub fn get_mouse_position(&self) -> glam::DVec2 {
+        self.crt_mouse_pos
+    }
+
+    /// 获取鼠标位置变化
+    pub fn get_mouse_delta(&self) -> glam::DVec2 {
+        self.crt_mouse_pos - self.last_mouse_pos
+    }
+
+    /// 检查鼠标右键是否被按下
+    pub fn is_right_button_pressed(&self) -> bool {
+        self.right_button_pressed
+    }
 }

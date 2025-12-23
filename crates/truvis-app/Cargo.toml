@@ -7,7 +7,7 @@ description = "app"
 
 [dependencies]
 truvis-gfx = { workspace = true }
-truvis-render = { workspace = true }
+truvis-render-core = { workspace = true }
 truvis-model = { workspace = true }
 truvis-shader-binding = { workspace = true }
 truvis-crate-tools = { workspace = true }
@@ -15,7 +15,6 @@ truvis-asset = { workspace = true }
 truvis-resource = { workspace = true }
 truvis-render-base = { workspace = true }
 truvis-render-graph = { workspace = true }
-truvis-gui = { workspace = true }
 
 log = { workspace = true }
 ash = { workspace = true }

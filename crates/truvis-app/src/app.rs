@@ -1,7 +1,7 @@
 use std::{cell::OnceCell, ffi::CStr, sync::OnceLock};
 
 use ash::vk;
-use raw_window_handle::HasDisplayHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
@@ -11,12 +11,14 @@ use winit::{
 
 use crate::outer_app::OuterApp;
 use crate::platform::camera_controller::CameraController;
-use crate::window_system::main_window::{MainWindow, PresentData};
+use crate::render_app::RenderApp;
+use crate::window_system::main_window::MainWindow;
 use truvis_crate_tools::init_log::init_log;
 use truvis_gfx::commands::barrier::GfxBarrierMask;
 use truvis_gfx::gfx::Gfx;
-use truvis_render::core::renderer::Renderer;
-use truvis_render::platform::input_manager::InputManager;
+use truvis_render_core::core::renderer::Renderer;
+use truvis_render_core::platform::input_manager::InputManager;
+use truvis_render_core::present::render_present::PresentData;
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     log::error!("{}", info);
@@ -33,16 +35,13 @@ pub struct UserEvent;
 /// # Frames in Flight
 /// 采用 3 帧并行渲染（A/B/C），通过 timeline semaphore 同步 GPU 进度。
 pub struct TruvisApp<T: OuterApp> {
-    renderer: Renderer,
+    render_app: RenderApp<T>,
 
     /// 需要等待窗口事件初始化，因此 OnceCell
     window_system: OnceCell<MainWindow>,
     last_render_area: vk::Extent2D,
 
     input_manager: InputManager,
-    camera_controller: CameraController,
-
-    outer_app: OnceCell<T>,
 }
 
 // 总的 main 函数
@@ -72,12 +71,10 @@ impl<T: OuterApp> TruvisApp<T> {
                 .collect();
 
         let mut app = Self {
-            renderer: Renderer::new(extra_instance_ext),
+            render_app: RenderApp::new(extra_instance_ext),
             window_system: OnceCell::new(),
             last_render_area: Default::default(),
             input_manager,
-            camera_controller,
-            outer_app: OnceCell::new(),
         };
         event_loop.run_app(&mut app).unwrap();
 
@@ -92,8 +89,7 @@ impl<T: OuterApp> TruvisApp<T> {
 impl<T: OuterApp> TruvisApp<T> {
     /// 在 window 创建之后调用，初始化 Renderer 和 GUI
     fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
-        let window_system = MainWindow::new(
-            &mut self.renderer,
+        let mut window_system = MainWindow::new(
             event_loop,
             "Truvis".to_string(),
             vk::Extent2D {
@@ -101,148 +97,69 @@ impl<T: OuterApp> TruvisApp<T> {
                 height: 800,
             },
         );
+        self.render_app.init_after_window(
+            window_system.window().display_handle().unwrap().as_raw(),
+            window_system.window().window_handle().unwrap().as_raw(),
+        );
 
-        let outer_app = {
-            let _span = tracy_client::span!("OuterApp::init");
-            T::init(&mut self.renderer, self.camera_controller.camera_mut())
-        };
+        window_system.init_with_gui_backend(
+            &mut self.render_app.renderer.render_present.as_mut().unwrap().gui_backend,
+            &mut self.render_app.renderer.render_context.bindless_manager,
+            &mut self.render_app.renderer.render_context.gfx_resource_manager,
+        );
 
         self.window_system.set(window_system).map_err(|_| ()).unwrap();
-        self.outer_app.set(outer_app).map_err(|_| ()).unwrap();
     }
 
     fn update(&mut self) {
         // Begin Frame ============================
-        if !self.renderer.time_to_render() {
+        if !self.render_app.time_to_render() {
             return;
         }
+        let elapsed = self.render_app.get_delta_time();
 
-        self.renderer.begin_frame();
-        let frame_label = self.renderer.render_context.frame_counter.frame_label();
-        let elapsed = self.renderer.timer.delta_time;
-
-        {
-            let _span = tracy_client::span!("Acquire Image");
-            self.window_system.get_mut().unwrap().acquire_image(frame_label);
-        }
+        self.render_app.begin_frame();
 
         // Update Gui ==================================
         {
             let _span = tracy_client::span!("Update Gui");
             self.window_system.get_mut().unwrap().update_gui(elapsed, |ui| {
-                // camera info
-                {
-                    let camera = self.camera_controller.camera();
-                    ui.text(format!(
-                        "CameraPos: ({:.2}, {:.2}, {:.2})",
-                        camera.position.x, camera.position.y, camera.position.z
-                    ));
-                    ui.text(format!(
-                        "CameraEuler: ({:.2}, {:.2}, {:.2})",
-                        camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg
-                    ));
-                    ui.text(format!(
-                        "CameraForward: ({:.2}, {:.2}, {:.2})",
-                        camera.camera_forward().x,
-                        camera.camera_forward().y,
-                        camera.camera_forward().z
-                    ));
-                    ui.text(format!("CameraAspect: {:.2}", camera.asp));
-                    ui.text(format!("CameraFov(Vertical): {:.2}°", camera.fov_deg_vertical));
-                    {
-                        let pipeline_settings = &mut self.renderer.render_context.pipeline_settings;
-                        ui.slider("channel", 0, 3, &mut pipeline_settings.channel);
-                    }
-                    ui.text(format!("Accum Frames: {}", self.renderer.render_context.accum_data.accum_frames_num()));
-                    ui.new_line();
-                }
-
-                self.outer_app.get_mut().unwrap().draw_ui(ui);
+                self.render_app.build_ui(ui);
             });
         }
 
         // Rendere Update ==================================
         {
             let _span = tracy_client::span!("Renderer Update");
-            let extent = self.window_system.get().unwrap().get_render_extent();
-
-            // Renderer: Resize Framebuffer
-            {
-                if self.last_render_area != extent {
-                    // log::info!("resize frame buffer to: {}x{}", extent.width, extent.height);
-                    self.renderer.resize_frame_buffer(extent);
-                    self.last_render_area = extent;
-                }
-            }
-
-            // Renderer: Update Input and Camera
-            {
-                self.input_manager.update();
-                self.camera_controller.update(
-                    &self.input_manager,
-                    glam::vec2(extent.width as f32, extent.height as f32),
-                    self.renderer.timer.delta_time,
-                );
-            }
-
-            // Outer App: Update
-            {
-                self.outer_app.get_mut().unwrap().update(&mut self.renderer);
-            }
+            self.last_render_area = self.window_system.get().unwrap().get_render_extent();
+            self.input_manager.update();
+            self.render_app.update_scene(self.input_manager.state(), self.last_render_area);
         }
 
         // Renderer: Render ================================
-        self.renderer.before_render(self.input_manager.state(), self.camera_controller.camera());
-        {
-            let _span = tracy_client::span!("OuterApp::draw");
-            // 构建出 PipelineContext
-            self.outer_app.get_mut().unwrap().draw(&self.renderer.render_context);
-        }
+        self.render_app.render(self.input_manager.state());
 
         // Window: Draw Gui ===============================
-        {
-            let _span = tracy_client::span!("Present GUI");
-            let present_data = {
-                let render_target_texture =
-                    self.renderer.render_context.fif_buffers.render_target_texture_handle(frame_label);
-
-                PresentData {
-                    render_target: render_target_texture,
-                    render_target_barrier: GfxBarrierMask {
-                        src_stage: vk::PipelineStageFlags2::COMPUTE_SHADER,
-                        src_access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
-                        dst_stage: vk::PipelineStageFlags2::NONE,
-                        dst_access: vk::AccessFlags2::NONE,
-                    },
-                }
-            };
-            self.window_system.get_mut().unwrap().draw_gui(&self.renderer.render_context, present_data);
-        }
+        self.render_app.draw_to_window(self.window_system.get_mut().unwrap().gui_host.compile_ui());
 
         // End Frame ===================================
-        {
-            self.window_system.get_mut().unwrap().present_image();
-        }
-        self.renderer.end_frame();
+        self.render_app.end_frame();
 
         tracy_client::frame_mark();
     }
 
     fn on_window_resized(&mut self, _width: u32, _height: u32) {
-        self.window_system.get_mut().unwrap().rebuild_after_resized();
-
-        // log::info!("try to rebuild render context");
-        self.outer_app.get_mut().unwrap().rebuild(&mut self.renderer);
+        let window = self.window_system.get().unwrap().window();
+        self.render_app
+            .on_window_resized(window.display_handle().unwrap().as_raw(), window.window_handle().unwrap().as_raw());
     }
 }
 
 // 手动 drop
 impl<T: OuterApp> TruvisApp<T> {
     fn destroy(mut self) {
-        Gfx::get().wait_idel();
-
+        self.render_app.destroy();
         self.window_system.take().unwrap().destroy();
-        self.renderer.destroy();
     }
 }
 

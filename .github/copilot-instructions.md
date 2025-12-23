@@ -60,8 +60,8 @@ cargo run --bin rt-cornell
 // crates/truvis-app/src/bin/my_app/main.rs
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
-use truvis_render::core::renderer::Renderer;
-use truvis_render::platform::camera::Camera;
+use truvis_render_core::core::renderer::Renderer;
+use truvis_render_core::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
 
 struct MyApp {

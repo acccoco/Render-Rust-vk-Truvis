@@ -26,11 +26,12 @@ pub struct GfxRenderSwapchain {
 impl GfxRenderSwapchain {
     pub fn new(
         vk_core: &GfxCore,
-        window: &winit::window::Window,
+        raw_display_handle: raw_window_handle::RawDisplayHandle,
+        raw_window_handle: raw_window_handle::RawWindowHandle,
         present_mode: vk::PresentModeKHR,
         surface_format: vk::SurfaceFormatKHR,
     ) -> Self {
-        let surface = GfxSurface::new(vk_core, window);
+        let surface = GfxSurface::new(vk_core, raw_display_handle, raw_window_handle);
         let extent = surface.capabilities.current_extent;
 
         let swapchain_handle =

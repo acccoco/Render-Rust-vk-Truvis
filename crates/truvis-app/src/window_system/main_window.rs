@@ -1,5 +1,6 @@
 use ash::vk;
 use itertools::Itertools;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::{event_loop::ActiveEventLoop, platform::windows::WindowAttributesExtWindows, window::Window};
 
 use truvis_crate_tools::resource::TruvisPath;
@@ -10,29 +11,15 @@ use truvis_gfx::{
     gfx::Gfx,
     swapchain::render_swapchain::GfxRenderSwapchain,
 };
-use truvis_gui::gui::core::Gui;
-use truvis_gui::gui::gui_pass::GuiPass;
-use truvis_render::core::renderer::Renderer;
+use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{DefaultRendererSettings, FrameLabel};
+use truvis_render_core::core::renderer::Renderer;
+use truvis_render_core::present::gui_backend::GuiBackend;
+use truvis_render_core::present::gui_front::GuiHost;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::handles::GfxTextureHandle;
-
-/// 渲染演示数据结构
-///
-/// 包含了向演示窗口提交渲染结果所需的所有数据和资源。
-/// 这个结构体作为渲染器内部状态与外部演示系统之间的桥梁。
-pub struct PresentData {
-    /// 当前帧的渲染目标纹理
-    ///
-    /// 包含了最终的渲染结果，将被复制或演示到屏幕上
-    pub render_target: GfxTextureHandle,
-
-    /// 渲染目标的内存屏障配置
-    ///
-    /// 定义了渲染目标纹理的同步需求，确保在读取前所有写入操作已完成
-    pub render_target_barrier: GfxBarrierMask,
-}
 
 mod helper {
     pub fn load_icon(bytes: &[u8]) -> winit::window::Icon {
@@ -48,26 +35,11 @@ mod helper {
 
 pub struct MainWindow {
     winit_window: Window,
-
-    swapchain: Option<GfxRenderSwapchain>,
-    gui: Gui,
-    gui_pass: GuiPass,
-    cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
-
-    /// 数量和 fif num 相同
-    present_complete_semaphores: [GfxSemaphore; FrameCounter::fif_count()],
-
-    /// 数量和 swapchain image num 相同
-    render_complete_semaphores: Vec<GfxSemaphore>,
+    pub gui_host: GuiHost,
 }
 // new & init
 impl MainWindow {
-    pub fn new(
-        renderer: &mut Renderer,
-        event_loop: &ActiveEventLoop,
-        window_title: String,
-        window_extent: vk::Extent2D,
-    ) -> Self {
+    pub fn new(event_loop: &ActiveEventLoop, window_title: String, window_extent: vk::Extent2D) -> Self {
         let icon_data = std::fs::read(TruvisPath::resources_path("DruvisIII.png")).expect("Failed to read icon file");
         let icon = helper::load_icon(icon_data.as_ref());
         let window_attr = Window::default_attributes()
@@ -78,51 +50,29 @@ impl MainWindow {
             .with_inner_size(winit::dpi::LogicalSize::new(window_extent.width as f64, window_extent.height as f64));
 
         let window = event_loop.create_window(window_attr).unwrap();
-        let swapchain = GfxRenderSwapchain::new(
-            Gfx::get().vk_core(),
-            &window,
-            DefaultRendererSettings::DEFAULT_PRESENT_MODE,
-            DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
-        );
 
-        let swapchain_image_infos = swapchain.image_infos();
-
-        let gui = Gui::new(renderer, &window, &swapchain_image_infos);
-        let gui_pass =
-            GuiPass::new(&renderer.render_context.global_descriptor_sets, swapchain_image_infos.image_format);
-
-        let present_complete_semaphores = FrameCounter::frame_labes()
-            .map(|frame_label| GfxSemaphore::new(&format!("window-present-complete-{}", frame_label)));
-        let render_complete_semaphores = (0..swapchain_image_infos.image_cnt)
-            .map(|i| GfxSemaphore::new(&format!("window-render-complete-{}", i)))
-            .collect_vec();
-
-        let cmds = FrameCounter::frame_labes()
-            .map(|frame_label| renderer.cmd_allocator.alloc_command_buffer(frame_label, "window-present"));
+        let mut gui_host = GuiHost::new(&window);
 
         Self {
             winit_window: window,
-            swapchain: Some(swapchain),
-            present_complete_semaphores,
-            render_complete_semaphores,
-            gui,
-            gui_pass,
-            cmds,
+            gui_host,
         }
+    }
+
+    pub fn init_with_gui_backend(
+        &mut self,
+        gui_backend: &mut GuiBackend,
+        bindless_manager: &mut BindlessManager,
+        gfx_resource_manager: &mut GfxResourceManager,
+    ) {
+        let (fonts_atlas, font_tex_id) = self.gui_host.init_font();
+        gui_backend.register_font(bindless_manager, gfx_resource_manager, fonts_atlas, font_tex_id);
     }
 }
 // destroy
 impl MainWindow {
     pub fn destroy(self) {
-        for semaphore in self.present_complete_semaphores {
-            semaphore.destroy();
-        }
-        for semaphore in self.render_complete_semaphores {
-            semaphore.destroy();
-        }
-        if let Some(swapchain) = self.swapchain {
-            swapchain.destroy();
-        }
+        // TODO 似乎全都是 RAII 的
     }
 }
 // getters
@@ -133,115 +83,12 @@ impl MainWindow {
     }
 }
 // tools
-impl MainWindow {
-    fn draw(&mut self, render_context: &RenderContext, renderer_data: PresentData) {
-        let swapchain = self.swapchain.as_ref().unwrap();
-        let swapchain_image_idx = swapchain.current_image_index();
-        let frame_label = render_context.frame_counter.frame_label();
-
-        let render_target_texture =
-            render_context.gfx_resource_manager.get_texture(renderer_data.render_target).unwrap();
-
-        let cmd = self.cmds[*frame_label].clone();
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
-        {
-            cmd.image_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[
-                    // 将 swapchian image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
-                    // 注1: 可能有 blend 操作，因此需要 COLOR_ATTACHMENT_READ
-                    // 注2: 这里的 bottom 表示 layout transfer 等待 present 完成
-                    GfxImageBarrier::new()
-                        .image(swapchain.current_image())
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                        .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                        .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
-                        .dst_mask(
-                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-                        ),
-                    GfxImageBarrier::new()
-                        .image(render_target_texture.image().handle())
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                        .layout_transfer(vk::ImageLayout::GENERAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                        .src_mask(
-                            renderer_data.render_target_barrier.src_stage,
-                            renderer_data.render_target_barrier.src_access,
-                        )
-                        .dst_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ),
-                ],
-            );
-
-            self.gui_pass.draw(
-                render_context,
-                swapchain.current_image_view().handle(),
-                swapchain.extent(),
-                &cmd,
-                &mut self.gui,
-                frame_label,
-            );
-
-            cmd.image_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[
-                    // 将 swapchain image layout 转换为 PRESENT_SRC_KHR
-                    // 注1: 这里的 top 表示 present 需要等待 layout transfer 完成
-                    GfxImageBarrier::new()
-                        .image(swapchain.current_image())
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                        .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
-                        .src_mask(
-                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-                        )
-                        .dst_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty()),
-                    GfxImageBarrier::new()
-                        .image(render_target_texture.image().handle())
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                        .layout_transfer(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL, vk::ImageLayout::GENERAL)
-                        .src_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ)
-                        .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty()),
-                ],
-            );
-        }
-        cmd.end();
-
-        // 等待 swapchain 的 image 准备好；通知 swapchain 的 image 已经绘制完成
-        let submit_info = GfxSubmitInfo::new(std::slice::from_ref(&cmd))
-            .wait(
-                &self.present_complete_semaphores[*frame_label],
-                vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                None,
-            )
-            .signal(
-                &self.render_complete_semaphores[swapchain_image_idx],
-                vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                None,
-            );
-
-        Gfx::get().gfx_queue().submit(vec![submit_info], None);
-    }
-}
+impl MainWindow {}
 // phase
 impl MainWindow {
-    pub fn acquire_image(&mut self, frame_label: FrameLabel) {
-        // 从 swapchain 获取图像
-        let swapchain = self.swapchain.as_mut().unwrap();
-        // let timeout_ns = 10 * 1000 * 1000 * 1000;
-        swapchain.acquire_next_image(Some(&self.present_complete_semaphores[*frame_label]), None, 0);
-    }
-
-    pub fn present_image(&self) {
-        let swapchain = self.swapchain.as_ref().unwrap();
-        swapchain.present_image(
-            Gfx::get().gfx_queue(),
-            std::slice::from_ref(&self.render_complete_semaphores[swapchain.current_image_index()]),
-        );
-    }
-
     pub fn update_gui(&mut self, elapsed: std::time::Duration, ui_func_right: impl FnOnce(&imgui::Ui)) {
-        self.gui.prepare_frame(&self.winit_window, elapsed);
-        self.gui.update(
+        self.gui_host.prepare_frame(&self.winit_window, elapsed);
+        self.gui_host.update(
             &self.winit_window,
             |ui, content_size| {
                 let min_pos = ui.window_content_region_min();
@@ -253,33 +100,12 @@ impl MainWindow {
         );
     }
 
-    pub fn draw_gui(&mut self, render_context: &RenderContext, renderer_data: PresentData) {
-        self.gui.register_render_texture(renderer_data.render_target);
-        self.draw(render_context, renderer_data);
-    }
-
     pub fn handle_event<T>(&mut self, event: &winit::event::Event<T>) {
-        self.gui.handle_event(&self.winit_window, event);
+        self.gui_host.handle_event(&self.winit_window, event);
     }
 
     /// imgui 中用于绘制图形的区域大小
     pub fn get_render_extent(&self) -> vk::Extent2D {
-        self.gui.get_render_region().extent
-    }
-
-    pub fn rebuild_after_resized(&mut self) {
-        unsafe {
-            Gfx::get().gfx_device().device_wait_idle().unwrap();
-        }
-
-        if let Some(swapchain) = self.swapchain.take() {
-            swapchain.destroy();
-        }
-        self.swapchain = Some(GfxRenderSwapchain::new(
-            Gfx::get().vk_core(),
-            &self.winit_window,
-            DefaultRendererSettings::DEFAULT_PRESENT_MODE,
-            DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
-        ));
+        self.gui_host.get_render_region().extent
     }
 }

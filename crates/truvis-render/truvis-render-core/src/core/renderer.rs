@@ -1,6 +1,8 @@
 use crate::platform::timer::Timer;
 use crate::platform::{camera::Camera, input_manager::InputState};
+use crate::present::render_present::{PresentData, RenderPresent};
 use ash::vk;
+use imgui::DrawData;
 use std::ffi::CStr;
 use std::path::PathBuf;
 use truvis_asset::asset_hub::AssetHub;
@@ -32,6 +34,7 @@ use truvis_resource::gfx_resource_manager::GfxResourceManager;
 use truvis_resource::texture::{GfxTexture, ImageLoader};
 use truvis_shader_binding::truvisl;
 use truvis_shader_binding::truvisl::Instance;
+use winit::raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 
 /// 渲染器核心
 ///
@@ -56,6 +59,8 @@ pub struct Renderer {
     pub fif_timeline_semaphore: GfxSemaphore,
 
     gpu_scene_update_cmds: Vec<GfxCommandBuffer>,
+
+    pub render_present: Option<RenderPresent>,
 }
 
 // new & init
@@ -110,6 +115,13 @@ impl Renderer {
             .collect();
 
         Self {
+            asset_hub,
+            cmd_allocator,
+            timer,
+            fif_timeline_semaphore,
+            gpu_scene_update_cmds: cmds,
+            render_present: None,
+
             render_context: RenderContext {
                 scene_manager,
                 gpu_scene,
@@ -128,12 +140,16 @@ impl Renderer {
                 frame_settings,
                 pipeline_settings: PipelineSettings::default(),
             },
-            asset_hub,
-            cmd_allocator,
-            timer,
-            fif_timeline_semaphore,
-            gpu_scene_update_cmds: cmds,
         }
+    }
+
+    pub fn init_after_window(&mut self, raw_display_handle: RawDisplayHandle, raw_window_handle: RawWindowHandle) {
+        self.render_present = Some(RenderPresent::new(
+            &self.render_context.global_descriptor_sets,
+            &mut self.cmd_allocator,
+            raw_display_handle,
+            raw_window_handle,
+        ));
     }
 
     /// 根据 vulkan 实例和显卡，获取合适的深度格式
@@ -154,6 +170,10 @@ impl Renderer {
     pub fn destroy(mut self) {
         // 在 Renderer 被销毁时，等待 Gfx 设备空闲
         Gfx::get().wait_idel();
+
+        if let Some(render_present) = self.render_present.take() {
+            render_present.destroy();
+        }
 
         self.render_context
             .fif_buffers
@@ -195,10 +215,16 @@ impl Renderer {
 
         // Update AssetHub
         self.asset_hub.update(&mut self.render_context.gfx_resource_manager, &mut self.render_context.bindless_manager);
+
+        // swapchain image
+        self.render_present.as_mut().unwrap().acquire_image(self.render_context.frame_counter.frame_label());
     }
 
     pub fn end_frame(&mut self) {
         let _span = tracy_client::span!("Renderer::end_frame");
+
+        self.render_present.as_ref().unwrap().present_image();
+
         // 设置当前帧结束的 semaphore，用于保护当前帧的资源
         {
             let submit_info = GfxSubmitInfo::new(&[]).signal(
@@ -339,6 +365,27 @@ impl Renderer {
             PerFrameDescriptorBinding::per_frame_data().write_buffer(perframe_set, 0, perframe_data_buffer_info),
             PerFrameDescriptorBinding::gpu_scene().write_buffer(perframe_set, 0, gpu_scene_buffer_info),
         ]);
+    }
+
+    pub fn draw_to_window(&mut self, draw_data: Option<&DrawData>) {
+        let _span = tracy_client::span!("Renderer::draw_to_window");
+
+        let frame_label = self.render_context.frame_counter.frame_label();
+
+        let present_data = {
+            let render_target_texture = self.render_context.fif_buffers.render_target_texture_handle(frame_label);
+
+            PresentData {
+                render_target: render_target_texture,
+                render_target_barrier: GfxBarrierMask {
+                    src_stage: vk::PipelineStageFlags2::COMPUTE_SHADER,
+                    src_access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
+                    dst_stage: vk::PipelineStageFlags2::NONE,
+                    dst_access: vk::AccessFlags2::NONE,
+                },
+            }
+        };
+        self.render_present.as_mut().unwrap().draw_gui(&self.render_context, draw_data, present_data);
     }
 }
 // getters

@@ -6,8 +6,8 @@ use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 use truvis_model::components::geometry::RtGeometry;
 use truvis_model::vertex::soa_3d::VertexLayoutSoA3D;
-use truvis_render::core::renderer::Renderer;
-use truvis_render::platform::camera::Camera;
+use truvis_render_core::core::renderer::Renderer;
+use truvis_render_core::platform::camera::Camera;
 
 mod async_pass;
 use async_pass::AsyncPass;

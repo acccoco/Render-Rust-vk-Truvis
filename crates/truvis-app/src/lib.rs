@@ -6,4 +6,5 @@
 pub mod app;
 pub mod outer_app;
 pub mod platform;
+pub mod render_app;
 pub mod window_system;

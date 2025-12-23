@@ -1,9 +1,12 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
 
-use crate::gui::core::Gui;
-use crate::gui::gui_vertex_layout::ImGuiVertexLayoutAoS;
+use crate::present::gui_backend::GuiBackend;
+use crate::present::gui_mesh::GuiMesh;
+use crate::present::gui_vertex_layout::ImGuiVertexLayoutAoS;
 use ash::vk;
+use imgui::TextureId;
 use itertools::Itertools;
 use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
@@ -18,6 +21,7 @@ use truvis_gfx::{
 use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_resource::handles::GfxTextureHandle;
 use truvis_shader_binding::truvisl;
 use truvis_shader_binding::truvisl::SrvHandle;
 
@@ -95,10 +99,12 @@ impl GuiPass {
         canvas_color_view: vk::ImageView,
         canvas_extent: vk::Extent2D,
         cmd: &GfxCommandBuffer,
-        gui: &mut Gui,
         frame_label: FrameLabel,
+        gui_mesh: &GuiMesh,
+        draw_data: &imgui::DrawData,
+        tex_map: &HashMap<TextureId, GfxTextureHandle>,
     ) {
-        // TODO mesh 应该放在 gui pass 中管理
+        // TODO mesh 应该放在 present pass 中管理
         let color_attach_info = vk::RenderingAttachmentInfo::default()
             .image_view(canvas_color_view)
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
@@ -114,16 +120,6 @@ impl GuiPass {
             .layer_count(1)
             .render_area(canvas_extent.into())
             .color_attachments(std::slice::from_ref(&color_attach_info));
-
-        let mesh;
-        let draw_data;
-        let get_texture_handle;
-        if let Some(res) = gui.imgui_render(frame_label) {
-            (mesh, draw_data, get_texture_handle) = res;
-        } else {
-            log::warn!("No ImGui draw data available, skipping GUI pass.");
-            return;
-        }
 
         let viewport = vk::Viewport {
             width: draw_data.framebuffer_scale[0] * draw_data.display_size[0],
@@ -170,8 +166,8 @@ impl GuiPass {
             bytemuck::bytes_of(&push_constant),
         );
 
-        cmd.cmd_bind_index_buffer(&mesh.index_buffer, 0);
-        cmd.cmd_bind_vertex_buffers(0, &[mesh.vertex_buffer.vk_buffer()], &[0]);
+        cmd.cmd_bind_index_buffer(&gui_mesh.index_buffer, 0);
+        cmd.cmd_bind_vertex_buffers(0, &[gui_mesh.vertex_buffer.vk_buffer()], &[0]);
 
         let mut index_offset = 0;
         let mut vertex_offset = 0;
@@ -216,9 +212,9 @@ impl GuiPass {
                         // 加载 texture，如果和上一个 command 使用的 texture
                         // 不是同一个，则需要重新加载
                         if Some(texture_id) != last_texture_id {
-                            let texture_handle = get_texture_handle(texture_id);
+                            let texture_handle = tex_map.get(&texture_id).unwrap();
                             let texture_bindless_handle =
-                                bindless_manager.get_shader_srv_handle_with_texture(texture_handle);
+                                bindless_manager.get_shader_srv_handle_with_texture(*texture_handle);
 
                             push_constant.texture = texture_bindless_handle.0;
 

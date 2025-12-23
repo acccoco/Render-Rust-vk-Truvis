@@ -4,6 +4,7 @@
 //! 通过 [`FrameContext`] 统一管理帧资源、命令分配器、Bindless 描述符等核心子系统。
 
 pub mod platform;
+pub mod present;
 pub mod subsystems;
 
 pub mod core;
