@@ -8,7 +8,7 @@ description = "app"
 [dependencies]
 truvis-gfx = { workspace = true }
 truvis-render = { workspace = true }
-truvis-model-manager = { workspace = true }
+truvis-model = { workspace = true }
 truvis-shader-binding = { workspace = true }
 truvis-crate-tools = { workspace = true }
 truvis-asset = { workspace = true }

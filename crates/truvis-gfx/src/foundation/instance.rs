@@ -24,6 +24,8 @@ impl GfxInstance {
         engine_name: String,
         extra_instance_exts: Vec<&'static CStr>,
     ) -> Self {
+        let _span = tracy_client::span!("GfxInstance::new");
+
         let app_name = CString::new(app_name.as_str()).unwrap();
         let engine_name = CString::new(engine_name.as_str()).unwrap();
         let app_info = vk::ApplicationInfo::default()

@@ -39,6 +39,8 @@ pub struct GfxCore {
 // 创建与销毁
 impl GfxCore {
     pub fn new(app_name: String, engine_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
+        let _span = tracy_client::span!("GfxCore::new");
+
         let vk_pf = unsafe { ash::Entry::load() }.expect("Failed to load vulkan entry");
         let instance = GfxInstance::new(&vk_pf, app_name, engine_name, instance_extra_exts);
         let physical_device = GfxPhysicalDevice::new_descrete_physical_device(instance.ash_instance());

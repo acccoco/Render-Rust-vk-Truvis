@@ -23,3 +23,4 @@ vk-mem = { workspace = true }
 log = { workspace = true }
 bytemuck = { workspace = true }
 serde_json = { workspace = true }
+tracy-client = { workspace = true }

@@ -11,7 +11,7 @@ use truvis_gfx::{
         rendering_info::GfxRenderingInfo,
     },
 };
-use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_model::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_shader_binding::truvisl;
@@ -84,7 +84,7 @@ impl PhongSubpass {
             bytemuck::bytes_of(push_constant),
         );
 
-        let render_descriptor_sets = &render_context.render_descriptor_sets;
+        let render_descriptor_sets = &render_context.global_descriptor_sets;
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline.layout(),

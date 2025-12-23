@@ -27,29 +27,19 @@ pub enum LoadResult {
     Failure(AssetTextureHandle, String),
 }
 
-// TODO 一句话解释：这就是线程池：crossbeam 提供消息队列；rayon 提供线程池
-/// IO 工作器
-///
 /// 负责管理后台 IO 任务。
-/// 架构设计:
-/// 1. 主线程通过 `request_tx` 发送加载请求。
-/// 2. 内部有一个 "Asset-IO-Dispatcher" 线程不断接收请求。
-/// 3. Dispatcher 将繁重的 IO 和解码任务 (image::open) 派发给 `rayon` 全局线程池。
-/// 4. 完成的任务通过 `result_rx` 发送回主线程 (AssetHub)。
 ///
-/// 这种设计确保了:
-/// - 主线程不会被 IO 阻塞 (非阻塞发送)。
-/// - 繁重的图片解码利用多核 CPU (rayon)。
-/// - 结果处理在主线程统一进行 (AssetHub::update)。
-///
-/// # 线程生命周期
-/// "Asset-IO-Dispatcher" 线程的生命周期与 `IoWorker` 实例绑定。
-/// 当 `IoWorker` 被 Drop 时：
-/// 1. `request_tx` 被销毁，导致 channel 断开。
-/// 2. 后台线程中的 `req_rx.recv()` 返回错误，退出循环。
-/// 3. 线程执行 `wg.wait()`，阻塞等待所有已分发的 Rayon 任务完成。
-/// 4. `IoWorker::drop` 会调用 `thread.join()` 等待后台线程完全退出。
-pub struct IoDispather {
+/// ## 架构设计
+/// - 内部的 `dispatch-thread` 负责调度：接收加载请求，分发任务到 workder
+/// - rayon 提供 worker 线程池
+/// - crossbeam 提供线程间通信的 channel
+/// - 外部线程和 dispatch-thread 之间的通信
+///     - request_rx: 接收加载请求
+///     - request_tx: 发送加载请求
+/// - dispatch_thread 和 workder 线程池的通信
+///     - result_tx: 发送加载结果
+///     - result_rx: 接收加载结果
+pub struct AssetLoader {
     /// 用于向 IoWorker 发送加载请求
     request_sender: Option<Sender<AssetLoadRequest>>,
     /// 用于从 IoWorker 接收加载结果
@@ -59,30 +49,28 @@ pub struct IoDispather {
     dispatch_thread: Option<std::thread::JoinHandle<()>>,
 }
 
-impl Default for IoDispather {
+impl Default for AssetLoader {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl IoDispather {
+impl AssetLoader {
     pub fn new() -> Self {
         let (req_tx, req_rx) = crossbeam_channel::unbounded::<AssetLoadRequest>();
         let (res_tx, res_rx) = crossbeam_channel::unbounded::<LoadResult>();
 
-        // 创建一个专用的 Rayon 线程池，并设置线程名称
-        // 这样在调试器中可以看到 "Asset-Loader-0", "Asset-Loader-1" 等
+        // Rayon 线程池，用于执行实际的加载任务
         let pool = rayon::ThreadPoolBuilder::new()
             .thread_name(|index| format!("Asset-Loader-{}", index))
             .build()
             .expect("Failed to create asset loader thread pool");
 
-        // 启动一个协调线程，负责从 channel 接收请求并分发给 rayon 线程池
-        // 这是一个轻量级线程，只负责消息转发，不进行重计算
-        let io_thread = thread::Builder::new()
-            .name("Asset-IO-Dispatcher".to_string())
+        // 调度线程，负责接收请求并分发任务
+        let dispatch_thread = thread::Builder::new()
+            .name("AssetDispatchThread".to_string())
             .spawn(move || {
-                let wg = WaitGroup::new();
+                let wait_group = WaitGroup::new();
 
                 while let Ok(req) = req_rx.recv() {
                     let _span = tracy_client::span!("IoWorker::dispatch");
@@ -90,7 +78,7 @@ impl IoDispather {
                     let res_tx = res_tx.clone();
                     // 为每个任务克隆一个 WaitGroup
                     // 当任务结束，闭包销毁，wg_task 也会被 drop
-                    let wg_task = wg.clone();
+                    let wg_task = wait_group.clone();
 
                     // 使用专用线程池执行任务
                     pool.spawn(move || {
@@ -103,7 +91,7 @@ impl IoDispather {
                 }
 
                 // 等待所有任务完成
-                wg.wait();
+                wait_group.wait();
             })
             .expect("Failed to spawn IO dispatcher thread");
 
@@ -111,7 +99,7 @@ impl IoDispather {
             request_sender: Some(req_tx),
             result_receiver: res_rx,
 
-            dispatch_thread: Some(io_thread),
+            dispatch_thread: Some(dispatch_thread),
         }
     }
 
@@ -132,7 +120,7 @@ impl IoDispather {
     pub fn join(self) {}
 }
 
-impl Drop for IoDispather {
+impl Drop for AssetLoader {
     fn drop(&mut self) {
         // 显式关闭 channel，通知后台线程退出
         // 必须先 drop sender，否则 recv 会一直阻塞，导致 join 死锁

@@ -1,12 +1,14 @@
-use crate::components::geometry::RtGeometry;
-use crate::components::instance::Instance;
-use crate::components::material::Material;
-use crate::components::mesh::Mesh;
-use crate::guid_new_type::{InstanceHandle, MaterialHandle, MeshHandle};
-use crate::vertex::soa_3d::VertexLayoutSoA3D;
 use itertools::Itertools;
+use truvis_asset::asset_hub::AssetHub;
 use truvis_cxx_binding::truvixx;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
+use truvis_model::components::geometry::RtGeometry;
+use truvis_model::components::instance::Instance;
+use truvis_model::components::material::Material;
+use truvis_model::components::mesh::Mesh;
+use truvis_model::guid_new_type::{InstanceHandle, MaterialHandle, MeshHandle};
+use truvis_model::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_render_scene::scene_manager::SceneManager;
 
 /// Assimp 场景加载器
 ///
@@ -35,16 +37,18 @@ impl AssimpSceneLoader {
     /// 返回整个场景的所有 instance id
     pub fn load_scene(
         model_file: &std::path::Path,
-        instance_register: impl FnMut(Instance) -> InstanceHandle,
-        mesh_register: impl FnMut(Mesh) -> MeshHandle,
-        mat_register: impl FnMut(Material) -> MaterialHandle,
+        scene_manager: &mut SceneManager,
+        asset_hub: &mut AssetHub,
     ) -> Vec<InstanceHandle> {
         let _span = tracy_client::span!("AssimpSceneLoader::load_scene");
 
         let model_file = model_file.to_str().unwrap();
         let c_model_file = std::ffi::CString::new(model_file).unwrap();
 
-        let loader = unsafe { truvixx::truvixx_scene_load(c_model_file.as_ptr()) };
+        let loader = unsafe {
+            let _span = tracy_client::span!("truvixx_scene_load");
+            truvixx::truvixx_scene_load(c_model_file.as_ptr())
+        };
         let model_name = model_file.split('/').next_back().unwrap();
 
         let mut scene_loader = AssimpSceneLoader {
@@ -55,11 +59,22 @@ impl AssimpSceneLoader {
             instances: vec![],
         };
 
-        scene_loader.load_mesh(mesh_register);
-        scene_loader.load_mats(mat_register);
-        scene_loader.load_instance(instance_register);
+        scene_loader.load_mesh(|mut mesh| {
+            mesh.build_blas();
+            scene_manager.register_mesh(mesh)
+        });
+        scene_loader.load_mats(|mat| {
+            if !mat.diffuse_map.is_empty() {
+                asset_hub.load_texture(std::path::PathBuf::from(&mat.diffuse_map));
+            }
+            scene_manager.register_mat(mat)
+        });
+        scene_loader.load_instance(|ins| scene_manager.register_instance(ins));
 
-        unsafe { truvixx::truvixx_scene_free(loader) };
+        {
+            let _span = tracy_client::span!("truvixx_scene_free");
+            unsafe { truvixx::truvixx_scene_free(loader) };
+        }
 
         scene_loader.instances
     }

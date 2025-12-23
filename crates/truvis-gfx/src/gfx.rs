@@ -41,6 +41,8 @@ impl Gfx {
     const ENGINE_NAME: &'static str = "DruvisIII";
 
     fn new(app_name: String, instance_extra_exts: Vec<&'static CStr>) -> Self {
+        let _span = tracy_client::span!("Gfx::new");
+
         let gfx_core = GfxCore::new(app_name, Self::ENGINE_NAME.to_string(), instance_extra_exts);
 
         // 注意：在初始化过程中，我们需要使用传统的参数传递方式

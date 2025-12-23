@@ -20,7 +20,7 @@ pub struct RenderContext {
     pub gfx_resource_manager: GfxResourceManager,
     pub sampler_manager: RenderSamplerManager,
 
-    pub render_descriptor_sets: GlobalDescriptorSets,
+    pub global_descriptor_sets: GlobalDescriptorSets,
 
     pub delta_time_s: f32,
     pub total_time_s: f32,

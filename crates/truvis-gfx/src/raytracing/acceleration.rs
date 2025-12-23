@@ -38,6 +38,8 @@ impl GfxAcceleration {
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: impl AsRef<str>,
     ) -> Self {
+        let _span = tracy_client::span!("GfxAcceleration::build_blas_sync");
+
         let geometries = blas_inputs.iter().map(|blas_input| blas_input.geometry).collect_vec();
         let range_infos = blas_inputs.iter().map(|blas_input| blas_input.range).collect_vec();
         let max_primitives = blas_inputs.iter().map(|blas_input| blas_input.range.primitive_count).collect_vec();
@@ -145,6 +147,8 @@ impl GfxAcceleration {
         build_flags: vk::BuildAccelerationStructureFlagsKHR,
         debug_name: impl AsRef<str>,
     ) -> Self {
+        let _span = tracy_client::span!("GfxAcceleration::build_tlas_sync");
+
         let acceleration_instance_buffer = GfxAccelerationInstanceBuffer::new(
             size_of_val(instances) as vk::DeviceSize,
             format!("{}-acceleration-instance-buffer", debug_name.as_ref()),

@@ -1,13 +1,13 @@
 use imgui::Ui;
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
-use truvis_model_manager::components::geometry::RtGeometry;
+use truvis_model::components::geometry::RtGeometry;
 use truvis_render::platform::camera::Camera;
 
 mod shader_toy_pass;
 
 use shader_toy_pass::ShaderToyPass;
-use truvis_model_manager::shapes::rect::RectSoA;
+use truvis_model::shapes::rect::RectSoA;
 use truvis_render::core::renderer::Renderer;
 use truvis_render_graph::render_context::RenderContext;
 

@@ -1,8 +1,5 @@
 use slotmap::new_key_type;
 
-// 强类型句柄
-// 使用 slotmap 的 generational index 机制，避免悬垂引用和资源释放后的 ID 复用问题。
-// 句柄本身只是一个轻量级的 ID (u64)，可以安全地 Copy/Clone。
 new_key_type! { pub struct AssetTextureHandle; }
 new_key_type! { pub struct AssetMeshHandle; }
 

@@ -62,7 +62,7 @@ impl<P: bytemuck::Pod> ComputeSubpass<P> {
             vk::PipelineBindPoint::COMPUTE,
             self.pipeline_layout,
             0,
-            &render_context.render_descriptor_sets.global_sets(frame_label),
+            &render_context.global_descriptor_sets.global_sets(frame_label),
             None,
         );
 

@@ -18,8 +18,8 @@ use truvis_gfx::{
         shader::GfxShaderStageInfo,
     },
 };
-use truvis_model_manager::components::geometry::RtGeometry;
-use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_model::components::geometry::RtGeometry;
+use truvis_model::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};

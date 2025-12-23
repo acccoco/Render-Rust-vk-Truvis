@@ -4,8 +4,8 @@ use truvis_app::outer_app::OuterApp;
 use truvis_asset::handle::AssetTextureHandle;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
-use truvis_model_manager::components::geometry::RtGeometry;
-use truvis_model_manager::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_model::components::geometry::RtGeometry;
+use truvis_model::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render::core::renderer::Renderer;
 use truvis_render::platform::camera::Camera;
 
@@ -57,7 +57,7 @@ impl OuterApp for AsyncLoadTest {
 
         Self {
             pipeline: AsyncPass::new(
-                &renderer.render_context.render_descriptor_sets,
+                &renderer.render_context.global_descriptor_sets,
                 &renderer.render_context.frame_settings,
                 &mut renderer.cmd_allocator,
             ),

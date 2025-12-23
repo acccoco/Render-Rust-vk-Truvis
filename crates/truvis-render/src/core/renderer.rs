@@ -1,6 +1,8 @@
-use std::ffi::CStr;
-
+use crate::platform::timer::Timer;
+use crate::platform::{camera::Camera, input_manager::InputState};
 use ash::vk;
+use std::ffi::CStr;
+use std::path::PathBuf;
 use truvis_asset::asset_hub::AssetHub;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
@@ -13,6 +15,7 @@ use truvis_gfx::{
     },
     gfx::Gfx,
 };
+use truvis_model::guid_new_type::InstanceHandle;
 use truvis_render_base::bindless_manager::BindlessManager;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
@@ -26,10 +29,9 @@ use truvis_render_graph::resources::fif_buffer::FifBuffers;
 use truvis_render_scene::gpu_scene::GpuScene;
 use truvis_render_scene::scene_manager::SceneManager;
 use truvis_resource::gfx_resource_manager::GfxResourceManager;
+use truvis_resource::texture::{GfxTexture, ImageLoader};
 use truvis_shader_binding::truvisl;
-
-use crate::platform::timer::Timer;
-use crate::platform::{camera::Camera, input_manager::InputState};
+use truvis_shader_binding::truvisl::Instance;
 
 /// 渲染器核心
 ///
@@ -59,6 +61,8 @@ pub struct Renderer {
 // new & init
 impl Renderer {
     pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
+        let _span = tracy_client::span!("Renderer::new");
+
         // 初始化 RenderContext 单例
         Gfx::init("Truvis".to_string(), extra_instance_ext);
 
@@ -86,9 +90,9 @@ impl Renderer {
             frame_limit: 60.0,
         };
 
-        let scene_manager = SceneManager::new();
-        let asset_hub = AssetHub::new();
         let mut bindless_manager = BindlessManager::new();
+        let scene_manager = SceneManager::new();
+        let asset_hub = AssetHub::new(&mut gfx_resource_manager, &mut bindless_manager);
         let gpu_scene = GpuScene::new(&mut gfx_resource_manager, &mut bindless_manager);
         let fif_buffers =
             FifBuffers::new(&frame_settings, &mut bindless_manager, &mut gfx_resource_manager, &frame_counter);
@@ -113,7 +117,7 @@ impl Renderer {
                 bindless_manager,
                 per_frame_data_buffers,
                 gfx_resource_manager,
-                render_descriptor_sets,
+                global_descriptor_sets: render_descriptor_sets,
                 sampler_manager,
 
                 delta_time_s: 0.0,
@@ -156,12 +160,12 @@ impl Renderer {
             .destroy_mut(&mut self.render_context.bindless_manager, &mut self.render_context.gfx_resource_manager);
         self.render_context.bindless_manager.destroy();
         self.render_context.scene_manager.destroy();
-        self.asset_hub.destroy();
+        self.asset_hub.destroy(&mut self.render_context.gfx_resource_manager);
         self.render_context.gpu_scene.destroy();
         self.cmd_allocator.destroy();
         self.render_context.gfx_resource_manager.destroy();
         self.fif_timeline_semaphore.destroy();
-        self.render_context.render_descriptor_sets.destroy();
+        self.render_context.global_descriptor_sets.destroy();
     }
 }
 // phase call
@@ -190,7 +194,7 @@ impl Renderer {
         self.render_context.total_time_s = self.timer.total_time.as_secs_f32();
 
         // Update AssetHub
-        self.asset_hub.update();
+        self.asset_hub.update(&mut self.render_context.gfx_resource_manager, &mut self.render_context.bindless_manager);
     }
 
     pub fn end_frame(&mut self) {
@@ -258,20 +262,20 @@ impl Renderer {
             dst_access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::UNIFORM_READ,
         };
 
-        // 因为 Bindless RefCel 的问题，所以这里提前结束作用域
-        self.render_context.gpu_scene.prepare_render_data(
-            &self.render_context.scene_manager,
-            &mut self.render_context.bindless_manager,
+        self.render_context.bindless_manager.prepare_render_data(
             &self.render_context.gfx_resource_manager,
-            &self.render_context.render_descriptor_sets,
-            &self.render_context.frame_counter,
+            &self.render_context.global_descriptor_sets,
+            frame_label,
         );
-        self.render_context.gpu_scene.upload_to_buffer(
+
+        self.render_context.gpu_scene.prepare_render_data(
             &cmd,
             transfer_barrier_mask,
             &self.render_context.frame_counter,
+            self.render_context.scene_manager.prepare_render_data(),
             &self.render_context.scene_manager,
             &self.render_context.bindless_manager,
+            &self.asset_hub,
         );
 
         // 准备好当前帧的数据
@@ -319,7 +323,7 @@ impl Renderer {
         let frame_label = self.render_context.frame_counter.frame_label();
         let per_frame_data_buffer = &self.render_context.per_frame_data_buffers[*frame_label];
         let gpu_scene_buffer = self.render_context.gpu_scene.scene_buffer(frame_label);
-        let perframe_set = self.render_context.render_descriptor_sets.current_perframe_set(frame_label).handle();
+        let perframe_set = self.render_context.global_descriptor_sets.current_perframe_set(frame_label).handle();
 
         let perframe_data_buffer_info = vec![
             vk::DescriptorBufferInfo::default()

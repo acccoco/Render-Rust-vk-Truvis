@@ -89,7 +89,7 @@ impl MainWindow {
 
         let gui = Gui::new(renderer, &window, &swapchain_image_infos);
         let gui_pass =
-            GuiPass::new(&renderer.render_context.render_descriptor_sets, swapchain_image_infos.image_format);
+            GuiPass::new(&renderer.render_context.global_descriptor_sets, swapchain_image_infos.image_format);
 
         let present_complete_semaphores = FrameCounter::frame_labes()
             .map(|frame_label| GfxSemaphore::new(&format!("window-present-complete-{}", frame_label)));

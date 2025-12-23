@@ -3,6 +3,7 @@ use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_render::core::renderer::Renderer;
+use truvis_render::model_loader::assimp_loader::AssimpSceneLoader;
 use truvis_render::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_pipeline::rt_pass::RtRenderPass;
@@ -45,11 +46,10 @@ impl CornellApp {
         //     &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         // );
         log::info!("Loading scene...");
-        renderer.render_context.scene_manager.load_scene(
-            &mut renderer.render_context.gfx_resource_manager,
-            &mut renderer.render_context.bindless_manager,
+        AssimpSceneLoader::load_scene(
             TruvisPath::assets_path("fbx/cube-coord.fbx").as_ref(),
-            &glam::Mat4::IDENTITY,
+            &mut renderer.render_context.scene_manager,
+            &mut renderer.asset_hub,
         );
         log::info!("Scene loaded.");
     }
@@ -58,7 +58,7 @@ impl CornellApp {
 impl OuterApp for CornellApp {
     fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self {
         let rt_pipeline =
-            RtRenderPass::new(&renderer.render_context.render_descriptor_sets, &mut renderer.cmd_allocator);
+            RtRenderPass::new(&renderer.render_context.global_descriptor_sets, &mut renderer.cmd_allocator);
 
         Self::create_scene(renderer, camera);
 

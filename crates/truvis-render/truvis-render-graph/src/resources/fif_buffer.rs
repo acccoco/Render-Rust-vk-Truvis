@@ -159,7 +159,7 @@ impl FifBuffers {
         frame_settings: &FrameSettings,
         frame_counter: &FrameCounter,
     ) -> [GfxTextureHandle; FrameCounter::fif_count()] {
-        let create_texture = |fif_labe: FrameLabel| {
+        let create_one_target = |fif_labe: FrameLabel| {
             let name = format!("render-target-{}-{}", fif_labe, frame_counter.frame_id);
 
             let image_create_info = GfxImageCreateInfo::new_image_2d_info(
@@ -181,7 +181,7 @@ impl FifBuffers {
             );
             GfxTexture::new(color_image, &name)
         };
-        let textures = FrameCounter::frame_labes().map(create_texture);
+        let textures = FrameCounter::frame_labes().map(create_one_target);
 
         // 将 layout 设置为 general
         Gfx::get().one_time_exec(

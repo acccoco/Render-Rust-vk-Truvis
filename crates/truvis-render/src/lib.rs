@@ -7,3 +7,4 @@ pub mod platform;
 pub mod subsystems;
 
 pub mod core;
+pub mod model_loader;

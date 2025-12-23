@@ -6,11 +6,12 @@ description = ""
 
 [dependencies]
 truvis-gfx = { workspace = true }
-truvis-model-manager = { workspace = true }
+truvis-model = { workspace = true }
 truvis-render-base = { workspace = true }
 truvis-resource = { workspace = true }
 truvis-shader-binding = { workspace = true }
 truvis-crate-tools = { workspace = true }
+truvis-asset = { workspace = true }
 
 
 # 默认 features：

@@ -154,7 +154,7 @@ impl GuiPass {
             _padding_1: Default::default(),
         };
 
-        let render_descriptor_sets = &render_context.render_descriptor_sets;
+        let render_descriptor_sets = &render_context.global_descriptor_sets;
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::GRAPHICS,
             self.pipeline_layout.handle(),

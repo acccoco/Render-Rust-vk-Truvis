@@ -1,5 +1,5 @@
+use crate::asset_loader::RawAssetData;
 use crate::handle::AssetTextureHandle;
-use crate::loader::RawAssetData;
 use ash::vk;
 use std::collections::VecDeque;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;

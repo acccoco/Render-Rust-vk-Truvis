@@ -102,7 +102,10 @@ impl<T: OuterApp> TruvisApp<T> {
             },
         );
 
-        let outer_app = T::init(&mut self.renderer, self.camera_controller.camera_mut());
+        let outer_app = {
+            let _span = tracy_client::span!("OuterApp::init");
+            T::init(&mut self.renderer, self.camera_controller.camera_mut())
+        };
 
         self.window_system.set(window_system).map_err(|_| ()).unwrap();
         self.outer_app.set(outer_app).map_err(|_| ()).unwrap();

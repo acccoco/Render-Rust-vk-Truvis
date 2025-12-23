@@ -2,6 +2,7 @@ use imgui::Ui;
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
 use truvis_render::core::renderer::Renderer;
+use truvis_render::model_loader::assimp_loader::AssimpSceneLoader;
 use truvis_render::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_pipeline::rt_pass::RtRenderPass;
@@ -43,19 +44,20 @@ impl SponzaApp {
         //     std::path::Path::new("assets/fbx/sponza/Sponza.fbx"),
         //     &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
         // );
-        renderer.render_context.scene_manager.load_scene(
-            &mut renderer.render_context.gfx_resource_manager,
-            &mut renderer.render_context.bindless_manager,
+        log::info!("start load sponza scene");
+        AssimpSceneLoader::load_scene(
             std::path::Path::new("assets/blender/sponza.fbx"),
-            &glam::Mat4::IDENTITY,
+            &mut renderer.render_context.scene_manager,
+            &mut renderer.asset_hub,
         );
+        log::info!("finished load sponza scene");
     }
 }
 
 impl OuterApp for SponzaApp {
     fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self {
         let rt_pipeline =
-            RtRenderPass::new(&renderer.render_context.render_descriptor_sets, &mut renderer.cmd_allocator);
+            RtRenderPass::new(&renderer.render_context.global_descriptor_sets, &mut renderer.cmd_allocator);
 
         Self::create_scene(renderer, camera);
 

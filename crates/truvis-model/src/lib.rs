@@ -9,14 +9,13 @@
 //!
 //! # 使用示例
 //! ```ignore
-//! use truvis_model_manager::vertex::aos_pos_color::VertexLayoutAoSPosColor;
-//! use truvis_model_manager::components::geometry::Geometry;
+//! use truvis_model::vertex::aos_pos_color::VertexLayoutAoSPosColor;
+//! use truvis_model::components::geometry::Geometry;
 //!
 //! // 创建内置几何体（自动上传 GPU）
 //! let triangle: Geometry<VertexLayoutAoSPosColor> = VertexLayoutAoSPosColor::triangle();
 //! ```
 
-pub mod assimp_loader;
 pub mod components;
 pub mod guid_new_type;
 pub mod shapes;

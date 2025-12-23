@@ -1,5 +1,5 @@
 [package]
-name = "truvis-model-manager"
+name = "truvis-model"
 version = "0.1.0"
 edition = "2024"
 description = "基础的模型管理，提供了模型的基础定义"
@@ -8,6 +8,7 @@ description = "基础的模型管理，提供了模型的基础定义"
 [dependencies]
 truvis-gfx = { workspace = true }
 truvis-cxx-binding = { workspace = true }
+truvis-asset = { workspace = true }
 
 ash = { workspace = true }
 glam = { workspace = true }

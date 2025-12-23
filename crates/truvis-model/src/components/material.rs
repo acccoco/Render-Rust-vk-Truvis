@@ -1,3 +1,5 @@
+use truvis_asset::handle::AssetTextureHandle;
+
 /// CPU 侧的材质数据
 #[derive(Default)]
 pub struct Material {

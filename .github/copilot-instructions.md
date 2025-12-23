@@ -12,7 +12,7 @@ crates/
 │   ├── truvis-render-base/  # 基础设施（CmdAllocator、BindlessManager）
 │   ├── truvis-render-graph/ # 渲染管线、RenderContext、Pass/Subpass
 │   └── truvis-render-scene/ # GPU 场景（GpuScene、SceneManager）
-├── truvis-model-manager/    # 顶点数据和几何体
+├── truvis-model/    # 顶点数据和几何体
 ├── truvis-cxx/             # C++ 绑定（truvis-cxx-binding + truvis-cxx-build）
 ├── truvis-shader/          # 着色器系统
 │   ├── truvis-shader-binding/  # Slang → Rust 自动绑定
@@ -199,8 +199,8 @@ let shader = TruvisPath::shader_path("rt/raygen.slang.spv"); // shader/build/rt/
 
 ### 顶点数据创建（model-manager）
 ```rust
-use truvis_model_manager::shapes::triangle::TriangleSoA;
-use truvis_model_manager::components::geometry::RtGeometry;
+use truvis_model::shapes::triangle::TriangleSoA;
+use truvis_model::components::geometry::RtGeometry;
 
 // 内置几何体（已包含 GPU 缓冲区）
 let triangle: RtGeometry = TriangleSoA::create_mesh();

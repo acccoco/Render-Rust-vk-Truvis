@@ -1,10 +1,13 @@
+use crate::asset_loader::{AssetLoadRequest, AssetLoader, LoadResult};
+use crate::asset_upload_manager::AssetUploadManager;
 use crate::handle::{AssetTextureHandle, LoadStatus};
-use crate::loader::{AssetLoadRequest, IoDispather, LoadResult};
-use crate::transfer::AssetUploadManager;
 use slotmap::{SecondaryMap, SlotMap};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use truvis_gfx::resources::image::GfxImage;
+use truvis_render_base::bindless_manager::BindlessManager;
+use truvis_resource::gfx_resource_manager::GfxResourceManager;
+use truvis_resource::handles::GfxTextureHandle;
 use truvis_resource::texture::GfxTexture;
 
 /// 资产中心 (Facade)
@@ -20,33 +23,30 @@ pub struct AssetHub {
     texture_states: SlotMap<AssetTextureHandle, LoadStatus>,
 
     // 存储实际的纹理资源 (仅 Ready 状态才有)
-    textures: SecondaryMap<AssetTextureHandle, GfxTexture>,
+    textures: SecondaryMap<AssetTextureHandle, GfxTextureHandle>,
 
     // 路径到句柄的映射，用于去重 (避免重复加载同一文件)
     texture_cache: HashMap<PathBuf, AssetTextureHandle>,
 
     // 默认资源 (1x1 粉色纹理)，用于 Loading/Failed 状态时的占位
-    fallback_texture: GfxTexture,
+    fallback_texture: GfxTextureHandle,
 
-    io_dispather: IoDispather,
+    asset_loader: AssetLoader,
     upload_manager: AssetUploadManager,
-}
-impl Default for AssetHub {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 // new & init
 impl AssetHub {
-    pub fn new() -> Self {
+    pub fn new(gfx_resource_manager: &mut GfxResourceManager, bindless_manager: &mut BindlessManager) -> Self {
         let fallback_texture = Self::create_fallback_texture();
+        let fallback_texture_handle = gfx_resource_manager.register_texture(fallback_texture);
+        bindless_manager.register_srv_with_texture(fallback_texture_handle);
 
         Self {
             texture_states: SlotMap::with_key(),
             textures: SecondaryMap::new(),
             texture_cache: HashMap::new(),
-            fallback_texture,
-            io_dispather: IoDispather::new(),
+            fallback_texture: fallback_texture_handle,
+            asset_loader: AssetLoader::new(),
             upload_manager: AssetUploadManager::new(),
         }
     }
@@ -63,11 +63,11 @@ impl AssetHub {
 }
 // destroy
 impl AssetHub {
-    pub fn destroy(self) {
-        self.fallback_texture.destroy();
+    pub fn destroy(self, gfx_resource_manager: &mut GfxResourceManager) {
+        gfx_resource_manager.destroy_texture_auto(self.fallback_texture);
     }
-    pub fn destroy_mut(&mut self) {
-        self.fallback_texture.destroy_mut();
+    pub fn destroy_mut(&mut self, gfx_resource_manager: &mut GfxResourceManager) {
+        gfx_resource_manager.destroy_texture_auto(self.fallback_texture);
     }
 }
 // tools
@@ -92,7 +92,7 @@ impl AssetHub {
         log::info!("Request load texture: {:?}", path);
 
         // 发送 IO 请求到后台线程
-        self.io_dispather.request_load(AssetLoadRequest { path, handle });
+        self.asset_loader.request_load(AssetLoadRequest { path, handle });
 
         handle
     }
@@ -106,18 +106,23 @@ impl AssetHub {
     /// 如果资源已 Ready，返回实际纹理。
     /// 否则 (Loading/Uploading/Failed)，返回 Fallback 纹理。
     /// 这保证了渲染循环永远不会因为资源未就绪而阻塞或崩溃。
-    pub fn get_texture(&self, handle: AssetTextureHandle) -> &GfxTexture {
-        self.textures.get(handle).unwrap_or(&self.fallback_texture)
+    pub fn get_texture(&self, asset_tex_handle: AssetTextureHandle) -> GfxTextureHandle {
+        *self.textures.get(asset_tex_handle).unwrap_or(&self.fallback_texture)
+    }
+
+    pub fn get_texture_by_path(&self, tex_path: &Path) -> GfxTextureHandle {
+        let asset_tex_handle = self.texture_cache.get(tex_path).unwrap();
+        self.get_texture(*asset_tex_handle)
     }
 
     /// 驱动加载流程 (每帧调用)
     ///
     /// 1. 检查 IO 线程是否有完成的任务 -> 提交给 TransferManager。
     /// 2. 检查 TransferManager 是否有完成的上传 -> 创建 View/Sampler 并标记为 Ready。
-    pub fn update(&mut self) {
+    pub fn update(&mut self, gfx_resource_manager: &mut GfxResourceManager, bindless_manager: &mut BindlessManager) {
         let _span = tracy_client::span!("AssetHub::update");
         // 1. 处理 IO 完成的消息
-        while let Some(result) = self.io_dispather.try_recv_result() {
+        while let Some(result) = self.asset_loader.try_recv_result() {
             match result {
                 LoadResult::Success(data) => {
                     let handle = data.handle;
@@ -156,7 +161,11 @@ impl AssetHub {
 
             let texture = GfxTexture::new(image, "TextureView");
 
-            self.textures.insert(handle, texture);
+            // 注册到 Bindless 里面去
+            let gfx_texture_handle = gfx_resource_manager.register_texture(texture);
+            bindless_manager.register_srv_with_texture(gfx_texture_handle);
+
+            self.textures.insert(handle, gfx_texture_handle);
 
             if let Some(status) = self.texture_states.get_mut(handle) {
                 *status = LoadStatus::Ready;

@@ -2366,7 +2366,7 @@ dependencies = [
  "truvis-crate-tools",
  "truvis-gfx",
  "truvis-gui",
- "truvis-model-manager",
+ "truvis-model",
  "truvis-render",
  "truvis-render-base",
  "truvis-render-graph",
@@ -2389,6 +2389,7 @@ dependencies = [
  "slotmap",
  "tracy-client",
  "truvis-gfx",
+ "truvis-render-base",
  "truvis-resource",
  "vk-mem",
 ]
@@ -2447,6 +2448,7 @@ dependencies = [
  "log",
  "raw-window-handle",
  "serde_json",
+ "tracy-client",
  "truvis-descriptor-layout-trait",
  "vk-mem",
  "winit",
@@ -2474,7 +2476,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "truvis-model-manager"
+name = "truvis-model"
 version = "0.1.0"
 dependencies = [
  "ash",
@@ -2483,6 +2485,7 @@ dependencies = [
  "itertools 0.10.5",
  "slotmap",
  "tracy-client",
+ "truvis-asset",
  "truvis-cxx-binding",
  "truvis-gfx",
 ]
@@ -2494,9 +2497,12 @@ dependencies = [
  "ash",
  "bytemuck",
  "glam",
+ "itertools 0.10.5",
  "tracy-client",
  "truvis-asset",
+ "truvis-cxx-binding",
  "truvis-gfx",
+ "truvis-model",
  "truvis-render-base",
  "truvis-render-graph",
  "truvis-render-scene",
@@ -2536,7 +2542,7 @@ dependencies = [
  "truvis-descriptor-layout-macro",
  "truvis-descriptor-layout-trait",
  "truvis-gfx",
- "truvis-model-manager",
+ "truvis-model",
  "truvis-render-base",
  "truvis-render-scene",
  "truvis-resource",
@@ -2556,9 +2562,10 @@ dependencies = [
  "log",
  "slotmap",
  "tracy-client",
+ "truvis-asset",
  "truvis-crate-tools",
  "truvis-gfx",
- "truvis-model-manager",
+ "truvis-model",
  "truvis-render-base",
  "truvis-resource",
  "truvis-shader-binding",
