@@ -17,14 +17,14 @@ use truvis_resource::texture::GfxTexture;
 /// 所有帧会用到的 buffers
 pub struct FifBuffers {
     /// RT 计算的累积结果
-    accum_image: GfxImageHandle,
-    accum_image_view: GfxImageViewHandle,
+    pub accum_image: GfxImageHandle,
+    pub accum_image_view: GfxImageViewHandle,
 
-    depth_image: GfxImageHandle,
-    depth_image_view: GfxImageViewHandle,
+    pub depth_image: GfxImageHandle,
+    pub depth_image_view: GfxImageViewHandle,
 
     /// 离屏渲染的结果，数量和 fif 相同
-    off_screen_targets: [GfxTextureHandle; FrameCounter::fif_count()],
+    pub off_screen_targets: [GfxTextureHandle; FrameCounter::fif_count()],
 }
 // new & init
 impl FifBuffers {

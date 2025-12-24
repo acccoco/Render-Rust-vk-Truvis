@@ -95,6 +95,8 @@ pub struct GfxImageViewDesc {
     pub(crate) aspect_mask: vk::ImageAspectFlags,
     /// base mip level 和 mip level count
     pub(crate) mip: (u8, u8),
+    ///
+    pub(crate) layer: (u8, u8),
 }
 impl GfxImageViewDesc {
     pub fn new_2d(format: vk::Format, aspect: vk::ImageAspectFlags) -> Self {
@@ -103,6 +105,7 @@ impl GfxImageViewDesc {
             view_type: vk::ImageViewType::TYPE_2D,
             aspect_mask: aspect,
             mip: (0, 1),
+            layer: (0, 1),
         }
     }
 }

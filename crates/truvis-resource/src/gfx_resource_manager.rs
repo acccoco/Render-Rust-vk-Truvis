@@ -14,10 +14,12 @@ use truvis_gfx::resources::image_view::GfxImageViewDesc;
 /// 支持资源的延迟销毁（Frames in Flight）。
 pub struct GfxResourceManager {
     /// 存储所有的 Buffer 资源
-    buffers: SlotMap<GfxBufferHandle, GfxBuffer>,
+    buffer_pool: SlotMap<GfxBufferHandle, GfxBuffer>,
     /// 存储所有的 Image 资源
-    images: SlotMap<GfxImageHandle, GfxImage>,
-    image_views: SlotMap<GfxImageViewHandle, GfxImageView>,
+    image_pool: SlotMap<GfxImageHandle, GfxImage>,
+    /// 存储所有的 ImageView 资源
+    image_view_pool: SlotMap<GfxImageViewHandle, GfxImageView>,
+
     image_view_map: SecondaryMap<GfxImageHandle, Vec<(GfxImageViewDesc, GfxImageViewHandle)>>,
 
     textures: SlotMap<GfxTextureHandle, GfxTexture>,
@@ -44,9 +46,9 @@ impl GfxResourceManager {
     /// 创建一个新的资源管理器
     pub fn new() -> Self {
         Self {
-            buffers: SlotMap::with_key(),
-            images: SlotMap::with_key(),
-            image_views: SlotMap::with_key(),
+            buffer_pool: SlotMap::with_key(),
+            image_pool: SlotMap::with_key(),
+            image_view_pool: SlotMap::with_key(),
             image_view_map: SecondaryMap::new(),
             textures: SlotMap::with_key(),
 
@@ -75,18 +77,18 @@ impl GfxResourceManager {
         }
 
         // destroy 所有的 image views
-        for (_, image_view) in self.image_views.drain() {
+        for (_, image_view) in self.image_view_pool.drain() {
             image_view.destroy()
         }
         self.image_view_map.clear();
 
         // Destroy 所有的 images
-        for (_, image) in self.images.drain() {
+        for (_, image) in self.image_pool.drain() {
             image.destroy()
         }
 
         // Destroy 所有的 buffers
-        for (_, buffer) in self.buffers.drain() {
+        for (_, buffer) in self.buffer_pool.drain() {
             buffer.destroy()
         }
 
@@ -151,7 +153,7 @@ impl GfxResourceManager {
             }
         });
         for buffer_handle in buffers_to_destroy {
-            if let Some(buffer) = self.buffers.remove(buffer_handle) {
+            if let Some(buffer) = self.buffer_pool.remove(buffer_handle) {
                 buffer.destroy()
             }
         }
@@ -170,13 +172,13 @@ impl GfxResourceManager {
             // 先清理基于 image 创建的 image views
             if let Some(views) = self.image_view_map.remove(*image_handle) {
                 for (_, image_view_handle) in views {
-                    if let Some(image_view) = self.image_views.remove(image_view_handle) {
+                    if let Some(image_view) = self.image_view_pool.remove(image_view_handle) {
                         image_view.destroy()
                     }
                 }
             }
             // 再销毁 image 本身
-            if let Some(image) = self.images.remove(*image_handle) {
+            if let Some(image) = self.image_pool.remove(*image_handle) {
                 image.destroy()
             }
         }
@@ -185,7 +187,7 @@ impl GfxResourceManager {
 // Buffer API
 impl GfxResourceManager {
     pub fn register_buffer(&mut self, buffer: GfxBuffer) -> GfxBufferHandle {
-        self.buffers.insert(buffer)
+        self.buffer_pool.insert(buffer)
     }
 
     pub fn create_buffer(
@@ -202,12 +204,12 @@ impl GfxResourceManager {
 
     /// 获取 Buffer 资源引用
     pub fn get_buffer(&self, handle: GfxBufferHandle) -> Option<&GfxBuffer> {
-        self.buffers.get(handle)
+        self.buffer_pool.get(handle)
     }
 
     /// 获取 Buffer 资源可变引用
     pub fn get_buffer_mut(&mut self, handle: GfxBufferHandle) -> Option<&mut GfxBuffer> {
-        self.buffers.get_mut(handle)
+        self.buffer_pool.get_mut(handle)
     }
 
     /// 销毁 Buffer（指定帧索引）
@@ -228,7 +230,7 @@ impl GfxResourceManager {
 // Image API
 impl GfxResourceManager {
     pub fn register_image(&mut self, image: GfxImage) -> GfxImageHandle {
-        self.images.insert(image)
+        self.image_pool.insert(image)
     }
 
     pub fn create_image(
@@ -243,7 +245,7 @@ impl GfxResourceManager {
 
     /// 获取 Image 资源引用
     pub fn get_image(&self, handle: GfxImageHandle) -> Option<&GfxImage> {
-        self.images.get(handle)
+        self.image_pool.get(handle)
     }
 
     /// 销毁 Image（指定帧索引）
@@ -279,9 +281,9 @@ impl GfxResourceManager {
             }
         }
 
-        let image = self.images.get(image_handle).expect("Invalid image handle");
+        let image = self.image_pool.get(image_handle).expect("Invalid image handle");
         let image_view = GfxImageView::new(image.handle(), view_desc, name);
-        let image_view_handle = self.image_views.insert(image_view);
+        let image_view_handle = self.image_view_pool.insert(image_view);
         views.push((view_desc, image_view_handle));
 
         image_view_handle
@@ -289,7 +291,7 @@ impl GfxResourceManager {
 
     /// 获取 ImageView 资源引用
     pub fn get_image_view(&self, handle: GfxImageViewHandle) -> Option<&GfxImageView> {
-        self.image_views.get(handle)
+        self.image_view_pool.get(handle)
     }
 
     /// 销毁所有资源

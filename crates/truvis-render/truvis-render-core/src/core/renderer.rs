@@ -25,6 +25,7 @@ use truvis_render_base::pipeline_settings::{
 };
 use truvis_render_base::sampler_manager::RenderSamplerManager;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_render_graph::render_graph::{GraphImage, RenderGraph};
 use truvis_render_graph::resources::fif_buffer::FifBuffers;
 use truvis_render_scene::gpu_scene::GpuScene;
 use truvis_render_scene::scene_manager::SceneManager;
@@ -53,6 +54,7 @@ pub struct Renderer {
     pub asset_hub: AssetHub,
     pub timer: Timer,
     pub fif_timeline_semaphore: GfxSemaphore,
+    pub render_graph: RenderGraph,
 
     gpu_scene_update_cmds: Vec<GfxCommandBuffer>,
 
@@ -117,6 +119,7 @@ impl Renderer {
             fif_timeline_semaphore,
             gpu_scene_update_cmds: cmds,
             render_present: None,
+            render_graph: RenderGraph::default(),
 
             render_context: RenderContext {
                 scene_manager,
@@ -246,6 +249,15 @@ impl Renderer {
         self.render_context.accum_data.update_accum_frames(current_camera_dir, camera.position);
         self.update_gpu_scene(input_state, camera);
         self.update_perframe_descriptor_set();
+        
+        self.prepare_render_graph();
+    }
+
+    pub fn prepare_render_graph(&mut self) {
+        self.render_graph.maps.clear();
+        self.render_graph.maps.insert("rt_color".to_string(), GraphImage {
+            // view: self.render_context.fif_buffers.
+        });
     }
 
     pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
