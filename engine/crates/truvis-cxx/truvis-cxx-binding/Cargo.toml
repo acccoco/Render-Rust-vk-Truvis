@@ -1,0 +1,14 @@
+[package]
+name = "truvis-cxx-binding"
+version = "0.1.0"
+edition = "2024"
+description = "为 Truvis 提供 Cxx 绑定"
+
+
+[dependencies]
+
+
+[build-dependencies]
+truvis-crate-tools = { workspace = true }
+
+bindgen = { workspace = true }

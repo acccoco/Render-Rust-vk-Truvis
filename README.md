@@ -6,7 +6,7 @@
 
 基于 Rust 和 Vulkan 的现代渲染引擎，支持自动化着色器绑定和光线追踪技术。
 
-![Result](./resources/Result.PNG)
+![Result](./docs/Result.PNG)
 
 ## 🌟 特性
 
@@ -21,11 +21,11 @@
 
 ### 支持剖切体
 
-![Section](./resources/Result-Section.PNG)
+![Section](./docs/Result-Section.PNG)
 
 ### 支持填充面
 
-![Section-Fill](./resources/Section-Fill-Result.PNG)
+![Section-Fill](./docs/Section-Fill-Result.PNG)
 
 ## 🏗️ 项目结构
 
