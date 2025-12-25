@@ -50,16 +50,8 @@ impl<T: OuterApp> TruvisApp<T> {
 
         let event_loop = winit::event_loop::EventLoop::<UserEvent>::with_user_event().build().unwrap();
 
-        // 追加 window system 需要的 extension，在 windows 下也就是 khr::Surface
-        let extra_instance_ext =
-            ash_window::enumerate_required_extensions(event_loop.display_handle().unwrap().as_raw())
-                .unwrap()
-                .iter()
-                .map(|ext| unsafe { CStr::from_ptr(*ext) })
-                .collect();
-
         let mut app = Self {
-            render_app: RenderApp::new(extra_instance_ext),
+            render_app: RenderApp::new(event_loop.display_handle().unwrap().as_raw()),
             window: OnceCell::new(),
             gui_host: GuiHost::new(),
             last_render_area: Default::default(),
@@ -70,8 +62,6 @@ impl<T: OuterApp> TruvisApp<T> {
         log::info!("end run.");
 
         app.destroy();
-
-        Gfx::destroy();
     }
 }
 // new & init

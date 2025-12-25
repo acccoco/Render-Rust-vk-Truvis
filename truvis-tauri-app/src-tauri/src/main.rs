@@ -4,38 +4,37 @@
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use tauri::Manager;
 use tauri::window::WindowBuilder;
+use truvis_app::outer_app::OuterApp;
+use truvis_app::render_app::RenderApp;
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // 获取主窗口 (Tauri 2 默认会创建 "main" 窗口)
-            let main_window = app.get_webview_window("main")
-                .expect("Failed to get main window");
-            
+            let main_window = app.get_webview_window("main").expect("Failed to get main window");
+
             // 创建一个新的纯窗口（没有 WebView），用于 Vulkan 渲染
             let render_window = WindowBuilder::new(app, "render")
                 .title("Render Window")
                 .inner_size(1280.0, 720.0)
-                .always_on_top(true)           // 始终浮在顶层
-                .decorations(true)              // 有窗口装饰
-                .resizable(true)                // 可调整大小
-                .visible(true)                  // 可见
+                .always_on_top(true) // 始终浮在顶层
+                .decorations(true) // 有窗口装饰
+                .resizable(true) // 可调整大小
+                .visible(true) // 可见
                 .build()
                 .expect("Failed to create render window");
-            
+
             // 获取 render 窗口的 raw-window-handle
-            let window_handle = render_window.window_handle()
-                .expect("Failed to get window handle");
-            let display_handle = render_window.display_handle()
-                .expect("Failed to get display handle");
-            
+            let window_handle = render_window.window_handle().expect("Failed to get window handle");
+            let display_handle = render_window.display_handle().expect("Failed to get display handle");
+
             println!("Render Window Handle: {:?}", window_handle.as_raw());
             println!("Render Display Handle: {:?}", display_handle.as_raw());
-            
+
             // 初始化 Vulkan 渲染器
             init_vulkan_renderer(&render_window);
-            
+
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -44,19 +43,25 @@ fn main() {
 
 fn init_vulkan_renderer(window: &tauri::Window) {
     // 获取窗口句柄用于 Vulkan
-    let window_handle = window.window_handle()
-        .expect("Failed to get window handle");
-    let display_handle = window.display_handle()
-        .expect("Failed to get display handle");
-    
+    let window_handle = window.window_handle().expect("Failed to get window handle");
+    let display_handle = window.display_handle().expect("Failed to get display handle");
+
     // 获取窗口尺寸
-    let size = window.inner_size().unwrap_or(tauri::PhysicalSize { width: 800, height: 600 });
-    
+    let size = window.inner_size().unwrap_or(tauri::PhysicalSize {
+        width: 800,
+        height: 600,
+    });
+
     println!("初始化 Vulkan 渲染器...");
     println!("窗口尺寸: {}x{}", size.width, size.height);
     println!("RawWindowHandle: {:?}", window_handle.as_raw());
     println!("RawDisplayHandle: {:?}", display_handle.as_raw());
-    
+
+    let mut app = RenderApp::<App>::new(display_handle.as_raw());
+    app.init_after_window(display_handle.as_raw(), window_handle.as_raw());
+
+    app.destroy();
+
     // TODO: 在这里创建 Vulkan instance, surface, device 等
     // 使用 ash 或 vulkano 时，可以这样创建 surface:
     //
@@ -72,4 +77,14 @@ fn init_vulkan_renderer(window: &tauri::Window) {
     //     }
     //     _ => panic!("Unsupported platform"),
     // }
+}
+
+struct App {}
+impl OuterApp for App {
+    fn init(
+        renderer: &mut truvis_render_core::core::renderer::Renderer,
+        camera: &mut truvis_render_core::platform::camera::Camera,
+    ) -> Self {
+        Self {}
+    }
 }

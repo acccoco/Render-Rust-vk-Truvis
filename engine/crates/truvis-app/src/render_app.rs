@@ -11,11 +11,18 @@ pub struct RenderApp<T: OuterApp> {
     pub renderer: Renderer,
     pub camera_controller: CameraController,
 
-    pub outer_app: T,
+    pub outer_app: Option<T>,
 }
 // new & init
 impl<T: OuterApp> RenderApp<T> {
-    pub fn new(extra_instance_ext: Vec<&'static CStr>) -> Self {
+    pub fn new(raw_display_handle: RawDisplayHandle) -> Self {
+        // 追加 window system 需要的 extension，在 windows 下也就是 khr::Surface
+        let extra_instance_ext = ash_window::enumerate_required_extensions(raw_display_handle)
+            .unwrap()
+            .iter()
+            .map(|ext| unsafe { CStr::from_ptr(*ext) })
+            .collect();
+
         let mut renderer = Renderer::new(extra_instance_ext);
         let mut camera_controller = CameraController::new();
 
@@ -26,7 +33,7 @@ impl<T: OuterApp> RenderApp<T> {
 
         Self {
             renderer,
-            outer_app,
+            outer_app: Some(outer_app),
             camera_controller,
         }
     }
@@ -36,10 +43,13 @@ impl<T: OuterApp> RenderApp<T> {
 }
 // destroy
 impl<T: OuterApp> RenderApp<T> {
-    pub fn destroy(self) {
+    pub fn destroy(mut self) {
         Gfx::get().wait_idel();
 
+        self.outer_app = None;
         self.renderer.destroy();
+
+        Gfx::destroy();
     }
 }
 // getter
@@ -86,7 +96,7 @@ impl<T: OuterApp> RenderApp<T> {
             ui.new_line();
         }
 
-        self.outer_app.draw_ui(ui);
+        self.outer_app.as_mut().unwrap().draw_ui(ui);
     }
 
     pub fn update_scene(&mut self, input_state: &InputState, extent: vk::Extent2D) {
@@ -104,7 +114,7 @@ impl<T: OuterApp> RenderApp<T> {
 
         // Outer App: Update
         {
-            self.outer_app.update(&mut self.renderer);
+            self.outer_app.as_mut().unwrap().update(&mut self.renderer);
         }
     }
 
@@ -113,7 +123,7 @@ impl<T: OuterApp> RenderApp<T> {
         {
             let _span = tracy_client::span!("OuterApp::draw");
             // 构建出 PipelineContext
-            self.outer_app.draw(&self.renderer.render_context);
+            self.outer_app.as_mut().unwrap().draw(&self.renderer.render_context);
         }
     }
 
@@ -128,6 +138,6 @@ impl<T: OuterApp> RenderApp<T> {
     pub fn on_window_resized(&mut self, raw_display_handle: RawDisplayHandle, raw_window_handle: RawWindowHandle) {
         self.renderer.render_present.as_mut().unwrap().rebuild_after_resized(raw_display_handle, raw_window_handle);
 
-        self.outer_app.rebuild(&mut self.renderer);
+        self.outer_app.as_mut().unwrap().rebuild(&mut self.renderer);
     }
 }
