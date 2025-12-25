@@ -1,5 +1,6 @@
+use crate::platform::camera::Camera;
+use crate::platform::input_state::InputState;
 use crate::platform::timer::Timer;
-use crate::platform::{camera::Camera, input_manager::InputState};
 use crate::present::render_present::{PresentData, RenderPresent};
 use ash::vk;
 use imgui::DrawData;
@@ -25,7 +26,7 @@ use truvis_render_base::pipeline_settings::{
 };
 use truvis_render_base::sampler_manager::RenderSamplerManager;
 use truvis_render_graph::render_context::RenderContext;
-use truvis_render_graph::render_graph::{GraphImage, RenderGraph};
+use truvis_render_graph::render_graph::RenderGraph;
 use truvis_render_graph::resources::fif_buffer::FifBuffers;
 use truvis_render_scene::gpu_scene::GpuScene;
 use truvis_render_scene::scene_manager::SceneManager;
@@ -249,15 +250,12 @@ impl Renderer {
         self.render_context.accum_data.update_accum_frames(current_camera_dir, camera.position);
         self.update_gpu_scene(input_state, camera);
         self.update_perframe_descriptor_set();
-        
+
         self.prepare_render_graph();
     }
 
     pub fn prepare_render_graph(&mut self) {
         self.render_graph.maps.clear();
-        self.render_graph.maps.insert("rt_color".to_string(), GraphImage {
-            // view: self.render_context.fif_buffers.
-        });
     }
 
     pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
@@ -330,8 +328,8 @@ impl Renderer {
                 delta_time_ms: self.timer.delte_time_ms(),
                 frame_id: self.render_context.frame_counter.frame_id as u64,
                 mouse_pos: truvisl::Float2 {
-                    x: mouse_pos.x as f32,
-                    y: mouse_pos.y as f32,
+                    x: mouse_pos[0] as f32,
+                    y: mouse_pos[1] as f32,
                 },
                 resolution: truvisl::Float2 {
                     x: frame_extent.width as f32,
@@ -375,7 +373,7 @@ impl Renderer {
         ]);
     }
 
-    pub fn draw_to_window(&mut self, draw_data: Option<&DrawData>) {
+    pub fn draw_to_window(&mut self, ui_draw_data: Option<&DrawData>) {
         let _span = tracy_client::span!("Renderer::draw_to_window");
 
         let frame_label = self.render_context.frame_counter.frame_label();
@@ -393,7 +391,7 @@ impl Renderer {
                 },
             }
         };
-        self.render_present.as_mut().unwrap().draw_gui(&self.render_context, draw_data, present_data);
+        self.render_present.as_mut().unwrap().draw_gui(&self.render_context, ui_draw_data, present_data);
     }
 }
 // getters

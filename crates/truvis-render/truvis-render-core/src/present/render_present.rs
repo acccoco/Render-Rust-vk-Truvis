@@ -116,15 +116,15 @@ impl RenderPresent {
     pub fn draw_gui(
         &mut self,
         render_context: &RenderContext,
-        draw_data: Option<&DrawData>,
+        ui_draw_data: Option<&DrawData>,
         present_data: PresentData,
     ) {
         self.gui_backend.register_render_texture(present_data.render_target);
 
-        self.draw(render_context, draw_data, present_data);
+        self.draw(render_context, ui_draw_data, present_data);
     }
 
-    fn draw(&mut self, render_context: &RenderContext, draw_data: Option<&DrawData>, present_data: PresentData) {
+    fn draw(&mut self, render_context: &RenderContext, ui_draw_data: Option<&DrawData>, present_data: PresentData) {
         let swapchain = self.swapchain.as_ref().unwrap();
         let swapchain_image_idx = swapchain.current_image_index();
         let frame_label = render_context.frame_counter.frame_label();
@@ -162,7 +162,7 @@ impl RenderPresent {
                 ],
             );
 
-            if let Some(draw_data) = draw_data {
+            if let Some(draw_data) = ui_draw_data {
                 self.gui_backend.prepare_render_data(draw_data, render_context.frame_counter.frame_label());
 
                 self.gui_pass.draw(

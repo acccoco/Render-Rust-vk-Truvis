@@ -1,6 +1,6 @@
 use truvis_render_core::platform::camera::Camera;
-use truvis_render_core::platform::input_manager::InputState;
-use winit::keyboard::KeyCode;
+use truvis_render_core::platform::event::KeyCode;
+use truvis_render_core::platform::input_state::InputState;
 
 pub struct CameraController {
     camera: Camera,
@@ -37,10 +37,10 @@ impl CameraController {
         self.camera.set_aspect_ratio(viewport_size.x / viewport_size.y);
 
         if input_state.is_right_button_pressed() {
-            let mouse_delta = input_state.get_mouse_delta() / 7.0;
+            let mouse_delta = input_state.get_mouse_delta();
 
-            self.camera.rotate_yaw(-mouse_delta.x as f32);
-            self.camera.rotate_pitch(-mouse_delta.y as f32);
+            self.camera.rotate_yaw(-mouse_delta[0] as f32 / 7.0);
+            self.camera.rotate_pitch(-mouse_delta[1] as f32 / 7.0);
         }
 
         let move_speed = 320_f32;

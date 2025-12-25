@@ -5,7 +5,7 @@ use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use std::ffi::CStr;
 use truvis_gfx::gfx::Gfx;
 use truvis_render_core::core::renderer::Renderer;
-use truvis_render_core::platform::input_manager::InputState;
+use truvis_render_core::platform::input_state::InputState;
 
 pub struct RenderApp<T: OuterApp> {
     pub renderer: Renderer,
@@ -117,8 +117,8 @@ impl<T: OuterApp> RenderApp<T> {
         }
     }
 
-    pub fn draw_to_window(&mut self, draw_data: Option<&imgui::DrawData>) {
-        self.renderer.draw_to_window(draw_data);
+    pub fn draw_to_window(&mut self, ui_draw_data: Option<&imgui::DrawData>) {
+        self.renderer.draw_to_window(ui_draw_data);
     }
 
     pub fn end_frame(&mut self) {

@@ -1,3 +1,4 @@
+use crate::platform::event::{ElementState, InputEvent, MouseButton};
 use ash::vk;
 use imgui::{DrawData, FontAtlasTexture, TextureId};
 use truvis_crate_tools::resource::TruvisPath;
@@ -7,14 +8,20 @@ const RENDER_IMAGE_ID: usize = 1;
 
 pub struct GuiHost {
     pub imgui_ctx: imgui::Context,
-    pub platform: imgui_winit_support::WinitPlatform,
+    pub hidpi_factor: f64,
 
     /// 3D 渲染的区域
     pub render_region: vk::Rect2D,
 }
 // new & init
+impl Default for GuiHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GuiHost {
-    pub fn new(window: &winit::window::Window) -> Self {
+    pub fn new() -> Self {
         let mut imgui_ctx = imgui::Context::create();
         // disable automatic saving .ini file
         imgui_ctx.set_ini_filename(None);
@@ -26,18 +33,15 @@ impl GuiHost {
             style.colors[imgui::StyleColor::WindowBg as usize] = [1.0, 0.0, 0.0, 1.0];
         }
 
-        let mut platform = imgui_winit_support::WinitPlatform::new(&mut imgui_ctx);
-        platform.attach_window(imgui_ctx.io_mut(), window, imgui_winit_support::HiDpiMode::Rounded);
-
         Self {
             imgui_ctx,
-            platform,
             render_region: Default::default(),
+            hidpi_factor: 1.0,
         }
     }
 
     pub fn init_font(&mut self) -> (FontAtlasTexture<'_>, TextureId) {
-        let hidpi_factor = self.platform.hidpi_factor();
+        let hidpi_factor = self.hidpi_factor;
         let font_size = (13.0 * hidpi_factor) as f32;
 
         let font_data = std::fs::read(TruvisPath::resources_path("mplus-1p-regular.ttf")).unwrap();
@@ -63,7 +67,8 @@ impl GuiHost {
         self.imgui_ctx.fonts().tex_id = font_texture_id;
 
         let io = self.imgui_ctx.io_mut();
-        io.font_global_scale = (1.0 / hidpi_factor) as f32;
+        // io.font_global_scale = (1.0 / hidpi_factor) as f32;
+        io.font_global_scale = 1.0;
         io.config_flags |= imgui::ConfigFlags::DOCKING_ENABLE;
 
         let fonts = self.imgui_ctx.fonts();
@@ -81,28 +86,41 @@ impl GuiHost {
 }
 // update
 impl GuiHost {
-    /// 接受 window 的事件
-    pub fn handle_event<T>(&mut self, window: &winit::window::Window, event: &winit::event::Event<T>) {
-        self.platform.handle_event(self.imgui_ctx.io_mut(), window, event);
-    }
-
-    /// # Phase: IO
-    /// 1. 可能会修改鼠标位置
-    /// 1. 更新 imgui 的 delta time
-    pub fn prepare_frame(&mut self, window: &winit::window::Window, duration: std::time::Duration) {
-        // 看源码可知：imgui 可能会设定鼠标位置
-        self.platform.prepare_frame(self.imgui_ctx.io_mut(), window).unwrap();
-
-        self.imgui_ctx.io_mut().update_delta_time(duration);
+    pub fn handle_event(&mut self, event: &InputEvent) {
+        let io = self.imgui_ctx.io_mut();
+        match event {
+            InputEvent::Resized {
+                physical_width,
+                physical_height,
+            } => {
+                io.display_size = [*physical_width as f32, *physical_height as f32];
+            }
+            InputEvent::MouseMoved { physical_position } => {
+                io.add_mouse_pos_event([physical_position[0] as f32, physical_position[1] as f32]);
+            }
+            InputEvent::MouseButtonInput { button, state } => {
+                if let Some(mb) = match button {
+                    MouseButton::Left => Some(imgui::MouseButton::Left),
+                    MouseButton::Right => Some(imgui::MouseButton::Right),
+                    MouseButton::Middle => Some(imgui::MouseButton::Middle),
+                    _ => None,
+                } {
+                    let pressed = *state == ElementState::Pressed;
+                    io.add_mouse_button_event(mb, pressed);
+                }
+            }
+            _ => {}
+        }
     }
 
     /// # Phase: Update
-    pub fn update(
+    pub fn new_frame(
         &mut self,
-        window: &winit::window::Window,
-        ui_func_main: impl FnOnce(&imgui::Ui, [f32; 2]),
-        ui_func_right: impl FnOnce(&imgui::Ui),
+        duration: std::time::Duration,
+        ui_build_func_main: impl FnOnce(&imgui::Ui, [f32; 2]),
+        ui_build_func_right: impl FnOnce(&imgui::Ui),
     ) {
+        self.imgui_ctx.io_mut().update_delta_time(duration);
         let ui = self.imgui_ctx.new_frame();
 
         unsafe {
@@ -207,7 +225,7 @@ impl GuiHost {
                     imgui::Image::new(imgui::TextureId::new(RENDER_IMAGE_ID), [window_size[0], window_size[1]])
                         .build(ui);
 
-                    ui_func_main(ui, window_size);
+                    ui_build_func_main(ui, window_size);
                 });
 
             // 右侧的窗口，用于放置各种设置
@@ -219,18 +237,14 @@ impl GuiHost {
                 ui.text(format!("Root Node Position: ({:.1},{:.1})", root_pos.x, root_pos.y));
                 ui.text(format!("Root Node Size: ({:.1},{:.1})", root_size.x, root_size.y));
 
-                let hidpi_factor = self.platform.hidpi_factor();
-                ui.text(format!("Hidpi Factor: {}", hidpi_factor));
+                ui.text(format!("Hidpi Factor: {}", self.hidpi_factor));
                 ui.text(format!("Window Size: ({:?})", self.render_region.extent));
                 ui.text(format!("Window Position: ({:?})", self.render_region.offset));
                 ui.new_line();
 
-                ui_func_right(ui);
+                ui_build_func_right(ui);
             });
         }
-
-        // 看源码可知：imgui 可能会隐藏鼠标指针
-        self.platform.prepare_render(ui, window);
     }
 
     pub fn compile_ui(&mut self) -> Option<&DrawData> {
