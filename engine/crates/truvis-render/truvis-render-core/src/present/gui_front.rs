@@ -1,6 +1,6 @@
 use crate::platform::event::{ElementState, InputEvent, MouseButton};
 use ash::vk;
-use imgui::{DrawData, FontAtlasTexture, TextureId};
+use imgui::{DrawData, FontAtlasTexture, TextureId, sys};
 use truvis_crate_tools::resource::TruvisPath;
 
 const FONT_TEXTURE_ID: usize = 0;
@@ -250,5 +250,10 @@ impl GuiHost {
     pub fn compile_ui(&mut self) -> Option<&DrawData> {
         let draw_data = self.imgui_ctx.render();
         if draw_data.total_vtx_count == 0 { None } else { Some(draw_data) }
+    }
+
+    /// 确保之前调用过 compile_ui
+    pub fn get_render_data(&self) -> &DrawData {
+        unsafe { &*(imgui::sys::igGetDrawData() as *mut DrawData) }
     }
 }
