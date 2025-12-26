@@ -25,8 +25,7 @@ use truvis_render_graph::render_context::RenderContext;
 /// }
 /// ```
 pub trait OuterApp {
-    /// 初始化应用（窗口创建后调用）
-    fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self;
+    fn init(&mut self, _renderer: &mut Renderer, _camera: &mut Camera) {}
 
     /// 绘制 GUI（可选）
     fn draw_ui(&mut self, _ui: &imgui::Ui) {}

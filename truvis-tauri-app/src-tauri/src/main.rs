@@ -57,8 +57,9 @@ fn init_vulkan_renderer(window: &tauri::Window) {
     println!("RawWindowHandle: {:?}", window_handle.as_raw());
     println!("RawDisplayHandle: {:?}", display_handle.as_raw());
 
-    let mut app = RenderApp::<App>::new(display_handle.as_raw());
-    app.init_after_window(display_handle.as_raw(), window_handle.as_raw());
+    let outer_app = Box::new(TempApp::default());
+    let mut app = RenderApp::new(display_handle.as_raw(), outer_app);
+    app.init_after_window(display_handle.as_raw(), window_handle.as_raw(), window.scale_factor().unwrap());
 
     app.destroy();
 
@@ -79,12 +80,13 @@ fn init_vulkan_renderer(window: &tauri::Window) {
     // }
 }
 
-struct App {}
-impl OuterApp for App {
+#[derive(Default)]
+struct TempApp {}
+impl OuterApp for TempApp {
     fn init(
+        &mut self,
         renderer: &mut truvis_render_core::core::renderer::Renderer,
         camera: &mut truvis_render_core::platform::camera::Camera,
-    ) -> Self {
-        Self {}
+    ) {
     }
 }

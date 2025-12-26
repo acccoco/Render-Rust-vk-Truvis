@@ -1,5 +1,5 @@
 use imgui::Ui;
-use truvis_app::app::TruvisApp;
+use truvis_app::app::WinitApp;
 use truvis_app::outer_app::OuterApp;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_render_core::core::renderer::Renderer;
@@ -9,8 +9,9 @@ use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_pipeline::rt_pass::RtRenderPass;
 use truvis_shader_binding::truvisl;
 
+#[derive(Default)]
 struct SponzaApp {
-    rt_pipeline: RtRenderPass,
+    rt_pipeline: Option<RtRenderPass>,
 }
 
 impl SponzaApp {
@@ -56,22 +57,23 @@ impl SponzaApp {
 }
 
 impl OuterApp for SponzaApp {
-    fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self {
+    fn init(&mut self, renderer: &mut Renderer, camera: &mut Camera) {
         let rt_pipeline =
             RtRenderPass::new(&renderer.render_context.global_descriptor_sets, &mut renderer.cmd_allocator);
 
         Self::create_scene(renderer, camera);
 
-        Self { rt_pipeline }
+        self.rt_pipeline = Some(rt_pipeline);
     }
 
     fn draw_ui(&mut self, _ui: &Ui) {}
 
     fn draw(&self, render_context: &RenderContext) {
-        self.rt_pipeline.render(render_context);
+        self.rt_pipeline.as_ref().unwrap().render(render_context);
     }
 }
 
 fn main() {
-    TruvisApp::<SponzaApp>::run();
+    let outer_app = Box::new(SponzaApp::default());
+    WinitApp::run(outer_app);
 }

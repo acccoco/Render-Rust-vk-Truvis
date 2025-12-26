@@ -1,5 +1,5 @@
 use imgui::Ui;
-use truvis_app::app::TruvisApp;
+use truvis_app::app::WinitApp;
 use truvis_app::outer_app::OuterApp;
 use truvis_asset::handle::AssetTextureHandle;
 use truvis_crate_tools::resource::TruvisPath;
@@ -13,10 +13,11 @@ mod async_pass;
 use async_pass::AsyncPass;
 use truvis_render_graph::render_context::RenderContext;
 
+#[derive(Default)]
 struct AsyncLoadTest {
-    pipeline: AsyncPass,
-    quad: RtGeometry,
-    texture_handle: AssetTextureHandle,
+    pipeline: Option<AsyncPass>,
+    quad: Option<RtGeometry>,
+    texture_handle: Option<AssetTextureHandle>,
 }
 
 impl AsyncLoadTest {
@@ -48,22 +49,20 @@ impl AsyncLoadTest {
 }
 
 impl OuterApp for AsyncLoadTest {
-    fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {
+    fn init(&mut self, renderer: &mut Renderer, _camera: &mut Camera) {
         log::info!("Async Load Test init.");
 
         // Load a texture
         let texture_path = TruvisPath::resources_path_str("uv_checker.png");
         let texture_handle = renderer.asset_hub.load_texture(texture_path.into());
 
-        Self {
-            pipeline: AsyncPass::new(
-                &renderer.render_context.global_descriptor_sets,
-                &renderer.render_context.frame_settings,
-                &mut renderer.cmd_allocator,
-            ),
-            quad: Self::create_quad(),
-            texture_handle,
-        }
+        self.pipeline = Some(AsyncPass::new(
+            &renderer.render_context.global_descriptor_sets,
+            &renderer.render_context.frame_settings,
+            &mut renderer.cmd_allocator,
+        ));
+        self.quad = Some(Self::create_quad());
+        self.texture_handle = Some(texture_handle);
     }
 
     fn draw_ui(&mut self, _ui: &Ui) {}
@@ -79,5 +78,6 @@ impl OuterApp for AsyncLoadTest {
 }
 
 fn main() {
-    TruvisApp::<AsyncLoadTest>::run();
+    let outer_app = Box::new(AsyncLoadTest::default());
+    WinitApp::run(outer_app);
 }

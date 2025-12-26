@@ -43,7 +43,7 @@ impl CameraController {
             self.camera.rotate_pitch(-mouse_delta[1] as f32 / 7.0);
         }
 
-        let move_speed = 320_f32;
+        let move_speed = 320.0_f32;
         if input_state.is_key_pressed(KeyCode::KeyW) {
             self.camera.move_forward(delta_time_s * move_speed);
         }

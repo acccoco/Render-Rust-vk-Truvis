@@ -209,9 +209,9 @@ impl Renderer {
             self.cmd_allocator.reset_frame_commands(self.render_context.frame_counter.frame_label());
         }
 
-        self.timer.tic();
+        self.timer.tick();
         self.render_context.delta_time_s = self.timer.delta_time_s();
-        self.render_context.total_time_s = self.timer.total_time.as_secs_f32();
+        self.render_context.total_time_s = self.timer.total_time_s();
 
         // Update AssetHub
         self.asset_hub.update(&mut self.render_context.gfx_resource_manager, &mut self.render_context.bindless_manager);
@@ -240,7 +240,7 @@ impl Renderer {
 
     pub fn time_to_render(&mut self) -> bool {
         let limit_elapsed_us = 1000.0 * 1000.0 / self.render_context.frame_counter.frame_limit;
-        limit_elapsed_us < self.timer.toc().as_micros() as f32
+        limit_elapsed_us < self.timer.elapsed_since_tick().as_micros() as f32
     }
 
     pub fn before_render(&mut self, input_state: &InputState, camera: &Camera) {
@@ -324,8 +324,8 @@ impl Renderer {
                 inv_projection: projection.inverse().into(),
                 camera_pos: camera.position.into(),
                 camera_forward: camera.camera_forward().into(),
-                time_ms: self.timer.total_time.as_micros() as f32 / 1000.0,
-                delta_time_ms: self.timer.delte_time_ms(),
+                time_ms: self.timer.total_time_ms(),
+                delta_time_ms: self.timer.delta_time_ms(),
                 frame_id: self.render_context.frame_counter.frame_id as u64,
                 mouse_pos: truvisl::Float2 {
                     x: mouse_pos[0] as f32,

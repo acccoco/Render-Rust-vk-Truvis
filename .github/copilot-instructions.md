@@ -1,56 +1,60 @@
 # Render-Rust-vk-Truvis Copilot 指令
 
-基于 Rust 和 Vulkan 的现代渲染引擎，支持自动化着色器绑定和光线追踪。
+基于 Rust 和 Vulkan 1.3+ 的现代渲染引擎，支持 Slang 自动着色器绑定和硬件光线追踪。
 
 ## 🏗️ 核心架构
 
 ```
-crates/
-├── truvis-gfx/              # Vulkan RHI 抽象（Gfx 单例）
-├── truvis-app/              # 应用框架（TruvisApp + OuterApp trait）
-├── truvis-render/           # 渲染核心 + 子模块
-│   ├── truvis-render-base/  # 基础设施（CmdAllocator、BindlessManager）
-│   ├── truvis-render-graph/ # 渲染管线、RenderContext、Pass/Subpass
-│   └── truvis-render-scene/ # GPU 场景（GpuScene、SceneManager）
-├── truvis-model/    # 顶点数据和几何体
-├── truvis-cxx/             # C++ 绑定（truvis-cxx-binding + truvis-cxx-build）
-├── truvis-shader/          # 着色器系统
-│   ├── truvis-shader-binding/  # Slang → Rust 自动绑定
-│   └── truvis-shader-build/    # 着色器编译工具
-├── truvis-asset/           # 资产加载（异步）
-├── truvis-resource/        # 资源管理器
-└── truvis-crate-tools/     # 共享工具（TruvisPath 等）
-
-shader/
-├── src/       # .slang/.glsl/.hlsl 源码
-├── include/   # 共享头文件（.slangi）
-└── build/     # 编译后 .spv 文件
+engine/
+├── crates/
+│   ├── truvis-gfx/              # Vulkan RHI 抽象（Gfx 单例）
+│   ├── truvis-app/              # 应用框架（TruvisApp + OuterApp trait）
+│   │   └── src/bin/             # 示例应用：triangle/, rt-sponza/, shader-toy/
+│   ├── truvis-render/           # 渲染核心（4 个子 crate）
+│   │   ├── truvis-render-base/  # CmdAllocator, BindlessManager, FrameCounter
+│   │   ├── truvis-render-core/  # Renderer, Camera, Timer
+│   │   ├── truvis-render-graph/ # RenderContext, Pass/Subpass, FifBuffers
+│   │   └── truvis-render-scene/ # GpuScene, SceneManager
+│   ├── truvis-model/            # 顶点数据和几何体（RtGeometry）
+│   ├── truvis-shader/           # 着色器系统
+│   │   ├── truvis-shader-binding/   # Slang → Rust 自动绑定（build.rs + bindgen）
+│   │   └── truvis-shader-build/     # 着色器编译工具（slangc/glslc/dxc）
+│   ├── truvis-cxx/              # C++ FFI（Assimp 场景加载）
+│   ├── truvis-asset/            # 异步资产加载
+│   └── truvis-crate-tools/      # TruvisPath 路径工具
+├── shader/
+│   ├── src/                     # .slang 源码（按 pass 组织）
+│   ├── include/                 # 共享头文件（.slangi）
+│   └── build/                   # 编译后 .spv（自动生成）
+└── cxx/                         # C++ 源码 + CMakeLists.txt
 ```
 
-**层次关系**: truvis-gfx → truvis-render → truvis-app → 应用 bin (`crates/truvis-app/src/bin/*/main.rs`)
+**层次关系**: `truvis-gfx` → `truvis-render-*` → `truvis-app` → `bin/*/main.rs`
 
-## 🚀 构建流程（必需按顺序执行）
+## 🚀 构建流程（必须按顺序）
 
 ```powershell
-# 1. 首次构建（自动处理 CMake + C++ 依赖）
+# 1. 首次构建（自动处理 CMake + vcpkg 依赖）
 cargo build --release
 
 # 2. 编译着色器（运行前必需！）
 cargo run --bin shader-build
 
 # 3. 运行演示
-cargo run --bin triangle
-cargo run --bin rt-sponza    # 需要模型文件
-cargo run --bin shader-toy
-cargo run --bin rt-cornell
+cargo run --bin triangle       # 基础三角形
+cargo run --bin rt-sponza      # 光追 Sponza（需要模型）
+cargo run --bin shader-toy     # 着色器实验场
+cargo run --bin rt-cornell     # Cornell Box
 ```
 
-**关键**: `shader-build` 位于 `crates/truvis-shader/truvis-shader-build/src/bin/shader-build/`，使用 rayon 并行编译。
+**⚠️ 关键约束**:
+- `shader-build` 必须在运行任何渲染应用前执行
+- 位于 `engine/crates/truvis-shader/truvis-shader-build/src/bin/shader-build/`
+- 使用 rayon 并行编译 `.slang` → `.spv`
 
 **自动生成系统**:
-- 着色器绑定: `truvis-shader-binding/build.rs` 通过 `bindgen` 从 `.slangi` 生成 Rust 类型
-- C++ 绑定: `truvis-cxx-build/build.rs` 通过 CMake 构建并复制 DLL
-- 路径: `TruvisPath` 基于 `CARGO_MANIFEST_DIR` 推导工作区路径
+- 着色器绑定: `truvis-shader-binding/build.rs` 通过 bindgen 从 `.slangi` 生成 Rust 类型
+- C++ 绑定: `truvis-cxx-build/build.rs` 构建 CMake 并复制 DLL 到 `target/`
 
 
 ## 🎯 OuterApp 开发模式
@@ -94,23 +98,18 @@ fn main() {
 
 
 ### RenderContext（核心渲染状态）
-```rust
-// RenderContext 通过 renderer.render_context 访问，包含所有渲染状态
-// 在 OuterApp::draw() 中作为参数传入
-pub struct RenderContext {
-    pub scene_manager: SceneManager,
-    pub gpu_scene: GpuScene,
-    pub fif_buffers: FifBuffers,
-    pub bindless_manager: BindlessManager,
-    pub frame_counter: FrameCounter,
-    pub frame_settings: FrameSettings,
-    // ...
-}
 
-// 典型渲染 Pass（命令缓冲区在 init 时预分配）
+通过 `renderer.render_context` 访问，`OuterApp::draw()` 参数传入：
+- `frame_counter.frame_label()` → 当前帧标签（A/B/C）
+- `fif_buffers` → 管理 render target、depth images
+- `bindless_manager` → Bindless 资源管理
+- `gpu_scene` → GPU 场景数据
+- `frame_settings` → 分辨率、格式等
+
+**Pass 模式**（命令缓冲区预分配）：
+```rust
 impl MyPass {
     pub fn new(frame_settings: &FrameSettings, cmd_allocator: &mut CmdAllocator) -> Self {
-        // 每帧一个命令缓冲区，预分配
         let cmds = FrameCounter::frame_labes()
             .map(|label| cmd_allocator.alloc_command_buffer(label, "my-pass"));
         Self { subpass: MySubpass::new(frame_settings), cmds }
@@ -120,92 +119,77 @@ impl MyPass {
         let frame_label = render_context.frame_counter.frame_label();
         let cmd = self.cmds[*frame_label].clone();
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "my-pass");
-        // 绘制...
+        self.subpass.draw(&cmd, /* ... */);
         cmd.end();
         Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(&[cmd])], None);
     }
 }
 ```
 
-**常用字段**:
-- `render_context.frame_counter.frame_label()` - 当前帧标签（A/B/C）
-- `render_context.bindless_manager` - Bindless 管理
-- `render_context.gpu_scene` - GPU 场景
-- `render_context.frame_settings` - 帧设置（分辨率、格式等）
-- `renderer.cmd_allocator` - 命令分配器（在 Renderer 上）
-
 
 ### 渲染管线架构
-- **Subpass** (`*_subpass.rs`): 封装着色器、描述符布局，实现 `RenderSubpass` trait
-- **Pass** (`*_pass.rs`): 协调命令记录、图像屏障，提供 `render()` 方法
 
-```rust
-// Subpass 示例（位于 truvis-render-graph/src/render_pipeline/）
-impl RenderSubpass for TriangleSubpass {}
-impl TriangleSubpass {
-    pub fn draw(&self, cmd: &GfxCommandBuffer, /* ... */) {
-        cmd.cmd_begin_rendering2(&rendering_info);
-        cmd.cmd_bind_pipeline(vk::PipelineBindPoint::GRAPHICS, self.pipeline.handle());
-        // 绘制...
-        cmd.end_rendering();
-    }
-}
+| 层级 | 文件模式 | 职责 |
+|------|----------|------|
+| Subpass | `*_subpass.rs` | 封装着色器、描述符布局，实现 `RenderSubpass` trait |
+| Pass | `*_pass.rs` | 命令记录、图像屏障、调用 subpass.draw() |
+
+
+## 🎨 着色器开发（Slang 优先）
+
+### 目录结构
+| 目录 | 用途 |
+|------|------|
+| `engine/shader/include/` | 共享头文件（`.slangi`）：结构体、全局绑定 |
+| `engine/shader/src/<pass>/` | 按渲染通道组织的着色器源码 |
+| `shader/build/` | 编译输出（SPIR-V） |
+
+### 全局描述符布局（三层绑定）
+定义于 [global_binding_sets.slangi](engine/shader/include/global_binding_sets.slangi)：
+```slang
+// set 0: 全局采样器
+[[vk::binding(0, 0)]] SamplerState global_samplers[];
+// set 1: Bindless 资源（需 NonUniformResourceIndex）
+[[vk::binding(0, 1)]] Sampler2D<float4> bindless_textures[];
+// set 2: 每帧数据
+[[vk::binding(0, 2)]] ConstantBuffer<PerFrameData> per_frame_data;
 ```
 
-
-## 🎨 着色器开发工作流
-
-### Slang 结构体自动绑定
+### Slang → Rust 自动绑定
+```slang
+// engine/shader/include/frame_data.slangi
+struct PerFrameData { float4x4 projection; float4x4 view; float3 camera_pos; uint time_ms; };
+```
 ```rust
-// shader/include/frame_data.slangi
-struct PerFrameData {
-    float4x4 projection;
-    float4x4 view;
-    float3 camera_pos;
-    uint time_ms;
-};
-
 // 自动生成到 truvis-shader-binding crate
 use truvis_shader_binding::truvisl::PerFrameData;
 ```
 
-### 描述符布局简化（关键宏）
+### 描述符布局宏
 ```rust
 #[shader_layout]  // 来自 truvis-descriptor-layout-macro
 struct MyLayout {
     #[binding = 0] uniforms: PerFrameData,
     #[texture(binding = 1)] diffuse: TextureHandle,
-    #[sampler(binding = 2)] sampler: SamplerHandle,
 }
 ```
 
-### 多编译器支持
-- **Slang**: `.slang` → `slangc` (主要使用，位于 `tools/slang/slangc.exe`)
-- **GLSL**: `.vert/.frag` → `glslc`  
-- **HLSL**: `.hlsl` → `dxc`
-- 输出: `shader/build/*.spv` (SPIR-V)
 
-## 📁 资源管理模式
+## 📁 资源管理
 
-### TruvisPath（统一路径管理）
+### TruvisPath
 ```rust
 use truvis_crate_tools::resource::TruvisPath;
 
-// 所有路径基于工作区根目录（通过 CARGO_MANIFEST_DIR 推导）
-let model = TruvisPath::assets_path("sponza.fbx");           // assets/sponza.fbx
-let texture = TruvisPath::resources_path("uv_checker.png");  // resources/uv_checker.png
-let shader = TruvisPath::shader_path("rt/raygen.slang.spv"); // shader/build/rt/raygen.slang.spv
+let model = TruvisPath::assets_path("sponza.fbx");           // assets/...
+let texture = TruvisPath::resources_path("uv_checker.png");  // resources/...
+let shader = TruvisPath::shader_path("rt/raygen.slang.spv"); // shader/build/...
 ```
 
-### 顶点数据创建（model-manager）
+### 顶点数据
 ```rust
 use truvis_model::shapes::triangle::TriangleSoA;
-use truvis_model::components::geometry::RtGeometry;
-
-// 内置几何体（已包含 GPU 缓冲区）
-let triangle: RtGeometry = TriangleSoA::create_mesh();
-
-// 通过 truvis-cxx + Assimp 加载模型（DLL 自动复制到 target/）
+let triangle: RtGeometry = TriangleSoA::create_mesh();  // 内置几何体
 ```
 
 ## 📐 关键约定
@@ -233,10 +217,10 @@ cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
 ### 添加新应用
 ```powershell
 # 1. 创建目录（位于 truvis-app/src/bin/）
-mkdir crates/truvis-app/src/bin/my_app/
+mkdir engine/crates/truvis-app/src/bin/my_app/
 
 # 2. 创建 main.rs，实现 OuterApp trait（参考上述模式）
-# 3. 如需新着色器，在 shader/src/ 添加 .slang 文件
+# 3. 如需新着色器，在 engine/shader/src/ 添加 .slang 文件
 # 4. 运行构建流程
 cargo run --bin shader-build
 cargo run --bin my_app
@@ -244,14 +228,14 @@ cargo run --bin my_app
 
 ### 创建新渲染管线
 ```rust
-// crates/truvis-render/truvis-render-graph/src/render_pipeline/my_subpass.rs
+// engine/crates/truvis-render/truvis-render-graph/src/render_pipeline/my_subpass.rs
 pub struct MySubpass {
     pipeline: GfxGraphicsPipeline,
     pipeline_layout: Rc<GfxPipelineLayout>,
 }
 impl RenderSubpass for MySubpass {}
 
-// crates/truvis-app/src/bin/my_app/my_pass.rs
+// engine/crates/truvis-app/src/bin/my_app/my_pass.rs
 impl MyPass {
     pub fn render(&self, render_context: &RenderContext, geometry: &RtGeometry) {
         let frame_label = render_context.frame_counter.frame_label();
@@ -271,7 +255,7 @@ impl MyPass {
 ```
 
 ### 集成新 C++ 库
-参考 `crates/truvis-cxx/build.rs` 的 CMake + DLL 复制模式：
+参考 `engine/crates/truvis-cxx/build.rs` 的 CMake + DLL 复制模式：
 ```rust
 // build.rs
 println!("cargo:rustc-link-search=native={}", cargo_build_dir.display());
@@ -344,4 +328,3 @@ fn draw(&self) { }
 // ✅ 正确：当前版本接收 RenderContext
 fn draw(&self, render_context: &RenderContext) { /* 通过 render_context 访问状态 */ }
 ```
-

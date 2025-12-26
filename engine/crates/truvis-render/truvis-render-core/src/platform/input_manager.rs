@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 
 use crate::platform::event::{ElementState, InputEvent, MouseButton};
 use crate::platform::input_state::InputState;
-use winit::event::WindowEvent;
 
 /// 输入管理器
 pub struct InputManager {
@@ -33,8 +32,7 @@ impl InputManager {
     }
 
     /// 处理窗口事件
-    pub fn handle_window_event(&mut self, event: &WindowEvent) {
-        let event = InputEvent::from_winit_event(event);
+    pub fn handle_window_event(&mut self, event: InputEvent) {
         self.events.push_back(event);
     }
 

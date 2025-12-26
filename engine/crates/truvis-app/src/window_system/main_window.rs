@@ -1,7 +1,7 @@
 use ash::vk;
 use winit::window::Window;
 
-use truvis_render_core::platform::event::InputEvent;
+use truvis_render_core::platform::winit_event_adapter::WinitEventAdapter;
 use truvis_render_core::present::gui_front::GuiHost;
 
 mod helper {}
@@ -31,7 +31,7 @@ impl MainWindow {}
 impl MainWindow {
     pub fn handle_event<T>(&mut self, event: &winit::event::Event<T>) {
         if let winit::event::Event::WindowEvent { event, .. } = event {
-            let input_event = InputEvent::from_winit_event(event);
+            let input_event = WinitEventAdapter::from_winit_event(event);
             self.gui_host.handle_event(&input_event);
         }
     }

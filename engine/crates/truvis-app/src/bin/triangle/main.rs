@@ -1,5 +1,5 @@
 use imgui::Ui;
-use truvis_app::app::TruvisApp;
+use truvis_app::app::WinitApp;
 use truvis_app::outer_app::OuterApp;
 use truvis_model::components::geometry::RtGeometry;
 use truvis_render_core::platform::camera::Camera;
@@ -11,18 +11,18 @@ use truvis_model::shapes::triangle::TriangleSoA;
 use truvis_render_core::core::renderer::Renderer;
 use truvis_render_graph::render_context::RenderContext;
 
+#[derive(Default)]
 struct HelloTriangle {
-    triangle_pipeline: TrianglePass,
-    triangle: RtGeometry,
+    triangle_pipeline: Option<TrianglePass>,
+    triangle: Option<RtGeometry>,
 }
 impl OuterApp for HelloTriangle {
-    fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {
+    fn init(&mut self, renderer: &mut Renderer, _camera: &mut Camera) {
         log::info!("hello triangle init.");
 
-        Self {
-            triangle_pipeline: TrianglePass::new(&renderer.render_context.frame_settings, &mut renderer.cmd_allocator),
-            triangle: TriangleSoA::create_mesh(),
-        }
+        self.triangle_pipeline =
+            Some(TrianglePass::new(&renderer.render_context.frame_settings, &mut renderer.cmd_allocator));
+        self.triangle = Some(TriangleSoA::create_mesh());
     }
 
     fn draw_ui(&mut self, _ui: &Ui) {
@@ -30,10 +30,11 @@ impl OuterApp for HelloTriangle {
     }
 
     fn draw(&self, render_context: &RenderContext) {
-        self.triangle_pipeline.render(render_context, &self.triangle);
+        self.triangle_pipeline.as_ref().unwrap().render(render_context, self.triangle.as_ref().unwrap());
     }
 }
 
 fn main() {
-    TruvisApp::<HelloTriangle>::run();
+    let outer_app = Box::new(HelloTriangle::default());
+    WinitApp::run(outer_app);
 }

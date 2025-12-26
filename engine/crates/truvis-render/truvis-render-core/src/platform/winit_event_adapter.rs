@@ -2,8 +2,9 @@ use crate::platform::event::{ElementState, InputEvent, KeyCode, MouseButton};
 use winit::event::{KeyEvent, WindowEvent};
 use winit::keyboard::PhysicalKey;
 
-impl InputEvent {
-    pub fn from_winit_event(event: &WindowEvent) -> Self {
+pub struct WinitEventAdapter {}
+impl WinitEventAdapter {
+    pub fn from_winit_event(event: &WindowEvent) -> InputEvent {
         match event {
             WindowEvent::CursorMoved { position, .. } => InputEvent::MouseMoved {
                 physical_position: [position.x, position.y],

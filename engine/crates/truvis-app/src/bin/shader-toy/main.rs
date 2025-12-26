@@ -1,5 +1,5 @@
 use imgui::Ui;
-use truvis_app::app::TruvisApp;
+use truvis_app::app::WinitApp;
 use truvis_app::outer_app::OuterApp;
 use truvis_model::components::geometry::RtGeometry;
 use truvis_render_core::platform::camera::Camera;
@@ -11,20 +11,18 @@ use truvis_model::shapes::rect::RectSoA;
 use truvis_render_core::core::renderer::Renderer;
 use truvis_render_graph::render_context::RenderContext;
 
+#[derive(Default)]
 struct ShaderToy {
-    rectangle: RtGeometry,
-    pipeline: ShaderToyPass,
+    rectangle: Option<RtGeometry>,
+    pipeline: Option<ShaderToyPass>,
 }
 impl OuterApp for ShaderToy {
-    fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {
+    fn init(&mut self, renderer: &mut Renderer, _camera: &mut Camera) {
         log::info!("shader toy.");
-        Self {
-            pipeline: ShaderToyPass::new(
-                renderer.render_context.frame_settings.color_format,
-                &mut renderer.cmd_allocator,
-            ),
-            rectangle: RectSoA::create_mesh(),
-        }
+
+        self.pipeline =
+            Some(ShaderToyPass::new(renderer.render_context.frame_settings.color_format, &mut renderer.cmd_allocator));
+        self.rectangle = Some(RectSoA::create_mesh());
     }
 
     fn draw_ui(&mut self, ui: &Ui) {
@@ -33,10 +31,11 @@ impl OuterApp for ShaderToy {
     }
 
     fn draw(&self, render_context: &RenderContext) {
-        self.pipeline.render(render_context, &self.rectangle);
+        self.pipeline.as_ref().unwrap().render(render_context, self.rectangle.as_ref().unwrap());
     }
 }
 
 fn main() {
-    TruvisApp::<ShaderToy>::run();
+    let outer_app = Box::new(ShaderToy::default());
+    WinitApp::run(outer_app);
 }

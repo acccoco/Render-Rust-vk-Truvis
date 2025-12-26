@@ -1,4 +1,4 @@
-use std::{cell::OnceCell, ffi::CStr, sync::OnceLock};
+use std::sync::OnceLock;
 
 use crate::outer_app::OuterApp;
 use crate::render_app::RenderApp;
@@ -7,9 +7,7 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use truvis_crate_tools::init_log::init_log;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::gfx::Gfx;
-use truvis_render_core::platform::event::InputEvent;
-use truvis_render_core::platform::input_manager::InputManager;
-use truvis_render_core::present::gui_front::GuiHost;
+use truvis_render_core::platform::winit_event_adapter::WinitEventAdapter;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::window::Window;
 use winit::{
@@ -26,36 +24,26 @@ pub fn panic_handler(info: &std::panic::PanicHookInfo) {
 
 pub struct UserEvent;
 
-pub struct TruvisApp<T: OuterApp> {
-    render_app: RenderApp<T>,
+pub struct WinitApp {
+    render_app: RenderApp,
 
-    window: OnceCell<Window>,
-    gui_host: GuiHost,
-    last_render_area: vk::Extent2D,
-
-    input_manager: InputManager,
+    window: Option<Window>,
 }
 // 总的 main 函数
-impl<T: OuterApp> TruvisApp<T> {
+impl WinitApp {
     /// 整个程序的入口
-    pub fn run() {
+    pub fn run(outer_app: Box<dyn OuterApp>) {
         std::panic::set_hook(Box::new(panic_handler));
 
         init_log();
         tracy_client::Client::start();
         tracy_client::set_thread_name!("MiaowThread");
 
-        // 创建输入管理器和计时器
-        let input_manager = InputManager::new();
-
         let event_loop = winit::event_loop::EventLoop::<UserEvent>::with_user_event().build().unwrap();
 
         let mut app = Self {
-            render_app: RenderApp::new(event_loop.display_handle().unwrap().as_raw()),
-            window: OnceCell::new(),
-            gui_host: GuiHost::new(),
-            last_render_area: Default::default(),
-            input_manager,
+            render_app: RenderApp::new(event_loop.display_handle().unwrap().as_raw(), outer_app),
+            window: None,
         };
         event_loop.run_app(&mut app).unwrap();
 
@@ -65,7 +53,7 @@ impl<T: OuterApp> TruvisApp<T> {
     }
 }
 // new & init
-impl<T: OuterApp> TruvisApp<T> {
+impl WinitApp {
     /// 在 window 创建之后调用，初始化 Renderer 和 GUI
     fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
         let window = Self::create_window(
@@ -76,19 +64,14 @@ impl<T: OuterApp> TruvisApp<T> {
                 height: 800,
             },
         );
-        self.gui_host.hidpi_factor = window.scale_factor();
-        self.render_app
-            .init_after_window(window.display_handle().unwrap().as_raw(), window.window_handle().unwrap().as_raw());
 
-        let (fonts_atlas, font_tex_id) = self.gui_host.init_font();
-        self.render_app.renderer.render_present.as_mut().unwrap().gui_backend.register_font(
-            &mut self.render_app.renderer.render_context.bindless_manager,
-            &mut self.render_app.renderer.render_context.gfx_resource_manager,
-            fonts_atlas,
-            font_tex_id,
+        self.render_app.init_after_window(
+            window.display_handle().unwrap().as_raw(),
+            window.window_handle().unwrap().as_raw(),
+            window.scale_factor(),
         );
 
-        self.window.set(window).map_err(|_| ()).unwrap();
+        self.window = Some(window);
     }
 
     fn create_window(event_loop: &ActiveEventLoop, window_title: String, window_extent: vk::Extent2D) -> Window {
@@ -116,70 +99,26 @@ impl<T: OuterApp> TruvisApp<T> {
     }
 }
 // update
-impl<T: OuterApp> TruvisApp<T> {
+impl WinitApp {
     fn update(&mut self) {
-        // Begin Frame ============================
-        if !self.render_app.time_to_render() {
-            return;
-        }
-        let elapsed = self.render_app.get_delta_time();
-
-        self.render_app.begin_frame();
-
-        // build Gui ==================================
-        {
-            let _span = tracy_client::span!("Update Gui");
-
-            self.gui_host.new_frame(
-                elapsed,
-                |ui, content_size| {
-                    let min_pos = ui.window_content_region_min();
-                    ui.set_cursor_pos([min_pos[0] + 5.0, min_pos[1] + 5.0]);
-                    ui.text(format!("FPS: {:.2}", 1.0 / elapsed.as_secs_f32()));
-                    ui.text(format!("size: {:.0}x{:.0}", content_size[0], content_size[1]));
-                },
-                |ui| self.render_app.build_ui(ui),
-            );
-        }
-
-        // Rendere Update ==================================
-        {
-            let _span = tracy_client::span!("Renderer Update");
-            self.last_render_area = self.gui_host.get_render_region().extent;
-            self.input_manager.update();
-            self.render_app.update_scene(self.input_manager.state(), self.last_render_area);
-        }
-
-        // Renderer: Render ================================
-        self.render_app.render(self.input_manager.state());
-
-        // Window: Draw Gui ===============================
-        {
-            let ui_draw_data = self.gui_host.compile_ui();
-            self.render_app.draw_to_window(ui_draw_data);
-        }
-
-        // End Frame ===================================
-        self.render_app.end_frame();
-
-        tracy_client::frame_mark();
+        self.render_app.big_update();
     }
 
     fn on_window_resized(&mut self, _width: u32, _height: u32) {
-        let window = self.window.get().unwrap();
+        let window = self.window.as_ref().unwrap();
         self.render_app
             .on_window_resized(window.display_handle().unwrap().as_raw(), window.window_handle().unwrap().as_raw());
     }
 }
 // destroy
-impl<T: OuterApp> TruvisApp<T> {
-    fn destroy(self) {
+impl WinitApp {
+    fn destroy(mut self) {
         self.render_app.destroy();
-        // window 没有必要 destroy，因为 RAII
+        self.window = None;
     }
 }
 // 各种 winit 的事件处理
-impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
+impl ApplicationHandler<UserEvent> for WinitApp {
     fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: StartCause) {
         // TODO 确认一下发送时机
         // TODO 可以在此处更新 timer
@@ -200,13 +139,10 @@ impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
-        let input_event = InputEvent::from_winit_event(&event);
-        self.gui_host.handle_event(&input_event);
+        let input_event = WinitEventAdapter::from_winit_event(&event);
+        self.render_app.handle_event(&input_event);
 
-        // FIXME 这一部分应该接收 imgui 的事件
-        // 使用InputManager处理窗口事件
-        self.input_manager.handle_window_event(&event);
-
+        // TODO 可以放到 render app 里面去处理，加入队列中
         match event {
             WindowEvent::CloseRequested => {
                 Gfx::get().wait_idel();
@@ -230,7 +166,7 @@ impl<T: OuterApp> ApplicationHandler<UserEvent> for TruvisApp<T> {
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        self.window.get().unwrap().request_redraw();
+        self.window.as_ref().unwrap().request_redraw();
     }
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
