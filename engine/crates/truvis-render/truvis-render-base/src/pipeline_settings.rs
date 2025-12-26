@@ -6,7 +6,9 @@ use ash::vk;
 pub struct DefaultRendererSettings;
 impl DefaultRendererSettings {
     pub const DEFAULT_SURFACE_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
-        format: vk::Format::R8G8B8A8_UNORM,
+        // shader 输出会被自动改变： liner -> sRGB
+        format: vk::Format::R8G8B8A8_SRGB,
+        // 通知 OS，将数值按照 sRGB 空间进行处理和显示
         color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
     };
     pub const DEFAULT_PRESENT_MODE: vk::PresentModeKHR = vk::PresentModeKHR::MAILBOX;
