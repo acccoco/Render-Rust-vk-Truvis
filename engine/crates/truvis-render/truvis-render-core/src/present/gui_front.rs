@@ -44,7 +44,7 @@ impl GuiHost {
         let hidpi_factor = self.hidpi_factor;
         let font_size = (13.0 * hidpi_factor) as f32;
 
-        let font_data = std::fs::read(TruvisPath::resources_path("mplus-1p-regular.ttf")).unwrap();
+        let font_data = std::fs::read(TruvisPath::resources_path_str("mplus-1p-regular.ttf")).unwrap();
         self.imgui_ctx.fonts().add_font(&[
             imgui::FontSource::DefaultFontData {
                 config: Some(imgui::FontConfig {

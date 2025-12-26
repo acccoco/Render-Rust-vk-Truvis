@@ -17,21 +17,25 @@ use std::{
 pub struct TruvisPath {}
 impl TruvisPath {
     /// 获取 `assets/` 目录下的文件路径
-    pub fn assets_path(filename: &str) -> String {
+    pub fn assets_path(filename: &str) -> std::path::PathBuf {
         let workspace_dir = Self::workspace_path();
-        let assets_path = workspace_dir.parent().unwrap().join("assets").join(filename);
-        assets_path.to_str().unwrap().to_string()
+        workspace_dir.parent().unwrap().join("assets").join(filename)
+    }
+    pub fn assets_path_str(filename: &str) -> String {
+        Self::assets_path(filename).to_str().unwrap().to_string()
     }
 
     /// 获取 `resources/` 目录下的文件路径
-    pub fn resources_path(filename: &str) -> String {
+    pub fn resources_path(filename: &str) -> std::path::PathBuf {
         let workspace_dir = Self::workspace_path();
-        let resources_path = workspace_dir.parent().unwrap().join("resources").join(filename);
-        resources_path.to_str().unwrap().to_string()
+        workspace_dir.parent().unwrap().join("resources").join(filename)
+    }
+    pub fn resources_path_str(filename: &str) -> String {
+        Self::resources_path(filename).to_str().unwrap().to_string()
     }
 
     /// 获取 `shader/.build/` 目录下的着色器路径（编译后的 SPIR-V）
-    pub fn shader_path(filename: &str) -> String {
+    pub fn shader_build_path_str(filename: &str) -> String {
         let workspace_dir = Self::workspace_path();
         let shader_path = workspace_dir.join("shader").join(".build").join(filename);
         let mut shader_build_path = shader_path.to_str().unwrap().to_string();

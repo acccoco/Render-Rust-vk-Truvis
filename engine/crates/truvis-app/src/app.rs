@@ -102,7 +102,7 @@ impl<T: OuterApp> TruvisApp<T> {
             winit::window::Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
         }
 
-        let icon_data = std::fs::read(TruvisPath::resources_path("DruvisIII.png")).expect("Failed to read icon file");
+        let icon_data = std::fs::read(TruvisPath::resources_path_str("DruvisIII.png")).expect("Failed to read icon file");
         let icon = load_icon(icon_data.as_ref());
         let window_attr = Window::default_attributes()
             .with_title(window_title)

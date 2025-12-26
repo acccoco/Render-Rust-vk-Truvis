@@ -45,7 +45,7 @@ impl SdrSubpass {
         let sdr_pass = ComputeSubpass::<truvisl::sdr::PushConstant>::new(
             render_descriptor_sets,
             c"main",
-            TruvisPath::shader_path("pass/pp/sdr.slang").as_str(),
+            TruvisPath::shader_build_path_str("pass/pp/sdr.slang").as_str(),
         );
 
         Self { sdr_pass }

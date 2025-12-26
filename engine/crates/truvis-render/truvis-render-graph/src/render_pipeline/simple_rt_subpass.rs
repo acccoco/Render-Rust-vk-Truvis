@@ -37,32 +37,32 @@ enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     RayGen: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::RAYGEN_KHR,
         entry_point: c"main_ray_gen",
-        path: TruvisPath::shader_path("rt/rt.slang"),
+        path: TruvisPath::shader_build_path_str("rt/rt.slang"),
     },
     SkyMiss: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::MISS_KHR,
         entry_point: c"sky_miss",
-        path: TruvisPath::shader_path("rt/rt.slang"),
+        path: TruvisPath::shader_build_path_str("rt/rt.slang"),
     },
     ShadowMiss: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::MISS_KHR,
         entry_point: c"shadow_miss",
-        path: TruvisPath::shader_path("rt/rt.slang"),
+        path: TruvisPath::shader_build_path_str("rt/rt.slang"),
     },
     ClosestHit: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::CLOSEST_HIT_KHR,
         entry_point: c"main_closest_hit",
-        path: TruvisPath::shader_path("rt/rt.slang"),
+        path: TruvisPath::shader_build_path_str("rt/rt.slang"),
     },
     TransAny: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::ANY_HIT_KHR,
         entry_point: c"trans_any",
-        path: TruvisPath::shader_path("rt/rt.slang"),
+        path: TruvisPath::shader_build_path_str("rt/rt.slang"),
     },
     DiffuseCall: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::CALLABLE_KHR,
         entry_point: c"diffuse_callable",
-        path: TruvisPath::shader_path("rt/rt.slang"),
+        path: TruvisPath::shader_build_path_str("rt/rt.slang"),
     },
 });
 

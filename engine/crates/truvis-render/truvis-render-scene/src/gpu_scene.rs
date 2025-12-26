@@ -131,8 +131,8 @@ impl GpuScene {
 // new & init
 impl GpuScene {
     pub fn new(gfx_resource_manager: &mut GfxResourceManager, bindless_manager: &mut BindlessManager) -> Self {
-        let sky_path = TruvisPath::resources_path("sky.jpg");
-        let uv_checker_path = TruvisPath::resources_path("uv_checker.png");
+        let sky_path = TruvisPath::resources_path_str("sky.jpg");
+        let uv_checker_path = TruvisPath::resources_path_str("uv_checker.png");
         let sky_image = ImageLoader::load_image(&PathBuf::from(&sky_path));
         let uv_checker_image = ImageLoader::load_image(&PathBuf::from(&uv_checker_path));
 

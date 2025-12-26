@@ -31,12 +31,12 @@ enumed_map!(ShaderStage<GfxShaderStageInfo>:{
     Vertex: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: c"main",
-        path: TruvisPath::shader_path("shadertoy-glsl/shadertoy.vert"),
+        path: TruvisPath::shader_build_path_str("shadertoy-glsl/shadertoy.vert"),
     },
     Fragment: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: c"main",
-        path: TruvisPath::shader_path("shadertoy-glsl/shadertoy.frag"),
+        path: TruvisPath::shader_build_path_str("shadertoy-glsl/shadertoy.frag"),
     },
 });
 

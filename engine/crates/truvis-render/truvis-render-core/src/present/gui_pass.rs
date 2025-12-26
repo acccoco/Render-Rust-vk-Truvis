@@ -28,12 +28,12 @@ enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: c"vsmain",
-        path: TruvisPath::shader_path("imgui/imgui.slang"),
+        path: TruvisPath::shader_build_path_str("imgui/imgui.slang"),
     },
     Fragment: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: c"psmain",
-        path: TruvisPath::shader_path("imgui/imgui.slang"),
+        path: TruvisPath::shader_build_path_str("imgui/imgui.slang"),
     },
 });
 

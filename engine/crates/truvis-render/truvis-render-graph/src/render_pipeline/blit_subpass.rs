@@ -45,7 +45,7 @@ impl BlitSubpass {
         let blit_pass = ComputeSubpass::<truvisl::blit::PushConstant>::new(
             render_descriptor_sets,
             c"main",
-            TruvisPath::shader_path("imgui/blit.slang").as_str(),
+            TruvisPath::shader_build_path_str("imgui/blit.slang").as_str(),
         );
 
         Self { blit_pass }

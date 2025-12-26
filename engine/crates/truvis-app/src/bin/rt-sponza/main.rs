@@ -1,6 +1,7 @@
 use imgui::Ui;
 use truvis_app::app::TruvisApp;
 use truvis_app::outer_app::OuterApp;
+use truvis_crate_tools::resource::TruvisPath;
 use truvis_render_core::core::renderer::Renderer;
 use truvis_render_core::model_loader::assimp_loader::AssimpSceneLoader;
 use truvis_render_core::platform::camera::Camera;
@@ -46,7 +47,7 @@ impl SponzaApp {
         // );
         log::info!("start load sponza scene");
         AssimpSceneLoader::load_scene(
-            std::path::Path::new("assets/blender/sponza.fbx"),
+            &TruvisPath::assets_path("blender/sponza.fbx"),
             &mut renderer.render_context.scene_manager,
             &mut renderer.asset_hub,
         );

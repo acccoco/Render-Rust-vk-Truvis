@@ -52,7 +52,7 @@ impl OuterApp for AsyncLoadTest {
         log::info!("Async Load Test init.");
 
         // Load a texture
-        let texture_path = TruvisPath::resources_path("uv_checker.png");
+        let texture_path = TruvisPath::resources_path_str("uv_checker.png");
         let texture_handle = renderer.asset_hub.load_texture(texture_path.into());
 
         Self {
