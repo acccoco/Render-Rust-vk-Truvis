@@ -61,9 +61,8 @@ pub struct GfxImage {
     extent: vk::Extent3D,
     format: vk::Format,
 
-    usage: vk::ImageUsageFlags,
+    _usage: vk::ImageUsageFlags,
 
-    #[cfg(debug_assertions)]
     name: String,
 }
 // getter
@@ -99,9 +98,8 @@ impl GfxImage {
             source: ImageSource::Allocated(alloc),
             extent: image_info.inner.extent,
             format: image_info.inner.format,
-            usage: image_info.inner.usage,
+            _usage: image_info.inner.usage,
 
-            #[cfg(debug_assertions)]
             name: debug_name.to_string(),
         };
         gfx_device.set_debug_name(&image, debug_name);

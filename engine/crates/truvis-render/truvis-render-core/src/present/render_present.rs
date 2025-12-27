@@ -1,5 +1,3 @@
-use crate::present::gui_backend::GuiBackend;
-use crate::present::gui_pass::GuiPass;
 use ash::vk;
 use imgui::DrawData;
 use itertools::Itertools;
@@ -9,6 +7,8 @@ use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
 use truvis_gfx::swapchain::render_swapchain::GfxRenderSwapchain;
+use truvis_gui_backend::gui_backend::GuiBackend;
+use truvis_gui_backend::gui_pass::GuiPass;
 use truvis_render_base::cmd_allocator::CmdAllocator;
 use truvis_render_base::frame_counter::FrameCounter;
 use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;

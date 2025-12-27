@@ -8,7 +8,7 @@ use truvis_shader_binding::truvisl;
 
 // Sampler manager
 pub struct RenderSamplerManager {
-    samplers: [GfxSampler; truvisl::ESamplerType__Count_ as usize],
+    _samplers: [GfxSampler; truvisl::ESamplerType__Count_ as usize],
 }
 
 impl RenderSamplerManager {
@@ -23,7 +23,7 @@ impl RenderSamplerManager {
         );
         Gfx::get().gfx_device().write_descriptor_sets(std::slice::from_ref(&write_sampler));
 
-        Self { samplers }
+        Self { _samplers: samplers }
     }
 
     fn create_sampler() -> [GfxSampler; truvisl::ESamplerType__Count_ as usize] {

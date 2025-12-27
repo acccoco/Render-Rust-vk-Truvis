@@ -18,8 +18,7 @@ pub struct GfxBuffer {
 
     debug_name: String,
 
-    #[cfg(debug_assertions)]
-    usage: vk::BufferUsageFlags,
+    _usage: vk::BufferUsageFlags,
 }
 impl DebugType for GfxBuffer {
     fn debug_type_name() -> &'static str {
@@ -103,8 +102,7 @@ impl GfxBuffer {
 
             debug_name: name.as_ref().to_string(),
 
-            #[cfg(debug_assertions)]
-            usage: buffer_usage,
+            _usage: buffer_usage,
         }
     }
 

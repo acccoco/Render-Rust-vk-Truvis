@@ -1,6 +1,6 @@
 //! 参考 imgui-rs-vulkan-renderer
 
-use crate::present::gui_mesh::GuiMesh;
+use crate::gui_mesh::GuiMesh;
 use imgui::{DrawData, FontAtlasTexture, TextureId};
 use std::collections::HashMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;

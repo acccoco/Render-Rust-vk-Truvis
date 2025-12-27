@@ -7,8 +7,6 @@ description = "基础的模型管理，提供了模型的基础定义"
 
 [dependencies]
 truvis-gfx = { workspace = true }
-truvis-cxx-binding = { workspace = true }
-truvis-asset = { workspace = true }
 
 ash = { workspace = true }
 glam = { workspace = true }

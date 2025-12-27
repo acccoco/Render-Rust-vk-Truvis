@@ -12,7 +12,6 @@ truvis-model = { workspace = true }
 truvis-shader-binding = { workspace = true }
 truvis-crate-tools = { workspace = true }
 truvis-asset = { workspace = true }
-truvis-resource = { workspace = true }
 truvis-render-base = { workspace = true }
 truvis-render-graph = { workspace = true }
 truvis-platform = { workspace = true }

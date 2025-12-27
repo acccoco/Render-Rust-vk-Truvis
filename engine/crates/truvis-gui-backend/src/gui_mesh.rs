@@ -1,4 +1,4 @@
-use crate::present::gui_vertex_layout::{ImGuiVertex, ImGuiVertexLayoutAoS};
+use crate::gui_vertex_layout::{ImGuiVertex, ImGuiVertexLayoutAoS};
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndexBuffer;
 use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexBuffer;
 use truvis_render_base::pipeline_settings::FrameLabel;

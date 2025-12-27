@@ -18,6 +18,7 @@ members = [
     "crates/truvis-render/truvis-render-base",
     "crates/truvis-render/truvis-render-scene",
     "crates/truvis-platform",
+    "crates/truvis-gui-backend",
 ]
 
 
@@ -39,6 +40,7 @@ truvis-render-graph = { path = "crates/truvis-render/truvis-render-graph" }
 truvis-render-base = { path = "crates/truvis-render/truvis-render-base" }
 truvis-render-scene = { path = "crates/truvis-render/truvis-render-scene" }
 truvis-platform = { path = "crates/truvis-platform" }
+truvis-gui-backend = { path = "crates/truvis-gui-backend" }
 
 
 # 图形相关的库

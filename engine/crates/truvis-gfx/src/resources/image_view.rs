@@ -95,7 +95,7 @@ pub struct GfxImageViewDesc {
     pub(crate) aspect_mask: vk::ImageAspectFlags,
     /// base mip level 和 mip level count
     pub(crate) mip: (u8, u8),
-    ///
+    /// base layer 和 layer count
     pub(crate) layer: (u8, u8),
 }
 impl GfxImageViewDesc {

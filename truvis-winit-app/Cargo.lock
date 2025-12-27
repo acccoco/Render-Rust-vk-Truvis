@@ -2524,7 +2524,6 @@ dependencies = [
  "truvis-render-base",
  "truvis-render-core",
  "truvis-render-graph",
- "truvis-resource",
  "truvis-shader-binding",
 ]
 
@@ -2600,6 +2599,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "truvis-gui-backend"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "bytemuck",
+ "glam",
+ "imgui",
+ "itertools 0.10.5",
+ "log",
+ "truvis-crate-tools",
+ "truvis-gfx",
+ "truvis-render-base",
+ "truvis-render-graph",
+ "truvis-resource",
+ "truvis-shader-binding",
+]
+
+[[package]]
 name = "truvis-model"
 version = "0.1.0"
 dependencies = [
@@ -2609,8 +2626,6 @@ dependencies = [
  "itertools 0.10.5",
  "slotmap",
  "tracy-client",
- "truvis-asset",
- "truvis-cxx-binding",
  "truvis-gfx",
 ]
 
@@ -2648,9 +2663,9 @@ dependencies = [
  "raw-window-handle",
  "tracy-client",
  "truvis-asset",
- "truvis-crate-tools",
  "truvis-cxx-binding",
  "truvis-gfx",
+ "truvis-gui-backend",
  "truvis-model",
  "truvis-platform",
  "truvis-render-base",

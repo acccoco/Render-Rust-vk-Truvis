@@ -114,7 +114,7 @@ impl AssetUploadManager {
         let target_value = self.next_timeline_value;
         self.next_timeline_value += 1;
 
-        let submit_info = GfxSubmitInfo::new(&[command_buffer.clone()]).signal(
+        let submit_info = GfxSubmitInfo::new(std::slice::from_ref(&command_buffer)).signal(
             &self.timeline_semaphore,
             vk::PipelineStageFlags2::ALL_COMMANDS,
             Some(target_value),

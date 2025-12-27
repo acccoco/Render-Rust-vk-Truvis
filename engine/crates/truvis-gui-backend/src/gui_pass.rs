@@ -1,12 +1,11 @@
-use std::collections::HashMap;
-use std::rc::Rc;
-use truvis_crate_tools::count_indexed_array;
-
-use crate::present::gui_mesh::GuiMesh;
-use crate::present::gui_vertex_layout::ImGuiVertexLayoutAoS;
+use crate::gui_mesh::GuiMesh;
+use crate::gui_vertex_layout::ImGuiVertexLayoutAoS;
 use ash::vk;
 use imgui::TextureId;
 use itertools::Itertools;
+use std::collections::HashMap;
+use std::rc::Rc;
+use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::layout::GfxVertexLayout;

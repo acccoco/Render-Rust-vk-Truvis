@@ -1,0 +1,23 @@
+[package]
+name = "truvis-gui-backend"
+version = "0.1.0"
+edition = "2024"
+description = "imgui GUI 后端实现"
+
+
+[dependencies]
+truvis-gfx = { workspace = true }
+truvis-render-base = { workspace = true }
+truvis-resource = { workspace = true }
+truvis-crate-tools = { workspace = true }
+truvis-render-graph = { workspace = true }
+truvis-shader-binding = { workspace = true }
+
+
+imgui = { workspace = true }
+ash = { workspace = true }
+itertools = { workspace = true }
+glam = { workspace = true }
+bytemuck = { workspace = true }
+log = { workspace = true }
+

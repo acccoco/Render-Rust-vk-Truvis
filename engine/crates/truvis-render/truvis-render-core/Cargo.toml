@@ -13,8 +13,8 @@ truvis-render-base = { workspace = true }
 truvis-render-scene = { workspace = true }
 truvis-model = { workspace = true }
 truvis-cxx-binding = { workspace = true }
-truvis-crate-tools = { workspace = true }
 truvis-platform = { workspace = true }
+truvis-gui-backend = { workspace = true }
 
 
 # 默认 features：

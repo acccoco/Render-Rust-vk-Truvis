@@ -1,6 +1,6 @@
 #[derive(Debug)]
 pub struct Timer {
-    start_time: std::time::Instant,
+    _start_time: std::time::Instant,
     last_tick: std::time::Instant,
 
     delta_time: std::time::Duration,
@@ -11,7 +11,7 @@ impl Default for Timer {
     fn default() -> Self {
         let now = std::time::Instant::now();
         Self {
-            start_time: now,
+            _start_time: now,
             last_tick: now,
             delta_time: std::time::Duration::ZERO,
             total_time: std::time::Duration::ZERO,

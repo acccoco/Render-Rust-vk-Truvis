@@ -35,8 +35,7 @@ pub struct GfxCommandBuffer {
     vk_handle: vk::CommandBuffer,
     _command_pool_handle: vk::CommandPool,
 
-    #[cfg(debug_assertions)]
-    name: String,
+    _name: String,
 }
 // new & init
 impl GfxCommandBuffer {
@@ -51,8 +50,7 @@ impl GfxCommandBuffer {
             vk_handle: command_buffer,
             _command_pool_handle: command_pool.handle(),
 
-            #[cfg(debug_assertions)]
-            name: debug_name.to_string(),
+            _name: debug_name.to_string(),
         };
         Gfx::get().gfx_device().set_debug_name(&cmd_buffer, debug_name);
         cmd_buffer
