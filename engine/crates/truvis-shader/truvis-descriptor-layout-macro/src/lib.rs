@@ -59,6 +59,7 @@ pub fn derive_descriptor_binding(input: TokenStream) -> TokenStream {
         impl #struct_name {
             #(
                 pub fn #method_names() -> &'static truvis_descriptor_layout_trait::DescriptorBindingItem {
+                    // OnceLock 的开销：get 大约是 1~3 cycles
                     static CURSOR: std::sync::OnceLock<truvis_descriptor_layout_trait::DescriptorBindingItem> = std::sync::OnceLock::new();
                     CURSOR.get_or_init(|| truvis_descriptor_layout_trait::DescriptorBindingItem{
                         name: stringify!(#field_names).trim_matches('_'),

@@ -1,6 +1,6 @@
+use crate::outer_app::OuterApp;
+use crate::outer_app::async_load_test::async_pass::AsyncPass;
 use imgui::Ui;
-use truvis_app::app::WinitApp;
-use truvis_app::outer_app::OuterApp;
 use truvis_asset::handle::AssetTextureHandle;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
@@ -8,13 +8,10 @@ use truvis_model::components::geometry::RtGeometry;
 use truvis_model::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render_core::core::renderer::Renderer;
 use truvis_render_core::platform::camera::Camera;
-
-mod async_pass;
-use async_pass::AsyncPass;
 use truvis_render_graph::render_context::RenderContext;
 
 #[derive(Default)]
-struct AsyncLoadTest {
+pub struct AsyncLoadTest {
     pipeline: Option<AsyncPass>,
     quad: Option<RtGeometry>,
     texture_handle: Option<AssetTextureHandle>,
@@ -75,9 +72,4 @@ impl OuterApp for AsyncLoadTest {
         //
         // self.pipeline.render(&self.quad, texture_id);
     }
-}
-
-fn main() {
-    let outer_app = Box::new(AsyncLoadTest::default());
-    WinitApp::run(outer_app);
 }

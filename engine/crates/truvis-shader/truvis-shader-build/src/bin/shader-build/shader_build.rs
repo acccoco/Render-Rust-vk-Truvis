@@ -8,9 +8,8 @@ impl EnvPath {
     pub fn shader_src_path() -> &'static std::path::Path {
         static P: OnceLock<std::path::PathBuf> = OnceLock::new();
         P.get_or_init(|| {
-            let mut p = TruvisPath::workspace_path();
-            p.extend(["shader", "src"]);
-            p
+            let p = TruvisPath::shader_root_path();
+            p.join("src")
         })
     }
 
@@ -18,9 +17,8 @@ impl EnvPath {
     pub fn shader_build_path() -> &'static std::path::Path {
         static P: OnceLock<std::path::PathBuf> = OnceLock::new();
         P.get_or_init(|| {
-            let mut p = TruvisPath::workspace_path();
-            p.extend(["shader", ".build"]);
-            p
+            let p = TruvisPath::shader_root_path();
+            p.join(".build")
         })
     }
 
@@ -28,9 +26,8 @@ impl EnvPath {
     pub fn shader_include_path() -> &'static std::path::Path {
         static P: OnceLock<std::path::PathBuf> = OnceLock::new();
         P.get_or_init(|| {
-            let mut p = TruvisPath::workspace_path();
-            p.extend(["shader", "include"]);
-            p
+            let p = TruvisPath::shader_root_path();
+            p.join("include")
         })
     }
 

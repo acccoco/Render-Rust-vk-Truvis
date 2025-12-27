@@ -1,18 +1,14 @@
+use crate::outer_app::OuterApp;
+use crate::outer_app::shader_toy::shader_toy_pass::ShaderToyPass;
 use imgui::Ui;
-use truvis_app::app::WinitApp;
-use truvis_app::outer_app::OuterApp;
 use truvis_model::components::geometry::RtGeometry;
-use truvis_render_core::platform::camera::Camera;
-
-mod shader_toy_pass;
-
-use shader_toy_pass::ShaderToyPass;
 use truvis_model::shapes::rect::RectSoA;
 use truvis_render_core::core::renderer::Renderer;
+use truvis_render_core::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
 
 #[derive(Default)]
-struct ShaderToy {
+pub struct ShaderToy {
     rectangle: Option<RtGeometry>,
     pipeline: Option<ShaderToyPass>,
 }
@@ -33,9 +29,4 @@ impl OuterApp for ShaderToy {
     fn draw(&self, render_context: &RenderContext) {
         self.pipeline.as_ref().unwrap().render(render_context, self.rectangle.as_ref().unwrap());
     }
-}
-
-fn main() {
-    let outer_app = Box::new(ShaderToy::default());
-    WinitApp::run(outer_app);
 }

@@ -1,14 +1,20 @@
+use crate::gui_front::GuiHost;
 use crate::outer_app::OuterApp;
 use crate::platform::camera_controller::CameraController;
 use ash::vk;
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use std::ffi::CStr;
+use truvis_crate_tools::init_log::init_log;
 use truvis_gfx::gfx::Gfx;
+use truvis_platform::input_event::InputEvent;
+use truvis_platform::input_manager::InputManager;
+use truvis_platform::input_state::InputState;
 use truvis_render_core::core::renderer::Renderer;
-use truvis_render_core::platform::event::InputEvent;
-use truvis_render_core::platform::input_manager::InputManager;
-use truvis_render_core::platform::input_state::InputState;
-use truvis_render_core::present::gui_front::GuiHost;
+
+pub fn panic_handler(info: &std::panic::PanicHookInfo) {
+    log::error!("{}", info);
+    // std::thread::sleep(std::time::Duration::from_secs(30));
+}
 
 pub struct RenderApp {
     pub renderer: Renderer,
@@ -64,6 +70,15 @@ impl RenderApp {
             fonts_atlas,
             font_tex_id,
         );
+    }
+
+    pub fn init_env() {
+        std::panic::set_hook(Box::new(panic_handler));
+
+        init_log();
+
+        tracy_client::Client::start();
+        tracy_client::set_thread_name!("RenderThread");
     }
 }
 // destroy

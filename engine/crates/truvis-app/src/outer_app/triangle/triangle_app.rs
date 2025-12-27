@@ -1,18 +1,14 @@
+use crate::outer_app::OuterApp;
+use crate::outer_app::triangle::triangle_pass::TrianglePass;
 use imgui::Ui;
-use truvis_app::app::WinitApp;
-use truvis_app::outer_app::OuterApp;
 use truvis_model::components::geometry::RtGeometry;
-use truvis_render_core::platform::camera::Camera;
-
-mod triangle_pass;
-
-use triangle_pass::TrianglePass;
 use truvis_model::shapes::triangle::TriangleSoA;
 use truvis_render_core::core::renderer::Renderer;
+use truvis_render_core::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
 
 #[derive(Default)]
-struct HelloTriangle {
+pub struct HelloTriangle {
     triangle_pipeline: Option<TrianglePass>,
     triangle: Option<RtGeometry>,
 }
@@ -32,9 +28,4 @@ impl OuterApp for HelloTriangle {
     fn draw(&self, render_context: &RenderContext) {
         self.triangle_pipeline.as_ref().unwrap().render(render_context, self.triangle.as_ref().unwrap());
     }
-}
-
-fn main() {
-    let outer_app = Box::new(HelloTriangle::default());
-    WinitApp::run(outer_app);
 }

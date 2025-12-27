@@ -2,6 +2,12 @@ use truvis_render_core::core::renderer::Renderer;
 use truvis_render_core::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
 
+pub mod async_load_test;
+pub mod cornell_app;
+pub mod shader_toy;
+pub mod sponza_app;
+pub mod triangle;
+
 /// 外部应用接口 trait
 ///
 /// 定义应用生命周期的关键钩子函数。所有自定义应用需实现此 trait。
@@ -14,7 +20,7 @@ use truvis_render_graph::render_context::RenderContext;
 ///     fn init(renderer: &mut Renderer, camera: &mut Camera) -> Self {
 ///         Self { pipeline: MyPipeline::new() }
 ///     }
-///     
+///
 ///     fn draw(&self) {
 ///         self.pipeline.render();
 ///     }

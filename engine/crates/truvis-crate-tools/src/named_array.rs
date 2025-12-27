@@ -15,6 +15,7 @@ macro_rules! enumed_map {
 
             // 获取数组的静态方法
             fn get_array() -> &'static [$vtype; Self::COUNT] {
+                // OnceLock 的开销：get 大约是 1~3 cycles
                 // 使用 OnceLock 实现延迟初始化的静态数组
                 static ARRAY: std::sync::OnceLock<[$vtype; { count_indexed_array!($($variant),*) }]> = std::sync::OnceLock::new();
 

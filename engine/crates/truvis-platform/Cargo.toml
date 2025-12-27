@@ -1,0 +1,9 @@
+[package]
+name = "truvis-platform"
+version = "0.1.0"
+edition = "2024"
+description = "Truvis 的平台抽象，和具体的平台无关"
+
+
+[dependencies]
+

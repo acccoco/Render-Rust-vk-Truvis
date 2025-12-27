@@ -1,7 +1,7 @@
-use crate::platform::event::{ElementState, InputEvent, MouseButton};
 use ash::vk;
 use imgui::{DrawData, FontAtlasTexture, TextureId};
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_platform::input_event::{ElementState, InputEvent, MouseButton};
 
 const FONT_TEXTURE_ID: usize = 0;
 const RENDER_IMAGE_ID: usize = 1;

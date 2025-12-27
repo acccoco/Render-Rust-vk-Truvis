@@ -1,6 +1,6 @@
+use truvis_platform::input_event::KeyCode;
+use truvis_platform::input_state::InputState;
 use truvis_render_core::platform::camera::Camera;
-use truvis_render_core::platform::event::KeyCode;
-use truvis_render_core::platform::input_state::InputState;
 
 pub struct CameraController {
     camera: Camera,

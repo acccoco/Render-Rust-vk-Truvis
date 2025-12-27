@@ -15,6 +15,7 @@ truvis-asset = { workspace = true }
 truvis-resource = { workspace = true }
 truvis-render-base = { workspace = true }
 truvis-render-graph = { workspace = true }
+truvis-platform = { workspace = true }
 
 log = { workspace = true }
 ash = { workspace = true }
@@ -22,10 +23,7 @@ glam = { workspace = true }
 bytemuck = { workspace = true }
 itertools = { workspace = true }
 ash-window = { workspace = true }
-winit = { workspace = true }
 imgui = { workspace = true }
-imgui-winit-support = { workspace = true }
 raw-window-handle = { workspace = true }
 tracy-client = { workspace = true }
-image = { workspace = true }
 

@@ -1,13 +1,8 @@
-use std::sync::OnceLock;
-
-use crate::outer_app::OuterApp;
-use crate::render_app::RenderApp;
-use ash::vk;
+use crate::winit_event_adapter::WinitEventAdapter;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use truvis_crate_tools::init_log::init_log;
-use truvis_crate_tools::resource::TruvisPath;
-use truvis_gfx::gfx::Gfx;
-use truvis_render_core::platform::winit_event_adapter::WinitEventAdapter;
+use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
+use truvis_app::outer_app::OuterApp;
+use truvis_app::render_app::RenderApp;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::window::Window;
 use winit::{
@@ -16,11 +11,6 @@ use winit::{
     event_loop::ActiveEventLoop,
     window::WindowId,
 };
-
-pub fn panic_handler(info: &std::panic::PanicHookInfo) {
-    log::error!("{}", info);
-    // std::thread::sleep(std::time::Duration::from_secs(30));
-}
 
 pub struct UserEvent;
 
@@ -33,18 +23,15 @@ pub struct WinitApp {
 impl WinitApp {
     /// 整个程序的入口
     pub fn run(outer_app: Box<dyn OuterApp>) {
-        std::panic::set_hook(Box::new(panic_handler));
-
-        init_log();
-        tracy_client::Client::start();
-        tracy_client::set_thread_name!("MiaowThread");
+        RenderApp::init_env();
 
         let event_loop = winit::event_loop::EventLoop::<UserEvent>::with_user_event().build().unwrap();
 
         let mut app = Self {
-            render_app: RenderApp::new(event_loop.display_handle().unwrap().as_raw(), outer_app),
+            render_app: RenderApp::new(event_loop.raw_display_handle().unwrap(), outer_app),
             window: None,
         };
+
         event_loop.run_app(&mut app).unwrap();
 
         log::info!("end run.");
@@ -56,25 +43,18 @@ impl WinitApp {
 impl WinitApp {
     /// 在 window 创建之后调用，初始化 Renderer 和 GUI
     fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
-        let window = Self::create_window(
-            event_loop,
-            "Truvis".to_string(),
-            vk::Extent2D {
-                width: 1200,
-                height: 800,
-            },
-        );
+        let window = Self::create_window(event_loop, "Truvis".to_string(), [1200.0, 800.0]);
 
         self.render_app.init_after_window(
-            window.display_handle().unwrap().as_raw(),
-            window.window_handle().unwrap().as_raw(),
+            window.raw_display_handle().unwrap(),
+            window.raw_window_handle().unwrap(),
             window.scale_factor(),
         );
 
         self.window = Some(window);
     }
 
-    fn create_window(event_loop: &ActiveEventLoop, window_title: String, window_extent: vk::Extent2D) -> Window {
+    fn create_window(event_loop: &ActiveEventLoop, window_title: String, window_extent: [f64; 2]) -> Window {
         fn load_icon(bytes: &[u8]) -> winit::window::Icon {
             let (icon_rgba, icon_width, icon_height) = {
                 let image = image::load_from_memory(bytes).unwrap().into_rgba8();
@@ -85,15 +65,14 @@ impl WinitApp {
             winit::window::Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
         }
 
-        let icon_data =
-            std::fs::read(TruvisPath::resources_path_str("DruvisIII.png")).expect("Failed to read icon file");
+        let icon_data = std::fs::read("../resources/DruvisIII.png").expect("Failed to read icon file");
         let icon = load_icon(icon_data.as_ref());
         let window_attr = Window::default_attributes()
             .with_title(window_title)
             .with_window_icon(Some(icon.clone()))
             .with_taskbar_icon(Some(icon.clone()))
             .with_transparent(true)
-            .with_inner_size(winit::dpi::LogicalSize::new(window_extent.width as f64, window_extent.height as f64));
+            .with_inner_size(winit::dpi::LogicalSize::new(window_extent[0], window_extent[1]));
 
         event_loop.create_window(window_attr).unwrap()
     }
@@ -126,12 +105,11 @@ impl ApplicationHandler<UserEvent> for WinitApp {
 
     // 建议在这里创建 window 和 Renderer
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        static INIT_FLAG: OnceLock<bool> = OnceLock::new();
+        assert!(self.window.is_none(), "window should be None when resumed.");
 
         log::info!("winit event: resumed");
 
         self.init_after_window(event_loop);
-        INIT_FLAG.set(true).unwrap();
     }
 
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: UserEvent) {
@@ -145,7 +123,6 @@ impl ApplicationHandler<UserEvent> for WinitApp {
         // TODO 可以放到 render app 里面去处理，加入队列中
         match event {
             WindowEvent::CloseRequested => {
-                Gfx::get().wait_idel();
                 event_loop.exit();
             }
             WindowEvent::Resized(new_size) => {

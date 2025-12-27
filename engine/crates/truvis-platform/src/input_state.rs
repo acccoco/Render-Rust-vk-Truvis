@@ -1,4 +1,4 @@
-use crate::platform::event::KeyCode;
+use crate::input_event::KeyCode;
 use std::collections::HashMap;
 
 /// 记录输入信息

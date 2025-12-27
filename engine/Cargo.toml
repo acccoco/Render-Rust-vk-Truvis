@@ -17,6 +17,7 @@ members = [
     "crates/truvis-render/truvis-render-graph",
     "crates/truvis-render/truvis-render-base",
     "crates/truvis-render/truvis-render-scene",
+    "crates/truvis-platform",
 ]
 
 
@@ -37,6 +38,7 @@ truvis-render-core = { path = "crates/truvis-render/truvis-render-core" }
 truvis-render-graph = { path = "crates/truvis-render/truvis-render-graph" }
 truvis-render-base = { path = "crates/truvis-render/truvis-render-base" }
 truvis-render-scene = { path = "crates/truvis-render/truvis-render-scene" }
+truvis-platform = { path = "crates/truvis-platform" }
 
 
 # 图形相关的库
@@ -49,15 +51,12 @@ glam = { version = "0.22.0", features = ["bytemuck", "rand", "serde", "bytemuck"
 vk-mem = "0.4.0"
 
 
-
 # 窗口和 UI
 ###################################################
 # create vk surface using window handle
 ash-window = "0.13.0"
 
 # window create & event loop
-winit = "0.30.8"
-imgui-winit-support = "0.13.0"
 imgui = { version = "0.12.0", features = ["docking"] }
 
 # 让 winit 可以和图形库通信
@@ -105,7 +104,6 @@ tracy-client = "0.18.3"
 
 # 编译相关
 ######################################################
-cmake = "0.1.54"
 bindgen = "0.72.1"
 
 
@@ -120,23 +118,13 @@ proc-macro2 = "1.0"
 # 语言便利性工具
 ######################################################
 # 各种自动的 macro
-derive-getters = "0.2.0"
-derive-new = "0.5.9"
-derive_setters = "0.1.5"
-derive_builder = "0.12.0"
 bytemuck = { version = "1.16.0", features = ["derive"] }
 
 # 允许超过 2 个 iter 进行 zip
 itertools = "0.10.5"
 
-# 允许更灵活的 static 变量
-static_init = "1.0.3"
-
 # 方便的初始化 array 的方法
 array-init = "2.1.0"
-
-# 根据字面量创建 CStr
-# cstr = "0.2.11"
 
 # 序列化和反序列化
 serde = "1.0.152"

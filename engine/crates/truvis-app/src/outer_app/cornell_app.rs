@@ -1,6 +1,5 @@
+use crate::outer_app::OuterApp;
 use imgui::Ui;
-use truvis_app::app::WinitApp;
-use truvis_app::outer_app::OuterApp;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_render_core::core::renderer::Renderer;
 use truvis_render_core::model_loader::assimp_loader::AssimpSceneLoader;
@@ -10,7 +9,7 @@ use truvis_render_graph::render_pipeline::rt_pass::RtRenderPass;
 use truvis_shader_binding::truvisl;
 
 #[derive(Default)]
-struct CornellApp {
+pub struct CornellApp {
     rt_pipeline: Option<RtRenderPass>,
 }
 
@@ -71,9 +70,4 @@ impl OuterApp for CornellApp {
     fn draw(&self, render_context: &RenderContext) {
         self.rt_pipeline.as_ref().unwrap().render(render_context);
     }
-}
-
-fn main() {
-    let outer_app = Box::new(CornellApp::default());
-    WinitApp::run(outer_app);
 }

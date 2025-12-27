@@ -1,7 +1,6 @@
+use crate::input_event::{ElementState, InputEvent, MouseButton};
+use crate::input_state::InputState;
 use std::collections::VecDeque;
-
-use crate::platform::event::{ElementState, InputEvent, MouseButton};
-use crate::platform::input_state::InputState;
 
 /// 输入管理器
 pub struct InputManager {

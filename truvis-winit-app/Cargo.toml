@@ -1,0 +1,16 @@
+[package]
+name = "truvis-winit-app"
+version = "0.1.0"
+edition = "2024"
+description = "app"
+
+
+[dependencies]
+truvis-app = { path = "../engine/crates/truvis-app" }
+truvis-platform = { path = "../engine/crates/truvis-platform" }
+
+log = "0.4.0"
+winit = "0.30.8"
+tracy-client = "0.18.3"
+image = "0.25.6"
+raw-window-handle = "0.6.2"
