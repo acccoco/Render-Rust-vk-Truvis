@@ -23,7 +23,6 @@ pub struct GuiBackend {
     /// 存放多帧 imgui 的 mesh 数据
     pub gui_meshes: [GuiMesh; FrameCounter::fif_count()],
 
-    render_texture_handle: Option<GfxTextureHandle>,
     font_texture_handle: Option<GfxTextureHandle>,
     font_tex_id: TextureId,
 
@@ -39,7 +38,6 @@ impl GuiBackend {
 
         Self {
             gui_meshes,
-            render_texture_handle: None,
             font_texture_handle: None,
             font_tex_id: TextureId::new(0),
             cmds,
@@ -67,10 +65,6 @@ impl GuiBackend {
 }
 // tools
 impl GuiBackend {
-    pub fn register_render_texture(&mut self, texture_handle: GfxTextureHandle) {
-        self.render_texture_handle = Some(texture_handle);
-    }
-
     // TODO 这个函数设计的非常别扭
     /// # Phase: Render
     ///
@@ -82,9 +76,9 @@ impl GuiBackend {
         self.gui_meshes[*frame_label].fill_index_buffer(draw_data);
         Gfx::get().gfx_queue().end_label();
 
-        self.tex_map = HashMap::from([
-            (imgui::TextureId::new(RENDER_IMAGE_ID), self.render_texture_handle.unwrap()),
-            (imgui::TextureId::new(FONT_TEXTURE_ID) as imgui::TextureId, self.font_texture_handle.unwrap()),
-        ]);
+        self.tex_map = HashMap::from([(
+            imgui::TextureId::new(FONT_TEXTURE_ID) as imgui::TextureId,
+            self.font_texture_handle.unwrap(),
+        )]);
     }
 }

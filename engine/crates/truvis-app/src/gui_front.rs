@@ -9,9 +9,6 @@ const RENDER_IMAGE_ID: usize = 1;
 pub struct GuiHost {
     pub imgui_ctx: imgui::Context,
     pub hidpi_factor: f64,
-
-    /// 3D 渲染的区域
-    pub render_region: vk::Rect2D,
 }
 // new & init
 impl Default for GuiHost {
@@ -30,12 +27,12 @@ impl GuiHost {
         {
             let style = imgui_ctx.style_mut();
             style.use_dark_colors();
-            style.colors[imgui::StyleColor::WindowBg as usize] = [1.0, 0.0, 0.0, 1.0];
+            // WindowBg: 半透明深色背景
+            style.colors[imgui::StyleColor::WindowBg as usize] = [0.1, 0.1, 0.1, 0.9];
         }
 
         Self {
             imgui_ctx,
-            render_region: Default::default(),
             hidpi_factor: 1.0,
         }
     }
@@ -77,13 +74,6 @@ impl GuiHost {
         (atlas_texture, imgui::TextureId::new(FONT_TEXTURE_ID))
     }
 }
-// getters
-impl GuiHost {
-    #[inline]
-    pub fn get_render_region(&self) -> vk::Rect2D {
-        self.render_region
-    }
-}
 // update
 impl GuiHost {
     pub fn handle_event(&mut self, event: &InputEvent) {
@@ -113,8 +103,13 @@ impl GuiHost {
         }
     }
 
-    /// # Phase: Update
-    pub fn new_frame(
+    pub fn new_frame(&mut self, duration: std::time::Duration, ui_func: impl FnOnce(&imgui::Ui)) {
+        self.imgui_ctx.io_mut().update_delta_time(duration);
+        let ui = self.imgui_ctx.new_frame();
+        ui_func(ui);
+    }
+
+    pub fn new_frame_dock(
         &mut self,
         duration: std::time::Duration,
         ui_build_func_main: impl FnOnce(&imgui::Ui, [f32; 2]),
@@ -213,14 +208,14 @@ impl GuiHost {
                     // let hidpi_factor = self.platform.hidpi_factor() as f32;
                     let hidpi_factor = 1.0;
 
-                    self.render_region.offset = vk::Offset2D {
-                        x: (window_pos[0] * hidpi_factor) as i32,
-                        y: (window_pos[1] * hidpi_factor) as i32,
-                    };
-                    self.render_region.extent = vk::Extent2D {
-                        width: (window_size[0] * hidpi_factor) as u32,
-                        height: (window_size[1] * hidpi_factor) as u32,
-                    };
+                    // self.render_region.offset = vk::Offset2D {
+                    //     x: (window_pos[0] * hidpi_factor) as i32,
+                    //     y: (window_pos[1] * hidpi_factor) as i32,
+                    // };
+                    // self.render_region.extent = vk::Extent2D {
+                    //     width: (window_size[0] * hidpi_factor) as u32,
+                    //     height: (window_size[1] * hidpi_factor) as u32,
+                    // };
 
                     imgui::Image::new(imgui::TextureId::new(RENDER_IMAGE_ID), [window_size[0], window_size[1]])
                         .build(ui);
@@ -238,8 +233,8 @@ impl GuiHost {
                 ui.text(format!("Root Node Size: ({:.1},{:.1})", root_size.x, root_size.y));
 
                 ui.text(format!("Hidpi Factor: {}", self.hidpi_factor));
-                ui.text(format!("Window Size: ({:?})", self.render_region.extent));
-                ui.text(format!("Window Position: ({:?})", self.render_region.offset));
+                // ui.text(format!("Window Size: ({:?})", self.render_region.extent));
+                // ui.text(format!("Window Position: ({:?})", self.render_region.offset));
                 ui.new_line();
 
                 ui_build_func_right(ui);
@@ -247,13 +242,13 @@ impl GuiHost {
         }
     }
 
-    pub fn compile_ui(&mut self) -> Option<&DrawData> {
-        let draw_data = self.imgui_ctx.render();
-        if draw_data.total_vtx_count == 0 { None } else { Some(draw_data) }
+    pub fn compile_ui(&mut self) {
+        self.imgui_ctx.render();
     }
 
     /// 确保之前调用过 compile_ui
-    pub fn get_render_data(&self) -> &DrawData {
-        unsafe { &*(imgui::sys::igGetDrawData() as *mut DrawData) }
+    pub fn get_render_data(&self) -> Option<&DrawData> {
+        let draw_data = unsafe { &*(imgui::sys::igGetDrawData() as *mut DrawData) };
+        if draw_data.total_vtx_count == 0 { None } else { Some(draw_data) }
     }
 }

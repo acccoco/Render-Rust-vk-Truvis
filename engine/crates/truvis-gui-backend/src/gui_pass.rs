@@ -102,16 +102,11 @@ impl GuiPass {
         draw_data: &imgui::DrawData,
         tex_map: &HashMap<TextureId, GfxTextureHandle>,
     ) {
-        // TODO mesh 应该放在 present pass 中管理
+        // 使用 LOAD 保留 resolve pass 绘制的内容
         let color_attach_info = vk::RenderingAttachmentInfo::default()
             .image_view(canvas_color_view)
             .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-            .load_op(vk::AttachmentLoadOp::CLEAR)
-            .clear_value(vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 1.0],
-                },
-            })
+            .load_op(vk::AttachmentLoadOp::LOAD)
             .store_op(vk::AttachmentStoreOp::STORE);
 
         let render_info = vk::RenderingInfo::default()

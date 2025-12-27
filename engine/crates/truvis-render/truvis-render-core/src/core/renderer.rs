@@ -215,15 +215,19 @@ impl Renderer {
 
         // Update AssetHub
         self.asset_hub.update(&mut self.render_context.gfx_resource_manager, &mut self.render_context.bindless_manager);
+    }
 
+    pub fn acquire_image(&mut self) {
         // swapchain image
         self.render_present.as_mut().unwrap().acquire_image(self.render_context.frame_counter.frame_label());
     }
 
+    pub fn present_image(&mut self) {
+        self.render_present.as_ref().unwrap().present_image();
+    }
+
     pub fn end_frame(&mut self) {
         let _span = tracy_client::span!("Renderer::end_frame");
-
-        self.render_present.as_ref().unwrap().present_image();
 
         // 设置当前帧结束的 semaphore，用于保护当前帧的资源
         {
@@ -256,6 +260,19 @@ impl Renderer {
 
     pub fn prepare_render_graph(&mut self) {
         self.render_graph.maps.clear();
+    }
+
+    pub fn on_resize(&mut self) {
+        self.render_present.as_mut().unwrap().rebuild_after_resized();
+
+        // 更新 frame settings
+        let extent = self.render_present.as_ref().unwrap().swapchain.as_ref().unwrap().extent();
+
+        // Renderer: Resize Framebuffer
+        if self.render_context.frame_settings.frame_extent != extent {
+            self.render_context.frame_settings.frame_extent = extent;
+            self.resize_frame_buffer(extent);
+        }
     }
 
     pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {
@@ -391,7 +408,7 @@ impl Renderer {
                 },
             }
         };
-        self.render_present.as_mut().unwrap().draw_gui(&self.render_context, ui_draw_data, present_data);
+        self.render_present.as_mut().unwrap().draw(&self.render_context, ui_draw_data, present_data);
     }
 }
 // getters

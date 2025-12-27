@@ -11,4 +11,5 @@
 #include "pass/rt.slangi"
 #include "pass/imgui.slangi"
 #include "pass/raster.slangi"
+#include "pass/resolve.slangi"
 #include "pass/pp/sdr.slangi"

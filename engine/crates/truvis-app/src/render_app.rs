@@ -98,113 +98,179 @@ impl RenderApp {
         self.renderer.time_to_render()
     }
 
-    pub fn begin_frame(&mut self) {
-        self.renderer.begin_frame();
-    }
-
     pub fn handle_event(&mut self, event: &InputEvent) {
-        // TODO 判断是否改下方处理
-        self.gui_host.handle_event(event);
-
         // 使用InputManager处理窗口事件
-        self.input_manager.handle_window_event(event.clone());
+        self.input_manager.push_event(event.clone());
     }
 
     pub fn build_ui(&mut self) {
         let elapsed = self.renderer.timer.delta_time();
+        let swapchain_image_size = self.renderer.render_present.as_ref().unwrap().swapchain.as_ref().unwrap().extent();
 
-        self.gui_host.new_frame(
-            elapsed,
-            |ui, content_size| {
-                let min_pos = ui.window_content_region_min();
-                ui.set_cursor_pos([min_pos[0] + 5.0, min_pos[1] + 5.0]);
-                ui.text(format!("FPS: {:.2}", 1.0 / elapsed.as_secs_f32()));
-                ui.text(format!("size: {:.0}x{:.0}", content_size[0], content_size[1]));
-            },
-            |ui| {
-                // camera info
-                {
-                    let camera = self.camera_controller.camera();
-                    ui.text(format!(
-                        "CameraPos: ({:.2}, {:.2}, {:.2})",
-                        camera.position.x, camera.position.y, camera.position.z
-                    ));
-                    ui.text(format!(
-                        "CameraEuler: ({:.2}, {:.2}, {:.2})",
-                        camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg
-                    ));
-                    ui.text(format!(
-                        "CameraForward: ({:.2}, {:.2}, {:.2})",
-                        camera.camera_forward().x,
-                        camera.camera_forward().y,
-                        camera.camera_forward().z
-                    ));
-                    ui.text(format!("CameraAspect: {:.2}", camera.asp));
-                    ui.text(format!("CameraFov(Vertical): {:.2}°", camera.fov_deg_vertical));
+        self.gui_host.new_frame(elapsed, |ui| {
+            // 创建一个全屏的、固定位置的、无边框的透明窗口作为 UI 容器
+            // 这样可以直接相对于 framebuffer 左上角绘制，而不会有可拖动的窗口
+            ui.window("##overlay")
+                .position([0.0, 0.0], imgui::Condition::Always)
+                .size(
+                    [swapchain_image_size.width as f32, swapchain_image_size.height as f32],
+                    imgui::Condition::Always,
+                )
+                .flags(
+                    imgui::WindowFlags::NO_TITLE_BAR
+                        | imgui::WindowFlags::NO_RESIZE
+                        | imgui::WindowFlags::NO_MOVE
+                        | imgui::WindowFlags::NO_SCROLLBAR
+                        | imgui::WindowFlags::NO_SCROLL_WITH_MOUSE
+                        | imgui::WindowFlags::NO_COLLAPSE
+                        | imgui::WindowFlags::NO_BACKGROUND
+                        | imgui::WindowFlags::NO_SAVED_SETTINGS
+                        | imgui::WindowFlags::NO_MOUSE_INPUTS
+                        | imgui::WindowFlags::NO_FOCUS_ON_APPEARING
+                        | imgui::WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS
+                        | imgui::WindowFlags::NO_NAV_INPUTS
+                        | imgui::WindowFlags::NO_NAV_FOCUS,
+                )
+                .build(|| {
+                    // fps
                     {
-                        let pipeline_settings = &mut self.renderer.render_context.pipeline_settings;
-                        ui.slider("channel", 0, 3, &mut pipeline_settings.channel);
+                        ui.set_cursor_pos([5.0, 5.0]);
+                        ui.text(format!("FPS: {:.2}", 1.0 / elapsed.as_secs_f32()));
+                        ui.text(format!("swapchain: {:.0}x{:.0}", swapchain_image_size.width, swapchain_image_size.height));
                     }
-                    ui.text(format!("Accum Frames: {}", self.renderer.render_context.accum_data.accum_frames_num()));
-                    ui.new_line();
-                }
 
-                self.outer_app.as_mut().unwrap().draw_ui(ui);
-            },
-        );
+                    // camera info
+                    {
+                        let camera = self.camera_controller.camera();
+                        ui.text(format!(
+                            "CameraPos: ({:.2}, {:.2}, {:.2})",
+                            camera.position.x, camera.position.y, camera.position.z
+                        ));
+                        ui.text(format!(
+                            "CameraEuler: ({:.2}, {:.2}, {:.2})",
+                            camera.euler_yaw_deg, camera.euler_pitch_deg, camera.euler_roll_deg
+                        ));
+                        ui.text(format!(
+                            "CameraForward: ({:.2}, {:.2}, {:.2})",
+                            camera.camera_forward().x,
+                            camera.camera_forward().y,
+                            camera.camera_forward().z
+                        ));
+                        ui.text(format!("CameraAspect: {:.2}", camera.asp));
+                        ui.text(format!("CameraFov(Vertical): {:.2}°", camera.fov_deg_vertical));
+                        ui.text(format!("Accum Frames: {}", self.renderer.render_context.accum_data.accum_frames_num()));
+                        ui.new_line();
+                    }
+                });
+
+            // 可交互的控制面板窗口
+            ui.window("Controls")
+                .position([10.0, 200.0], imgui::Condition::FirstUseEver)
+                .size([250.0, 100.0], imgui::Condition::FirstUseEver)
+                .build(|| {
+                    let pipeline_settings = &mut self.renderer.render_context.pipeline_settings;
+                    ui.slider("channel", 0, 3, &mut pipeline_settings.channel);
+                });
+
+            self.outer_app.as_mut().unwrap().draw_ui(ui);
+        });
     }
 
     pub fn big_update(&mut self) {
-        // Begin Frame ============================
         if !self.time_to_render() {
             return;
         }
 
-        self.begin_frame();
-
-        // build Gui ==================================
+        // Begin Frame
         {
-            let _span = tracy_client::span!("Update Gui");
-
-            self.build_ui();
+            let _span = tracy_client::span!("Begin Frame");
+            self.renderer.begin_frame();
         }
 
-        // Rendere Update ==================================
+        // 处理 swapchain resize
+        {
+            let mut need_reisze = false;
+            for event in self.input_manager.get_events() {
+                if let InputEvent::Resized { .. } = event {
+                    need_reisze = true;
+                }
+            }
+            if need_reisze {
+                self.renderer.on_resize();
+                self.outer_app.as_mut().unwrap().on_window_resized(&mut self.renderer);
+            }
+        }
+
+        // 处理事件
+        {
+            let _span = tracy_client::span!("Process Input Events");
+
+            for event in self.input_manager.get_events() {
+                // TODO imgui 是否吞掉事件
+                self.gui_host.handle_event(event);
+            }
+            self.input_manager.process_events();
+        }
+
+        // GUI 绘制
+        {
+            let _span = tracy_client::span!("Build Gui");
+
+            self.build_ui();
+            self.gui_host.compile_ui();
+        }
+
+        // 更新 CPU world
         {
             let _span = tracy_client::span!("Renderer Update");
-            self.update();
+
+            self.update_scene(&self.input_manager.state().clone());
+        }
+
+        // GPU 帧的开始
+        {
+            self.renderer.acquire_image();
+        }
+
+        // 将数据上传到 GPU
+        {
+            let _span = tracy_client::span!("Renderer Before Render");
+            self.renderer.before_render(self.input_manager.state(), self.camera_controller.camera());
         }
 
         // Renderer: Render ================================
-        self.render();
-
-        // Window: Draw Gui ===============================
         {
-            self.draw_to_window();
+            let _span = tracy_client::span!("Renderer Render");
+
+            self.outer_app.as_mut().unwrap().draw(&self.renderer.render_context);
+            self.renderer.draw_to_window(self.gui_host.get_render_data());
+        }
+
+        // GPU 帧的结束
+        {
+            self.renderer.present_image();
         }
 
         // End Frame ===================================
-        self.end_frame();
+        {
+            let _span = tracy_client::span!("End  Frame");
+            self.renderer.end_frame();
+        }
 
         tracy_client::frame_mark();
     }
 
-    pub fn update(&mut self) {
-        self.last_render_area = self.gui_host.get_render_region().extent;
-        self.input_manager.update();
-        self.update_scene(&self.input_manager.state().clone(), self.last_render_area);
+    pub fn on_resize(&mut self) {
+        self.renderer.render_present.as_mut().unwrap().rebuild_after_resized();
     }
 
-    fn update_scene(&mut self, input_state: &InputState, extent: vk::Extent2D) {
-        // Renderer: Resize Framebuffer
-        if self.renderer.render_context.frame_settings.frame_extent != extent {
-            self.renderer.resize_frame_buffer(extent);
-        }
+    fn update_scene(&mut self, input_state: &InputState) {
+        let frame_extent = self.renderer.render_context.frame_settings.frame_extent;
 
         // Renderer: Update Input and Camera
         self.camera_controller.update(
             input_state,
-            glam::vec2(extent.width as f32, extent.height as f32),
+            glam::vec2(frame_extent.width as f32, frame_extent.height as f32),
             self.renderer.timer.delta_time(),
         );
 
@@ -212,31 +278,5 @@ impl RenderApp {
         {
             self.outer_app.as_mut().unwrap().update(&mut self.renderer);
         }
-    }
-
-    pub fn render(&mut self) {
-        let input_state = self.input_manager.state();
-
-        self.renderer.before_render(input_state, self.camera_controller.camera());
-        {
-            let _span = tracy_client::span!("OuterApp::draw");
-            // 构建出 PipelineContext
-            self.outer_app.as_mut().unwrap().draw(&self.renderer.render_context);
-        }
-    }
-
-    pub fn draw_to_window(&mut self) {
-        let ui_draw_data = self.gui_host.compile_ui();
-        self.renderer.draw_to_window(ui_draw_data);
-    }
-
-    pub fn end_frame(&mut self) {
-        self.renderer.end_frame();
-    }
-
-    pub fn on_window_resized(&mut self, raw_display_handle: RawDisplayHandle, raw_window_handle: RawWindowHandle) {
-        self.renderer.render_present.as_mut().unwrap().rebuild_after_resized(raw_display_handle, raw_window_handle);
-
-        self.outer_app.as_mut().unwrap().rebuild(&mut self.renderer);
     }
 }

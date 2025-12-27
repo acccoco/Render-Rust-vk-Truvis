@@ -77,18 +77,6 @@ impl WinitApp {
         event_loop.create_window(window_attr).unwrap()
     }
 }
-// update
-impl WinitApp {
-    fn update(&mut self) {
-        self.render_app.big_update();
-    }
-
-    fn on_window_resized(&mut self, _width: u32, _height: u32) {
-        let window = self.window.as_ref().unwrap();
-        self.render_app
-            .on_window_resized(window.display_handle().unwrap().as_raw(), window.window_handle().unwrap().as_raw());
-    }
-}
 // destroy
 impl WinitApp {
     fn destroy(mut self) {
@@ -125,13 +113,8 @@ impl ApplicationHandler<UserEvent> for WinitApp {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
             }
-            WindowEvent::Resized(new_size) => {
-                // log::info!("window was resized, new size is : {}x{}", new_size.width,
-                // new_size.height);
-                self.on_window_resized(new_size.width, new_size.height);
-            }
             WindowEvent::RedrawRequested => {
-                self.update();
+                self.render_app.big_update();
                 // TODO 是否应该手动调用 redraw，实现死循环？
             }
             _ => {}

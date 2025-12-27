@@ -31,13 +31,17 @@ impl InputManager {
     }
 
     /// 处理窗口事件
-    pub fn handle_window_event(&mut self, event: InputEvent) {
+    pub fn push_event(&mut self, event: InputEvent) {
         self.events.push_back(event);
+    }
+
+    pub fn get_events(&self) -> &VecDeque<InputEvent> {
+        &self.events
     }
 
     /// 更新输入状态
     /// 处理所有队列中的事件，更新输入状态
-    pub fn update(&mut self) {
+    pub fn process_events(&mut self) {
         // 保存上一帧的鼠标位置
         self.state.last_mouse_pos = self.state.crt_mouse_pos;
 

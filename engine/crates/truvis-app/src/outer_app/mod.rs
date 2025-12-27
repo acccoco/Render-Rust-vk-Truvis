@@ -43,5 +43,5 @@ pub trait OuterApp {
     fn draw(&self, _render_context: &RenderContext) {}
 
     /// 窗口大小改变后重建资源（可选）
-    fn rebuild(&mut self, _renderer: &mut Renderer) {}
+    fn on_window_resized(&mut self, _renderer: &mut Renderer) {}
 }
