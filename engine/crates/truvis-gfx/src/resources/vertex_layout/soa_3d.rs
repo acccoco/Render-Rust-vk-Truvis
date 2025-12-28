@@ -1,7 +1,7 @@
+use crate::resources::layout::GfxVertexLayout;
+use crate::resources::special_buffers::vertex_buffer::GfxVertexBuffer;
 use ash::vk;
 use std::ptr;
-use truvis_gfx::resources::layout::GfxVertexLayout;
-use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexBuffer;
 
 /// SoA 的顶点 buffer 布局，包含：Positions, Normals, Tangents, UVs
 pub struct VertexLayoutSoA3D;

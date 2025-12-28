@@ -11,7 +11,7 @@ use truvis_gfx::{
         rendering_info::GfxRenderingInfo,
     },
 };
-use truvis_model::vertex::soa_3d::VertexLayoutSoA3D;
+use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
 use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_shader_binding::truvisl;

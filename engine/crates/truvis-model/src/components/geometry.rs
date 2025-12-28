@@ -1,10 +1,10 @@
-use crate::vertex::soa_3d::VertexLayoutSoA3D;
 use ash::vk;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::raytracing::acceleration::GfxBlasInputInfo;
 use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexBuffer;
+use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
 
 /// 几何体数据（包含顶点和索引缓冲）
 ///

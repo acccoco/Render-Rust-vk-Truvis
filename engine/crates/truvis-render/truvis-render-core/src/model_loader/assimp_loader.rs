@@ -2,12 +2,12 @@ use itertools::Itertools;
 use truvis_asset::asset_hub::AssetHub;
 use truvis_cxx_binding::truvixx;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
+use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
 use truvis_model::components::geometry::RtGeometry;
 use truvis_model::components::instance::Instance;
 use truvis_model::components::material::Material;
 use truvis_model::components::mesh::Mesh;
 use truvis_model::guid_new_type::{InstanceHandle, MaterialHandle, MeshHandle};
-use truvis_model::vertex::soa_3d::VertexLayoutSoA3D;
 use truvis_render_scene::scene_manager::SceneManager;
 
 /// Assimp 场景加载器
