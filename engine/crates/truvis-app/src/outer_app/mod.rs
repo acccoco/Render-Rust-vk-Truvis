@@ -1,6 +1,6 @@
-use truvis_render_core::core::renderer::Renderer;
-use truvis_render_core::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_renderer::platform::camera::Camera;
+use truvis_renderer::renderer::Renderer;
 
 pub mod async_load_test;
 pub mod cornell_app;

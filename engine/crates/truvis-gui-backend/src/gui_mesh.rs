@@ -1,7 +1,7 @@
 use crate::gui_vertex_layout::{ImGuiVertex, ImGuiVertexLayoutAoS};
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndexBuffer;
 use truvis_gfx::resources::special_buffers::vertex_buffer::GfxVertexBuffer;
-use truvis_render_base::pipeline_settings::FrameLabel;
+use truvis_render_interface::pipeline_settings::FrameLabel;
 
 /// imgui 绘制所需的 vertex buffer 和 index buffer
 pub struct GuiMesh {

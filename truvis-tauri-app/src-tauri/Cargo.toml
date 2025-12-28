@@ -19,7 +19,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 truvis-app = { path = "../../engine/crates/truvis-app" }
-truvis-render-core = { path = "../../engine/crates/truvis-render/truvis-render-core" }
+truvis-renderer = { path = "../../engine/crates/truvis-renderer" }
 
 
 tauri = { version = "2", features = ["unstable"] }

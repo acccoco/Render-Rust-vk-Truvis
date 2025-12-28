@@ -85,8 +85,8 @@ struct TempApp {}
 impl OuterApp for TempApp {
     fn init(
         &mut self,
-        renderer: &mut truvis_render_core::core::renderer::Renderer,
-        camera: &mut truvis_render_core::platform::camera::Camera,
+        renderer: &mut truvis_renderer::renderer::Renderer,
+        camera: &mut truvis_renderer::platform::camera::Camera,
     ) {
     }
 }

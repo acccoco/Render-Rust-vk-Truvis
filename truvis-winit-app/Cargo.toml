@@ -7,7 +7,6 @@ description = "app"
 
 [dependencies]
 truvis-app = { path = "../engine/crates/truvis-app" }
-truvis-platform = { path = "../engine/crates/truvis-platform" }
 
 log = "0.4.0"
 winit = "0.30.8"

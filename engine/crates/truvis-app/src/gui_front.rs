@@ -1,7 +1,6 @@
-use ash::vk;
+use crate::platform::input_event::{ElementState, InputEvent, MouseButton};
 use imgui::{DrawData, FontAtlasTexture, TextureId};
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_platform::input_event::{ElementState, InputEvent, MouseButton};
 
 const FONT_TEXTURE_ID: usize = 0;
 const RENDER_IMAGE_ID: usize = 1;
@@ -198,7 +197,7 @@ impl GuiHost {
                 // .bg_alpha(0.0)
                 .draw_background(false)
                 .build(|| {
-                    let window_pos = ui.window_pos();
+                    let _window_pos = ui.window_pos();
                     let window_region_max = ui.window_content_region_max();
                     let window_region_min = ui.window_content_region_min();
                     let window_size = [
@@ -206,7 +205,7 @@ impl GuiHost {
                         window_region_max[1] - window_region_min[1],
                     ];
                     // let hidpi_factor = self.platform.hidpi_factor() as f32;
-                    let hidpi_factor = 1.0;
+                    let _hidpi_factor = 1.0;
 
                     // self.render_region.offset = vk::Offset2D {
                     //     x: (window_pos[0] * hidpi_factor) as i32,

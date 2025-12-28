@@ -5577,11 +5577,10 @@ dependencies = [
  "truvis-asset",
  "truvis-crate-tools",
  "truvis-gfx",
- "truvis-model",
- "truvis-platform",
- "truvis-render-base",
- "truvis-render-core",
  "truvis-render-graph",
+ "truvis-render-interface",
+ "truvis-renderer",
+ "truvis-scene",
  "truvis-shader-binding",
 ]
 
@@ -5599,8 +5598,7 @@ dependencies = [
  "slotmap",
  "tracy-client",
  "truvis-gfx",
- "truvis-render-base",
- "truvis-resource",
+ "truvis-render-interface",
  "vk-mem",
 ]
 
@@ -5668,68 +5666,8 @@ dependencies = [
  "log",
  "truvis-crate-tools",
  "truvis-gfx",
- "truvis-render-base",
  "truvis-render-graph",
- "truvis-resource",
- "truvis-shader-binding",
-]
-
-[[package]]
-name = "truvis-model"
-version = "0.1.0"
-dependencies = [
- "ash",
- "bytemuck",
- "glam",
- "itertools 0.10.5",
- "slotmap",
- "tracy-client",
- "truvis-gfx",
-]
-
-[[package]]
-name = "truvis-platform"
-version = "0.1.0"
-
-[[package]]
-name = "truvis-render-base"
-version = "0.1.0"
-dependencies = [
- "ash",
- "glam",
- "itertools 0.10.5",
- "log",
- "slotmap",
- "tracy-client",
- "truvis-descriptor-layout-macro",
- "truvis-descriptor-layout-trait",
- "truvis-gfx",
- "truvis-resource",
- "truvis-shader-binding",
-]
-
-[[package]]
-name = "truvis-render-core"
-version = "0.1.0"
-dependencies = [
- "ash",
- "bytemuck",
- "glam",
- "imgui",
- "itertools 0.10.5",
- "log",
- "raw-window-handle",
- "tracy-client",
- "truvis-asset",
- "truvis-cxx-binding",
- "truvis-gfx",
- "truvis-gui-backend",
- "truvis-model",
- "truvis-platform",
- "truvis-render-base",
- "truvis-render-graph",
- "truvis-render-scene",
- "truvis-resource",
+ "truvis-render-interface",
  "truvis-shader-binding",
 ]
 
@@ -5747,16 +5685,54 @@ dependencies = [
  "truvis-descriptor-layout-macro",
  "truvis-descriptor-layout-trait",
  "truvis-gfx",
- "truvis-model",
- "truvis-render-base",
- "truvis-render-scene",
- "truvis-resource",
+ "truvis-render-interface",
+ "truvis-scene",
  "truvis-shader-binding",
  "vk-mem",
 ]
 
 [[package]]
-name = "truvis-render-scene"
+name = "truvis-render-interface"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "glam",
+ "image",
+ "itertools 0.10.5",
+ "log",
+ "slotmap",
+ "tracy-client",
+ "truvis-descriptor-layout-macro",
+ "truvis-descriptor-layout-trait",
+ "truvis-gfx",
+ "truvis-shader-binding",
+ "vk-mem",
+]
+
+[[package]]
+name = "truvis-renderer"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "bytemuck",
+ "glam",
+ "imgui",
+ "itertools 0.10.5",
+ "log",
+ "raw-window-handle",
+ "tracy-client",
+ "truvis-asset",
+ "truvis-cxx-binding",
+ "truvis-gfx",
+ "truvis-gui-backend",
+ "truvis-render-graph",
+ "truvis-render-interface",
+ "truvis-scene",
+ "truvis-shader-binding",
+]
+
+[[package]]
+name = "truvis-scene"
 version = "0.1.0"
 dependencies = [
  "ash",
@@ -5770,23 +5746,8 @@ dependencies = [
  "truvis-asset",
  "truvis-crate-tools",
  "truvis-gfx",
- "truvis-model",
- "truvis-render-base",
- "truvis-resource",
+ "truvis-render-interface",
  "truvis-shader-binding",
-]
-
-[[package]]
-name = "truvis-resource"
-version = "0.1.0"
-dependencies = [
- "ash",
- "image",
- "slotmap",
- "tracy-client",
- "truvis-gfx",
- "truvis-shader-binding",
- "vk-mem",
 ]
 
 [[package]]
@@ -5812,7 +5773,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-opener",
  "truvis-app",
- "truvis-render-core",
+ "truvis-renderer",
 ]
 
 [[package]]

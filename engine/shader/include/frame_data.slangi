@@ -14,11 +14,12 @@ struct PerFrameData
     float3 camera_forward;
     float delta_time_ms;
 
-    float2 mouse_pos;
     float2 resolution;
-
     uint64_t frame_id;
+
     /// 累计的帧数
     uint accum_frames;
     uint _padding_0;
+    uint _padding_1;
+    uint _padding_2;
 };

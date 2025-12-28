@@ -16,10 +16,10 @@ use truvis_gfx::{
         shader::GfxShaderStageInfo,
     },
 };
-use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
-use truvis_render_base::pipeline_settings::FrameLabel;
 use truvis_render_graph::render_context::RenderContext;
-use truvis_resource::handles::GfxTextureHandle;
+use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
+use truvis_render_interface::handles::GfxTextureHandle;
+use truvis_render_interface::pipeline_settings::FrameLabel;
 use truvis_shader_binding::truvisl;
 use truvis_shader_binding::truvisl::SrvHandle;
 

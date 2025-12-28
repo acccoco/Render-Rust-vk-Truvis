@@ -1,11 +1,11 @@
 use crate::outer_app::OuterApp;
 use crate::outer_app::triangle::triangle_pass::TrianglePass;
 use imgui::Ui;
-use truvis_model::components::geometry::RtGeometry;
-use truvis_model::shapes::triangle::TriangleSoA;
-use truvis_render_core::core::renderer::Renderer;
-use truvis_render_core::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_renderer::platform::camera::Camera;
+use truvis_renderer::renderer::Renderer;
+use truvis_scene::components::geometry::RtGeometry;
+use truvis_scene::shapes::triangle::TriangleSoA;
 
 #[derive(Default)]
 pub struct HelloTriangle {

@@ -1,4 +1,4 @@
-use truvis_platform::input_event::{ElementState, InputEvent, KeyCode, MouseButton};
+use truvis_app::platform::input_event::{ElementState, InputEvent, KeyCode, MouseButton};
 use winit::event::{KeyEvent, WindowEvent};
 use winit::keyboard::PhysicalKey;
 

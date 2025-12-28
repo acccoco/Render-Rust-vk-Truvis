@@ -4,11 +4,11 @@ use imgui::Ui;
 use truvis_asset::handle::AssetTextureHandle;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
-use truvis_model::components::geometry::RtGeometry;
 use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
-use truvis_render_core::core::renderer::Renderer;
-use truvis_render_core::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_renderer::platform::camera::Camera;
+use truvis_renderer::renderer::Renderer;
+use truvis_scene::components::geometry::RtGeometry;
 
 #[derive(Default)]
 pub struct AsyncLoadTest {

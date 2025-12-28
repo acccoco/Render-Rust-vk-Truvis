@@ -10,6 +10,7 @@ use truvis_gfx::commands::barrier::GfxImageBarrier;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::layout::GfxVertexLayout;
+use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
 use truvis_gfx::{
     commands::command_buffer::GfxCommandBuffer,
     pipelines::{
@@ -18,14 +19,13 @@ use truvis_gfx::{
         shader::GfxShaderStageInfo,
     },
 };
-use truvis_model::components::geometry::RtGeometry;
-use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
-use truvis_render_base::cmd_allocator::CmdAllocator;
-use truvis_render_base::frame_counter::FrameCounter;
-use truvis_render_base::global_descriptor_sets::GlobalDescriptorSets;
-use truvis_render_base::pipeline_settings::{FrameLabel, FrameSettings};
 use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::RenderContext;
+use truvis_render_interface::cmd_allocator::CmdAllocator;
+use truvis_render_interface::frame_counter::FrameCounter;
+use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
+use truvis_render_interface::pipeline_settings::{FrameLabel, FrameSettings};
+use truvis_scene::components::geometry::RtGeometry;
 
 enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {

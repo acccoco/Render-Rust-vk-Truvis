@@ -5,13 +5,13 @@ use imgui::{DrawData, FontAtlasTexture, TextureId};
 use std::collections::HashMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::{basic::color::LabelColor, gfx::Gfx, resources::image::GfxImage};
-use truvis_render_base::bindless_manager::BindlessManager;
-use truvis_render_base::cmd_allocator::CmdAllocator;
-use truvis_render_base::frame_counter::FrameCounter;
-use truvis_render_base::pipeline_settings::FrameLabel;
-use truvis_resource::gfx_resource_manager::GfxResourceManager;
-use truvis_resource::handles::GfxTextureHandle;
-use truvis_resource::texture::GfxTexture;
+use truvis_render_interface::bindless_manager::BindlessManager;
+use truvis_render_interface::cmd_allocator::CmdAllocator;
+use truvis_render_interface::frame_counter::FrameCounter;
+use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
+use truvis_render_interface::handles::GfxTextureHandle;
+use truvis_render_interface::pipeline_settings::FrameLabel;
+use truvis_render_interface::texture::GfxTexture;
 
 // TODO 这个东西和 GuiHost 的重复了
 const FONT_TEXTURE_ID: usize = 0;

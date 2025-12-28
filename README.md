@@ -80,23 +80,28 @@ cargo build --release
 **编译着色器**（运行前必需！）
 
 ```powershell
-cargo run --bin build_shader
+cargo run --bin shader-build
 ```
 
-**运行演示程序**
+**运行演示程序**（从 truvis-winit-app 目录）
 
 ```powershell
+cd truvis-winit-app
+
 # 基础三角形
-cargo run --bin triangle
+cargo run --bin triangle_app
 
 # 光线追踪 Sponza 场景
-cargo run --bin rt-sponza
+cargo run --bin sponza_app
 
 # Cornell Box 光线追踪
 cargo run --bin rt_cornell
 
 # 着色器实验场
-cargo run --bin shader_toy
+cargo run --bin shader_toy_app
+
+# 异步资源加载测试
+cargo run --bin async_load_app
 ```
 
 ## 🎯 应用开发

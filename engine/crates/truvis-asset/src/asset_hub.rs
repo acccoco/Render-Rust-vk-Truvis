@@ -5,10 +5,10 @@ use slotmap::{SecondaryMap, SlotMap};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use truvis_gfx::resources::image::GfxImage;
-use truvis_render_base::bindless_manager::BindlessManager;
-use truvis_resource::gfx_resource_manager::GfxResourceManager;
-use truvis_resource::handles::GfxTextureHandle;
-use truvis_resource::texture::GfxTexture;
+use truvis_render_interface::bindless_manager::BindlessManager;
+use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
+use truvis_render_interface::handles::GfxTextureHandle;
+use truvis_render_interface::texture::GfxTexture;
 
 /// 资产中心 (Facade)
 ///

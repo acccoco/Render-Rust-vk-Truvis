@@ -1,11 +1,11 @@
 use crate::outer_app::OuterApp;
 use imgui::Ui;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_render_core::core::renderer::Renderer;
-use truvis_render_core::model_loader::assimp_loader::AssimpSceneLoader;
-use truvis_render_core::platform::camera::Camera;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_pipeline::rt_pass::RtRenderPass;
+use truvis_renderer::model_loader::assimp_loader::AssimpSceneLoader;
+use truvis_renderer::platform::camera::Camera;
+use truvis_renderer::renderer::Renderer;
 use truvis_shader_binding::truvisl;
 
 #[derive(Default)]

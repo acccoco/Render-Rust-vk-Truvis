@@ -1,0 +1,28 @@
+[package]
+name = "truvis-render-graph"
+version = "0.1.0"
+edition = "2024"
+description = ""
+
+[dependencies]
+truvis-render-interface = { workspace = true }
+truvis-gfx = { workspace = true }
+truvis-crate-tools = { workspace = true }
+truvis-shader-binding = { workspace = true }
+truvis-scene = { workspace = true }
+truvis-descriptor-layout-trait = { workspace = true }
+truvis-descriptor-layout-macro = { workspace = true }
+
+
+# 默认 features：
+# - debug 表示 vulkan 结构体实现了 Debut Trait
+# - loader 表示在运行时动态搜索 vulkan，体现在 Entry 对象的创建上
+ash = { workspace = true }
+# graphics math
+# bytemuck：可以转换为 bytes slices
+glam = { workspace = true }
+itertools = { workspace = true }
+vk-mem = { workspace = true }
+log = { workspace = true }
+bytemuck = { workspace = true }
+slotmap = { workspace = true }

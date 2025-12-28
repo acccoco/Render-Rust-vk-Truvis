@@ -1,15 +1,15 @@
 use crate::gui_front::GuiHost;
 use crate::outer_app::OuterApp;
 use crate::platform::camera_controller::CameraController;
+use crate::platform::input_event::InputEvent;
+use crate::platform::input_manager::InputManager;
+use crate::platform::input_state::InputState;
 use ash::vk;
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use std::ffi::CStr;
 use truvis_crate_tools::init_log::init_log;
 use truvis_gfx::gfx::Gfx;
-use truvis_platform::input_event::InputEvent;
-use truvis_platform::input_manager::InputManager;
-use truvis_platform::input_state::InputState;
-use truvis_render_core::core::renderer::Renderer;
+use truvis_renderer::renderer::Renderer;
 
 pub fn panic_handler(info: &std::panic::PanicHookInfo) {
     log::error!("{}", info);
@@ -112,10 +112,7 @@ impl RenderApp {
             // 这样可以直接相对于 framebuffer 左上角绘制，而不会有可拖动的窗口
             ui.window("##overlay")
                 .position([0.0, 0.0], imgui::Condition::Always)
-                .size(
-                    [swapchain_image_size.width as f32, swapchain_image_size.height as f32],
-                    imgui::Condition::Always,
-                )
+                .size([swapchain_image_size.width as f32, swapchain_image_size.height as f32], imgui::Condition::Always)
                 .flags(
                     imgui::WindowFlags::NO_TITLE_BAR
                         | imgui::WindowFlags::NO_RESIZE
@@ -136,7 +133,10 @@ impl RenderApp {
                     {
                         ui.set_cursor_pos([5.0, 5.0]);
                         ui.text(format!("FPS: {:.2}", 1.0 / elapsed.as_secs_f32()));
-                        ui.text(format!("swapchain: {:.0}x{:.0}", swapchain_image_size.width, swapchain_image_size.height));
+                        ui.text(format!(
+                            "swapchain: {:.0}x{:.0}",
+                            swapchain_image_size.width, swapchain_image_size.height
+                        ));
                     }
 
                     // camera info
@@ -158,7 +158,10 @@ impl RenderApp {
                         ));
                         ui.text(format!("CameraAspect: {:.2}", camera.asp));
                         ui.text(format!("CameraFov(Vertical): {:.2}°", camera.fov_deg_vertical));
-                        ui.text(format!("Accum Frames: {}", self.renderer.render_context.accum_data.accum_frames_num()));
+                        ui.text(format!(
+                            "Accum Frames: {}",
+                            self.renderer.render_context.accum_data.accum_frames_num()
+                        ));
                         ui.new_line();
                     }
                 });
@@ -235,7 +238,7 @@ impl RenderApp {
         // 将数据上传到 GPU
         {
             let _span = tracy_client::span!("Renderer Before Render");
-            self.renderer.before_render(self.input_manager.state(), self.camera_controller.camera());
+            self.renderer.before_render(self.camera_controller.camera());
         }
 
         // Renderer: Render ================================

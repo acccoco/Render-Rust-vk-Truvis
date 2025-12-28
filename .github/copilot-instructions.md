@@ -8,14 +8,12 @@
 engine/
 ├── crates/
 │   ├── truvis-gfx/              # Vulkan RHI 抽象（Gfx 单例）
-│   ├── truvis-app/              # 应用框架（TruvisApp + OuterApp trait）
-│   │   └── src/bin/             # 示例应用：triangle/, rt-sponza/, shader-toy/
-│   ├── truvis-render/           # 渲染核心（4 个子 crate）
-│   │   ├── truvis-render-base/  # CmdAllocator, BindlessManager, FrameCounter
-│   │   ├── truvis-render-core/  # Renderer, Camera, Timer
-│   │   ├── truvis-render-graph/ # RenderContext, Pass/Subpass, FifBuffers
-│   │   └── truvis-render-scene/ # GpuScene, SceneManager
-│   ├── truvis-model/            # 顶点数据和几何体（RtGeometry）
+│   ├── truvis-app/              # 应用框架核心（OuterApp trait + 内置 subpass 实现）
+│   │   └── src/outer_app/       # 内置应用：triangle/, shader_toy/, sponza_app.rs
+│   ├── truvis-render-interface/ # CmdAllocator, BindlessManager, FrameCounter, FrameLabel
+│   ├── truvis-renderer/         # Renderer, Camera, Timer, 模型加载
+│   ├── truvis-render-graph/     # RenderContext, Pass/Subpass, FifBuffers
+│   ├── truvis-scene/            # GpuScene, SceneManager, RtGeometry, 几何体形状
 │   ├── truvis-shader/           # 着色器系统
 │   │   ├── truvis-shader-binding/   # Slang → Rust 自动绑定（build.rs + bindgen）
 │   │   └── truvis-shader-build/     # 着色器编译工具（slangc/glslc/dxc）
@@ -25,11 +23,17 @@ engine/
 ├── shader/
 │   ├── src/                     # .slang 源码（按 pass 组织）
 │   ├── include/                 # 共享头文件（.slangi）
-│   └── build/                   # 编译后 .spv（自动生成）
+│   └── .build/                  # 编译后 .spv（自动生成）
 └── cxx/                         # C++ 源码 + CMakeLists.txt
+
+truvis-winit-app/                # 独立 crate：可运行的演示应用
+├── src/bin/                     # 应用入口：triangle_app.rs, sponza_app.rs, rt_cornell.rs...
+└── src/app.rs                   # WinitApp 窗口管理
+
+truvis-tauri-app/                # Tauri GUI 应用（可选）
 ```
 
-**层次关系**: `truvis-gfx` → `truvis-render-*` → `truvis-app` → `bin/*/main.rs`
+**层次关系**: `truvis-gfx` → `truvis-render-*` → `truvis-app` → `truvis-winit-app/src/bin/*.rs`
 
 ## 🚀 构建流程（必须按顺序）
 
@@ -40,59 +44,67 @@ cargo build --release
 # 2. 编译着色器（运行前必需！）
 cargo run --bin shader-build
 
-# 3. 运行演示
-cargo run --bin triangle       # 基础三角形
-cargo run --bin rt-sponza      # 光追 Sponza（需要模型）
-cargo run --bin shader-toy     # 着色器实验场
-cargo run --bin rt-cornell     # Cornell Box
+# 3. 运行演示（从 truvis-winit-app 目录）
+cd truvis-winit-app
+cargo run --bin triangle_app       # 基础三角形
+cargo run --bin sponza_app         # 光追 Sponza（需要模型）
+cargo run --bin shader_toy_app     # 着色器实验场
+cargo run --bin rt_cornell         # Cornell Box
+cargo run --bin async_load_app     # 异步加载测试
 ```
 
 **⚠️ 关键约束**:
 - `shader-build` 必须在运行任何渲染应用前执行
 - 位于 `engine/crates/truvis-shader/truvis-shader-build/src/bin/shader-build/`
 - 使用 rayon 并行编译 `.slang` → `.spv`
+- 输出目录：`engine/shader/.build/`
 
 **自动生成系统**:
 - 着色器绑定: `truvis-shader-binding/build.rs` 通过 bindgen 从 `.slangi` 生成 Rust 类型
-- C++ 绑定: `truvis-cxx-build/build.rs` 构建 CMake 并复制 DLL 到 `target/`
+- C++ 绑定: `truvis-cxx-binding/build.rs` 构建 CMake 并复制 DLL 到 `target/`
 
 
 ## 🎯 OuterApp 开发模式
 
 ### 标准模板
-```rust
-// crates/truvis-app/src/bin/my_app/main.rs
-use truvis_app::app::TruvisApp;
-use truvis_app::outer_app::OuterApp;
-use truvis_render_core::core::renderer::Renderer;
-use truvis_render_core::platform::camera::Camera;
-use truvis_render_graph::render_context::RenderContext;
+应用入口位于 `truvis-winit-app/src/bin/`，OuterApp 实现位于 `truvis-app/src/outer_app/`：
 
-struct MyApp {
-    pipeline: MyPipeline,
-    geometry: RtGeometry,
+```rust
+// truvis-winit-app/src/bin/my_app.rs
+use truvis_app::outer_app::my_app::MyAppImpl;
+use truvis_winit_app::app::WinitApp;
+
+fn main() {
+    let outer_app = Box::new(MyAppImpl::default());
+    WinitApp::run(outer_app);
 }
 
-impl OuterApp for MyApp {
-    fn init(renderer: &mut Renderer, _camera: &mut Camera) -> Self {
-        Self {
-            pipeline: MyPipeline::new(&renderer.render_context.frame_settings, &mut renderer.cmd_allocator),
-            geometry: TriangleSoA::create_mesh(),
-        }
+// engine/crates/truvis-app/src/outer_app/my_app.rs
+use truvis_app::outer_app::OuterApp;
+use truvis_renderer::renderer::Renderer;
+use truvis_renderer::platform::camera::Camera;
+use truvis_render_graph::render_context::RenderContext;
+
+#[derive(Default)]
+pub struct MyAppImpl {
+    pipeline: Option<MyPass>,
+    geometry: Option<RtGeometry>,
+}
+
+impl OuterApp for MyAppImpl {
+    fn init(&mut self, renderer: &mut Renderer, _camera: &mut Camera) {
+        self.pipeline = Some(MyPass::new(&renderer.render_context.frame_settings, &mut renderer.cmd_allocator));
+        self.geometry = Some(TriangleSoA::create_mesh());
     }
     
     fn draw(&self, render_context: &RenderContext) {
-        self.pipeline.render(render_context, &self.geometry);
+        self.pipeline.as_ref().unwrap().render(render_context, self.geometry.as_ref().unwrap());
     }
     
     // 可选方法
-    fn draw_ui(&mut self, ui: &imgui::Ui) {}
-    fn update(&mut self, renderer: &mut Renderer) {}
-    fn rebuild(&mut self, renderer: &mut Renderer) {}
-}
-
-fn main() {
-    TruvisApp::<MyApp>::run();
+    fn draw_ui(&mut self, _ui: &imgui::Ui) {}
+    fn update(&mut self, _renderer: &mut Renderer) {}
+    fn on_window_resized(&mut self, _renderer: &mut Renderer) {}
 }
 ```
 
@@ -142,7 +154,7 @@ impl MyPass {
 |------|------|
 | `engine/shader/include/` | 共享头文件（`.slangi`）：结构体、全局绑定 |
 | `engine/shader/src/<pass>/` | 按渲染通道组织的着色器源码 |
-| `shader/build/` | 编译输出（SPIR-V） |
+| `engine/shader/.build/` | 编译输出（SPIR-V） |
 
 ### 全局描述符布局（三层绑定）
 定义于 [global_binding_sets.slangi](engine/shader/include/global_binding_sets.slangi)：
@@ -181,14 +193,16 @@ struct MyLayout {
 ```rust
 use truvis_crate_tools::resource::TruvisPath;
 
-let model = TruvisPath::assets_path("sponza.fbx");           // assets/...
-let texture = TruvisPath::resources_path("uv_checker.png");  // resources/...
-let shader = TruvisPath::shader_path("rt/raygen.slang.spv"); // shader/build/...
+let model = TruvisPath::assets_path("sponza.fbx");                      // assets/...
+let texture = TruvisPath::resources_path("uv_checker.png");             // resources/...
+let shader = TruvisPath::shader_build_path_str("rt/raygen.slang");      // shader/.build/...spv
+// 注意：shader_build_path_str 自动添加 .spv 后缀
 ```
 
 ### 顶点数据
 ```rust
-use truvis_model::shapes::triangle::TriangleSoA;
+use truvis_scene::shapes::triangle::TriangleSoA;
+use truvis_scene::components::geometry::RtGeometry;
 let triangle: RtGeometry = TriangleSoA::create_mesh();  // 内置几何体
 ```
 
@@ -216,26 +230,26 @@ cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
 
 ### 添加新应用
 ```powershell
-# 1. 创建目录（位于 truvis-app/src/bin/）
-mkdir engine/crates/truvis-app/src/bin/my_app/
-
-# 2. 创建 main.rs，实现 OuterApp trait（参考上述模式）
+# 1. 在 truvis-app/src/outer_app/ 创建 OuterApp 实现
+# 2. 在 truvis-winit-app/src/bin/ 创建入口文件 my_app.rs
 # 3. 如需新着色器，在 engine/shader/src/ 添加 .slang 文件
 # 4. 运行构建流程
 cargo run --bin shader-build
-cargo run --bin my_app
+cd truvis-winit-app && cargo run --bin my_app
 ```
+
+参考示例：[triangle_app.rs](truvis-winit-app/src/bin/triangle_app.rs) + [triangle/](engine/crates/truvis-app/src/outer_app/triangle/)
 
 ### 创建新渲染管线
 ```rust
-// engine/crates/truvis-render/truvis-render-graph/src/render_pipeline/my_subpass.rs
+// engine/crates/truvis-app/src/outer_app/my_app/my_subpass.rs
 pub struct MySubpass {
     pipeline: GfxGraphicsPipeline,
     pipeline_layout: Rc<GfxPipelineLayout>,
 }
 impl RenderSubpass for MySubpass {}
 
-// engine/crates/truvis-app/src/bin/my_app/my_pass.rs
+// engine/crates/truvis-app/src/outer_app/my_app/my_pass.rs
 impl MyPass {
     pub fn render(&self, render_context: &RenderContext, geometry: &RtGeometry) {
         let frame_label = render_context.frame_counter.frame_label();
@@ -311,12 +325,12 @@ cargo run --bin triangle
 ```rust
 // ❌ 错误：忘记使用 TruvisPath
 let shader = "shader/src/triangle/triangle.slang.spv";
-// ✅ 正确
-let shader = TruvisPath::shader_path("hello_triangle/triangle.slang.spv");
+// ✅ 正确：使用 shader_build_path_str（自动添加 .spv 后缀）
+let shader = TruvisPath::shader_build_path_str("hello_triangle/triangle.slang");
 
 // ❌ 错误：viewport 设置
 let viewport = vk::Viewport { height: extent.height as f32, .. };
-// ✅ 正确：Y轴翻转
+// ✅ 正确：Y轴翻转（Vulkan Y-down → 右手坐标系 Y-up）
 let viewport = vk::Viewport { 
     y: extent.height as f32,
     height: -(extent.height as f32),
