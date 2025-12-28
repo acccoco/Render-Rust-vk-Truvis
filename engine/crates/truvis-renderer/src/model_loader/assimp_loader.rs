@@ -3,7 +3,7 @@ use truvis_asset::asset_hub::AssetHub;
 use truvis_cxx_binding::truvixx;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
-use truvis_scene::components::geometry::RtGeometry;
+use truvis_render_interface::geometry::RtGeometry;
 use truvis_scene::components::instance::Instance;
 use truvis_scene::components::material::Material;
 use truvis_scene::components::mesh::Mesh;

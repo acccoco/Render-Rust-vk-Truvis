@@ -1,7 +1,7 @@
-use crate::components::geometry::RtGeometry;
 use ash::vk;
 use itertools::Itertools;
 use truvis_gfx::raytracing::acceleration::GfxAcceleration;
+use truvis_render_interface::geometry::RtGeometry;
 
 /// CPU 侧的 Mesh 数据
 pub struct Mesh {

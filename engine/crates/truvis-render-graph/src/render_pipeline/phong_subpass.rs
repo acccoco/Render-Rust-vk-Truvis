@@ -134,16 +134,22 @@ impl PhongSubpass {
             },
             frame_label,
         );
-        render_context.gpu_scene.draw(cmd, &render_context.scene_manager, &mut |ins_idx, submesh_idx| {
-            // NOTE 这个数据和 PushConstant 中的内存布局是一致的
-            let data = [ins_idx, submesh_idx];
-            cmd.cmd_push_constants(
-                self.pipeline.layout(),
-                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                offset_of!(truvisl::raster::PushConstants, instance_idx) as u32,
-                bytemuck::bytes_of(&data),
-            );
-        });
+        render_context.gpu_scene.draw(
+            cmd,
+            &render_context
+                .scene_manager
+                .prepare_render_data(&render_context.bindless_manager, &render_context.asset_hub),
+            &mut |ins_idx, submesh_idx| {
+                // NOTE 这个数据和 PushConstant 中的内存布局是一致的
+                let data = [ins_idx, submesh_idx];
+                cmd.cmd_push_constants(
+                    self.pipeline.layout(),
+                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                    offset_of!(truvisl::raster::PushConstants, instance_idx) as u32,
+                    bytemuck::bytes_of(&data),
+                );
+            },
+        );
 
         cmd.end_label();
         cmd.end_rendering();

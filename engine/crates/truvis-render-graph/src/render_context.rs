@@ -1,12 +1,13 @@
 use crate::resources::fif_buffer::FifBuffers;
+use truvis_asset::asset_hub::AssetHub;
 use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
 use truvis_render_interface::bindless_manager::BindlessManager;
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
+use truvis_render_interface::gpu_scene::GpuScene;
 use truvis_render_interface::pipeline_settings::{AccumData, FrameSettings, PipelineSettings};
 use truvis_render_interface::sampler_manager::RenderSamplerManager;
-use truvis_scene::gpu_scene::GpuScene;
 use truvis_scene::scene_manager::SceneManager;
 use truvis_shader_binding::truvisl;
 
@@ -14,6 +15,8 @@ use truvis_shader_binding::truvisl;
 pub struct RenderContext {
     pub scene_manager: SceneManager,
     pub gpu_scene: GpuScene,
+    pub asset_hub: AssetHub,
+
     pub fif_buffers: FifBuffers,
     pub bindless_manager: BindlessManager,
     pub per_frame_data_buffers: [GfxStructuredBuffer<truvisl::PerFrameData>; FrameCounter::fif_count()],

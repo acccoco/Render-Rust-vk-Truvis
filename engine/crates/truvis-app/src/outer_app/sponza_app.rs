@@ -49,7 +49,7 @@ impl SponzaApp {
         AssimpSceneLoader::load_scene(
             &TruvisPath::assets_path("blender/sponza.fbx"),
             &mut renderer.render_context.scene_manager,
-            &mut renderer.asset_hub,
+            &mut renderer.render_context.asset_hub,
         );
         log::info!("finished load sponza scene");
     }

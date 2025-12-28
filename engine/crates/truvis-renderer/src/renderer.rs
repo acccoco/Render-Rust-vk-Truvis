@@ -25,11 +25,11 @@ use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::global_descriptor_sets::{GlobalDescriptorSets, PerFrameDescriptorBinding};
+use truvis_render_interface::gpu_scene::GpuScene;
 use truvis_render_interface::pipeline_settings::{
     AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings,
 };
 use truvis_render_interface::sampler_manager::RenderSamplerManager;
-use truvis_scene::gpu_scene::GpuScene;
 use truvis_scene::scene_manager::SceneManager;
 use truvis_shader_binding::truvisl;
 
@@ -51,7 +51,6 @@ pub struct Renderer {
 
     pub cmd_allocator: CmdAllocator,
 
-    pub asset_hub: AssetHub,
     pub timer: Timer,
     pub fif_timeline_semaphore: GfxSemaphore,
     pub render_graph: RenderGraph,
@@ -113,7 +112,6 @@ impl Renderer {
             .collect();
 
         Self {
-            asset_hub,
             cmd_allocator,
             timer,
             fif_timeline_semaphore,
@@ -122,6 +120,7 @@ impl Renderer {
             render_graph: RenderGraph::default(),
 
             render_context: RenderContext {
+                asset_hub,
                 scene_manager,
                 gpu_scene,
                 fif_buffers,
@@ -179,7 +178,7 @@ impl Renderer {
             .destroy_mut(&mut self.render_context.bindless_manager, &mut self.render_context.gfx_resource_manager);
         self.render_context.bindless_manager.destroy();
         self.render_context.scene_manager.destroy();
-        self.asset_hub.destroy(&mut self.render_context.gfx_resource_manager);
+        self.render_context.asset_hub.destroy(&mut self.render_context.gfx_resource_manager);
         self.render_context.gpu_scene.destroy();
         self.cmd_allocator.destroy();
         self.render_context.gfx_resource_manager.destroy();
@@ -213,7 +212,9 @@ impl Renderer {
         self.render_context.total_time_s = self.timer.total_time_s();
 
         // Update AssetHub
-        self.asset_hub.update(&mut self.render_context.gfx_resource_manager, &mut self.render_context.bindless_manager);
+        self.render_context
+            .asset_hub
+            .update(&mut self.render_context.gfx_resource_manager, &mut self.render_context.bindless_manager);
     }
 
     pub fn acquire_image(&mut self) {
@@ -316,14 +317,15 @@ impl Renderer {
             frame_label,
         );
 
-        self.render_context.gpu_scene.prepare_render_data(
+        self.render_context.gpu_scene.upload_render_data(
             &cmd,
             transfer_barrier_mask,
             &self.render_context.frame_counter,
-            self.render_context.scene_manager.prepare_render_data(),
-            &self.render_context.scene_manager,
+            &self
+                .render_context
+                .scene_manager
+                .prepare_render_data(&self.render_context.bindless_manager, &self.render_context.asset_hub),
             &self.render_context.bindless_manager,
-            &self.asset_hub,
         );
 
         // 准备好当前帧的数据

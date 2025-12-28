@@ -49,7 +49,7 @@ impl CornellApp {
         AssimpSceneLoader::load_scene(
             TruvisPath::assets_path_str("fbx/cube-coord.fbx").as_ref(),
             &mut renderer.render_context.scene_manager,
-            &mut renderer.asset_hub,
+            &mut renderer.render_context.asset_hub,
         );
         log::info!("Scene loaded.");
     }

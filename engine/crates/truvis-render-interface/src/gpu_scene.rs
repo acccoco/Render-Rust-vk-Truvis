@@ -1,12 +1,13 @@
-use crate::components::instance::Instance;
-use crate::scene_data::SceneRenderData;
-use crate::scene_manager::SceneManager;
+use crate::bindless_manager::BindlessManager;
+use crate::frame_counter::FrameCounter;
+use crate::gfx_resource_manager::GfxResourceManager;
+use crate::handles::GfxTextureHandle;
+use crate::pipeline_settings::FrameLabel;
+use crate::render_data::RenderData;
+use crate::texture::{GfxTexture, ImageLoader};
 use ash::vk;
-use glam::Vec4Swizzles;
 use itertools::Itertools;
-use slotmap::Key;
 use std::path::PathBuf;
-use truvis_asset::asset_hub::AssetHub;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::{
     commands::{
@@ -16,12 +17,6 @@ use truvis_gfx::{
     raytracing::acceleration::GfxAcceleration,
     resources::special_buffers::structured_buffer::GfxStructuredBuffer,
 };
-use truvis_render_interface::bindless_manager::{BindlessManager, BindlessSrvHandle};
-use truvis_render_interface::frame_counter::FrameCounter;
-use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
-use truvis_render_interface::handles::GfxTextureHandle;
-use truvis_render_interface::pipeline_settings::FrameLabel;
-use truvis_render_interface::texture::{GfxTexture, ImageLoader};
 use truvis_shader_binding::truvisl;
 
 /// 构建 Gpu Scene 所需的所有 buffer
@@ -105,15 +100,11 @@ impl GpuSceneBuffers {
 
 /// 用于构建传输到 GPU 的场景数据
 pub struct GpuScene {
-    scene_render_data: SceneRenderData,
-
-    /// mesh 在 geometry buffer 中的 start idx
-    // mesh_geometry_map: SecondaryMap<MeshHandle, usize>,
-    all_mesh_startup_index: Vec<usize>,
-
     gpu_scene_buffers: [GpuSceneBuffers; FrameCounter::fif_count()],
 
+    // TODO sky texture handle 不应该放在 GPU scene 里面
     sky_texture_handle: GfxTextureHandle,
+    // TODO uv checker texture handle 不应该放在 GPU scene 里面
     uv_checker_texture_handle: GfxTextureHandle,
 }
 // getter
@@ -146,9 +137,6 @@ impl GpuScene {
         bindless_manager.register_srv_with_texture(uv_checker_texture_handle);
 
         Self {
-            scene_render_data: Default::default(),
-            all_mesh_startup_index: Vec::default(),
-
             gpu_scene_buffers: FrameCounter::frame_labes().map(GpuSceneBuffers::new),
 
             sky_texture_handle,
@@ -166,53 +154,49 @@ impl GpuScene {
 }
 // tools
 impl GpuScene {
-    /// # Phase: Before Render
+    /// # Phase: Before Render (基于 SceneData2)
     ///
-    /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中
-    pub fn prepare_render_data(
+    /// 将已经准备好的 GPU 格式的场景数据写入 Device Buffer 中。
+    /// 此方法不依赖 SceneManager，仅使用 SceneData2 中的数据。
+    ///
+    /// # 参数
+    /// - `cmd`: 用于提交 GPU 命令的命令缓冲区
+    /// - `barrier_mask`: 用于同步的屏障掩码
+    /// - `frame_counter`: 帧计数器，用于获取当前帧的 buffer
+    /// - `scene_data`: 包含完整场景信息的 SceneData2
+    /// - `bindless_manager`: 用于获取 sky/uv_checker 等内置纹理的 bindless handle
+    pub fn upload_render_data(
         &mut self,
         cmd: &GfxCommandBuffer,
         barrier_mask: GfxBarrierMask,
         frame_counter: &FrameCounter,
-        scene_render_data: SceneRenderData,
-        scene_manager: &SceneManager,
+        render_data: &RenderData<'_>,
         bindless_manager: &BindlessManager,
-        asset_hub: &AssetHub,
     ) {
-        let _span = tracy_client::span!("GpuScene::upload_to_buffer");
-        self.scene_render_data = scene_render_data;
+        let _span = tracy_client::span!("GpuScene::prepare_render_data2");
 
-        // 记录每个 mesh 在 geometry buffer 中的 startup index
-        {
-            self.all_mesh_startup_index.reserve(self.scene_render_data.all_meshes.len());
+        self.upload_mesh_buffer(cmd, barrier_mask, render_data, frame_counter);
+        self.upload_instance_buffer(cmd, barrier_mask, render_data, frame_counter);
+        self.upload_material_buffer(cmd, barrier_mask, render_data, frame_counter);
+        self.upload_light_buffer(cmd, barrier_mask, render_data, frame_counter);
 
-            let mut mesh_startup_idx = 0;
-            for mesh_handle in &self.scene_render_data.all_meshes {
-                let mesh = scene_manager.get_mesh(*mesh_handle).unwrap();
-                self.all_mesh_startup_index.push(mesh_startup_idx);
-                mesh_startup_idx += mesh.geometries.len();
-            }
-        }
+        // 需要确保 instance 先于 tlas 构建
+        self.build_tlas(render_data, frame_counter);
 
-        self.upload_mesh_buffer(cmd, barrier_mask, scene_manager, frame_counter);
-        self.upload_instance_buffer(cmd, barrier_mask, scene_manager, frame_counter);
-        self.upload_material_buffer(cmd, barrier_mask, scene_manager, bindless_manager, asset_hub, frame_counter);
-        self.upload_light_buffer(cmd, barrier_mask, scene_manager, frame_counter);
-
-        // 需要确保 instance 先与 tlas 构建
-        self.build_tlas(scene_manager, frame_counter);
-
-        self.upload_scene_buffer(cmd, frame_counter, barrier_mask, scene_manager, bindless_manager);
+        self.upload_scene_buffer(cmd, frame_counter, barrier_mask, render_data, bindless_manager);
     }
 
-    /// 绘制场景中的所有实例
+    // TODO 改成：返回 Raster 模式的 RenderData
+    /// 绘制场景中的所有实例（基于 SceneData2）
     ///
-    /// before_draw(instance_idx, submesh_idx)
-    pub fn draw(&self, cmd: &GfxCommandBuffer, scene_manager: &SceneManager, mut before_draw: impl FnMut(u32, u32)) {
-        let _span = tracy_client::span!("GpuScene::draw");
-        for (instance_idx, instance_handle) in self.scene_render_data.all_instances.iter().enumerate() {
-            let instance = scene_manager.get_instance(*instance_handle).unwrap();
-            let mesh = scene_manager.get_mesh(instance.mesh).unwrap();
+    /// # 参数
+    /// - `cmd`: 命令缓冲区
+    /// - `scene_data`: 场景数据
+    /// - `before_draw`: 每次绘制前的回调函数 (instance_idx, submesh_idx)
+    pub fn draw(&self, cmd: &GfxCommandBuffer, scene_data: &RenderData<'_>, mut before_draw: impl FnMut(u32, u32)) {
+        let _span = tracy_client::span!("GpuScene::draw2");
+        for (instance_idx, instance) in scene_data.all_instances.iter().enumerate() {
+            let mesh = &scene_data.all_meshes[instance.mesh_index];
             for (submesh_idx, geometry) in mesh.geometries.iter().enumerate() {
                 geometry.cmd_bind_index_buffer(cmd);
                 geometry.cmd_bind_vertex_buffers(cmd);
@@ -222,18 +206,21 @@ impl GpuScene {
             }
         }
     }
+}
 
-    /// 将整个场景的数据上传到 scene buffer 中去
+// 基于 SceneData2 的新方法
+impl GpuScene {
+    /// 将整个场景的数据上传到 scene buffer 中去（基于 SceneData2）
     fn upload_scene_buffer(
         &mut self,
         cmd: &GfxCommandBuffer,
         frame_counter: &FrameCounter,
         barrier_mask: GfxBarrierMask,
-        scene_manager: &SceneManager,
+        scene_data: &RenderData<'_>,
         bindless_manager: &BindlessManager,
     ) {
         let crt_gpu_buffers = &self.gpu_scene_buffers[*frame_counter.frame_label()];
-        let scene_data = truvisl::GPUScene {
+        let gpu_scene_data = truvisl::GPUScene {
             all_instances: crt_gpu_buffers.instance_buffer.device_address(),
             all_mats: crt_gpu_buffers.material_buffer.device_address(),
             all_geometries: crt_gpu_buffers.geometry_buffer.device_address(),
@@ -241,7 +228,7 @@ impl GpuScene {
             instance_geometry_map: crt_gpu_buffers.geometry_indirect_buffer.device_address(),
             point_lights: crt_gpu_buffers.light_buffer.device_address(),
             spot_lights: 0, // TODO 暂时无用
-            point_light_count: scene_manager.point_light_map().len() as u32,
+            point_light_count: scene_data.all_point_lights.len() as u32,
             spot_light_count: 0, // TODO 暂时无用
 
             sky: bindless_manager.get_shader_srv_handle_with_texture(self.sky_texture_handle).0,
@@ -250,7 +237,7 @@ impl GpuScene {
             uv_checker_sampler_type: truvisl::ESamplerType_LinearClamp,
         };
 
-        cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.vk_buffer(), 0, bytemuck::bytes_of(&scene_data));
+        cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.vk_buffer(), 0, bytemuck::bytes_of(&gpu_scene_data));
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
             &[GfxBufferBarrier::default().mask(barrier_mask).buffer(
@@ -261,17 +248,15 @@ impl GpuScene {
         );
     }
 
-    /// 将数据转换为 shader 中的实例数据
-    ///
-    /// 其中 buffer 可以是 stage buffer 的内存映射
+    /// 将 instance 数据上传到 GPU（基于 SceneData2）
     fn upload_instance_buffer(
         &mut self,
         cmd: &GfxCommandBuffer,
         barrier_mask: GfxBarrierMask,
-        scene_manager: &SceneManager,
+        scene_data: &RenderData<'_>,
         frame_counter: &FrameCounter,
     ) {
-        let _span = tracy_client::span!("upload_instance_buffer");
+        let _span = tracy_client::span!("upload_instance_buffer2");
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_counter.frame_label()];
 
         let crt_instance_stage_buffer = &mut crt_gpu_buffers.instance_stage_buffer;
@@ -282,15 +267,14 @@ impl GpuScene {
         let material_indirect_buffer_slices = crt_material_indirect_stage_buffer.mapped_slice();
         let geometry_indirect_buffer_slices = crt_geometry_indirect_stage_buffer.mapped_slice();
 
-        if instance_buffer_slices.len() < self.scene_render_data.all_instances.len() {
+        if instance_buffer_slices.len() < scene_data.all_instances.len() {
             panic!("instance cnt can not be larger than buffer");
         }
 
         let mut crt_geometry_indirect_idx = 0;
         let mut crt_material_indirect_idx = 0;
-        for (instance_idx, instance_handle) in self.scene_render_data.all_instances.iter().enumerate() {
-            let instance = scene_manager.get_instance(*instance_handle).unwrap();
-            let submesh_cnt = instance.materials.len();
+        for (instance_idx, instance) in scene_data.all_instances.iter().enumerate() {
+            let submesh_cnt = instance.material_indices.len();
             if geometry_indirect_buffer_slices.len() < crt_geometry_indirect_idx + submesh_cnt {
                 panic!("instance geometry cnt can not be larger than buffer");
             }
@@ -307,22 +291,17 @@ impl GpuScene {
                 inv_model: instance.transform.inverse().into(),
             };
 
-            // TODO 对于 mesh 来说，可能不需要间接的索引 buffer，因为 mesh 在 geometry
-            //  buffer 中是连续的 首先将 instance 需要的 geometry
-            //  的实际索引，写入一个间接索引 buffer: geometry_indirect_buffer，
-            //  然后获得 instance 数据在间接索引 buffer 中的起始 idx 和长度，将这个值写入到
-            //  truvisl::Instance 中
-            let mesh_startup_index =
-                self.all_mesh_startup_index[self.scene_render_data.all_meshes.get_index_of(&instance.mesh).unwrap()];
-            for submesh_idx in 0..instance.materials.len() {
+            // 将 geometry 索引写入间接索引 buffer
+            let mesh_startup_index = scene_data.mesh_geometry_start_indices[instance.mesh_index];
+            for submesh_idx in 0..submesh_cnt {
                 let geometry_idx = mesh_startup_index + submesh_idx;
                 geometry_indirect_buffer_slices[crt_geometry_indirect_idx + submesh_idx] = geometry_idx as u32;
             }
             crt_geometry_indirect_idx += submesh_cnt;
 
-            for material_handle in instance.materials.iter() {
-                let material_idx = self.scene_render_data.all_materials.get_index_of(material_handle).unwrap();
-                material_indirect_buffer_slices[crt_material_indirect_idx] = material_idx as u32;
+            // 将 material 索引写入间接索引 buffer
+            for material_index in instance.material_indices.iter() {
+                material_indirect_buffer_slices[crt_material_indirect_idx] = *material_index as u32;
                 crt_material_indirect_idx += 1;
             }
         }
@@ -347,44 +326,31 @@ impl GpuScene {
         );
     }
 
-    /// 将 material 数据上传到 material buffer 中
+    /// 将 material 数据上传到 GPU（基于 SceneData2）
     fn upload_material_buffer(
         &mut self,
         cmd: &GfxCommandBuffer,
         barrier_mask: GfxBarrierMask,
-        scene_manager: &SceneManager,
-        bindless_manager: &BindlessManager,
-        asset_hub: &AssetHub,
+        scene_data: &RenderData<'_>,
         frame_counter: &FrameCounter,
     ) {
-        let _span = tracy_client::span!("upload_material_buffer");
+        let _span = tracy_client::span!("upload_material_buffer2");
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_counter.frame_label()];
         let crt_material_stage_buffer = &mut crt_gpu_buffers.material_stage_buffer;
         let material_buffer_slices = crt_material_stage_buffer.mapped_slice();
-        if material_buffer_slices.len() < self.scene_render_data.all_materials.len() {
+        if material_buffer_slices.len() < scene_data.all_materials.len() {
             panic!("material cnt can not be larger than buffer");
         }
 
-        for (mat_idx, mat_handle) in self.scene_render_data.all_materials.iter().enumerate() {
-            let mat = scene_manager.mat_map().get(*mat_handle).unwrap();
-
-            let mut diffuse_bindless_handle = BindlessSrvHandle::null();
-            if !mat.diffuse_map.is_empty() {
-                let diffuse_texture_handle = asset_hub.get_texture_by_path(std::path::Path::new(&mat.diffuse_map));
-                diffuse_bindless_handle = bindless_manager.get_shader_srv_handle_with_texture(diffuse_texture_handle);
-            }
-
-            // 暂不支持法线贴图
-            let normal_bindless_handle = BindlessSrvHandle::null();
-
+        for (mat_idx, mat) in scene_data.all_materials.iter().enumerate() {
             material_buffer_slices[mat_idx] = truvisl::PBRMaterial {
-                base_color: mat.base_color.xyz().into(),
-                emissive: mat.emissive.xyz().into(),
+                base_color: mat.base_color.truncate().into(),
+                emissive: mat.emissive.truncate().into(),
                 metallic: mat.metallic,
                 roughness: mat.roughness,
-                diffuse_map: diffuse_bindless_handle.0,
+                diffuse_map: mat.diffuse_bindless_handle.0,
                 diffuse_map_sampler_type: truvisl::ESamplerType_LinearRepeat,
-                normal_map: normal_bindless_handle.0,
+                normal_map: mat.normal_bindless_handle.0,
                 normal_map_sampler_type: truvisl::ESamplerType_LinearRepeat,
                 opaque: mat.opaque,
                 _padding_1: Default::default(),
@@ -401,22 +367,23 @@ impl GpuScene {
         );
     }
 
+    /// 将 light 数据上传到 GPU（基于 SceneData2）
     fn upload_light_buffer(
         &mut self,
         cmd: &GfxCommandBuffer,
         barrier_mask: GfxBarrierMask,
-        scene_manager: &SceneManager,
+        scene_data: &RenderData<'_>,
         frame_counter: &FrameCounter,
     ) {
-        let _span = tracy_client::span!("upload_light_buffer");
+        let _span = tracy_client::span!("upload_light_buffer2");
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_counter.frame_label()];
         let crt_light_stage_buffer = &mut crt_gpu_buffers.light_stage_buffer;
         let light_buffer_slices = crt_light_stage_buffer.mapped_slice();
-        if light_buffer_slices.len() < scene_manager.point_light_map().len() {
+        if light_buffer_slices.len() < scene_data.all_point_lights.len() {
             panic!("light cnt can not be larger than buffer");
         }
 
-        for (light_idx, (_, point_light)) in scene_manager.point_light_map().iter().enumerate() {
+        for (light_idx, point_light) in scene_data.all_point_lights.iter().enumerate() {
             light_buffer_slices[light_idx] = truvisl::PointLight {
                 pos: point_light.pos,
                 color: point_light.color,
@@ -429,22 +396,21 @@ impl GpuScene {
         helper::flush_copy_and_barrier(cmd, crt_light_stage_buffer, &mut crt_gpu_buffers.light_buffer, barrier_mask);
     }
 
-    /// 将 mesh 数据以 geometry 的形式上传到 GPU
+    /// 将 mesh 数据以 geometry 的形式上传到 GPU（基于 SceneData2）
     fn upload_mesh_buffer(
         &mut self,
         cmd: &GfxCommandBuffer,
         barrier_mask: GfxBarrierMask,
-        scene_manager: &SceneManager,
+        scene_data: &RenderData<'_>,
         frame_counter: &FrameCounter,
     ) {
-        let _span = tracy_client::span!("upload_mesh_buffer");
+        let _span = tracy_client::span!("upload_mesh_buffer2");
         let crt_gpu_buffers = &mut self.gpu_scene_buffers[*frame_counter.frame_label()];
         let crt_geometry_stage_buffer = &mut crt_gpu_buffers.geometry_stage_buffer;
         let geometry_buffer_slices = crt_geometry_stage_buffer.mapped_slice();
 
         let mut crt_geometry_idx = 0;
-        for mesh_handle in self.scene_render_data.all_meshes.iter() {
-            let mesh = scene_manager.mesh_map().get(*mesh_handle).unwrap();
+        for mesh in scene_data.all_meshes.iter() {
             if geometry_buffer_slices.len() < crt_geometry_idx + mesh.geometries.len() {
                 panic!("geometry cnt can not be larger than buffer");
             }
@@ -467,17 +433,15 @@ impl GpuScene {
             barrier_mask,
         );
     }
-}
-// ray tracing
-impl GpuScene {
-    /// 根据 instance 信息获得加速结构的 instance 信息
+
+    /// 根据 SceneData2 的 instance 信息获得加速结构的 instance 信息
     fn get_as_instance_info(
         &self,
-        instance: &Instance,
+        instance: &crate::render_data::InstanceRenderData,
         custom_idx: u32,
-        scene_manager: &SceneManager,
+        scene_data: &RenderData<'_>,
     ) -> vk::AccelerationStructureInstanceKHR {
-        let mesh = scene_manager.get_mesh(instance.mesh).expect("Mesh not found");
+        let mesh = &scene_data.all_meshes[instance.mesh_index];
         vk::AccelerationStructureInstanceKHR {
             // 3x4 row-major matrix
             transform: helper::get_rt_matrix(&instance.transform),
@@ -487,14 +451,15 @@ impl GpuScene {
                 vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE.as_raw() as u8,
             ),
             acceleration_structure_reference: vk::AccelerationStructureReferenceKHR {
-                device_handle: mesh.blas_device_address.unwrap(),
+                device_handle: mesh.blas_device_address.expect("BLAS not built for mesh"),
             },
         }
     }
 
-    fn build_tlas(&mut self, scene_manager: &SceneManager, frame_counter: &FrameCounter) {
-        let _span = tracy_client::span!("build_tlas");
-        if self.scene_render_data.all_instances.is_empty() {
+    /// 构建 TLAS（基于 SceneData2）
+    fn build_tlas(&mut self, scene_data: &RenderData<'_>, frame_counter: &FrameCounter) {
+        let _span = tracy_client::span!("build_tlas2");
+        if scene_data.all_instances.is_empty() {
             // 没有实例数据，直接返回
             return;
         }
@@ -504,18 +469,17 @@ impl GpuScene {
             return;
         }
 
-        let instance_infos = self
-            .scene_render_data
+        let instance_infos = scene_data
             .all_instances
             .iter()
-            .map(|ins_handle| (ins_handle, scene_manager.get_instance(*ins_handle).unwrap()))
+            .enumerate()
             // BUG custom idx 的有效位数只有 24 位，如果场景内 instance 过多，可能会溢出
-            .map(|(ins_handle, ins)| self.get_as_instance_info(ins, ins_handle.data().as_ffi() as u32, scene_manager))
+            .map(|(idx, ins)| self.get_as_instance_info(ins, idx as u32, scene_data))
             .collect_vec();
         let tlas = GfxAcceleration::build_tlas_sync(
             &instance_infos,
             vk::BuildAccelerationStructureFlagsKHR::empty(),
-            format!("scene-{}-{}", frame_counter.frame_label(), frame_counter.frame_id),
+            format!("scene2-{}-{}", frame_counter.frame_label(), frame_counter.frame_id),
         );
 
         self.gpu_scene_buffers[*frame_counter.frame_label()].tlas = Some(tlas);

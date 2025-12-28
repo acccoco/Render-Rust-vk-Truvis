@@ -5681,6 +5681,7 @@ dependencies = [
  "itertools 0.10.5",
  "log",
  "slotmap",
+ "truvis-asset",
  "truvis-crate-tools",
  "truvis-descriptor-layout-macro",
  "truvis-descriptor-layout-trait",
@@ -5696,12 +5697,14 @@ name = "truvis-render-interface"
 version = "0.1.0"
 dependencies = [
  "ash",
+ "bytemuck",
  "glam",
  "image",
  "itertools 0.10.5",
  "log",
  "slotmap",
  "tracy-client",
+ "truvis-crate-tools",
  "truvis-descriptor-layout-macro",
  "truvis-descriptor-layout-trait",
  "truvis-gfx",

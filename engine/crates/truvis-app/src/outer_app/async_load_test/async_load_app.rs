@@ -6,9 +6,9 @@ use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_render_interface::geometry::RtGeometry;
 use truvis_renderer::platform::camera::Camera;
 use truvis_renderer::renderer::Renderer;
-use truvis_scene::components::geometry::RtGeometry;
 
 #[derive(Default)]
 pub struct AsyncLoadTest {
@@ -51,7 +51,7 @@ impl OuterApp for AsyncLoadTest {
 
         // Load a texture
         let texture_path = TruvisPath::resources_path_str("uv_checker.png");
-        let texture_handle = renderer.asset_hub.load_texture(texture_path.into());
+        let texture_handle = renderer.render_context.asset_hub.load_texture(texture_path.into());
 
         self.pipeline = Some(AsyncPass::new(
             &renderer.render_context.global_descriptor_sets,

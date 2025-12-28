@@ -24,8 +24,8 @@ use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
+use truvis_render_interface::geometry::RtGeometry;
 use truvis_render_interface::pipeline_settings::FrameSettings;
-use truvis_scene::components::geometry::RtGeometry;
 
 enumed_map!(ShaderStage<GfxShaderStageInfo>:{
     Vertex: GfxShaderStageInfo {

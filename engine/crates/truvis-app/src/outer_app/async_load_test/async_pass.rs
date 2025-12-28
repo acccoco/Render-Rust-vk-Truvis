@@ -1,8 +1,6 @@
-use std::rc::Rc;
-
 use ash::vk;
 use itertools::Itertools;
-
+use std::rc::Rc;
 use truvis_crate_tools::count_indexed_array;
 use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
@@ -23,9 +21,9 @@ use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
+use truvis_render_interface::geometry::RtGeometry;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::pipeline_settings::{FrameLabel, FrameSettings};
-use truvis_scene::components::geometry::RtGeometry;
 
 enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {

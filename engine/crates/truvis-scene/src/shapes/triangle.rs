@@ -1,6 +1,6 @@
-use crate::components::geometry::RtGeometry;
 use truvis_gfx::resources::special_buffers::index_buffer::GfxIndex32Buffer;
 use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
+use truvis_render_interface::geometry::RtGeometry;
 
 /// 坐标系：RightHand, X-Right, Y-Up
 ///
