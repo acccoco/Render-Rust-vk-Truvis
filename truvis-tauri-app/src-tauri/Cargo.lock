@@ -5776,6 +5776,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-opener",
  "truvis-app",
+ "truvis-render-graph",
  "truvis-renderer",
 ]
 

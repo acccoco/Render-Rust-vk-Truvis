@@ -8,11 +8,11 @@ use truvis_renderer::renderer::Renderer;
 use truvis_scene::shapes::triangle::TriangleSoA;
 
 #[derive(Default)]
-pub struct HelloTriangle {
+pub struct HelloTriangleApp {
     triangle_pipeline: Option<TrianglePass>,
     triangle: Option<RtGeometry>,
 }
-impl OuterApp for HelloTriangle {
+impl OuterApp for HelloTriangleApp {
     fn init(&mut self, renderer: &mut Renderer, _camera: &mut Camera) {
         log::info!("hello triangle init.");
 

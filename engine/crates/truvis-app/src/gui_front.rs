@@ -30,6 +30,8 @@ impl GuiHost {
             style.colors[imgui::StyleColor::WindowBg as usize] = [0.1, 0.1, 0.1, 0.9];
         }
 
+        imgui_ctx.io_mut().display_size = [800.0, 600.0];
+
         Self {
             imgui_ctx,
             hidpi_factor: 1.0,

@@ -194,8 +194,16 @@ impl RenderApp {
         {
             let mut need_reisze = false;
             for event in self.input_manager.get_events() {
-                if let InputEvent::Resized { .. } = event {
+                if let InputEvent::Resized {
+                    physical_width,
+                    physical_height,
+                } = event
+                {
                     need_reisze = true;
+                    if physical_width + physical_height < 1.0 {
+                        log::error!("Invalid window size: {}x{}", physical_width, physical_height);
+                        continue;
+                    }
                 }
             }
             if need_reisze {
