@@ -18,9 +18,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-truvis-app = { path = "../../engine/crates/truvis-app" }
-truvis-renderer = { path = "../../engine/crates/truvis-renderer" }
-truvis-render-graph = { path = "../../engine/crates/truvis-render-graph" }
+truvis-app = { workspace = true }
+truvis-renderer = { workspace = true }
+truvis-render-graph = { workspace = true }
 
 
 tauri = { version = "2", features = ["unstable"] }
@@ -28,6 +28,4 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-imgui-winit-support = "0.13.0"
-imgui = { version = "0.12.0", features = ["docking"] }
-raw-window-handle = "0.6"
+raw-window-handle = { workspace = true }

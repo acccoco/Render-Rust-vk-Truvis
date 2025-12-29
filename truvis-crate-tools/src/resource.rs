@@ -15,11 +15,27 @@ use std::{
 /// let shader = TruvisPath::shader_path("rt/raygen.slang"); // shader/.build/rt/raygen.slang
 /// ```
 pub struct TruvisPath {}
+// 核心路径
 impl TruvisPath {
+    /// 获取工作区根目录
+    pub fn workspace_path() -> PathBuf {
+        // 从当前包的位置推导workspace目录
+        Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
+    }
+
+    pub fn target_path() -> PathBuf {
+        Self::workspace_path().join("target")
+    }
+}
+// 根目录下
+impl TruvisPath {
+    pub fn engine_path() -> PathBuf {
+        Self::workspace_path().join("engine")
+    }
+
     /// 获取 `assets/` 目录下的文件路径
     pub fn assets_path(filename: &str) -> std::path::PathBuf {
-        let workspace_dir = Self::workspace_path();
-        workspace_dir.parent().unwrap().join("assets").join(filename)
+        Self::workspace_path().join("assets").join(filename)
     }
     pub fn assets_path_str(filename: &str) -> String {
         Self::assets_path(filename).to_str().unwrap().to_string()
@@ -27,46 +43,31 @@ impl TruvisPath {
 
     /// 获取 `resources/` 目录下的文件路径
     pub fn resources_path(filename: &str) -> std::path::PathBuf {
-        let workspace_dir = Self::workspace_path();
-        workspace_dir.parent().unwrap().join("resources").join(filename)
+        Self::workspace_path().join("resources").join(filename)
     }
     pub fn resources_path_str(filename: &str) -> String {
         Self::resources_path(filename).to_str().unwrap().to_string()
     }
 
+    pub fn tools_path() -> PathBuf {
+        Self::workspace_path().parent().unwrap().join("tools")
+    }
+}
+// engine 目录下
+impl TruvisPath {
+    pub fn shader_root_path() -> PathBuf {
+        Self::engine_path().join("shader")
+    }
+
     /// 获取 `shader/.build/` 目录下的着色器路径（编译后的 SPIR-V）
     pub fn shader_build_path_str(filename: &str) -> String {
-        let workspace_dir = Self::workspace_path();
-        let shader_path = workspace_dir.join("shader").join(".build").join(filename);
+        let shader_path = Self::shader_root_path().join(".build").join(filename);
         let mut shader_build_path = shader_path.to_str().unwrap().to_string();
         shader_build_path.push_str(".spv");
         shader_build_path
     }
 
-    /// 获取工作区根目录
-    pub fn workspace_path() -> PathBuf {
-        // 从当前包的位置推导workspace目录
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent() // 从 crates/truvis-crate-tools 到 crates
-            .unwrap()
-            .parent() // 从 crates 到 workspace root
-            .unwrap()
-            .to_path_buf()
-    }
-
-    pub fn target_path() -> PathBuf {
-        Self::workspace_path().parent().unwrap().join("target")
-    }
-
-    pub fn tools_path() -> PathBuf {
-        Self::workspace_path().parent().unwrap().join("tools")
-    }
-
-    pub fn shader_root_path() -> PathBuf {
-        Self::workspace_path().join("shader")
-    }
-
     pub fn cxx_root_path() -> PathBuf {
-        Self::workspace_path().join("cxx")
+        Self::engine_path().join("cxx")
     }
 }

@@ -3,6 +3,7 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use truvis_app::outer_app::OuterApp;
 use truvis_app::render_app::RenderApp;
+use truvis_crate_tools::resource::TruvisPath;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::window::Window;
 use winit::{
@@ -65,7 +66,8 @@ impl WinitApp {
             winit::window::Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
         }
 
-        let icon_data = std::fs::read("../resources/DruvisIII.png").expect("Failed to read icon file");
+        let icon_data =
+            std::fs::read(TruvisPath::resources_path_str("DruvisIII.png")).expect("Failed to read icon file");
         let icon = load_icon(icon_data.as_ref());
         let window_attr = Window::default_attributes()
             .with_title(window_title)

@@ -1,48 +1,53 @@
 [workspace]
-resolver = "2"
+resolver = "3"
 members = [
-    "crates/truvis-crate-tools",
-    "crates/truvis-gfx",
+    # 通用部分
+    "truvis-crate-tools",
 
-    "crates/truvis-render-interface",
-    "crates/truvis-render-graph",
-    "crates/truvis-asset",
-    "crates/truvis-scene",
-    "crates/truvis-renderer",
-    "crates/truvis-app",
-
-    "crates/truvis-gui-backend",
-
-    "crates/truvis-shader/truvis-descriptor-layout-macro",
-    "crates/truvis-shader/truvis-descriptor-layout-trait",
-    "crates/truvis-shader/truvis-shader-binding",
-    "crates/truvis-shader/truvis-shader-build",
-
-    "crates/truvis-cxx/truvis-cxx-binding",
-    "crates/truvis-cxx/truvis-cxx-build",
+    # RenderApp 层级
+    "engine/crates/truvis-gfx",
+    "engine/crates/truvis-render-interface",
+    "engine/crates/truvis-render-graph",
+    "engine/crates/truvis-asset",
+    "engine/crates/truvis-scene",
+    "engine/crates/truvis-renderer",
+    "engine/crates/truvis-app",
+    # imgui 后端
+    "engine/crates/truvis-gui-backend",
+    # shader 绑定相关
+    "engine/crates/truvis-shader/truvis-descriptor-layout-macro",
+    "engine/crates/truvis-shader/truvis-descriptor-layout-trait",
+    "engine/crates/truvis-shader/truvis-shader-binding",
+    "engine/crates/truvis-shader/truvis-shader-build",
+    # cxx 绑定相关
+    "engine/crates/truvis-cxx/truvis-cxx-binding",
+    "engine/crates/truvis-cxx/truvis-cxx-build",
+    # App
+    "truvis-winit-app",
+    "truvis-tauri-app/src-tauri",
 ]
 
 
 [workspace.dependencies]
-truvis-crate-tools = { path = "crates/truvis-crate-tools" }
-truvis-gfx = { path = "crates/truvis-gfx" }
+truvis-crate-tools = { path = "truvis-crate-tools" }
+truvis-gfx = { path = "engine/crates/truvis-gfx" }
 
-truvis-render-interface = { path = "crates/truvis-render-interface" }
-truvis-render-graph = { path = "crates/truvis-render-graph" }
-truvis-asset = { path = "crates/truvis-asset" }
-truvis-scene = { path = "crates/truvis-scene" }
-truvis-renderer = { path = "crates/truvis-renderer" }
-truvis-app = { path = "crates/truvis-app" }
+truvis-render-interface = { path = "engine/crates/truvis-render-interface" }
+truvis-render-graph = { path = "engine/crates/truvis-render-graph" }
+truvis-asset = { path = "engine/crates/truvis-asset" }
+truvis-scene = { path = "engine/crates/truvis-scene" }
+truvis-renderer = { path = "engine/crates/truvis-renderer" }
+truvis-app = { path = "engine/crates/truvis-app" }
 
-truvis-gui-backend = { path = "crates/truvis-gui-backend" }
+truvis-gui-backend = { path = "engine/crates/truvis-gui-backend" }
 
-truvis-descriptor-layout-macro = { path = "crates/truvis-shader/truvis-descriptor-layout-macro" }
-truvis-descriptor-layout-trait = { path = "crates/truvis-shader/truvis-descriptor-layout-trait" }
-truvis-shader-binding = { path = "crates/truvis-shader/truvis-shader-binding" }
-truvis-shader-build = { path = "crates/truvis-shader/truvis-shader-build" }
+truvis-descriptor-layout-macro = { path = "engine/crates/truvis-shader/truvis-descriptor-layout-macro" }
+truvis-descriptor-layout-trait = { path = "engine/crates/truvis-shader/truvis-descriptor-layout-trait" }
+truvis-shader-binding = { path = "engine/crates/truvis-shader/truvis-shader-binding" }
+truvis-shader-build = { path = "engine/crates/truvis-shader/truvis-shader-build" }
 
-truvis-cxx-binding = { path = "crates/truvis-cxx/truvis-cxx-binding" }
-truvis-cxx-build = { path = "crates/truvis-cxx/truvis-cxx-build" }
+truvis-cxx-binding = { path = "engine/crates/truvis-cxx/truvis-cxx-binding" }
+truvis-cxx-build = { path = "engine/crates/truvis-cxx/truvis-cxx-build" }
 
 
 
@@ -66,6 +71,8 @@ imgui = { version = "0.12.0", features = ["docking"] }
 
 # 让 winit 可以和图形库通信
 raw-window-handle = "0.6.2"
+
+winit = "0.30.8"
 
 
 # 资源加载
