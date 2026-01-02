@@ -1,7 +1,18 @@
 use slotmap::new_key_type;
+use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle};
+use truvis_shader_binding::truvisl;
 
 new_key_type! { pub struct AssetTextureHandle; }
 new_key_type! { pub struct AssetMeshHandle; }
+
+#[derive(Debug)]
+pub struct AssetTexture {
+    pub image_handle: GfxImageHandle,
+    pub view_handle: GfxImageViewHandle,
+    pub sampler: truvisl::ESamplerType,
+    pub is_srgb: bool,
+    pub mip_levels: u32,
+}
 
 /// 资源加载状态机
 ///

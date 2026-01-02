@@ -10,4 +10,3 @@ pub mod pipeline_settings;
 pub mod render_data;
 pub mod sampler_manager;
 pub mod stage_buffer_manager;
-pub mod texture;

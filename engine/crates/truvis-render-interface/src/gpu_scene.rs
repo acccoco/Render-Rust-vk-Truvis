@@ -1,10 +1,10 @@
 use crate::bindless_manager::BindlessManager;
 use crate::frame_counter::FrameCounter;
 use crate::gfx_resource_manager::GfxResourceManager;
-use crate::handles::GfxTextureHandle;
+use crate::gpu_scene::helper::ImageLoader;
+use crate::handles::{GfxImageHandle, GfxImageViewHandle};
 use crate::pipeline_settings::FrameLabel;
 use crate::render_data::RenderData;
-use crate::texture::{GfxTexture, ImageLoader};
 use ash::vk;
 use itertools::Itertools;
 use std::path::PathBuf;
@@ -103,9 +103,9 @@ pub struct GpuScene {
     gpu_scene_buffers: [GpuSceneBuffers; FrameCounter::fif_count()],
 
     // TODO sky texture handle 不应该放在 GPU scene 里面
-    sky_texture_handle: GfxTextureHandle,
+    sky_texture: (GfxImageHandle, GfxImageViewHandle),
     // TODO uv checker texture handle 不应该放在 GPU scene 里面
-    uv_checker_texture_handle: GfxTextureHandle,
+    uv_checker_texture: (GfxImageHandle, GfxImageViewHandle),
 }
 // getter
 impl GpuScene {
@@ -124,23 +124,38 @@ impl GpuScene {
     pub fn new(gfx_resource_manager: &mut GfxResourceManager, bindless_manager: &mut BindlessManager) -> Self {
         let sky_path = TruvisPath::resources_path_str("sky.jpg");
         let uv_checker_path = TruvisPath::resources_path_str("uv_checker.png");
+
         let sky_image = ImageLoader::load_image(&PathBuf::from(&sky_path));
         let uv_checker_image = ImageLoader::load_image(&PathBuf::from(&uv_checker_path));
 
-        let sky_texture = GfxTexture::new(sky_image, &sky_path);
-        let uv_checker_texture = GfxTexture::new(uv_checker_image, &uv_checker_path);
+        let sky_image_format = sky_image.format();
+        let uv_checker_image_format = uv_checker_image.format();
 
-        let sky_texture_handle = gfx_resource_manager.register_texture(sky_texture);
-        let uv_checker_texture_handle = gfx_resource_manager.register_texture(uv_checker_texture);
+        let sky_image_handle = gfx_resource_manager.register_image(sky_image);
+        let sky_view_handle = gfx_resource_manager.get_or_create_image_view(
+            sky_image_handle,
+            truvis_gfx::resources::image_view::GfxImageViewDesc::new_2d(sky_image_format, vk::ImageAspectFlags::COLOR),
+            &sky_path,
+        );
 
-        bindless_manager.register_srv_with_texture(sky_texture_handle);
-        bindless_manager.register_srv_with_texture(uv_checker_texture_handle);
+        let uv_checker_image_handle = gfx_resource_manager.register_image(uv_checker_image);
+        let uv_checker_view_handle = gfx_resource_manager.get_or_create_image_view(
+            uv_checker_image_handle,
+            truvis_gfx::resources::image_view::GfxImageViewDesc::new_2d(
+                uv_checker_image_format,
+                vk::ImageAspectFlags::COLOR,
+            ),
+            &uv_checker_path,
+        );
+
+        bindless_manager.register_srv(sky_view_handle);
+        bindless_manager.register_srv(uv_checker_view_handle);
 
         Self {
             gpu_scene_buffers: FrameCounter::frame_labes().map(GpuSceneBuffers::new),
 
-            sky_texture_handle,
-            uv_checker_texture_handle,
+            sky_texture: (sky_image_handle, sky_view_handle),
+            uv_checker_texture: (uv_checker_image_handle, uv_checker_view_handle),
         }
     }
 }
@@ -231,9 +246,9 @@ impl GpuScene {
             point_light_count: scene_data.all_point_lights.len() as u32,
             spot_light_count: 0, // TODO 暂时无用
 
-            sky: bindless_manager.get_shader_srv_handle_with_texture(self.sky_texture_handle).0,
+            sky: bindless_manager.get_shader_srv_handle(self.sky_texture.1).0,
             sky_sampler_type: truvisl::ESamplerType_LinearClamp,
-            uv_checker: bindless_manager.get_shader_srv_handle_with_texture(self.uv_checker_texture_handle).0,
+            uv_checker: bindless_manager.get_shader_srv_handle(self.uv_checker_texture.1).0,
             uv_checker_sampler_type: truvisl::ESamplerType_LinearClamp,
         };
 
@@ -488,6 +503,7 @@ impl GpuScene {
 
 mod helper {
     use ash::vk;
+    use truvis_gfx::resources::image::GfxImage;
     use truvis_gfx::{
         commands::{
             barrier::{GfxBarrierMask, GfxBufferBarrier},
@@ -495,6 +511,7 @@ mod helper {
         },
         resources::buffer::GfxBuffer,
     };
+
     /// 三个操作：
     /// 1. 将 stage buffer 的数据 *全部* flush 到 buffer 中
     /// 2. 从 stage buffer 中将 *所有* 数据复制到目标 buffer 中
@@ -536,6 +553,20 @@ mod helper {
                 c1.y, c2.y, c3.y, c4.y, // row 2
                 c1.z, c2.z, c3.z, c4.z, // row 3
             ],
+        }
+    }
+
+    // TODO 临时的图片加载器，后续需要整合到 TextureManager 中
+    pub struct ImageLoader {}
+    impl ImageLoader {
+        pub fn load_image(tex_path: &std::path::Path) -> GfxImage {
+            let img = image::ImageReader::open(tex_path).unwrap().decode().unwrap().to_rgba8();
+            let width = img.width();
+            let height = img.height();
+            let data = img.as_raw();
+            let name = tex_path.to_str().unwrap();
+
+            GfxImage::from_rgba8(width, height, data, name)
         }
     }
 }

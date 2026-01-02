@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 truvis-gfx = { workspace = true }
 truvis-render-interface = { workspace = true }
+truvis-shader-binding = { workspace = true }
 
 
 ash = { workspace = true }

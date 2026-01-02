@@ -171,11 +171,11 @@ impl Renderer {
         self.render_context
             .fif_buffers
             .destroy_mut(&mut self.render_context.bindless_manager, &mut self.render_context.gfx_resource_manager);
-        self.render_context.bindless_manager.destroy();
         self.render_context.scene_manager.destroy();
         self.render_context
             .asset_hub
-            .destroy(&mut self.render_context.gfx_resource_manager, &self.render_context.frame_counter);
+            .destroy(&mut self.render_context.gfx_resource_manager, &mut self.render_context.bindless_manager);
+        self.render_context.bindless_manager.destroy();
         self.render_context.gpu_scene.destroy();
         self.cmd_allocator.destroy();
         self.render_context.gfx_resource_manager.destroy();

@@ -99,8 +99,8 @@ impl SceneManager {
 
             // 获取漫反射贴图的 bindless handle
             let diffuse_bindless_handle = if !mat.diffuse_map.is_empty() {
-                let texture_handle = asset_hub.get_texture_by_path(std::path::Path::new(&mat.diffuse_map));
-                bindless_manager.get_shader_srv_handle_with_texture(texture_handle)
+                let asset_texture = asset_hub.get_texture_by_path(std::path::Path::new(&mat.diffuse_map));
+                bindless_manager.get_shader_srv_handle(asset_texture.view_handle)
             } else {
                 BindlessSrvHandle::null()
             };

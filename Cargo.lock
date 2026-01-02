@@ -5755,6 +5755,7 @@ dependencies = [
  "tracy-client",
  "truvis-gfx",
  "truvis-render-interface",
+ "truvis-shader-binding",
  "vk-mem",
 ]
 

@@ -1,6 +1,6 @@
 use crate::gfx_resource_manager::GfxResourceManager;
 use crate::global_descriptor_sets::{BindlessDescriptorBinding, GlobalDescriptorSets};
-use crate::handles::{GfxImageViewHandle, GfxTextureHandle};
+use crate::handles::GfxImageViewHandle;
 use crate::pipeline_settings::FrameLabel;
 use ash::vk;
 use slotmap::{Key, SecondaryMap};
@@ -95,26 +95,19 @@ impl Default for BindlessSrvHandle {
 /// // 在着色器中: textures[key]
 /// ```
 pub struct BindlessManager {
-    // combined image sampler
-    combined_sampler_srvs: SecondaryMap<GfxTextureHandle, BindlessTextureHandle>,
-
     // storage image
     uavs: SecondaryMap<GfxImageViewHandle, BindlessUavHandle>,
-    texture_uavs: SecondaryMap<GfxTextureHandle, BindlessUavHandle>,
 
     // sampled image
     srvs: SecondaryMap<GfxImageViewHandle, BindlessSrvHandle>,
-    texture_srvs: SecondaryMap<GfxTextureHandle, BindlessSrvHandle>,
 }
+
 // new & init
 impl BindlessManager {
     pub fn new() -> Self {
         Self {
-            combined_sampler_srvs: SecondaryMap::new(),
             uavs: SecondaryMap::new(),
-            texture_uavs: SecondaryMap::new(),
             srvs: SecondaryMap::new(),
-            texture_srvs: SecondaryMap::new(),
         }
     }
 }
@@ -123,6 +116,7 @@ impl Default for BindlessManager {
         Self::new()
     }
 }
+
 // destroy
 impl BindlessManager {
     pub fn destroy(self) {}
@@ -132,6 +126,7 @@ impl Drop for BindlessManager {
         log::info!("Dropping BindlessManager");
     }
 }
+
 // update
 impl BindlessManager {
     /// # Phase: Before Render
@@ -146,20 +141,10 @@ impl BindlessManager {
         let _span = tracy_client::span!("BindlessManager::prepare_render_data");
 
         // combined image sampler 信息
-        let mut combined_sampler_srvs_inofs = Vec::with_capacity(self.combined_sampler_srvs.len());
-        for (tex_handle, shader_tex_handle) in self.combined_sampler_srvs.iter_mut() {
-            let texture = gfx_resource_manager.get_texture(tex_handle).unwrap();
-            combined_sampler_srvs_inofs.push(
-                vk::DescriptorImageInfo::default()
-                    .sampler(texture.sampler())
-                    .image_view(texture.image_view().handle())
-                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL),
-            );
-            shader_tex_handle.0.index = combined_sampler_srvs_inofs.len() as i32 - 1;
-        }
+        let combined_sampler_srvs_inofs = Vec::new();
 
         // UAV 信息
-        let mut uav_infos = Vec::with_capacity(self.uavs.len() + self.texture_uavs.len());
+        let mut uav_infos = Vec::with_capacity(self.uavs.len());
         for (image_view_handle, shader_uav_handle) in self.uavs.iter_mut() {
             let image_view = gfx_resource_manager.get_image_view(image_view_handle).unwrap();
             uav_infos.push(
@@ -169,32 +154,14 @@ impl BindlessManager {
             );
             shader_uav_handle.0.index = uav_infos.len() as i32 - 1;
         }
-        for (texture_handle, shader_uav_handle) in self.texture_uavs.iter_mut() {
-            let texture = gfx_resource_manager.get_texture(texture_handle).unwrap();
-            uav_infos.push(
-                vk::DescriptorImageInfo::default()
-                    .image_view(texture.image_view().handle())
-                    .image_layout(vk::ImageLayout::GENERAL),
-            );
-            shader_uav_handle.0.index = uav_infos.len() as i32 - 1;
-        }
 
         // SRV 信息
-        let mut srv_infos = Vec::with_capacity(self.srvs.len() + self.texture_srvs.len());
+        let mut srv_infos = Vec::with_capacity(self.srvs.len());
         for (image_view_handle, shader_src_handle) in self.srvs.iter_mut() {
             let image_view = gfx_resource_manager.get_image_view(image_view_handle).unwrap();
             srv_infos.push(
                 vk::DescriptorImageInfo::default()
                     .image_view(image_view.handle())
-                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL),
-            );
-            shader_src_handle.0.index = srv_infos.len() as i32 - 1;
-        }
-        for (texture_handle, shader_src_handle) in self.texture_srvs.iter_mut() {
-            let texture = gfx_resource_manager.get_texture(texture_handle).unwrap();
-            srv_infos.push(
-                vk::DescriptorImageInfo::default()
-                    .image_view(texture.image_view().handle())
                     .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL),
             );
             shader_src_handle.0.index = srv_infos.len() as i32 - 1;
@@ -226,34 +193,7 @@ impl BindlessManager {
         Gfx::get().gfx_device().write_descriptor_sets(&writes);
     }
 }
-// combined sampler SRV
-impl BindlessManager {
-    #[inline]
-    pub fn register_texture(&mut self, handle: GfxTextureHandle) {
-        debug_assert!(!handle.is_null());
 
-        if self.combined_sampler_srvs.contains_key(handle) {
-            log::error!("Texture handle {:?} is already registered", handle);
-            return;
-        }
-        self.combined_sampler_srvs.insert(handle, BindlessTextureHandle::null());
-        panic!("Not supported yet");
-    }
-
-    #[inline]
-    pub fn unregister_texture(&mut self, handle: GfxTextureHandle) {
-        debug_assert!(!handle.is_null());
-
-        self.combined_sampler_srvs.remove(handle);
-    }
-
-    #[inline]
-    pub fn get_shader_texture_handle(&self, texture_handle: GfxTextureHandle) -> BindlessTextureHandle {
-        debug_assert!(!texture_handle.is_null());
-
-        self.combined_sampler_srvs.get(texture_handle).copied().unwrap()
-    }
-}
 // UAV
 impl BindlessManager {
     #[inline]
@@ -268,28 +208,10 @@ impl BindlessManager {
     }
 
     #[inline]
-    pub fn register_uav_with_texture(&mut self, texture_handle: GfxTextureHandle) {
-        debug_assert!(!texture_handle.is_null());
-
-        if self.texture_uavs.contains_key(texture_handle) {
-            log::error!("Texture handle {:?} is already registered for image", texture_handle);
-            return;
-        }
-        self.texture_uavs.insert(texture_handle, BindlessUavHandle::null());
-    }
-
-    #[inline]
     pub fn unregister_uav(&mut self, image_view_handle: GfxImageViewHandle) {
         debug_assert!(!image_view_handle.is_null());
 
         self.uavs.remove(image_view_handle).unwrap();
-    }
-
-    #[inline]
-    pub fn unregister_uav_with_texture(&mut self, texture_handle: GfxTextureHandle) {
-        debug_assert!(!texture_handle.is_null());
-
-        self.texture_uavs.remove(texture_handle).unwrap();
     }
 
     #[inline]
@@ -298,14 +220,8 @@ impl BindlessManager {
 
         self.uavs.get(image_view_handle).copied().unwrap()
     }
-
-    #[inline]
-    pub fn get_shader_uav_handle_with_texture(&self, texture_handle: GfxTextureHandle) -> BindlessUavHandle {
-        debug_assert!(!texture_handle.is_null());
-
-        self.texture_uavs.get(texture_handle).copied().unwrap()
-    }
 }
+
 // SRV
 impl BindlessManager {
     #[inline]
@@ -320,17 +236,6 @@ impl BindlessManager {
     }
 
     #[inline]
-    pub fn register_srv_with_texture(&mut self, texture_handle: GfxTextureHandle) {
-        debug_assert!(!texture_handle.is_null());
-
-        if self.texture_srvs.contains_key(texture_handle) {
-            log::error!("Texture handle {:?} is already registered for image", texture_handle);
-            return;
-        }
-        self.texture_srvs.insert(texture_handle, BindlessSrvHandle::null());
-    }
-
-    #[inline]
     pub fn unregister_srv(&mut self, image_view_handle: GfxImageViewHandle) {
         debug_assert!(!image_view_handle.is_null());
 
@@ -338,23 +243,9 @@ impl BindlessManager {
     }
 
     #[inline]
-    pub fn unregister_srv_with_texture(&mut self, texture_handle: GfxTextureHandle) {
-        debug_assert!(!texture_handle.is_null());
-
-        self.texture_srvs.remove(texture_handle).unwrap();
-    }
-
-    #[inline]
     pub fn get_shader_srv_handle(&self, image_view_handle: GfxImageViewHandle) -> BindlessSrvHandle {
         debug_assert!(!image_view_handle.is_null());
 
         self.srvs.get(image_view_handle).copied().unwrap()
-    }
-
-    #[inline]
-    pub fn get_shader_srv_handle_with_texture(&self, texture_handle: GfxTextureHandle) -> BindlessSrvHandle {
-        debug_assert!(!texture_handle.is_null());
-
-        self.texture_srvs.get(texture_handle).copied().unwrap()
     }
 }

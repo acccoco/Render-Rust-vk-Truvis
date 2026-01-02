@@ -1,15 +1,15 @@
 use crate::asset_loader::{AssetLoadRequest, AssetLoader, LoadResult};
 use crate::asset_upload_manager::AssetUploadManager;
-use crate::handle::{AssetTextureHandle, LoadStatus};
+use crate::handle::{AssetTexture, AssetTextureHandle, LoadStatus};
+use ash::vk;
 use slotmap::{SecondaryMap, SlotMap};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use truvis_gfx::resources::image::GfxImage;
+use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_render_interface::bindless_manager::BindlessManager;
-use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
-use truvis_render_interface::handles::GfxTextureHandle;
-use truvis_render_interface::texture::GfxTexture;
+use truvis_shader_binding::truvisl;
 
 /// 资产中心 (Facade)
 ///
@@ -24,29 +24,28 @@ pub struct AssetHub {
     texture_states: SlotMap<AssetTextureHandle, LoadStatus>,
 
     // 存储实际的纹理资源 (仅 Ready 状态才有)
-    textures: SecondaryMap<AssetTextureHandle, GfxTextureHandle>,
+    textures: SecondaryMap<AssetTextureHandle, AssetTexture>,
 
     // 路径到句柄的映射，用于去重 (避免重复加载同一文件)
     texture_cache: HashMap<PathBuf, AssetTextureHandle>,
 
     // 默认资源 (1x1 粉色纹理)，用于 Loading/Failed 状态时的占位
-    fallback_texture: GfxTextureHandle,
+    fallback_texture: AssetTexture,
 
     asset_loader: AssetLoader,
     upload_manager: AssetUploadManager,
 }
+
 // new & init
 impl AssetHub {
     pub fn new(gfx_resource_manager: &mut GfxResourceManager, bindless_manager: &mut BindlessManager) -> Self {
-        let fallback_texture = Self::create_fallback_texture();
-        let fallback_texture_handle = gfx_resource_manager.register_texture(fallback_texture);
-        bindless_manager.register_srv_with_texture(fallback_texture_handle);
+        let fallback_texture = Self::create_fallback_texture(gfx_resource_manager, bindless_manager);
 
         Self {
             texture_states: SlotMap::with_key(),
             textures: SecondaryMap::new(),
             texture_cache: HashMap::new(),
-            fallback_texture: fallback_texture_handle,
+            fallback_texture,
             asset_loader: AssetLoader::new(),
             upload_manager: AssetUploadManager::new(),
         }
@@ -54,23 +53,41 @@ impl AssetHub {
 
     /// 创建一个 1x1 的粉色纹理 (同步创建)
     /// 这是一个阻塞操作，只在初始化时执行一次。
-    fn create_fallback_texture() -> GfxTexture {
+    fn create_fallback_texture(
+        gfx_resource_manager: &mut GfxResourceManager,
+        bindless_manager: &mut BindlessManager,
+    ) -> AssetTexture {
         // 1. Create Image (1x1 Pink)
         let pixels: [u8; 4] = [255, 0, 255, 255];
         let image = GfxImage::from_rgba8(1, 1, &pixels, "FallbackTexture");
+        let image_format = image.format();
 
-        GfxTexture::new(image, "FallbackTexture")
+        let image_handle = gfx_resource_manager.register_image(image);
+        let view_handle = gfx_resource_manager.get_or_create_image_view(
+            image_handle,
+            GfxImageViewDesc::new_2d(image_format, vk::ImageAspectFlags::COLOR),
+            "FallbackTextureView",
+        );
+        bindless_manager.register_srv(view_handle);
+
+        AssetTexture {
+            image_handle,
+            view_handle,
+            sampler: truvisl::ESamplerType_LinearRepeat,
+            is_srgb: false,
+            mip_levels: 1,
+        }
     }
 }
+
 // destroy
 impl AssetHub {
-    pub fn destroy(self, gfx_resource_manager: &mut GfxResourceManager, frame_counter: &FrameCounter) {
-        gfx_resource_manager.destroy_texture(self.fallback_texture, frame_counter.frame_id());
-    }
-    pub fn destroy_mut(&mut self, gfx_resource_manager: &mut GfxResourceManager, frame_counter: &FrameCounter) {
-        gfx_resource_manager.destroy_texture(self.fallback_texture, frame_counter.frame_id());
+    pub fn destroy(self, gfx_resource_manager: &mut GfxResourceManager, bindless_manager: &mut BindlessManager) {
+        bindless_manager.unregister_srv(self.fallback_texture.view_handle);
+        gfx_resource_manager.destroy_image_immediate(self.fallback_texture.image_handle);
     }
 }
+
 // tools
 impl AssetHub {
     /// 请求加载纹理
@@ -107,11 +124,11 @@ impl AssetHub {
     /// 如果资源已 Ready，返回实际纹理。
     /// 否则 (Loading/Uploading/Failed)，返回 Fallback 纹理。
     /// 这保证了渲染循环永远不会因为资源未就绪而阻塞或崩溃。
-    pub fn get_texture(&self, asset_tex_handle: AssetTextureHandle) -> GfxTextureHandle {
-        *self.textures.get(asset_tex_handle).unwrap_or(&self.fallback_texture)
+    pub fn get_texture(&self, asset_tex_handle: AssetTextureHandle) -> &AssetTexture {
+        self.textures.get(asset_tex_handle).unwrap_or(&self.fallback_texture)
     }
 
-    pub fn get_texture_by_path(&self, tex_path: &Path) -> GfxTextureHandle {
+    pub fn get_texture_by_path(&self, tex_path: &Path) -> &AssetTexture {
         let asset_tex_handle = self.texture_cache.get(tex_path).unwrap();
         self.get_texture(*asset_tex_handle)
     }
@@ -157,18 +174,29 @@ impl AssetHub {
 
         // 2. 检查 GPU 上传完成
         let finished_uploads = self.upload_manager.update();
-        for (handle, image) in finished_uploads {
-            log::info!("Upload finished for texture handle: {:?}", handle);
+        for (tex_handle, image) in finished_uploads {
+            log::info!("Upload finished for texture handle: {:?}", tex_handle);
 
-            let texture = GfxTexture::new(image, "TextureView");
+            let image_format = image.format();
+            let image_handle = gfx_resource_manager.register_image(image);
+            let view_handle = gfx_resource_manager.get_or_create_image_view(
+                image_handle,
+                GfxImageViewDesc::new_2d(image_format, vk::ImageAspectFlags::COLOR),
+                "TextureView",
+            );
+            bindless_manager.register_srv(view_handle);
 
-            // 注册到 Bindless 里面去
-            let gfx_texture_handle = gfx_resource_manager.register_texture(texture);
-            bindless_manager.register_srv_with_texture(gfx_texture_handle);
+            let texture = AssetTexture {
+                image_handle,
+                view_handle,
+                sampler: truvisl::ESamplerType_LinearRepeat,
+                is_srgb: true, // TODO 从加载数据中获取
+                mip_levels: 1, // TODO 从加载数据中获取
+            };
 
-            self.textures.insert(handle, gfx_texture_handle);
+            self.textures.insert(tex_handle, texture);
 
-            if let Some(status) = self.texture_states.get_mut(handle) {
+            if let Some(status) = self.texture_states.get_mut(tex_handle) {
                 *status = LoadStatus::Ready;
             }
         }

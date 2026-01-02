@@ -5,5 +5,4 @@ new_key_type! {
     pub struct GfxImageHandle;
     pub struct GfxBufferHandle;
     pub struct GfxImageViewHandle;
-    pub struct GfxTextureHandle;
 }

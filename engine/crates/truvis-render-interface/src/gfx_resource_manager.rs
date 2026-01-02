@@ -1,6 +1,5 @@
 use crate::frame_counter::FrameCounter;
-use crate::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle, GfxTextureHandle};
-use crate::texture::GfxTexture;
+use crate::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle};
 use ash::vk;
 use slotmap::{SecondaryMap, SlotMap};
 use std::collections::HashMap;
@@ -27,13 +26,10 @@ pub struct GfxResourceManager {
     /// 用于缓存：ImageHandle -> 所有关联的 ImageViewHandle
     image_to_views: SecondaryMap<GfxImageHandle, Vec<GfxImageViewHandle>>,
 
-    textures: SlotMap<GfxTextureHandle, GfxTexture>,
-
     // 待销毁队列 (用于延迟销毁，例如在帧结束时)
     // (handle, frame_index)
     pending_destroy_buffers: Vec<(GfxBufferHandle, u64)>,
     pending_destroy_images: Vec<(GfxImageHandle, u64)>,
-    pending_destroy_textures: Vec<(GfxTextureHandle, u64)>,
 
     destroyed: bool,
 }
@@ -52,11 +48,9 @@ impl GfxResourceManager {
             image_view_pool: SlotMap::with_key(),
             image_view_lookup: HashMap::new(),
             image_to_views: SecondaryMap::new(),
-            textures: SlotMap::with_key(),
 
             pending_destroy_buffers: Vec::new(),
             pending_destroy_images: Vec::new(),
-            pending_destroy_textures: Vec::new(),
 
             destroyed: false,
         }
@@ -69,11 +63,6 @@ impl GfxResourceManager {
     }
     pub fn destroy_mut(&mut self) {
         let _span = tracy_client::span!("ResourceManager::destroy_all");
-
-        // destroy 所有的 textures
-        for (_, texture) in self.textures.drain() {
-            texture.destroy()
-        }
 
         // destroy 所有的 image views
         for (_, image_view) in self.image_view_pool.drain() {
@@ -95,7 +84,6 @@ impl GfxResourceManager {
         // Clear pending queues
         self.pending_destroy_buffers.clear();
         self.pending_destroy_images.clear();
-        self.pending_destroy_textures.clear();
 
         #[cfg(debug_assertions)]
         {
@@ -120,22 +108,6 @@ impl GfxResourceManager {
         let _span = tracy_client::span!("ResourceManager::cleanup");
 
         const FIF: u64 = FrameCounter::fif_count() as u64;
-
-        // 清理 textures
-        let mut textures_to_destroy = Vec::new();
-        self.pending_destroy_textures.retain(|(texture_handle, frame_index)| {
-            if *frame_index + FIF <= current_frame_id {
-                textures_to_destroy.push(*texture_handle);
-                false
-            } else {
-                true
-            }
-        });
-        for texture_handle in textures_to_destroy {
-            if let Some(texture) = self.textures.remove(texture_handle) {
-                texture.destroy()
-            }
-        }
 
         // 清理 buffers
         let mut buffers_to_destroy = Vec::new();
@@ -309,19 +281,5 @@ impl GfxResourceManager {
     /// 获取 ImageView 资源引用
     pub fn get_image_view(&self, handle: GfxImageViewHandle) -> Option<&GfxImageView> {
         self.image_view_pool.get(handle)
-    }
-}
-// Texture API
-impl GfxResourceManager {
-    pub fn register_texture(&mut self, texture: GfxTexture) -> GfxTextureHandle {
-        self.textures.insert(texture)
-    }
-
-    pub fn get_texture(&self, handle: GfxTextureHandle) -> Option<&GfxTexture> {
-        self.textures.get(handle)
-    }
-
-    pub fn destroy_texture(&mut self, handle: GfxTextureHandle, current_frame_index: u64) {
-        self.pending_destroy_textures.push((handle, current_frame_index));
     }
 }
