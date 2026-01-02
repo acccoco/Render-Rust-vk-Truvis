@@ -4,6 +4,22 @@ version = "0.1.0"
 edition = "2024"
 description = "app"
 
+[[bin]]
+name = "rt-cornell"
+path = "src/bin/rt_cornell.rs"
+[[bin]]
+name = "shader-toy"
+path = "src/bin/shader_toy_app.rs"
+[[bin]]
+name = "rt-sponza"
+path = "src/bin/sponza_app.rs"
+[[bin]]
+name = "triangle"
+path = "src/bin/triangle_app.rs"
+[[bin]]
+name = "async-test"
+path = "src/bin/async_load_app.rs"
+
 
 [dependencies]
 truvis-app = { workspace = true }

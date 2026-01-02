@@ -50,7 +50,7 @@ impl TruvisPath {
     }
 
     pub fn tools_path() -> PathBuf {
-        Self::workspace_path().parent().unwrap().join("tools")
+        Self::workspace_path().join("tools")
     }
 }
 // engine 目录下

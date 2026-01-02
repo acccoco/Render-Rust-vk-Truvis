@@ -3,7 +3,6 @@ resolver = "3"
 members = [
     # 通用部分
     "truvis-crate-tools",
-
     # RenderApp 层级
     "engine/crates/truvis-gfx",
     "engine/crates/truvis-render-interface",
@@ -27,136 +26,110 @@ members = [
     "truvis-tauri-app/src-tauri",
 ]
 
+[profile.dev]
+opt-level = 0      # 优化级别: 0-3。0 表示不优化，编译最快
+debug = true       # 包含调试符号
+incremental = true # 开启增量编译，提升二次编译速度
+
+[profile.release]
+opt-level = 3      # 最高级优化，运行速度最快
+debug = false      # 移除调试符号，减小二进制体积
+lto = true         # 开启链接时优化 (Link Time Optimization)
+panic = 'abort'    # panic 时直接终止，进一步减小体积
+
 
 [workspace.dependencies]
 truvis-crate-tools = { path = "truvis-crate-tools" }
 truvis-gfx = { path = "engine/crates/truvis-gfx" }
-
 truvis-render-interface = { path = "engine/crates/truvis-render-interface" }
 truvis-render-graph = { path = "engine/crates/truvis-render-graph" }
 truvis-asset = { path = "engine/crates/truvis-asset" }
 truvis-scene = { path = "engine/crates/truvis-scene" }
 truvis-renderer = { path = "engine/crates/truvis-renderer" }
 truvis-app = { path = "engine/crates/truvis-app" }
-
 truvis-gui-backend = { path = "engine/crates/truvis-gui-backend" }
-
 truvis-descriptor-layout-macro = { path = "engine/crates/truvis-shader/truvis-descriptor-layout-macro" }
 truvis-descriptor-layout-trait = { path = "engine/crates/truvis-shader/truvis-descriptor-layout-trait" }
 truvis-shader-binding = { path = "engine/crates/truvis-shader/truvis-shader-binding" }
 truvis-shader-build = { path = "engine/crates/truvis-shader/truvis-shader-build" }
-
 truvis-cxx-binding = { path = "engine/crates/truvis-cxx/truvis-cxx-binding" }
 truvis-cxx-build = { path = "engine/crates/truvis-cxx/truvis-cxx-build" }
 
 
 
-# 图形相关的库
-################################################
+###########################################################
+# 图形、窗口与 GUI (Graphics, Windowing & GUI)
+###########################################################
 ash = { version = "0.38.0", features = ["debug"] }
-glam = { version = "0.22.0", features = ["bytemuck", "rand", "serde", "bytemuck"] }
-
-# vulkan memory allocate
 # vk-mem-0.4.0 和 ash-0.38.0+1.3.281 匹配
 vk-mem = "0.4.0"
-
-
-# 窗口和 UI
-###################################################
+glam = { version = "0.22.0", features = ["bytemuck", "rand", "serde"] }
+winit = "0.30.8"
 # create vk surface using window handle
 ash-window = "0.13.0"
-
-# window create & event loop
-imgui = { version = "0.12.0", features = ["docking"] }
-
 # 让 winit 可以和图形库通信
 raw-window-handle = "0.6.2"
+imgui = { version = "0.12.0", features = ["docking"] }
 
-winit = "0.30.8"
+###########################################################
+# Tauri
+###########################################################
+tauri-build = { version = "2", features = [] }
+tauri = { version = "2", features = ["unstable"] }
+tauri-plugin-opener = "2"
 
-
-# 资源加载
-######################################################
-# image parser
+###########################################################
+# 资源加载与序列化 (Asset Loading & Serialization)
+###########################################################
 image = "0.25.6"
-
-# load gltf
 gltf = "1.0.0"
-
-# 读取 .obj
 tobj = "4.0.3"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.91"
 
-
-# 引擎工具
-#######################################################
-# print 颜色
-colored = "2"
-
-# 日志
+###########################################################
+# 日志、调试与性能分析 (Logging, Debugging & Profiling)
+###########################################################
 log = "0.4.0"
 env_logger = "0.11.8"
+colored = "2"
 anstyle = "1.0.10"
+tracy-client = "0.18.3"
 
-# 计时器
-chrono = "0.4.38"
-
-uuid = { version = "1.16.0", features = ["v4"] }
+###########################################################
+# 并发与数据结构 (Concurrency & Data Structures)
+###########################################################
 rayon = "1.10.0"
-
-# 高性能多线程通信
 crossbeam-channel = "0.5.15"
 crossbeam-utils = "0.8"
-
 # 高性能哈希表，支持代际索引
 slotmap = "1.0.7"
 indexmap = "2.12.1"
+uuid = { version = "1.16.0", features = ["v4"] }
 
-# Tracy
-tracy-client = "0.18.3"
-
-# 编译相关
-######################################################
-bindgen = "0.72.1"
-
-
-# 宏
-######################################################
+###########################################################
+# 开发工具 (Development Tools)
+###########################################################
+# 错误处理
+anyhow = "1.0.84"
+# 宏开发
 syn = { version = "2.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
+# C/C++ 绑定生成
+bindgen = "0.72.1"
 
-
-
-# 语言便利性工具
-######################################################
-# 各种自动的 macro
+###########################################################
+# 通用工具 (General Utilities)
+###########################################################
 bytemuck = { version = "1.16.0", features = ["derive"] }
-
-# 允许超过 2 个 iter 进行 zip
 itertools = "0.10.5"
-
-# 方便的初始化 array 的方法
 array-init = "2.1.0"
-
-# 序列化和反序列化
-serde = "1.0.152"
-serde_json = "1.0.91"
-
-# 随机数
+include_dir = "0.7.3"
+lazy_static = "1.4.0"
+walkdir = "2.5.0"
+bitflags = "2.3.2"
+scopeguard = "1.2.0"
+chrono = "0.4.38"
 rand = "0.8.5"
 rand_derive = "0.5.0"
-
-include_dir = "0.7.3"
-
-# 延迟初始化 static
-lazy_static = "1.4.0"
-
-# 遍历文件夹
-walkdir = "2.5.0"
-
-bitflags = "2.3.2"
-
-# 简化错误处理
-anyhow = "1.0.84"
-scopeguard = "1.2.0"
-

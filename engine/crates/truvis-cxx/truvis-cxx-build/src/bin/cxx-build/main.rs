@@ -60,26 +60,26 @@ fn main() {
     let target_dir = TruvisPath::target_path();
     log::info!("target_dir: {:?}", target_dir);
 
-    let mut cmake_project = workspace_dir.clone();
-    cmake_project.extend(["cxx"]);
+    let cxx_project_dir = TruvisPath::cxx_root_path();
+    log::info!("cxx_project_dir: {:?}", cxx_project_dir);
 
     std::process::Command::new("cmake")
-        .current_dir(&cmake_project)
+        .current_dir(&cxx_project_dir)
         .args(["--preset", "vs2022"])
         .status()
         .expect("Failed to run cmake");
 
     std::process::Command::new("cmake")
-        .current_dir(&cmake_project)
+        .current_dir(&cxx_project_dir)
         .args(["--build", "--preset", "vs2022-build-debug"])
         .status()
         .expect("Failed to run cmake build");
     std::process::Command::new("cmake")
-        .current_dir(&cmake_project)
+        .current_dir(&cxx_project_dir)
         .args(["--build", "--preset", "vs2022-build-release"])
         .status()
         .expect("Failed to run cmake build");
 
-    copy_to_rust(&cmake_project, &target_dir, BuildType::Debug);
-    copy_to_rust(&cmake_project, &target_dir, BuildType::Release);
+    copy_to_rust(&cxx_project_dir, &target_dir, BuildType::Debug);
+    copy_to_rust(&cxx_project_dir, &target_dir, BuildType::Release);
 }
