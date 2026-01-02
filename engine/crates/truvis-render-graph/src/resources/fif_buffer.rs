@@ -59,7 +59,7 @@ impl FifBuffers {
         frame_settings: &FrameSettings,
         frame_counter: &FrameCounter,
     ) {
-        self.destroy_mut(bindless_manager, gfx_resource_manager);
+        self.destroy_mut(bindless_manager, gfx_resource_manager, frame_counter);
         *self = Self::new(frame_settings, bindless_manager, gfx_resource_manager, frame_counter);
     }
 
@@ -97,7 +97,7 @@ impl FifBuffers {
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
             },
-            &format!("fif-buffer-color-{}", frame_counter.frame_id),
+            &format!("fif-buffer-color-{}", frame_counter.frame_id()),
         );
 
         // 将 layout 设置为 general
@@ -117,10 +117,10 @@ impl FifBuffers {
         );
 
         let color_image_handle = gfx_resource_manager.register_image(color_image);
-        let color_image_view_handle = gfx_resource_manager.try_create_image_view(
+        let color_image_view_handle = gfx_resource_manager.get_or_create_image_view(
             color_image_handle,
             GfxImageViewDesc::new_2d(frame_settings.color_format, vk::ImageAspectFlags::COLOR),
-            format!("fif-buffer-color-{}", frame_counter.frame_id),
+            format!("fif-buffer-color-{}", frame_counter.frame_id()),
         );
 
         (color_image_handle, color_image_view_handle)
@@ -142,13 +142,13 @@ impl FifBuffers {
                 usage: vk_mem::MemoryUsage::AutoPreferDevice,
                 ..Default::default()
             },
-            &format!("fif-buffer-depth-{}", frame_counter.frame_id),
+            &format!("fif-buffer-depth-{}", frame_counter.frame_id()),
         );
         let depth_image_handle = gfx_resource_manager.register_image(depth_image);
-        let depth_image_view_handle = gfx_resource_manager.try_create_image_view(
+        let depth_image_view_handle = gfx_resource_manager.get_or_create_image_view(
             depth_image_handle,
             GfxImageViewDesc::new_2d(frame_settings.depth_format, vk::ImageAspectFlags::DEPTH),
-            format!("fif-buffer-depth-{}", frame_counter.frame_id),
+            format!("fif-buffer-depth-{}", frame_counter.frame_id()),
         );
 
         (depth_image_handle, depth_image_view_handle)
@@ -160,7 +160,7 @@ impl FifBuffers {
         frame_counter: &FrameCounter,
     ) -> [GfxTextureHandle; FrameCounter::fif_count()] {
         let create_one_target = |fif_labe: FrameLabel| {
-            let name = format!("render-target-{}-{}", fif_labe, frame_counter.frame_id);
+            let name = format!("render-target-{}-{}", fif_labe, frame_counter.frame_id());
 
             let image_create_info = GfxImageCreateInfo::new_image_2d_info(
                 frame_settings.frame_extent,
@@ -212,16 +212,17 @@ impl FifBuffers {
         &mut self,
         bindless_manager: &mut BindlessManager,
         gfx_resource_manager: &mut GfxResourceManager,
+        frame_counter: &FrameCounter,
     ) {
         self.unregister_bindless(bindless_manager);
 
         for render_target in std::mem::take(&mut self.off_screen_targets) {
-            gfx_resource_manager.destroy_texture_auto(render_target);
+            gfx_resource_manager.destroy_texture(render_target, frame_counter.frame_id());
         }
 
         // image view 无需销毁，只需要销毁 image 即可
-        gfx_resource_manager.destroy_image_auto(self.depth_image);
-        gfx_resource_manager.destroy_image_auto(self.accum_image);
+        gfx_resource_manager.destroy_image(self.depth_image, frame_counter.frame_id());
+        gfx_resource_manager.destroy_image(self.accum_image, frame_counter.frame_id());
 
         self.depth_image_view = GfxImageViewHandle::default();
         self.accum_image_view = GfxImageViewHandle::default();

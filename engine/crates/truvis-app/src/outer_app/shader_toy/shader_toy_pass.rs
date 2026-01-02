@@ -110,7 +110,7 @@ impl ShaderToySubpass {
         let push_constants = PushConstants {
             time: render_context.total_time_s,
             delta_time: render_context.delta_time_s,
-            frame: render_context.frame_counter.frame_id as i32,
+            frame: render_context.frame_counter.frame_id() as i32,
             frame_rate: 1.0 / render_context.delta_time_s,
             resolution: glam::Vec2::new(viewport_extent.width as f32, viewport_extent.height as f32),
             mouse: glam::Vec4::new(

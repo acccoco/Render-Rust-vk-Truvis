@@ -26,9 +26,7 @@ use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::global_descriptor_sets::{GlobalDescriptorSets, PerFrameDescriptorBinding};
 use truvis_render_interface::gpu_scene::GpuScene;
-use truvis_render_interface::pipeline_settings::{
-    AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings,
-};
+use truvis_render_interface::pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings, PipelineSettings};
 use truvis_render_interface::sampler_manager::RenderSamplerManager;
 use truvis_scene::scene_manager::SceneManager;
 use truvis_shader_binding::truvisl;
@@ -68,9 +66,6 @@ impl Renderer {
         // 初始化 RenderContext 单例
         Gfx::init("Truvis".to_string(), extra_instance_ext);
 
-        // 初始值应该是 1，因为 timeline semaphore 初始值是 0
-        let init_frame_id = 1;
-
         let frame_settings = FrameSettings {
             color_format: vk::Format::R32G32B32A32_SFLOAT,
             depth_format: Self::get_depth_format(),
@@ -87,10 +82,9 @@ impl Renderer {
         let mut gfx_resource_manager = GfxResourceManager::new();
         let mut cmd_allocator = CmdAllocator::new();
 
-        let frame_counter = FrameCounter {
-            frame_id: init_frame_id,
-            frame_limit: 60.0,
-        };
+        // 初始值应该是 1，因为 timeline semaphore 初始值是 0
+        let init_frame_id = 1;
+        let frame_counter = FrameCounter::new(init_frame_id, 60.0);
 
         let mut bindless_manager = BindlessManager::new();
         let scene_manager = SceneManager::new();
@@ -173,12 +167,16 @@ impl Renderer {
             render_present.destroy();
         }
 
-        self.render_context
-            .fif_buffers
-            .destroy_mut(&mut self.render_context.bindless_manager, &mut self.render_context.gfx_resource_manager);
+        self.render_context.fif_buffers.destroy_mut(
+            &mut self.render_context.bindless_manager,
+            &mut self.render_context.gfx_resource_manager,
+            &self.render_context.frame_counter,
+        );
         self.render_context.bindless_manager.destroy();
         self.render_context.scene_manager.destroy();
-        self.render_context.asset_hub.destroy(&mut self.render_context.gfx_resource_manager);
+        self.render_context
+            .asset_hub
+            .destroy(&mut self.render_context.gfx_resource_manager, &self.render_context.frame_counter);
         self.render_context.gpu_scene.destroy();
         self.cmd_allocator.destroy();
         self.render_context.gfx_resource_manager.destroy();
@@ -195,16 +193,17 @@ impl Renderer {
         {
             let _span = tracy_client::span!("wait fif timeline");
 
-            let current_frame_id = self.render_context.frame_counter.frame_id;
+            let current_frame_id = self.render_context.frame_counter.frame_id();
             let fif_count = FrameCounter::fif_count();
-            let wait_frame_id = current_frame_id.saturating_sub(fif_count);
+            let wait_frame_id = current_frame_id.saturating_sub(fif_count as u64);
             const WAIT_SEMAPHORE_TIMEOUT_NS: u64 = 30 * 1000 * 1000 * 1000; // 30s
-            self.fif_timeline_semaphore.wait_timeline(wait_frame_id as u64, WAIT_SEMAPHORE_TIMEOUT_NS);
+            self.fif_timeline_semaphore.wait_timeline(wait_frame_id, WAIT_SEMAPHORE_TIMEOUT_NS);
         }
 
         // 清理 fif 资源
         {
             self.cmd_allocator.reset_frame_commands(self.render_context.frame_counter.frame_label());
+            self.render_context.gfx_resource_manager.cleanup(self.render_context.frame_counter.frame_id());
         }
 
         self.timer.tick();
@@ -234,16 +233,16 @@ impl Renderer {
             let submit_info = GfxSubmitInfo::new(&[]).signal(
                 &self.fif_timeline_semaphore,
                 vk::PipelineStageFlags2::NONE,
-                Some(self.render_context.frame_counter.frame_id as u64),
+                Some(self.render_context.frame_counter.frame_id()),
             );
             Gfx::get().gfx_queue().submit(vec![submit_info], None);
         }
 
-        self.render_context.frame_counter.frame_id += 1;
+        self.render_context.frame_counter.next_frame();
     }
 
     pub fn time_to_render(&mut self) -> bool {
-        let limit_elapsed_us = 1000.0 * 1000.0 / self.render_context.frame_counter.frame_limit;
+        let limit_elapsed_us = 1000.0 * 1000.0 / self.render_context.frame_counter.frame_limit();
         limit_elapsed_us < self.timer.elapsed_since_tick().as_micros() as f32
     }
 
@@ -342,7 +341,7 @@ impl Renderer {
                 camera_forward: camera.camera_forward().into(),
                 time_ms: self.timer.total_time_ms(),
                 delta_time_ms: self.timer.delta_time_ms(),
-                frame_id: self.render_context.frame_counter.frame_id as u64,
+                frame_id: self.render_context.frame_counter.frame_id(),
                 resolution: truvisl::Float2 {
                     x: frame_extent.width as f32,
                     y: frame_extent.height as f32,
@@ -406,16 +405,5 @@ impl Renderer {
             }
         };
         self.render_present.as_mut().unwrap().draw(&self.render_context, ui_draw_data, present_data);
-    }
-}
-// getters
-impl Renderer {
-    #[inline]
-    pub fn frame_label(&self) -> FrameLabel {
-        self.render_context.frame_counter.frame_label()
-    }
-    #[inline]
-    pub fn frame_id(&self) -> usize {
-        self.render_context.frame_counter.frame_id
     }
 }

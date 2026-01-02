@@ -143,6 +143,8 @@ impl GfxImage {
         self.destroy_mut();
     }
     pub fn destroy_mut(&mut self) {
+        log::debug!("Destroying GfxImage: {}", self.name);
+
         match &mut self.source {
             ImageSource::External => (),
             ImageSource::Allocated(allocation) => unsafe {

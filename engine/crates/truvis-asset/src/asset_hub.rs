@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use truvis_gfx::resources::image::GfxImage;
 use truvis_render_interface::bindless_manager::BindlessManager;
+use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::handles::GfxTextureHandle;
 use truvis_render_interface::texture::GfxTexture;
@@ -63,11 +64,11 @@ impl AssetHub {
 }
 // destroy
 impl AssetHub {
-    pub fn destroy(self, gfx_resource_manager: &mut GfxResourceManager) {
-        gfx_resource_manager.destroy_texture_auto(self.fallback_texture);
+    pub fn destroy(self, gfx_resource_manager: &mut GfxResourceManager, frame_counter: &FrameCounter) {
+        gfx_resource_manager.destroy_texture(self.fallback_texture, frame_counter.frame_id());
     }
-    pub fn destroy_mut(&mut self, gfx_resource_manager: &mut GfxResourceManager) {
-        gfx_resource_manager.destroy_texture_auto(self.fallback_texture);
+    pub fn destroy_mut(&mut self, gfx_resource_manager: &mut GfxResourceManager, frame_counter: &FrameCounter) {
+        gfx_resource_manager.destroy_texture(self.fallback_texture, frame_counter.frame_id());
     }
 }
 // tools

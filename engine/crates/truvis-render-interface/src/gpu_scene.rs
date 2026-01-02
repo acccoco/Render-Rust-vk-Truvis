@@ -479,7 +479,7 @@ impl GpuScene {
         let tlas = GfxAcceleration::build_tlas_sync(
             &instance_infos,
             vk::BuildAccelerationStructureFlagsKHR::empty(),
-            format!("scene2-{}-{}", frame_counter.frame_label(), frame_counter.frame_id),
+            format!("scene2-{}-{}", frame_counter.frame_label(), frame_counter.frame_id()),
         );
 
         self.gpu_scene_buffers[*frame_counter.frame_label()].tlas = Some(tlas);

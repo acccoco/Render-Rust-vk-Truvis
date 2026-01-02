@@ -11,8 +11,6 @@ use serde::Deserialize;
 use std::sync::Mutex;
 use tauri::window::WindowBuilder;
 use tauri::{Listener, Manager, RunEvent, WindowEvent};
-use truvis_app::outer_app::OuterApp;
-use truvis_app::outer_app::triangle::triangle_app;
 use truvis_app::outer_app::triangle::triangle_app::HelloTriangleApp;
 
 /// 全局渲染线程句柄

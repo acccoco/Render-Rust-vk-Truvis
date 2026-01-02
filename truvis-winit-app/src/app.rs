@@ -1,5 +1,4 @@
 use crate::winit_event_adapter::WinitEventAdapter;
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use truvis_app::outer_app::OuterApp;
 use truvis_app::render_app::RenderApp;
