@@ -168,11 +168,9 @@ impl Renderer {
             render_present.destroy(&mut self.render_context.gfx_resource_manager);
         }
 
-        self.render_context.fif_buffers.destroy_mut(
-            &mut self.render_context.bindless_manager,
-            &mut self.render_context.gfx_resource_manager,
-            &self.render_context.frame_counter,
-        );
+        self.render_context
+            .fif_buffers
+            .destroy_mut(&mut self.render_context.bindless_manager, &mut self.render_context.gfx_resource_manager);
         self.render_context.bindless_manager.destroy();
         self.render_context.scene_manager.destroy();
         self.render_context
@@ -393,10 +391,12 @@ impl Renderer {
         let frame_label = self.render_context.frame_counter.frame_label();
 
         let present_data = {
-            let render_target_texture = self.render_context.fif_buffers.render_target_texture_handle(frame_label);
+            let (render_target_image_handle, render_target_view_handle) =
+                self.render_context.fif_buffers.render_target_handle(frame_label);
 
             PresentData {
-                render_target: render_target_texture,
+                render_target_image_handle,
+                render_target_view_handle,
                 render_target_barrier: GfxBarrierMask {
                     src_stage: vk::PipelineStageFlags2::COMPUTE_SHADER,
                     src_access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,

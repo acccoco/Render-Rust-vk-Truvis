@@ -191,10 +191,10 @@ impl ShaderToyPass {
     pub fn render(&self, render_context: &RenderContext, shape: &RtGeometry) {
         let frame_label = render_context.frame_counter.frame_label();
 
-        let render_target_texture = render_context
-            .gfx_resource_manager
-            .get_texture(render_context.fif_buffers.render_target_texture_handle(frame_label))
-            .unwrap();
+        let (render_target_image_handle, render_target_view_handle) =
+            render_context.fif_buffers.render_target_handle(frame_label);
+        let render_target_view = render_context.gfx_resource_manager.get_image_view(render_target_view_handle).unwrap();
+        let render_target_image = render_context.gfx_resource_manager.get_image(render_target_image_handle).unwrap();
 
         // render shader toy
         {
@@ -205,7 +205,7 @@ impl ShaderToyPass {
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(render_target_texture.image().handle())
+                    .image(render_target_image.handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
                     .src_mask(
@@ -222,7 +222,7 @@ impl ShaderToyPass {
                 render_context,
                 &cmd,
                 &render_context.frame_settings,
-                render_target_texture.image_view().handle(),
+                render_target_view.handle(),
                 shape,
             );
 
@@ -230,7 +230,7 @@ impl ShaderToyPass {
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(render_target_texture.image().handle())
+                    .image(render_target_image.handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
                     .src_mask(

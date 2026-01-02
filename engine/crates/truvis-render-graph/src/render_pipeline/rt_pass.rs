@@ -54,17 +54,13 @@ impl RtRenderPass {
         let frame_label = render_context.frame_counter.frame_label();
 
         let fif_buffers = &render_context.fif_buffers;
-        let bindless_manager = &render_context.bindless_manager;
+        let _bindless_manager = &render_context.bindless_manager;
 
         let color_image = render_context.gfx_resource_manager.get_image(fif_buffers.color_image_handle()).unwrap();
-        let _color_image_bindless_handle =
-            bindless_manager.get_shader_uav_handle(fif_buffers.color_image_view_handle());
-        let render_target_texture = render_context
-            .gfx_resource_manager
-            .get_texture(fif_buffers.render_target_texture_handle(frame_label))
-            .unwrap();
-        let _render_target_image_bindless_handle =
-            bindless_manager.get_shader_uav_handle_with_texture(fif_buffers.render_target_texture_handle(frame_label));
+
+        let (render_target_image_handle, render_target_view_handle) =
+            render_context.fif_buffers.render_target_handle(frame_label);
+        let render_target_image = render_context.gfx_resource_manager.get_image(render_target_image_handle).unwrap();
 
         let mut submit_cmds = Vec::new();
         // ray tracing
@@ -123,7 +119,7 @@ impl RtRenderPass {
                 &cmd,
                 BlitSubpassData {
                     src_image: fif_buffers.color_image_view_handle(),
-                    dst_image: fif_buffers.render_target_texture_handle(frame_label),
+                    dst_image: render_target_view_handle,
                     src_image_size: frame_settings.frame_extent,
                     dst_image_size: frame_settings.frame_extent,
                 },
@@ -146,7 +142,7 @@ impl RtRenderPass {
 
             // 等待之前的 compute shader 执行完成
             let rt_barrier = GfxImageBarrier::new()
-                .image(render_target_texture.image().handle())
+                .image(render_target_image.handle())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .src_mask(dst_image_pre_usage.stage, dst_image_pre_usage.src_access())
                 .dst_mask(dst_image_crt_usage.stage, dst_image_pre_usage.dst_access());
@@ -156,7 +152,7 @@ impl RtRenderPass {
                 &cmd,
                 SdrSubpassData {
                     src_image: fif_buffers.color_image_view_handle(),
-                    dst_image: fif_buffers.render_target_texture_handle(frame_label),
+                    dst_image: render_target_view_handle,
                     src_image_size: frame_settings.frame_extent,
                     dst_image_size: frame_settings.frame_extent,
                 },

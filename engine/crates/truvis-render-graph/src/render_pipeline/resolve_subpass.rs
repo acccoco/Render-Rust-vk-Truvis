@@ -13,7 +13,7 @@ use truvis_gfx::pipelines::graphics_pipeline::{GfxGraphicsPipeline, GfxGraphicsP
 use truvis_gfx::pipelines::rendering_info::GfxRenderingInfo;
 use truvis_gfx::pipelines::shader::GfxShaderStageInfo;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
-use truvis_render_interface::handles::GfxTextureHandle;
+use truvis_render_interface::handles::GfxImageViewHandle;
 use truvis_render_interface::pipeline_settings::FrameLabel;
 use truvis_shader_binding::truvisl;
 
@@ -33,7 +33,7 @@ enumed_map!(ShaderStage<GfxShaderStageInfo>: {
 /// 用于绘制的参数
 pub struct ResolveDrawParams {
     /// 源图像的 texture handle（将从 bindless_textures 中采样）
-    pub src_texture: GfxTextureHandle,
+    pub src_texture: GfxImageViewHandle,
     /// 采样器类型
     pub sampler_type: truvisl::ESamplerType,
     /// 在 color attachment 上的偏移量（像素坐标）
@@ -130,7 +130,7 @@ impl ResolveSubpass {
         params: &ResolveDrawParams,
     ) {
         // 获取源图像的 bindless handle
-        let src_srv_handle = render_context.bindless_manager.get_shader_srv_handle_with_texture(params.src_texture);
+        let src_srv_handle = render_context.bindless_manager.get_shader_srv_handle(params.src_texture);
 
         // 构造 push constant
         let push_constant = truvisl::resolve::PushConstant {

@@ -18,7 +18,7 @@ use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
-use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle, GfxTextureHandle};
+use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle};
 use truvis_render_interface::pipeline_settings::{DefaultRendererSettings, FrameLabel};
 use truvis_shader_binding::truvisl;
 
@@ -31,7 +31,8 @@ pub struct PresentData {
     /// 当前帧的渲染目标纹理
     ///
     /// 包含了最终的渲染结果，将被复制或演示到屏幕上
-    pub render_target: GfxTextureHandle,
+    pub render_target_image_handle: GfxImageHandle,
+    pub render_target_view_handle: GfxImageViewHandle,
 
     /// 渲染目标的内存屏障配置
     ///
@@ -190,8 +191,8 @@ impl RenderPresent {
         let swapchain_image_view =
             render_context.gfx_resource_manager.get_image_view(swapchain_image_view_handle).unwrap();
 
-        let render_target_texture =
-            render_context.gfx_resource_manager.get_texture(present_data.render_target).unwrap();
+        let render_target_image =
+            render_context.gfx_resource_manager.get_image(present_data.render_target_image_handle).unwrap();
 
         let cmd = self.resolve_cmds[*frame_label].clone();
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "resolve-pass");
@@ -213,7 +214,7 @@ impl RenderPresent {
                         ),
                     // 将 render target 转换为 SHADER_READ_ONLY_OPTIMAL 以便采样
                     GfxImageBarrier::new()
-                        .image(render_target_texture.image().handle())
+                        .image(render_target_image.handle())
                         .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                         .layout_transfer(vk::ImageLayout::GENERAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
                         .src_mask(
@@ -227,7 +228,7 @@ impl RenderPresent {
             // 绘制 render target 到 swapchain image（全屏）
             let target_extent = swapchain.extent();
             let draw_params = ResolveDrawParams {
-                src_texture: present_data.render_target,
+                src_texture: present_data.render_target_view_handle,
                 sampler_type: truvisl::ESamplerType_LinearClamp,
                 offset: glam::Vec2::ZERO,
                 size: glam::vec2(target_extent.width as f32, target_extent.height as f32),
@@ -246,7 +247,7 @@ impl RenderPresent {
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(render_target_texture.image().handle())
+                    .image(render_target_image.handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL, vk::ImageLayout::GENERAL)
                     .src_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ)

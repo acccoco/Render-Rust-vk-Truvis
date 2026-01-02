@@ -97,17 +97,15 @@ impl PhongSubpass {
     pub fn draw(&self, cmd: &GfxCommandBuffer, render_context: &RenderContext) {
         let frame_label = render_context.frame_counter.frame_label();
 
-        let render_target_texture = render_context
-            .gfx_resource_manager
-            .get_texture(render_context.fif_buffers.render_target_texture_handle(frame_label))
-            .unwrap();
+        let (_, render_target_view_handle) = render_context.fif_buffers.render_target_handle(frame_label);
+        let render_target_view = render_context.gfx_resource_manager.get_image_view(render_target_view_handle).unwrap();
         let depth_image_view = render_context
             .gfx_resource_manager
             .get_image_view(render_context.fif_buffers.depth_image_view_handle())
             .unwrap();
 
         let rendering_info = GfxRenderingInfo::new(
-            vec![render_target_texture.image_view().handle()],
+            vec![render_target_view.handle()],
             Some(depth_image_view.handle()),
             vk::Rect2D {
                 offset: vk::Offset2D::default(),

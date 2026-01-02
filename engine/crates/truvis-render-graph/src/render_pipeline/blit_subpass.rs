@@ -5,7 +5,7 @@ use ash::vk;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
-use truvis_render_interface::handles::{GfxImageViewHandle, GfxTextureHandle};
+use truvis_render_interface::handles::GfxImageViewHandle;
 use truvis_shader_binding::truvisl;
 
 pub struct BlitSubpassDep {
@@ -31,7 +31,7 @@ impl Default for BlitSubpassDep {
 
 pub struct BlitSubpassData {
     pub src_image: GfxImageViewHandle,
-    pub dst_image: GfxTextureHandle,
+    pub dst_image: GfxImageViewHandle,
 
     pub src_image_size: vk::Extent2D,
     pub dst_image_size: vk::Extent2D,
@@ -53,8 +53,7 @@ impl BlitSubpass {
 
     pub fn exec(&self, cmd: &GfxCommandBuffer, data: BlitSubpassData, render_context: &RenderContext) {
         let src_image_bindless_handle = render_context.bindless_manager.get_shader_uav_handle(data.src_image);
-        let dst_image_bindless_handle =
-            render_context.bindless_manager.get_shader_uav_handle_with_texture(data.dst_image);
+        let dst_image_bindless_handle = render_context.bindless_manager.get_shader_uav_handle(data.dst_image);
         self.blit_pass.exec(
             cmd,
             render_context,

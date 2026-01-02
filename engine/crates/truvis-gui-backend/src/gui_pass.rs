@@ -18,7 +18,7 @@ use truvis_gfx::{
 };
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
-use truvis_render_interface::handles::GfxTextureHandle;
+use truvis_render_interface::handles::GfxImageViewHandle;
 use truvis_render_interface::pipeline_settings::FrameLabel;
 use truvis_shader_binding::truvisl;
 use truvis_shader_binding::truvisl::SrvHandle;
@@ -100,7 +100,7 @@ impl GuiPass {
         frame_label: FrameLabel,
         gui_mesh: &GuiMesh,
         draw_data: &imgui::DrawData,
-        tex_map: &HashMap<TextureId, GfxTextureHandle>,
+        tex_map: &HashMap<TextureId, GfxImageViewHandle>,
     ) {
         // 使用 LOAD 保留 resolve pass 绘制的内容
         let color_attach_info = vk::RenderingAttachmentInfo::default()
@@ -205,11 +205,11 @@ impl GuiPass {
                         // 加载 texture，如果和上一个 command 使用的 texture
                         // 不是同一个，则需要重新加载
                         if Some(texture_id) != last_texture_id {
-                            let texture_handle = tex_map.get(&texture_id).unwrap();
-                            let texture_bindless_handle =
-                                bindless_manager.get_shader_srv_handle_with_texture(*texture_handle);
+                            let texture_image_view_handle = tex_map.get(&texture_id).unwrap();
+                            let srv_bindless_handle =
+                                bindless_manager.get_shader_srv_handle(*texture_image_view_handle);
 
-                            push_constant.texture = texture_bindless_handle.0;
+                            push_constant.texture = srv_bindless_handle.0;
 
                             cmd.cmd_push_constants(
                                 self.pipeline_layout.handle(),

@@ -88,13 +88,11 @@ impl AsyncSubpass {
     ) {
         let viewport_extent = frame_settings.frame_extent;
 
-        let render_target_texture = render_context
-            .gfx_resource_manager
-            .get_texture(render_context.fif_buffers.render_target_texture_handle(frame_label))
-            .unwrap();
+        let (_, render_target_view_handle) = render_context.fif_buffers.render_target_handle(frame_label);
+        let render_target_view = render_context.gfx_resource_manager.get_image_view(render_target_view_handle).unwrap();
 
         let rendering_info = GfxRenderingInfo::new(
-            vec![render_target_texture.image_view().handle()],
+            vec![render_target_view.handle()],
             None,
             vk::Rect2D {
                 offset: vk::Offset2D::default(),
@@ -176,10 +174,8 @@ impl AsyncPass {
     pub fn render(&self, render_context: &RenderContext, shape: &RtGeometry, texture_id: u32) {
         let frame_label = render_context.frame_counter.frame_label();
 
-        let render_target_texture = render_context
-            .gfx_resource_manager
-            .get_texture(render_context.fif_buffers.render_target_texture_handle(frame_label))
-            .unwrap();
+        let (render_target_image_handle, _) = render_context.fif_buffers.render_target_handle(frame_label);
+        let render_target_image = render_context.gfx_resource_manager.get_image(render_target_image_handle).unwrap();
 
         // render
         {
@@ -190,7 +186,7 @@ impl AsyncPass {
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(render_target_texture.image().handle())
+                    .image(render_target_image.handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
                     .src_mask(
@@ -209,7 +205,7 @@ impl AsyncPass {
             cmd.image_memory_barrier(
                 vk::DependencyFlags::empty(),
                 &[GfxImageBarrier::new()
-                    .image(render_target_texture.image().handle())
+                    .image(render_target_image.handle())
                     .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                     .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
                     .src_mask(

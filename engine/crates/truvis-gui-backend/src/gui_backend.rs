@@ -1,17 +1,18 @@
 //! 参考 imgui-rs-vulkan-renderer
 
 use crate::gui_mesh::GuiMesh;
+use ash::vk;
 use imgui::{DrawData, FontAtlasTexture, TextureId};
 use std::collections::HashMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
+use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_gfx::{basic::color::LabelColor, gfx::Gfx, resources::image::GfxImage};
 use truvis_render_interface::bindless_manager::BindlessManager;
 use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
-use truvis_render_interface::handles::GfxTextureHandle;
+use truvis_render_interface::handles::GfxImageViewHandle;
 use truvis_render_interface::pipeline_settings::FrameLabel;
-use truvis_render_interface::texture::GfxTexture;
 
 // TODO 这个东西和 GuiHost 的重复了
 const FONT_TEXTURE_ID: usize = 0;
@@ -23,10 +24,10 @@ pub struct GuiBackend {
     /// 存放多帧 imgui 的 mesh 数据
     pub gui_meshes: [GuiMesh; FrameCounter::fif_count()],
 
-    font_texture_handle: Option<GfxTextureHandle>,
+    fonts_image_view_handle: Option<GfxImageViewHandle>,
     font_tex_id: TextureId,
 
-    pub tex_map: HashMap<TextureId, GfxTextureHandle>,
+    pub tex_map: HashMap<TextureId, GfxImageViewHandle>,
 }
 // 创建过程
 impl GuiBackend {
@@ -38,7 +39,7 @@ impl GuiBackend {
 
         Self {
             gui_meshes,
-            font_texture_handle: None,
+            fonts_image_view_handle: None,
             font_tex_id: TextureId::new(0),
             cmds,
 
@@ -53,13 +54,16 @@ impl GuiBackend {
         font_atlas: FontAtlasTexture,
         font_tex_id: TextureId,
     ) {
-        let image = GfxImage::from_rgba8(font_atlas.width, font_atlas.height, font_atlas.data, "imgui-fonts");
-        let fonts_texture = GfxTexture::new(image, "imgui-fonts");
+        let fonts_image = GfxImage::from_rgba8(font_atlas.width, font_atlas.height, font_atlas.data, "imgui-fonts");
+        let fonts_image_handle = gfx_resource_manager.register_image(fonts_image);
+        let fonts_image_view_handle = gfx_resource_manager.get_or_create_image_view(
+            fonts_image_handle,
+            GfxImageViewDesc::new_2d(vk::Format::R8G8B8A8_UNORM, vk::ImageAspectFlags::COLOR),
+            "imgui-fonts",
+        );
+        bindless_manager.register_srv(fonts_image_view_handle);
 
-        let fonts_texture_handle = gfx_resource_manager.register_texture(fonts_texture);
-        bindless_manager.register_srv_with_texture(fonts_texture_handle);
-
-        self.font_texture_handle = Some(fonts_texture_handle);
+        self.fonts_image_view_handle = Some(fonts_image_view_handle);
         self.font_tex_id = font_tex_id;
     }
 }
@@ -78,7 +82,7 @@ impl GuiBackend {
 
         self.tex_map = HashMap::from([(
             imgui::TextureId::new(FONT_TEXTURE_ID) as imgui::TextureId,
-            self.font_texture_handle.unwrap(),
+            self.fonts_image_view_handle.unwrap(),
         )]);
     }
 }
