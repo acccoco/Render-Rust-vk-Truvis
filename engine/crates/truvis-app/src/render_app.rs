@@ -94,7 +94,7 @@ impl RenderApp {
 }
 // update
 impl RenderApp {
-    pub fn time_to_render(&mut self) -> bool {
+    fn time_to_render(&mut self) -> bool {
         self.renderer.time_to_render()
     }
 
@@ -103,7 +103,7 @@ impl RenderApp {
         self.input_manager.push_event(event.clone());
     }
 
-    pub fn build_ui(&mut self) {
+    fn build_ui(&mut self) {
         let elapsed = self.renderer.timer.delta_time();
         let swapchain_image_size = self.renderer.render_present.as_ref().unwrap().swapchain.as_ref().unwrap().extent();
 
@@ -269,10 +269,6 @@ impl RenderApp {
         }
 
         tracy_client::frame_mark();
-    }
-
-    pub fn on_resize(&mut self) {
-        self.renderer.render_present.as_mut().unwrap().rebuild_after_resized();
     }
 
     fn update_scene(&mut self, input_state: &InputState) {

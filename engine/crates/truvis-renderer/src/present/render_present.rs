@@ -7,6 +7,8 @@ use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
+use truvis_gfx::resources::image::GfxImage;
+use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_gfx::swapchain::render_swapchain::GfxRenderSwapchain;
 use truvis_gui_backend::gui_backend::GuiBackend;
 use truvis_gui_backend::gui_pass::GuiPass;
@@ -14,8 +16,9 @@ use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_pipeline::resolve_subpass::{ResolveDrawParams, ResolveSubpass};
 use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
+use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
-use truvis_render_interface::handles::GfxTextureHandle;
+use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle, GfxTextureHandle};
 use truvis_render_interface::pipeline_settings::{DefaultRendererSettings, FrameLabel};
 use truvis_shader_binding::truvisl;
 
@@ -38,6 +41,9 @@ pub struct PresentData {
 
 pub struct RenderPresent {
     pub swapchain: Option<GfxRenderSwapchain>,
+    pub swapchain_images: Vec<GfxImageHandle>,
+    pub swapchain_image_views: Vec<GfxImageViewHandle>,
+
     pub gui_backend: GuiBackend,
     pub gui_pass: GuiPass,
 
@@ -54,21 +60,24 @@ pub struct RenderPresent {
     /// 数量和 swapchain image num 相同
     pub render_complete_semaphores: Vec<GfxSemaphore>,
 }
+
 // new & init
 impl RenderPresent {
     pub fn new(
+        gfx_resource_manager: &mut GfxResourceManager,
         global_descriptor_sets: &GlobalDescriptorSets,
         cmd_allocator: &mut CmdAllocator,
         raw_display_handle: RawDisplayHandle,
         raw_window_handle: RawWindowHandle,
     ) -> Self {
         let swapchain = GfxRenderSwapchain::new(
-            Gfx::get().vk_core(),
             raw_display_handle,
             raw_window_handle,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
         );
+        let (swapchain_image_handles, swapchain_image_view_handles) =
+            Self::create_swapchain_images_and_views(&swapchain, gfx_resource_manager);
 
         let swapchain_image_infos = swapchain.image_infos();
 
@@ -87,6 +96,9 @@ impl RenderPresent {
 
         Self {
             swapchain: Some(swapchain),
+            swapchain_images: swapchain_image_handles,
+            swapchain_image_views: swapchain_image_view_handles,
+
             gui_backend,
             gui_pass,
             resolve_subpass,
@@ -97,24 +109,60 @@ impl RenderPresent {
             raw_window_handle,
         }
     }
+
+    fn create_swapchain_images_and_views(
+        swapchain: &GfxRenderSwapchain,
+        gfx_resource_manager: &mut GfxResourceManager,
+    ) -> (Vec<GfxImageHandle>, Vec<GfxImageViewHandle>) {
+        let mut image_handles = Vec::new();
+        let mut image_view_handles = Vec::new();
+
+        let swapchain_image_info = swapchain.image_infos();
+
+        for (image_idx, vk_image) in swapchain.present_images().iter().enumerate() {
+            let image = GfxImage::from_external(
+                *vk_image,
+                swapchain_image_info.image_extent.into(),
+                swapchain_image_info.image_format,
+                format!("swapchain-image-{}", image_idx),
+            );
+            let image_handle = gfx_resource_manager.register_image(image);
+
+            let image_view_handle = gfx_resource_manager.get_or_create_image_view(
+                image_handle,
+                GfxImageViewDesc::new_2d(swapchain_image_info.image_format, vk::ImageAspectFlags::COLOR),
+                format!("swapchain-{}", image_idx),
+            );
+
+            image_handles.push(image_handle);
+            image_view_handles.push(image_view_handle);
+        }
+
+        (image_handles, image_view_handles)
+    }
 }
+
 // update
 impl RenderPresent {
-    pub fn rebuild_after_resized(&mut self) {
+    pub fn rebuild_after_resized(&mut self, gfx_resource_manager: &mut GfxResourceManager) {
         unsafe {
             Gfx::get().gfx_device().device_wait_idle().unwrap();
         }
 
+        for image_handle in std::mem::take(&mut self.swapchain_images) {
+            gfx_resource_manager.destroy_image_immediate(image_handle);
+        }
         if let Some(swapchain) = self.swapchain.take() {
             swapchain.destroy();
         }
         self.swapchain = Some(GfxRenderSwapchain::new(
-            Gfx::get().vk_core(),
             self.raw_display_handle,
             self.raw_window_handle,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
         ));
+        (self.swapchain_images, self.swapchain_image_views) =
+            Self::create_swapchain_images_and_views(self.swapchain.as_ref().unwrap(), gfx_resource_manager);
     }
 
     pub fn acquire_image(&mut self, frame_label: FrameLabel) {
@@ -136,6 +184,12 @@ impl RenderPresent {
         let swapchain = self.swapchain.as_ref().unwrap();
         let frame_label = render_context.frame_counter.frame_label();
 
+        let swapchain_image_handle = self.swapchain_images[swapchain.current_image_index()];
+        let swapchain_image = render_context.gfx_resource_manager.get_image(swapchain_image_handle).unwrap();
+        let swapchain_image_view_handle = self.swapchain_image_views[swapchain.current_image_index()];
+        let swapchain_image_view =
+            render_context.gfx_resource_manager.get_image_view(swapchain_image_view_handle).unwrap();
+
         let render_target_texture =
             render_context.gfx_resource_manager.get_texture(present_data.render_target).unwrap();
 
@@ -148,7 +202,7 @@ impl RenderPresent {
                 &[
                     // 将 swapchain image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
                     GfxImageBarrier::new()
-                        .image(swapchain.current_image())
+                        .image(swapchain_image.handle())
                         .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                         .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
                         // bottom 表示等待 present
@@ -183,7 +237,7 @@ impl RenderPresent {
                 &cmd,
                 render_context,
                 frame_label,
-                swapchain.current_image_view().handle(),
+                swapchain_image_view.handle(),
                 target_extent,
                 &draw_params,
             );
@@ -233,6 +287,12 @@ impl RenderPresent {
         let swapchain = self.swapchain.as_ref().unwrap();
         let frame_label = render_context.frame_counter.frame_label();
 
+        let swapchain_image_handle = self.swapchain_images[swapchain.current_image_index()];
+        let swapchain_image = render_context.gfx_resource_manager.get_image(swapchain_image_handle).unwrap();
+        let swapchain_image_view_handle = self.swapchain_image_views[swapchain.current_image_index()];
+        let swapchain_image_view =
+            render_context.gfx_resource_manager.get_image_view(swapchain_image_view_handle).unwrap();
+
         let cmd = self.gui_backend.cmds[*frame_label].clone();
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
         {
@@ -244,7 +304,7 @@ impl RenderPresent {
                     // 等待 resolve pass 完成对 swapchain image 的写入
                     // 注：resolve pass 之后 swapchain image 已经是 COLOR_ATTACHMENT_OPTIMAL
                     GfxImageBarrier::new()
-                        .image(swapchain.current_image())
+                        .image(swapchain_image.handle())
                         .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                         .layout_transfer(
                             vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
@@ -266,7 +326,7 @@ impl RenderPresent {
 
                 self.gui_pass.draw(
                     render_context,
-                    swapchain.current_image_view().handle(),
+                    swapchain_image_view.handle(),
                     swapchain.extent(),
                     &cmd,
                     frame_label,
@@ -283,7 +343,7 @@ impl RenderPresent {
                     // 注意：dst_stage 需要与 submit 时 signal semaphore 的 stage 匹配
                     // 这样 present 等待 semaphore 时才能确保 layout transition 已完成
                     GfxImageBarrier::new()
-                        .image(swapchain.current_image())
+                        .image(swapchain_image.handle())
                         .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                         .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
                         .src_mask(
@@ -299,14 +359,18 @@ impl RenderPresent {
         cmd
     }
 }
+
 // destroy
 impl RenderPresent {
-    pub fn destroy(self) {
+    pub fn destroy(self, gfx_resource_manager: &mut GfxResourceManager) {
         for semaphore in self.present_complete_semaphores {
             semaphore.destroy();
         }
         for semaphore in self.render_complete_semaphores {
             semaphore.destroy();
+        }
+        for image_handle in self.swapchain_images {
+            gfx_resource_manager.destroy_image_immediate(image_handle)
         }
         if let Some(swapchain) = self.swapchain {
             swapchain.destroy();

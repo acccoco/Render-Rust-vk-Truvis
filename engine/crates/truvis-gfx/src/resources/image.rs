@@ -61,10 +61,9 @@ pub struct GfxImage {
     extent: vk::Extent3D,
     format: vk::Format,
 
-    _usage: vk::ImageUsageFlags,
-
     name: String,
 }
+
 // getter
 impl GfxImage {
     #[inline]
@@ -87,6 +86,7 @@ impl GfxImage {
         self.format
     }
 }
+
 // new & init
 impl GfxImage {
     pub fn new(image_info: &GfxImageCreateInfo, alloc_info: &vk_mem::AllocationCreateInfo, debug_name: &str) -> Self {
@@ -98,11 +98,24 @@ impl GfxImage {
             source: ImageSource::Allocated(alloc),
             extent: image_info.inner.extent,
             format: image_info.inner.format,
-            _usage: image_info.inner.usage,
 
             name: debug_name.to_string(),
         };
         gfx_device.set_debug_name(&image, debug_name);
+        image
+    }
+
+    pub fn from_external(image: vk::Image, extent: vk::Extent3D, format: vk::Format, name: impl AsRef<str>) -> Self {
+        let gfx_device = Gfx::get().gfx_device();
+        let image = Self {
+            handle: image,
+            source: ImageSource::External,
+            extent,
+            format,
+
+            name: name.as_ref().to_string(),
+        };
+        gfx_device.set_debug_name(&image, name.as_ref());
         image
     }
 
@@ -137,6 +150,7 @@ impl DebugType for GfxImage {
         self.handle
     }
 }
+
 // destroy
 impl GfxImage {
     pub fn destroy(mut self) {
@@ -159,6 +173,7 @@ impl Drop for GfxImage {
         debug_assert!(self.handle.is_null());
     }
 }
+
 // tools
 impl GfxImage {
     /// # 实现步骤

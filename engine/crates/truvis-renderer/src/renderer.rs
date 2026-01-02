@@ -137,6 +137,7 @@ impl Renderer {
 
     pub fn init_after_window(&mut self, raw_display_handle: RawDisplayHandle, raw_window_handle: RawWindowHandle) {
         self.render_present = Some(RenderPresent::new(
+            &mut self.render_context.gfx_resource_manager,
             &self.render_context.global_descriptor_sets,
             &mut self.cmd_allocator,
             raw_display_handle,
@@ -164,7 +165,7 @@ impl Renderer {
         Gfx::get().wait_idel();
 
         if let Some(render_present) = self.render_present.take() {
-            render_present.destroy();
+            render_present.destroy(&mut self.render_context.gfx_resource_manager);
         }
 
         self.render_context.fif_buffers.destroy_mut(
@@ -262,7 +263,7 @@ impl Renderer {
     }
 
     pub fn on_resize(&mut self) {
-        self.render_present.as_mut().unwrap().rebuild_after_resized();
+        self.render_present.as_mut().unwrap().rebuild_after_resized(&mut self.render_context.gfx_resource_manager);
 
         // 更新 frame settings
         let extent = self.render_present.as_ref().unwrap().swapchain.as_ref().unwrap().extent();

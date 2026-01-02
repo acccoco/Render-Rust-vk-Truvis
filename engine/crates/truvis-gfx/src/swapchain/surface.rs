@@ -1,5 +1,5 @@
 use crate::foundation::debug_messenger::DebugType;
-use crate::gfx_core::GfxCore;
+use crate::gfx::Gfx;
 use ash::vk;
 
 pub struct GfxSurface {
@@ -11,16 +11,16 @@ pub struct GfxSurface {
 
 impl GfxSurface {
     pub fn new(
-        vk_core: &GfxCore,
         raw_display_handle: raw_window_handle::RawDisplayHandle,
         raw_window_handle: raw_window_handle::RawWindowHandle,
     ) -> Self {
-        let surface_pf = ash::khr::surface::Instance::new(&vk_core.vk_entry, &vk_core.instance.ash_instance);
+        let gfx_core = &Gfx::get().gfx_core;
+        let surface_pf = ash::khr::surface::Instance::new(&gfx_core.vk_entry, &gfx_core.instance.ash_instance);
 
         let surface = unsafe {
             ash_window::create_surface(
-                &vk_core.vk_entry,
-                &vk_core.instance.ash_instance,
+                &gfx_core.vk_entry,
+                &gfx_core.instance.ash_instance,
                 raw_display_handle,
                 raw_window_handle,
                 None,
@@ -29,7 +29,7 @@ impl GfxSurface {
         };
 
         let surface_capabilities = unsafe {
-            surface_pf.get_physical_device_surface_capabilities(vk_core.physical_device.vk_handle, surface).unwrap()
+            surface_pf.get_physical_device_surface_capabilities(gfx_core.physical_device.vk_handle, surface).unwrap()
         };
 
         let surface = GfxSurface {
@@ -37,7 +37,7 @@ impl GfxSurface {
             pf: surface_pf,
             capabilities: surface_capabilities,
         };
-        vk_core.gfx_device.set_debug_name(&surface, "main");
+        gfx_core.gfx_device.set_debug_name(&surface, "main");
 
         surface
     }

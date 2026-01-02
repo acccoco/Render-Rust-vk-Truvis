@@ -247,6 +247,34 @@ impl GfxResourceManager {
     pub fn destroy_image(&mut self, handle: GfxImageHandle, current_frame_index: u64) {
         self.pending_destroy_images.push((handle, current_frame_index));
     }
+
+    /// 立即销毁 Image 及其关联的所有 ImageView
+    ///
+    /// 注意：调用者需要确保该资源不再被 GPU 使用，否则可能导致未定义行为。
+    pub fn destroy_image_immediate(&mut self, handle: GfxImageHandle) {
+        // 先清理基于 image 创建的 image views
+        if let Some(view_handles) = self.image_to_views.remove(handle) {
+            for image_view_handle in view_handles {
+                // 从 lookup 中移除对应条目
+                if let Some(image_view) = self.image_view_pool.get(image_view_handle) {
+                    let view_desc = *image_view.desc();
+                    self.image_view_lookup.remove(&(handle, view_desc));
+                }
+                // 销毁 image view
+                if let Some(image_view) = self.image_view_pool.remove(image_view_handle) {
+                    image_view.destroy()
+                }
+            }
+        }
+
+        // 从待销毁队列中移除（如果存在）
+        self.pending_destroy_images.retain(|(h, _)| *h != handle);
+
+        // 销毁 image 本身
+        if let Some(image) = self.image_pool.remove(handle) {
+            image.destroy()
+        }
+    }
 }
 // ImageView API
 impl GfxResourceManager {

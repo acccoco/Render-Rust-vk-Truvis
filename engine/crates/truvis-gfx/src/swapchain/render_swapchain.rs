@@ -2,8 +2,6 @@ use crate::commands::command_queue::GfxCommandQueue;
 use crate::commands::fence::GfxFence;
 use crate::commands::semaphore::GfxSemaphore;
 use crate::gfx::Gfx;
-use crate::gfx_core::GfxCore;
-use crate::resources::image_view::{GfxImageView, GfxImageViewDesc};
 use crate::swapchain::surface::GfxSurface;
 use ash::vk;
 use ash::vk::Handle;
@@ -13,9 +11,7 @@ pub struct GfxRenderSwapchain {
     _surface: GfxSurface,
     swapchain_handle: vk::SwapchainKHR,
 
-    /// 这里的 image 并非手动创建的，因此无法使用 GfxImage 类型
     swapchain_images: Vec<vk::Image>,
-    swapchain_image_views: Vec<GfxImageView>,
     swapchain_image_index: usize,
 
     color_format: vk::Format,
@@ -25,39 +21,22 @@ pub struct GfxRenderSwapchain {
 // new & init
 impl GfxRenderSwapchain {
     pub fn new(
-        vk_core: &GfxCore,
         raw_display_handle: raw_window_handle::RawDisplayHandle,
         raw_window_handle: raw_window_handle::RawWindowHandle,
         present_mode: vk::PresentModeKHR,
         surface_format: vk::SurfaceFormatKHR,
     ) -> Self {
-        let surface = GfxSurface::new(vk_core, raw_display_handle, raw_window_handle);
+        let surface = GfxSurface::new(raw_display_handle, raw_window_handle);
         let extent = surface.capabilities.current_extent;
 
         let swapchain_handle =
             Self::create_swapchain(&surface, surface_format.format, surface_format.color_space, extent, present_mode);
-
-        let images = unsafe { vk_core.gfx_device.swapchain.get_swapchain_images(swapchain_handle).unwrap() };
-        for (img_idx, img) in images.iter().enumerate() {
-            vk_core.gfx_device.set_object_debug_name(*img, format!("swapchain-image-{img_idx}"));
-        }
-        let image_views = images
-            .iter()
-            .enumerate()
-            .map(|(idx, img)| {
-                GfxImageView::new(
-                    *img,
-                    GfxImageViewDesc::new_2d(surface_format.format, vk::ImageAspectFlags::COLOR),
-                    format!("swapchain-{}", idx),
-                )
-            })
-            .collect_vec();
+        let images = unsafe { Gfx::get().gfx_device().swapchain.get_swapchain_images(swapchain_handle).unwrap() };
 
         Self {
             _surface: surface,
             swapchain_handle,
             swapchain_images: images,
-            swapchain_image_views: image_views,
             swapchain_image_index: 0,
             swapchain_extent: extent,
             color_format: surface_format.format,
@@ -103,11 +82,13 @@ impl GfxRenderSwapchain {
         }
     }
 }
+
 pub struct GfxSwapchainImageInfo {
     pub image_extent: vk::Extent2D,
     pub image_cnt: usize,
     pub image_format: vk::Format,
 }
+
 // getters
 impl GfxRenderSwapchain {
     #[inline]
@@ -121,18 +102,8 @@ impl GfxRenderSwapchain {
     }
 
     #[inline]
-    pub fn current_image(&self) -> vk::Image {
-        self.swapchain_images[self.swapchain_image_index]
-    }
-
-    #[inline]
     pub fn current_image_index(&self) -> usize {
         self.swapchain_image_index
-    }
-
-    #[inline]
-    pub fn current_image_view(&self) -> &GfxImageView {
-        &self.swapchain_image_views[self.swapchain_image_index]
     }
 
     #[inline]
@@ -144,7 +115,8 @@ impl GfxRenderSwapchain {
         }
     }
 }
-// tools
+
+// update
 impl GfxRenderSwapchain {
     /// timeout: nano seconds
     #[inline]
@@ -183,23 +155,19 @@ impl GfxRenderSwapchain {
         unsafe { Gfx::get().gfx_device().swapchain.queue_present(queue.handle(), &present_info).unwrap() };
     }
 }
+
 // destroy
 impl GfxRenderSwapchain {
     pub fn destroy(mut self) {
         unsafe {
             let gfx_device = Gfx::get().gfx_device();
-            for image_view in self.swapchain_image_views.drain(..) {
-                image_view.destroy();
-            }
             gfx_device.swapchain.destroy_swapchain(self.swapchain_handle, None);
         }
-        self.swapchain_images.clear();
         self.swapchain_handle = vk::SwapchainKHR::null();
     }
 }
 impl Drop for GfxRenderSwapchain {
     fn drop(&mut self) {
-        debug_assert!(self.swapchain_images.is_empty());
-        debug_assert!(self.swapchain_handle.is_null());
+        assert!(self.swapchain_handle.is_null());
     }
 }
