@@ -125,10 +125,17 @@ impl OuterApp for RasterGraphApp {
             "render_target",
             render_target_img,
             Some(render_target_view),
+            frame_settings.color_format,
             ImageState::UNDEFINED,
         );
 
-        let rg_depth = builder.import_image("depth", depth_img, Some(depth_view), ImageState::UNDEFINED);
+        let rg_depth = builder.import_image(
+            "depth",
+            depth_img,
+            Some(depth_view),
+            frame_settings.depth_format,
+            ImageState::UNDEFINED,
+        );
 
         // 1. Raster Pass - 场景渲染
         let raster_pass = RasterPass::new(

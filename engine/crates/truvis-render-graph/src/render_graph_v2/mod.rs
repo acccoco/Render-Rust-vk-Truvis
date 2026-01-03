@@ -38,8 +38,8 @@
 //! let mut builder = RenderGraphBuilder::new();
 //!
 //! // 导入外部资源
-//! let input = builder.import_image("input", input_handle, Some(input_view), ImageState::UNDEFINED);
-//! let output = builder.import_image("output", output_handle, Some(output_view), ImageState::UNDEFINED);
+//! let input = builder.import_image("input", input_handle, Some(input_view), vk::Format::R8G8B8A8_UNORM, ImageState::UNDEFINED);
+//! let output = builder.import_image("output", output_handle, Some(output_view), vk::Format::R8G8B8A8_UNORM, ImageState::UNDEFINED);
 //!
 //! // 添加 Pass
 //! builder.add_pass("compute", MyComputePass { input, output });

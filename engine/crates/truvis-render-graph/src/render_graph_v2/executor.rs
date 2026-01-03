@@ -59,6 +59,7 @@ impl<'a> RenderGraphBuilder<'a> {
     /// - `name`: 资源调试名称
     /// - `image_handle`: 物理图像句柄（来自 GfxResourceManager）
     /// - `view_handle`: 可选的图像视图句柄
+    /// - `format`: 图像格式（用于推断 barrier aspect）
     /// - `initial_state`: 图像的初始状态
     ///
     /// # 返回
@@ -68,9 +69,10 @@ impl<'a> RenderGraphBuilder<'a> {
         name: impl Into<String>,
         image_handle: GfxImageHandle,
         view_handle: Option<GfxImageViewHandle>,
+        format: vk::Format,
         initial_state: ImageState,
     ) -> RgImageHandle {
-        self.resources.register_imported_image(name, image_handle, view_handle, initial_state)
+        self.resources.register_imported_image(name, image_handle, view_handle, format, initial_state)
     }
 
     /// 导入外部缓冲区资源
@@ -160,7 +162,14 @@ impl<'a> RenderGraphBuilder<'a> {
     }
 
     /// 计算每个 Pass 需要的 barriers
+    ///
+    /// 采用"需要的最终状态"策略：
+    /// - 对于每个资源，收集 Pass 中所有读写声明
+    /// - 计算进入 Pass 需要的目标状态（写入状态优先）
+    /// - 生成一个从当前状态到目标状态的 barrier
     fn compute_barriers(&self, execution_order: &[usize]) -> Vec<PassBarriers> {
+        use std::collections::HashMap;
+
         let mut barriers = vec![PassBarriers::new(); self.passes.len()];
 
         // 跟踪每个资源的当前状态 (使用 SecondaryMap)
@@ -179,42 +188,57 @@ impl<'a> RenderGraphBuilder<'a> {
             let pass = &self.passes[pass_idx];
             let pass_barriers = &mut barriers[pass_idx];
 
-            // 处理图像读取
+            // 收集此 Pass 中每个图像的所有使用
+            // Key: handle, Value: (is_write, required_state)
+            let mut image_usage: HashMap<RgImageHandle, (bool, ImageState)> = HashMap::new();
+
+            // 处理读取声明
             for read in &pass.image_reads {
-                if let Some(&current) = image_states.get(read.handle) {
-                    let required = read.state;
-                    pass_barriers.add_image_barrier(ImageBarrierDesc::new(read.handle, current, required));
-                    // 读取可能需要 layout 转换
-                    if current.layout != required.layout {
-                        image_states.insert(read.handle, required);
+                image_usage.entry(read.handle).or_insert((false, read.state));
+            }
+
+            // 处理写入声明（写入会覆盖读取的目标状态）
+            for write in &pass.image_writes {
+                image_usage.insert(write.handle, (true, write.state));
+            }
+
+            // 为每个使用的图像生成 barrier
+            for (handle, (is_write, required)) in image_usage {
+                if let Some(&current) = image_states.get(handle) {
+                    let aspect = self
+                        .resources
+                        .get_image(handle)
+                        .map(|res| res.infer_aspect())
+                        .unwrap_or(vk::ImageAspectFlags::COLOR);
+
+                    pass_barriers
+                        .add_image_barrier(ImageBarrierDesc::new(handle, current, required).with_aspect(aspect));
+
+                    // 如果是写入或 layout 改变，更新状态
+                    if is_write || current.layout != required.layout {
+                        image_states.insert(handle, required);
                     }
                 }
             }
 
-            // 处理图像写入
-            for write in &pass.image_writes {
-                if let Some(&current) = image_states.get(write.handle) {
-                    let required = write.state;
-                    pass_barriers.add_image_barrier(ImageBarrierDesc::new(write.handle, current, required));
-                    // 写入更新状态
-                    image_states.insert(write.handle, required);
-                }
-            }
+            // 缓冲区使用类似逻辑
+            let mut buffer_usage: HashMap<RgBufferHandle, (bool, BufferState)> = HashMap::new();
 
-            // 处理缓冲区读取
             for read in &pass.buffer_reads {
-                if let Some(&current) = buffer_states.get(read.handle) {
-                    let required = read.state;
-                    pass_barriers.add_buffer_barrier(BufferBarrierDesc::new(read.handle, current, required));
-                }
+                buffer_usage.entry(read.handle).or_insert((false, read.state));
             }
 
-            // 处理缓冲区写入
             for write in &pass.buffer_writes {
-                if let Some(&current) = buffer_states.get(write.handle) {
-                    let required = write.state;
-                    pass_barriers.add_buffer_barrier(BufferBarrierDesc::new(write.handle, current, required));
-                    buffer_states.insert(write.handle, required);
+                buffer_usage.insert(write.handle, (true, write.state));
+            }
+
+            for (handle, (is_write, required)) in buffer_usage {
+                if let Some(&current) = buffer_states.get(handle) {
+                    pass_barriers.add_buffer_barrier(BufferBarrierDesc::new(handle, current, required));
+
+                    if is_write {
+                        buffer_states.insert(handle, required);
+                    }
                 }
             }
         }
@@ -320,9 +344,15 @@ impl CompiledGraph<'_> {
             .image_barriers
             .iter()
             .filter_map(|desc| {
+                // 跳过不需要的 barrier
+                if !desc.needs_barrier() {
+                    return None;
+                }
+
                 let res = self.resources.get_image(desc.handle)?;
                 let phys_handle = res.physical_handle()?;
                 let image = resource_manager.get_image(phys_handle)?;
+
                 Some(desc.to_gfx_barrier(image.handle()))
             })
             .collect();

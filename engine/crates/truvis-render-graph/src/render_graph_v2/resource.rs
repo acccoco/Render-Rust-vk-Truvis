@@ -107,7 +107,7 @@ impl RgImageDesc {
     }
 
     /// 从格式推断 aspect
-    fn infer_aspect(format: vk::Format) -> vk::ImageAspectFlags {
+    pub fn infer_aspect(format: vk::Format) -> vk::ImageAspectFlags {
         match format {
             vk::Format::D16_UNORM | vk::Format::D32_SFLOAT | vk::Format::X8_D24_UNORM_PACK32 => {
                 vk::ImageAspectFlags::DEPTH
@@ -197,6 +197,8 @@ pub struct ImageResource {
     pub source: ImageSource,
     /// 当前状态
     pub current_state: ImageState,
+    /// 图像格式（用于推断 barrier aspect）
+    pub format: vk::Format,
     /// 调试名称
     pub name: String,
     /// 当前版本（被写入的次数）
@@ -209,6 +211,7 @@ impl ImageResource {
         name: impl Into<String>,
         image_handle: GfxImageHandle,
         view_handle: Option<GfxImageViewHandle>,
+        format: vk::Format,
         initial_state: ImageState,
     ) -> Self {
         Self {
@@ -217,6 +220,7 @@ impl ImageResource {
                 view_handle,
             },
             current_state: initial_state,
+            format,
             name: name.into(),
             version: 0,
         }
@@ -224,12 +228,25 @@ impl ImageResource {
 
     /// 创建临时图像资源
     pub fn transient(name: impl Into<String>, desc: RgImageDesc) -> Self {
+        let format = desc.format;
         Self {
             source: ImageSource::Transient { desc },
             current_state: ImageState::UNDEFINED,
+            format,
             name: name.into(),
             version: 0,
         }
+    }
+
+    /// 获取图像格式
+    #[inline]
+    pub fn format(&self) -> vk::Format {
+        self.format
+    }
+
+    /// 根据格式推断 aspect flags
+    pub fn infer_aspect(&self) -> vk::ImageAspectFlags {
+        RgImageDesc::infer_aspect(self.format)
     }
 
     /// 获取物理 image handle（仅对导入资源有效）
@@ -326,9 +343,10 @@ impl ResourceRegistry {
         name: impl Into<String>,
         image_handle: GfxImageHandle,
         view_handle: Option<GfxImageViewHandle>,
+        format: vk::Format,
         initial_state: ImageState,
     ) -> RgImageHandle {
-        self.images.insert(ImageResource::imported(name, image_handle, view_handle, initial_state))
+        self.images.insert(ImageResource::imported(name, image_handle, view_handle, format, initial_state))
     }
 
     /// 注册临时图像（将在编译阶段创建）
