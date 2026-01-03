@@ -27,21 +27,27 @@ use super::state::{BufferState, ImageState};
 /// 3. 添加 Pass: `builder.add_pass("name", pass)`
 /// 4. 编译: `builder.compile()`
 /// 5. 执行: `compiled.execute(...)`
-pub struct RenderGraphBuilder {
+///
+/// # 生命周期
+///
+/// `'a` 是 Pass 可以借用的外部资源的生命周期。
+/// 这允许 Pass 直接引用外部的 pipeline、geometry 等资源，
+/// 而不需要使用 Rc/Arc 包装。
+pub struct RenderGraphBuilder<'a> {
     /// 资源注册表
     resources: ResourceRegistry,
 
     /// Pass 节点列表（按添加顺序）
-    passes: Vec<PassNode>,
+    passes: Vec<PassNode<'a>>,
 }
 
-impl Default for RenderGraphBuilder {
+impl Default for RenderGraphBuilder<'_> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl RenderGraphBuilder {
+impl<'a> RenderGraphBuilder<'a> {
     /// 创建新的 RenderGraph 构建器
     pub fn new() -> Self {
         Self { resources: ResourceRegistry::new(), passes: Vec::new() }
@@ -85,7 +91,7 @@ impl RenderGraphBuilder {
     ///
     /// # 返回
     /// 返回 `&mut Self` 以支持链式调用
-    pub fn add_pass<P: RgPass>(&mut self, name: impl Into<String>, mut pass: P) -> &mut Self {
+    pub fn add_pass<P: RgPass + 'a>(&mut self, name: impl Into<String>, mut pass: P) -> &mut Self {
         let name = name.into();
 
         // 创建 PassBuilder 供 Pass 声明依赖
@@ -124,7 +130,7 @@ impl RenderGraphBuilder {
     ///
     /// # Panics
     /// 如果检测到循环依赖
-    pub fn compile(self) -> CompiledGraph {
+    pub fn compile(self) -> CompiledGraph<'a> {
         let pass_count = self.passes.len();
 
         // 收集每个 Pass 的读写资源句柄
@@ -220,11 +226,16 @@ impl RenderGraphBuilder {
 /// 编译后的渲染图
 ///
 /// 包含执行顺序、预计算的 barriers，可以多次执行。
-pub struct CompiledGraph {
+///
+/// # 生命周期
+///
+/// `'a` 是 Pass 借用的外部资源的生命周期。
+/// CompiledGraph 的生命周期不能超过这些外部资源。
+pub struct CompiledGraph<'a> {
     /// 资源注册表
     resources: ResourceRegistry,
     /// Pass 节点列表
-    passes: Vec<PassNode>,
+    passes: Vec<PassNode<'a>>,
     /// 执行顺序（拓扑排序后）
     execution_order: Vec<usize>,
     /// 每个 Pass 的 barriers（按 pass 索引）
@@ -234,7 +245,7 @@ pub struct CompiledGraph {
     dep_graph: DependencyGraph,
 }
 
-impl CompiledGraph {
+impl CompiledGraph<'_> {
     /// 获取执行顺序
     pub fn execution_order(&self) -> &[usize] {
         &self.execution_order
@@ -288,7 +299,7 @@ impl CompiledGraph {
             cmd.begin_label(&pass.name, truvis_gfx::basic::color::LabelColor::COLOR_PASS);
 
             // 执行 Pass
-            let ctx = PassContext { cmd, image_handles: &image_handles, buffer_handles: &buffer_handles };
+            let ctx = PassContext { cmd, resource_manager, image_handles: &image_handles, buffer_handles: &buffer_handles };
             pass.executor.execute(&ctx);
 
             // 结束 Pass debug label

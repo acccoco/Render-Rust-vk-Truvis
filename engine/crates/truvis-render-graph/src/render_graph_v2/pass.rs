@@ -3,8 +3,6 @@
 //! 提供 `RgPass` trait 用于声明式定义渲染 Pass，
 //! 以及 `PassBuilder` 用于在 setup 阶段声明资源依赖。
 
-use std::any::Any;
-
 use slotmap::SecondaryMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_render_interface::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle};
@@ -19,6 +17,9 @@ use super::state::{BufferState, ImageState};
 pub struct PassContext<'a> {
     /// 命令缓冲区
     pub cmd: &'a GfxCommandBuffer,
+
+    /// 资源管理器引用（用于获取物理资源）
+    pub resource_manager: &'a truvis_render_interface::gfx_resource_manager::GfxResourceManager,
 
     /// 物理资源查询表（编译后填充）
     pub(crate) image_handles: &'a SecondaryMap<RgImageHandle, (GfxImageHandle, GfxImageViewHandle)>,
@@ -171,7 +172,7 @@ impl<'a> PassBuilder<'a> {
 }
 
 /// Pass 节点数据（编译后使用）
-pub struct PassNode {
+pub struct PassNode<'a> {
     /// Pass 名称
     pub name: String,
 
@@ -185,10 +186,10 @@ pub struct PassNode {
     pub buffer_writes: Vec<BufferWrite>,
 
     /// 执行回调（类型擦除的 Pass 实现）
-    pub(crate) executor: Box<dyn PassExecutor>,
+    pub(crate) executor: Box<dyn PassExecutor + 'a>,
 }
 
-impl PassNode {
+impl PassNode<'_> {
     /// 获取所有读取的图像句柄
     pub fn read_image_handles(&self) -> impl Iterator<Item = RgImageHandle> + '_ {
         self.image_reads.iter().map(|r| r.handle)
@@ -211,12 +212,9 @@ impl PassNode {
 }
 
 /// 类型擦除的 Pass 执行器 trait
-pub(crate) trait PassExecutor: Send + Sync {
+pub(crate) trait PassExecutor {
     /// 执行 Pass
     fn execute(&self, ctx: &PassContext<'_>);
-
-    /// 获取 Any 引用（用于向下转换）
-    fn as_any(&self) -> &dyn Any;
 }
 
 /// RgPass trait
@@ -244,7 +242,12 @@ pub(crate) trait PassExecutor: Send + Sync {
 ///     }
 /// }
 /// ```
-pub trait RgPass: Send + Sync + 'static {
+///
+/// # 线程安全
+///
+/// Pass 不需要是 Send + Sync，因为 RenderGraph 通常在单线程中使用。
+/// Pass 可以借用外部资源，生命周期由 RenderGraphBuilder 的生命周期参数约束。
+pub trait RgPass {
     /// 声明 Pass 的资源依赖
     ///
     /// 在此方法中使用 `PassBuilder` 声明读取和写入的资源。
@@ -264,9 +267,5 @@ pub(crate) struct RgPassExecutor<P: RgPass> {
 impl<P: RgPass> PassExecutor for RgPassExecutor<P> {
     fn execute(&self, ctx: &PassContext<'_>) {
         self.pass.execute(ctx);
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
