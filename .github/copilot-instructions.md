@@ -7,33 +7,32 @@
 ```
 engine/
 ├── crates/
-│   ├── truvis-gfx/              # Vulkan RHI 抽象（Gfx 单例）
-│   ├── truvis-app/              # 应用框架核心（OuterApp trait + 内置 subpass 实现）
-│   │   └── src/outer_app/       # 内置应用：triangle/, shader_toy/, sponza_app.rs
-│   ├── truvis-render-interface/ # CmdAllocator, BindlessManager, FrameCounter, FrameLabel
-│   ├── truvis-renderer/         # Renderer, Camera, Timer, 模型加载
+│   ├── truvis-gfx/              # Vulkan RHI 抽象（Gfx 单例，GfxBuffer/GfxImage）
+│   ├── truvis-app/              # 应用框架（OuterApp trait）
+│   │   └── src/outer_app/       # 内置应用：triangle/, shader_toy/, cornell_app.rs
+│   ├── truvis-render-interface/ # CmdAllocator, FrameCounter, GfxResourceManager, Handle 系统
+│   ├── truvis-renderer/         # Renderer, Camera, Timer
 │   ├── truvis-render-graph/     # RenderContext, Pass/Subpass, FifBuffers
-│   ├── truvis-scene/            # GpuScene, SceneManager, RtGeometry, 几何体形状
+│   ├── truvis-scene/            # RtGeometry, 几何体形状（shapes/triangle.rs）
 │   ├── truvis-shader/           # 着色器系统
-│   │   ├── truvis-shader-binding/   # Slang → Rust 自动绑定（build.rs + bindgen）
-│   │   └── truvis-shader-build/     # 着色器编译工具（slangc/glslc/dxc）
+│   │   ├── truvis-shader-binding/   # Slang → Rust 自动绑定
+│   │   └── truvis-shader-build/     # 着色器编译（slangc）
 │   ├── truvis-cxx/              # C++ FFI（Assimp 场景加载）
 │   ├── truvis-asset/            # 异步资产加载
-│   └── truvis-crate-tools/      # TruvisPath 路径工具
+│   └── truvis-gui-backend/      # ImGui 后端
 ├── shader/
-│   ├── src/                     # .slang 源码（按 pass 组织）
+│   ├── src/                     # .slang 源码（按 pass 组织：rt/, hello_triangle/）
 │   ├── include/                 # 共享头文件（.slangi）
 │   └── .build/                  # 编译后 .spv（自动生成）
 └── cxx/                         # C++ 源码 + CMakeLists.txt
 
-truvis-winit-app/                # 独立 crate：可运行的演示应用
-├── src/bin/                     # 应用入口：triangle_app.rs, sponza_app.rs, rt_cornell.rs...
+truvis-crate-tools/              # 独立 crate：TruvisPath 路径工具
+truvis-winit-app/                # 可运行的演示应用
+├── src/bin/                     # 应用入口：triangle_app.rs, rt_cornell.rs...
 └── src/app.rs                   # WinitApp 窗口管理
-
-truvis-tauri-app/                # Tauri GUI 应用（可选）
 ```
 
-**层次关系**: `truvis-gfx` → `truvis-render-*` → `truvis-app` → `truvis-winit-app/src/bin/*.rs`
+**依赖层次**: `truvis-gfx` → `truvis-render-interface` → `truvis-render-graph` → `truvis-app` → `truvis-winit-app`
 
 ## 🚀 构建流程（必须按顺序）
 
@@ -47,26 +46,21 @@ cargo run --bin shader-build
 # 3. 运行演示（从 truvis-winit-app 目录）
 cd truvis-winit-app
 cargo run --bin triangle_app       # 基础三角形
-cargo run --bin sponza_app         # 光追 Sponza（需要模型）
+cargo run --bin rt_cornell         # Cornell Box 光追
 cargo run --bin shader_toy_app     # 着色器实验场
-cargo run --bin rt_cornell         # Cornell Box
-cargo run --bin async_load_app     # 异步加载测试
 ```
 
 **⚠️ 关键约束**:
 - `shader-build` 必须在运行任何渲染应用前执行
-- 位于 `engine/crates/truvis-shader/truvis-shader-build/src/bin/shader-build/`
-- 使用 rayon 并行编译 `.slang` → `.spv`
-- 输出目录：`engine/shader/.build/`
+- 使用 rayon 并行编译 `.slang` → `.spv`，输出到 `engine/shader/.build/`
 
 **自动生成系统**:
-- 着色器绑定: `truvis-shader-binding/build.rs` 通过 bindgen 从 `.slangi` 生成 Rust 类型
-- C++ 绑定: `truvis-cxx-binding/build.rs` 构建 CMake 并复制 DLL 到 `target/`
+- 着色器绑定: `truvis-shader-binding/build.rs` 从 `.slangi` 生成 Rust 类型
+- C++ 绑定: `truvis-cxx/build.rs` 构建 CMake 并复制 DLL 到 `target/`
 
 
 ## 🎯 OuterApp 开发模式
 
-### 标准模板
 应用入口位于 `truvis-winit-app/src/bin/`，OuterApp 实现位于 `truvis-app/src/outer_app/`：
 
 ```rust
@@ -79,47 +73,33 @@ fn main() {
     WinitApp::run(outer_app);
 }
 
-// engine/crates/truvis-app/src/outer_app/my_app.rs
-use truvis_app::outer_app::OuterApp;
-use truvis_renderer::renderer::Renderer;
-use truvis_renderer::platform::camera::Camera;
-use truvis_render_graph::render_context::RenderContext;
-
+// truvis-app/src/outer_app/my_app.rs
 #[derive(Default)]
 pub struct MyAppImpl {
     pipeline: Option<MyPass>,
     geometry: Option<RtGeometry>,
 }
-
 impl OuterApp for MyAppImpl {
     fn init(&mut self, renderer: &mut Renderer, _camera: &mut Camera) {
         self.pipeline = Some(MyPass::new(&renderer.render_context.frame_settings, &mut renderer.cmd_allocator));
         self.geometry = Some(TriangleSoA::create_mesh());
     }
-    
     fn draw(&self, render_context: &RenderContext) {
         self.pipeline.as_ref().unwrap().render(render_context, self.geometry.as_ref().unwrap());
     }
-    
-    // 可选方法
-    fn draw_ui(&mut self, _ui: &imgui::Ui) {}
-    fn update(&mut self, _renderer: &mut Renderer) {}
-    fn on_window_resized(&mut self, _renderer: &mut Renderer) {}
+    // 可选: draw_ui(), update(), on_window_resized()
 }
 ```
 
+### Pass/Subpass 架构
 
-### RenderContext（核心渲染状态）
+| 层级 | 职责 |
+|------|------|
+| **Subpass** (`*_subpass.rs`) | 封装着色器、描述符布局、Pipeline，实现 `RenderSubpass` trait |
+| **Pass** (`*_pass.rs`) | 命令缓冲区分配、图像屏障、调用 subpass.draw() |
 
-通过 `renderer.render_context` 访问，`OuterApp::draw()` 参数传入：
-- `frame_counter.frame_label()` → 当前帧标签（A/B/C）
-- `fif_buffers` → 管理 render target、depth images
-- `bindless_manager` → Bindless 资源管理
-- `gpu_scene` → GPU 场景数据
-- `frame_settings` → 分辨率、格式等
-
-**Pass 模式**（命令缓冲区预分配）：
 ```rust
+// Pass 模式：每帧 label 预分配 CommandBuffer
 impl MyPass {
     pub fn new(frame_settings: &FrameSettings, cmd_allocator: &mut CmdAllocator) -> Self {
         let cmds = FrameCounter::frame_labes()
@@ -131,20 +111,12 @@ impl MyPass {
         let frame_label = render_context.frame_counter.frame_label();
         let cmd = self.cmds[*frame_label].clone();
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "my-pass");
-        self.subpass.draw(&cmd, /* ... */);
+        self.subpass.draw(&cmd, render_context, frame_label, geometry);
         cmd.end();
         Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(&[cmd])], None);
     }
 }
 ```
-
-
-### 渲染管线架构
-
-| 层级 | 文件模式 | 职责 |
-|------|----------|------|
-| Subpass | `*_subpass.rs` | 封装着色器、描述符布局，实现 `RenderSubpass` trait |
-| Pass | `*_pass.rs` | 命令记录、图像屏障、调用 subpass.draw() |
 
 
 ## 🎨 着色器开发（Slang 优先）
@@ -157,7 +129,7 @@ impl MyPass {
 | `engine/shader/.build/` | 编译输出（SPIR-V） |
 
 ### 全局描述符布局（三层绑定）
-定义于 [global_binding_sets.slangi](engine/shader/include/global_binding_sets.slangi)：
+定义于 `engine/shader/include/global_binding_sets.slangi`：
 ```slang
 // set 0: 全局采样器
 [[vk::binding(0, 0)]] SamplerState global_samplers[];
@@ -238,7 +210,7 @@ cargo run --bin shader-build
 cd truvis-winit-app && cargo run --bin my_app
 ```
 
-参考示例：[triangle_app.rs](truvis-winit-app/src/bin/triangle_app.rs) + [triangle/](engine/crates/truvis-app/src/outer_app/triangle/)
+参考示例：`truvis-winit-app/src/bin/triangle_app.rs` + `engine/crates/truvis-app/src/outer_app/triangle/`
 
 ### 创建新渲染管线
 ```rust
@@ -299,6 +271,20 @@ Gfx::get().gfx_queue()   // 访问队列
 ```rust
 let frame_label = render_context.frame_counter.frame_label();  // A/B/C
 let render_target = render_context.fif_buffers.render_target_image(frame_label);
+```
+
+### GfxResourceManager（Handle 系统）
+使用 SlotMap 存储 GPU 资源，返回轻量级 Handle：
+```rust
+// 创建资源并获取 Handle
+let image_handle: GfxImageHandle = resource_manager.create_image(create_info);
+let view_handle: GfxImageViewHandle = resource_manager.get_or_create_image_view(image_handle, desc);
+
+// 访问资源
+let image = resource_manager.get_image(image_handle).unwrap();
+
+// 延迟销毁（FIF 安全，cleanup() 在帧结束自动处理）
+resource_manager.destroy_image_later(image_handle, frame_id);
 ```
 
 
