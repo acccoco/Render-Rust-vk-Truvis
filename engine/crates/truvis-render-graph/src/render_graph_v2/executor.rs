@@ -4,6 +4,7 @@
 //! `CompiledGraph` 用于缓存编译结果并执行渲染。
 
 use ash::vk;
+use slotmap::SecondaryMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle};
@@ -32,15 +33,6 @@ pub struct RenderGraphBuilder {
 
     /// Pass 节点列表（按添加顺序）
     passes: Vec<PassNode>,
-
-    /// 下一个可用的图像资源 ID
-    next_image_id: u32,
-    /// 下一个可用的缓冲区资源 ID
-    next_buffer_id: u32,
-
-    /// 资源版本跟踪
-    image_versions: Vec<u32>,
-    buffer_versions: Vec<u32>,
 }
 
 impl Default for RenderGraphBuilder {
@@ -52,14 +44,7 @@ impl Default for RenderGraphBuilder {
 impl RenderGraphBuilder {
     /// 创建新的 RenderGraph 构建器
     pub fn new() -> Self {
-        Self {
-            resources: ResourceRegistry::new(),
-            passes: Vec::new(),
-            next_image_id: 0,
-            next_buffer_id: 0,
-            image_versions: Vec::new(),
-            buffer_versions: Vec::new(),
-        }
+        Self { resources: ResourceRegistry::new(), passes: Vec::new() }
     }
 
     /// 导入外部图像资源
@@ -79,15 +64,7 @@ impl RenderGraphBuilder {
         view_handle: Option<GfxImageViewHandle>,
         initial_state: ImageState,
     ) -> RgImageHandle {
-        let handle = self.resources.register_imported_image(name, image_handle, view_handle, initial_state);
-        self.next_image_id = self.next_image_id.max(handle.id + 1);
-
-        // 初始化版本
-        while self.image_versions.len() <= handle.id as usize {
-            self.image_versions.push(0);
-        }
-
-        handle
+        self.resources.register_imported_image(name, image_handle, view_handle, initial_state)
     }
 
     /// 导入外部缓冲区资源
@@ -97,14 +74,7 @@ impl RenderGraphBuilder {
         buffer_handle: GfxBufferHandle,
         initial_state: BufferState,
     ) -> RgBufferHandle {
-        let handle = self.resources.register_imported_buffer(name, buffer_handle, initial_state);
-        self.next_buffer_id = self.next_buffer_id.max(handle.id + 1);
-
-        while self.buffer_versions.len() <= handle.id as usize {
-            self.buffer_versions.push(0);
-        }
-
-        handle
+        self.resources.register_imported_buffer(name, buffer_handle, initial_state)
     }
 
     /// 添加 Pass
@@ -125,24 +95,11 @@ impl RenderGraphBuilder {
             image_writes: Vec::new(),
             buffer_reads: Vec::new(),
             buffer_writes: Vec::new(),
-            transient_images: Vec::new(),
-            transient_buffers: Vec::new(),
-            next_image_id: &mut self.next_image_id,
-            next_buffer_id: &mut self.next_buffer_id,
-            image_versions: &mut self.image_versions,
-            buffer_versions: &mut self.buffer_versions,
+            resources: &mut self.resources,
         };
 
         // 调用 Pass 的 setup 方法
         pass.setup(&mut builder);
-
-        // 注册临时资源
-        for (img_name, desc) in builder.transient_images {
-            self.resources.register_transient_image(img_name, desc);
-        }
-        for (buf_name, desc) in builder.transient_buffers {
-            self.resources.register_transient_buffer(buf_name, desc);
-        }
 
         // 创建 PassNode
         let node = PassNode {
@@ -170,11 +127,15 @@ impl RenderGraphBuilder {
     pub fn compile(self) -> CompiledGraph {
         let pass_count = self.passes.len();
 
-        // 收集每个 Pass 的读写资源 ID
-        let image_reads: Vec<Vec<u32>> = self.passes.iter().map(|p| p.read_image_ids().collect()).collect();
-        let image_writes: Vec<Vec<u32>> = self.passes.iter().map(|p| p.write_image_ids().collect()).collect();
-        let buffer_reads: Vec<Vec<u32>> = self.passes.iter().map(|p| p.read_buffer_ids().collect()).collect();
-        let buffer_writes: Vec<Vec<u32>> = self.passes.iter().map(|p| p.write_buffer_ids().collect()).collect();
+        // 收集每个 Pass 的读写资源句柄
+        let image_reads: Vec<Vec<RgImageHandle>> =
+            self.passes.iter().map(|p| p.read_image_handles().collect()).collect();
+        let image_writes: Vec<Vec<RgImageHandle>> =
+            self.passes.iter().map(|p| p.write_image_handles().collect()).collect();
+        let buffer_reads: Vec<Vec<RgBufferHandle>> =
+            self.passes.iter().map(|p| p.read_buffer_handles().collect()).collect();
+        let buffer_writes: Vec<Vec<RgBufferHandle>> =
+            self.passes.iter().map(|p| p.write_buffer_handles().collect()).collect();
 
         // 依赖分析
         let dep_graph =
@@ -189,37 +150,24 @@ impl RenderGraphBuilder {
         // 计算每个 Pass 的 barriers
         let barriers = self.compute_barriers(&execution_order);
 
-        CompiledGraph {
-            resources: self.resources,
-            passes: self.passes,
-            execution_order,
-            barriers,
-            dep_graph,
-        }
+        CompiledGraph { resources: self.resources, passes: self.passes, execution_order, barriers, dep_graph }
     }
 
     /// 计算每个 Pass 需要的 barriers
     fn compute_barriers(&self, execution_order: &[usize]) -> Vec<PassBarriers> {
         let mut barriers = vec![PassBarriers::new(); self.passes.len()];
 
-        // 跟踪每个资源的当前状态
-        let mut image_states: Vec<ImageState> = (0..self.resources.image_count())
-            .map(|i| {
-                self.resources
-                    .get_image(RgImageHandle::new(i as u32))
-                    .map(|r| r.current_state)
-                    .unwrap_or(ImageState::UNDEFINED)
-            })
-            .collect();
+        // 跟踪每个资源的当前状态 (使用 SecondaryMap)
+        let mut image_states: SecondaryMap<RgImageHandle, ImageState> = SecondaryMap::new();
+        let mut buffer_states: SecondaryMap<RgBufferHandle, BufferState> = SecondaryMap::new();
 
-        let mut buffer_states: Vec<BufferState> = (0..self.resources.buffer_count())
-            .map(|i| {
-                self.resources
-                    .get_buffer(RgBufferHandle::new(i as u32))
-                    .map(|r| r.current_state)
-                    .unwrap_or(BufferState::UNDEFINED)
-            })
-            .collect();
+        // 初始化状态
+        for (handle, res) in self.resources.iter_images() {
+            image_states.insert(handle, res.current_state);
+        }
+        for (handle, res) in self.resources.iter_buffers() {
+            buffer_states.insert(handle, res.current_state);
+        }
 
         for &pass_idx in execution_order {
             let pass = &self.passes[pass_idx];
@@ -227,48 +175,40 @@ impl RenderGraphBuilder {
 
             // 处理图像读取
             for read in &pass.image_reads {
-                let img_id = read.handle.id as usize;
-                if img_id < image_states.len() {
-                    let current = image_states[img_id];
+                if let Some(&current) = image_states.get(read.handle) {
                     let required = read.state;
-                    pass_barriers.add_image_barrier(ImageBarrierDesc::new(read.handle.id, current, required));
-                    // 读取不改变状态（除非需要 layout 转换）
+                    pass_barriers.add_image_barrier(ImageBarrierDesc::new(read.handle, current, required));
+                    // 读取可能需要 layout 转换
                     if current.layout != required.layout {
-                        image_states[img_id] = required;
+                        image_states.insert(read.handle, required);
                     }
                 }
             }
 
             // 处理图像写入
             for write in &pass.image_writes {
-                let img_id = write.handle.id as usize;
-                if img_id < image_states.len() {
-                    let current = image_states[img_id];
+                if let Some(&current) = image_states.get(write.handle) {
                     let required = write.state;
-                    pass_barriers.add_image_barrier(ImageBarrierDesc::new(write.handle.id, current, required));
+                    pass_barriers.add_image_barrier(ImageBarrierDesc::new(write.handle, current, required));
                     // 写入更新状态
-                    image_states[img_id] = required;
+                    image_states.insert(write.handle, required);
                 }
             }
 
             // 处理缓冲区读取
             for read in &pass.buffer_reads {
-                let buf_id = read.handle.id as usize;
-                if buf_id < buffer_states.len() {
-                    let current = buffer_states[buf_id];
+                if let Some(&current) = buffer_states.get(read.handle) {
                     let required = read.state;
-                    pass_barriers.add_buffer_barrier(BufferBarrierDesc::new(read.handle.id, current, required));
+                    pass_barriers.add_buffer_barrier(BufferBarrierDesc::new(read.handle, current, required));
                 }
             }
 
             // 处理缓冲区写入
             for write in &pass.buffer_writes {
-                let buf_id = write.handle.id as usize;
-                if buf_id < buffer_states.len() {
-                    let current = buffer_states[buf_id];
+                if let Some(&current) = buffer_states.get(write.handle) {
                     let required = write.state;
-                    pass_barriers.add_buffer_barrier(BufferBarrierDesc::new(write.handle.id, current, required));
-                    buffer_states[buf_id] = required;
+                    pass_barriers.add_buffer_barrier(BufferBarrierDesc::new(write.handle, current, required));
+                    buffer_states.insert(write.handle, required);
                 }
             }
         }
@@ -316,27 +256,23 @@ impl CompiledGraph {
     /// - `cmd`: 命令缓冲区（已经 begin）
     /// - `resource_manager`: 资源管理器（用于获取物理资源）
     pub fn execute(&self, cmd: &GfxCommandBuffer, resource_manager: &GfxResourceManager) {
-        // 构建物理资源查询表
-        let image_handles: Vec<(GfxImageHandle, GfxImageViewHandle)> = self
-            .resources
-            .iter_images()
-            .filter_map(|(_, res)| {
-                let img = res.physical_handle()?;
-                let view = res.physical_view_handle().unwrap_or_else(|| {
-                    // 如果没有提供 view，尝试获取默认 view
-                    // 这里简化处理，实际应该从 resource_manager 获取或创建
-                    GfxImageViewHandle::default()
-                });
-                Some((img, view))
-            })
-            .collect();
+        // 构建物理资源查询表（使用 SecondaryMap）
+        let mut image_handles: SecondaryMap<RgImageHandle, (GfxImageHandle, GfxImageViewHandle)> =
+            SecondaryMap::new();
+        let mut buffer_handles: SecondaryMap<RgBufferHandle, GfxBufferHandle> = SecondaryMap::new();
 
-        let buffer_handles: Vec<GfxBufferHandle> =
-            self.resources.iter_buffers().filter_map(|(_, res)| res.physical_handle()).collect();
+        for (handle, res) in self.resources.iter_images() {
+            if let Some(img) = res.physical_handle() {
+                let view = res.physical_view_handle().unwrap_or_default();
+                image_handles.insert(handle, (img, view));
+            }
+        }
 
-        // 创建索引映射
-        let image_index_map: Vec<usize> = (0..self.resources.image_count()).collect();
-        let buffer_index_map: Vec<usize> = (0..self.resources.buffer_count()).collect();
+        for (handle, res) in self.resources.iter_buffers() {
+            if let Some(buf) = res.physical_handle() {
+                buffer_handles.insert(handle, buf);
+            }
+        }
 
         // 按顺序执行 Pass
         for &pass_idx in &self.execution_order {
@@ -352,13 +288,7 @@ impl CompiledGraph {
             cmd.begin_label(&pass.name, truvis_gfx::basic::color::LabelColor::COLOR_PASS);
 
             // 执行 Pass
-            let ctx = PassContext {
-                cmd,
-                image_handles: &image_handles,
-                buffer_handles: &buffer_handles,
-                image_index_map: &image_index_map,
-                buffer_index_map: &buffer_index_map,
-            };
+            let ctx = PassContext { cmd, image_handles: &image_handles, buffer_handles: &buffer_handles };
             pass.executor.execute(&ctx);
 
             // 结束 Pass debug label
@@ -379,8 +309,7 @@ impl CompiledGraph {
             .image_barriers
             .iter()
             .filter_map(|desc| {
-                let handle = RgImageHandle::new(desc.resource_id);
-                let res = self.resources.get_image(handle)?;
+                let res = self.resources.get_image(desc.handle)?;
                 let phys_handle = res.physical_handle()?;
                 let image = resource_manager.get_image(phys_handle)?;
                 Some(desc.to_gfx_barrier(image.handle()))

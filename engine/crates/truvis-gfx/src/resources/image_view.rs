@@ -108,4 +108,52 @@ impl GfxImageViewDesc {
             layer: (0, 1),
         }
     }
+
+    /// 创建完整的视图描述
+    ///
+    /// # 参数
+    /// - `format`: 图像格式（可重解释）
+    /// - `view_type`: 视图类型（2D, 3D, Cube, Array 等）
+    /// - `aspect_mask`: 图像 aspect（COLOR, DEPTH, STENCIL）
+    /// - `mip_range`: (base_mip_level, level_count)
+    /// - `layer_range`: (base_array_layer, layer_count)
+    pub fn new(
+        format: vk::Format,
+        view_type: vk::ImageViewType,
+        aspect_mask: vk::ImageAspectFlags,
+        mip_range: (u8, u8),
+        layer_range: (u8, u8),
+    ) -> Self {
+        Self { format, view_type, aspect_mask, mip: mip_range, layer: layer_range }
+    }
+
+    /// 获取格式
+    #[inline]
+    pub fn format(&self) -> vk::Format {
+        self.format
+    }
+
+    /// 获取视图类型
+    #[inline]
+    pub fn view_type(&self) -> vk::ImageViewType {
+        self.view_type
+    }
+
+    /// 获取 aspect mask
+    #[inline]
+    pub fn aspect_mask(&self) -> vk::ImageAspectFlags {
+        self.aspect_mask
+    }
+
+    /// 获取 mip 范围 (base, count)
+    #[inline]
+    pub fn mip_range(&self) -> (u8, u8) {
+        self.mip
+    }
+
+    /// 获取 layer 范围 (base, count)
+    #[inline]
+    pub fn layer_range(&self) -> (u8, u8) {
+        self.layer
+    }
 }

@@ -5,13 +5,14 @@
 use ash::vk;
 use truvis_gfx::commands::barrier::{GfxBufferBarrier, GfxImageBarrier};
 
+use super::handle::{RgBufferHandle, RgImageHandle};
 use super::state::{BufferState, ImageState};
 
 /// 图像 Barrier 描述
 #[derive(Clone, Debug)]
 pub struct ImageBarrierDesc {
-    /// 资源 ID（RenderGraph 内部）
-    pub resource_id: u32,
+    /// 资源句柄（RenderGraph 内部）
+    pub handle: RgImageHandle,
     /// 源状态
     pub src_state: ImageState,
     /// 目标状态
@@ -22,13 +23,8 @@ pub struct ImageBarrierDesc {
 
 impl ImageBarrierDesc {
     /// 创建新的图像 barrier 描述
-    pub fn new(resource_id: u32, src_state: ImageState, dst_state: ImageState) -> Self {
-        Self {
-            resource_id,
-            src_state,
-            dst_state,
-            aspect: vk::ImageAspectFlags::COLOR,
-        }
+    pub fn new(handle: RgImageHandle, src_state: ImageState, dst_state: ImageState) -> Self {
+        Self { handle, src_state, dst_state, aspect: vk::ImageAspectFlags::COLOR }
     }
 
     /// 设置 aspect
@@ -71,8 +67,8 @@ impl ImageBarrierDesc {
 /// 缓冲区 Barrier 描述
 #[derive(Clone, Debug)]
 pub struct BufferBarrierDesc {
-    /// 资源 ID
-    pub resource_id: u32,
+    /// 资源句柄
+    pub handle: RgBufferHandle,
     /// 源状态
     pub src_state: BufferState,
     /// 目标状态
@@ -85,14 +81,8 @@ pub struct BufferBarrierDesc {
 
 impl BufferBarrierDesc {
     /// 创建新的缓冲区 barrier 描述
-    pub fn new(resource_id: u32, src_state: BufferState, dst_state: BufferState) -> Self {
-        Self {
-            resource_id,
-            src_state,
-            dst_state,
-            offset: 0,
-            size: vk::WHOLE_SIZE,
-        }
+    pub fn new(handle: RgBufferHandle, src_state: BufferState, dst_state: BufferState) -> Self {
+        Self { handle, src_state, dst_state, offset: 0, size: vk::WHOLE_SIZE }
     }
 
     /// 检查是否需要 barrier
@@ -164,28 +154,28 @@ impl BarrierCalculator {
     /// 计算单个图像资源的 barrier
     ///
     /// # 参数
-    /// - `resource_id`: 资源 ID
+    /// - `handle`: 资源句柄
     /// - `current_state`: 当前状态（上一个使用者留下的状态）
     /// - `required_state`: 需要的状态
     ///
     /// # 返回
     /// 如果需要 barrier，返回 `Some(ImageBarrierDesc)`
     pub fn compute_image_barrier(
-        resource_id: u32,
+        handle: RgImageHandle,
         current_state: ImageState,
         required_state: ImageState,
     ) -> Option<ImageBarrierDesc> {
-        let barrier = ImageBarrierDesc::new(resource_id, current_state, required_state);
+        let barrier = ImageBarrierDesc::new(handle, current_state, required_state);
         if barrier.needs_barrier() { Some(barrier) } else { None }
     }
 
     /// 计算单个缓冲区资源的 barrier
     pub fn compute_buffer_barrier(
-        resource_id: u32,
+        handle: RgBufferHandle,
         current_state: BufferState,
         required_state: BufferState,
     ) -> Option<BufferBarrierDesc> {
-        let barrier = BufferBarrierDesc::new(resource_id, current_state, required_state);
+        let barrier = BufferBarrierDesc::new(handle, current_state, required_state);
         if barrier.needs_barrier() { Some(barrier) } else { None }
     }
 
@@ -211,18 +201,27 @@ impl BarrierCalculator {
 
 #[cfg(test)]
 mod tests {
+    use slotmap::SlotMap;
+
     use super::*;
+
+    fn create_test_image_handle() -> RgImageHandle {
+        let mut sm: SlotMap<RgImageHandle, ()> = SlotMap::with_key();
+        sm.insert(())
+    }
 
     #[test]
     fn test_image_barrier_layout_change() {
-        let barrier = ImageBarrierDesc::new(0, ImageState::UNDEFINED, ImageState::COLOR_ATTACHMENT_WRITE);
+        let handle = create_test_image_handle();
+        let barrier = ImageBarrierDesc::new(handle, ImageState::UNDEFINED, ImageState::COLOR_ATTACHMENT_WRITE);
 
         assert!(barrier.needs_barrier());
     }
 
     #[test]
     fn test_image_barrier_read_to_read() {
-        let barrier = ImageBarrierDesc::new(0, ImageState::SHADER_READ_FRAGMENT, ImageState::SHADER_READ_COMPUTE);
+        let handle = create_test_image_handle();
+        let barrier = ImageBarrierDesc::new(handle, ImageState::SHADER_READ_FRAGMENT, ImageState::SHADER_READ_COMPUTE);
 
         // 同 layout 的只读到只读可以跳过
         // 但这里 layout 可能不同，取决于实际定义
@@ -232,7 +231,8 @@ mod tests {
 
     #[test]
     fn test_image_barrier_write_to_read() {
-        let barrier = ImageBarrierDesc::new(0, ImageState::STORAGE_WRITE_COMPUTE, ImageState::SHADER_READ_FRAGMENT);
+        let handle = create_test_image_handle();
+        let barrier = ImageBarrierDesc::new(handle, ImageState::STORAGE_WRITE_COMPUTE, ImageState::SHADER_READ_FRAGMENT);
 
         assert!(barrier.needs_barrier());
     }

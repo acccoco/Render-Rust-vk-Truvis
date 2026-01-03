@@ -2,7 +2,11 @@
 //!
 //! 分析 Pass 之间的资源依赖关系，构建 DAG 并进行拓扑排序。
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::VecDeque;
+
+use slotmap::SecondaryMap;
+
+use super::handle::{RgBufferHandle, RgImageHandle};
 
 /// 依赖边：从 producer 到 consumer
 #[derive(Clone, Debug)]
@@ -11,10 +15,10 @@ pub struct DependencyEdge {
     pub producer: usize,
     /// 消费者 Pass 索引
     pub consumer: usize,
-    /// 依赖的资源 ID（图像）
-    pub image_ids: Vec<u32>,
-    /// 依赖的资源 ID（缓冲区）
-    pub buffer_ids: Vec<u32>,
+    /// 依赖的图像资源
+    pub images: Vec<RgImageHandle>,
+    /// 依赖的缓冲区资源
+    pub buffers: Vec<RgBufferHandle>,
 }
 
 /// 依赖图
@@ -47,21 +51,22 @@ impl DependencyGraph {
     /// # 参数
     /// - `producer`: 生产者 Pass 索引（先执行）
     /// - `consumer`: 消费者 Pass 索引（后执行）
-    /// - `image_ids`: 涉及的图像资源 ID
-    /// - `buffer_ids`: 涉及的缓冲区资源 ID
-    pub fn add_edge(&mut self, producer: usize, consumer: usize, image_ids: Vec<u32>, buffer_ids: Vec<u32>) {
+    /// - `images`: 涉及的图像资源
+    /// - `buffers`: 涉及的缓冲区资源
+    pub fn add_edge(
+        &mut self,
+        producer: usize,
+        consumer: usize,
+        images: Vec<RgImageHandle>,
+        buffers: Vec<RgBufferHandle>,
+    ) {
         // 避免重复边
         if !self.adjacency[producer].contains(&consumer) {
             self.adjacency[producer].push(consumer);
             self.in_degrees[consumer] += 1;
         }
 
-        self.edges.push(DependencyEdge {
-            producer,
-            consumer,
-            image_ids,
-            buffer_ids,
-        });
+        self.edges.push(DependencyEdge { producer, consumer, images, buffers });
     }
 
     /// 执行拓扑排序
@@ -137,68 +142,58 @@ impl DependencyAnalyzer {
     /// - 写后写（WAW）：后一个 writer 依赖前一个 writer
     pub fn analyze(
         pass_count: usize,
-        image_reads: &[Vec<u32>],  // pass_index -> [image_ids]
-        image_writes: &[Vec<u32>], // pass_index -> [image_ids]
-        buffer_reads: &[Vec<u32>],
-        buffer_writes: &[Vec<u32>],
+        image_reads: &[Vec<RgImageHandle>],  // pass_index -> [image handles]
+        image_writes: &[Vec<RgImageHandle>], // pass_index -> [image handles]
+        buffer_reads: &[Vec<RgBufferHandle>],
+        buffer_writes: &[Vec<RgBufferHandle>],
     ) -> DependencyGraph {
         let mut graph = DependencyGraph::new(pass_count);
 
         // 跟踪每个资源的最后写入者
-        let mut last_image_writer: HashMap<u32, usize> = HashMap::new();
-        let mut last_buffer_writer: HashMap<u32, usize> = HashMap::new();
-
-        // 跟踪每个资源在最后一次写入后的所有读取者
-        let mut image_readers_since_write: HashMap<u32, HashSet<usize>> = HashMap::new();
-        let mut buffer_readers_since_write: HashMap<u32, HashSet<usize>> = HashMap::new();
+        let mut last_image_writer: SecondaryMap<RgImageHandle, usize> = SecondaryMap::new();
+        let mut last_buffer_writer: SecondaryMap<RgBufferHandle, usize> = SecondaryMap::new();
 
         for pass_idx in 0..pass_count {
             // 处理图像读取
-            for &img_id in &image_reads[pass_idx] {
+            for &img_handle in &image_reads[pass_idx] {
                 // 如果有之前的写入者，添加依赖
-                if let Some(&writer) = last_image_writer.get(&img_id) {
+                if let Some(&writer) = last_image_writer.get(img_handle) {
                     if writer != pass_idx {
-                        graph.add_edge(writer, pass_idx, vec![img_id], vec![]);
+                        graph.add_edge(writer, pass_idx, vec![img_handle], vec![]);
                     }
                 }
-                // 记录读取者
-                image_readers_since_write.entry(img_id).or_default().insert(pass_idx);
             }
 
             // 处理图像写入
-            for &img_id in &image_writes[pass_idx] {
+            for &img_handle in &image_writes[pass_idx] {
                 // 如果有之前的写入者，添加 WAW 依赖
-                if let Some(&prev_writer) = last_image_writer.get(&img_id) {
+                if let Some(&prev_writer) = last_image_writer.get(img_handle) {
                     if prev_writer != pass_idx {
-                        graph.add_edge(prev_writer, pass_idx, vec![img_id], vec![]);
+                        graph.add_edge(prev_writer, pass_idx, vec![img_handle], vec![]);
                     }
                 }
 
                 // 更新最后写入者
-                last_image_writer.insert(img_id, pass_idx);
-                // 清空读取者列表（新的写入开始）
-                image_readers_since_write.insert(img_id, HashSet::new());
+                last_image_writer.insert(img_handle, pass_idx);
             }
 
             // 处理缓冲区读取
-            for &buf_id in &buffer_reads[pass_idx] {
-                if let Some(&writer) = last_buffer_writer.get(&buf_id) {
+            for &buf_handle in &buffer_reads[pass_idx] {
+                if let Some(&writer) = last_buffer_writer.get(buf_handle) {
                     if writer != pass_idx {
-                        graph.add_edge(writer, pass_idx, vec![], vec![buf_id]);
+                        graph.add_edge(writer, pass_idx, vec![], vec![buf_handle]);
                     }
                 }
-                buffer_readers_since_write.entry(buf_id).or_default().insert(pass_idx);
             }
 
             // 处理缓冲区写入
-            for &buf_id in &buffer_writes[pass_idx] {
-                if let Some(&prev_writer) = last_buffer_writer.get(&buf_id) {
+            for &buf_handle in &buffer_writes[pass_idx] {
+                if let Some(&prev_writer) = last_buffer_writer.get(buf_handle) {
                     if prev_writer != pass_idx {
-                        graph.add_edge(prev_writer, pass_idx, vec![], vec![buf_id]);
+                        graph.add_edge(prev_writer, pass_idx, vec![], vec![buf_handle]);
                     }
                 }
-                last_buffer_writer.insert(buf_id, pass_idx);
-                buffer_readers_since_write.insert(buf_id, HashSet::new());
+                last_buffer_writer.insert(buf_handle, pass_idx);
             }
         }
 
@@ -208,14 +203,25 @@ impl DependencyAnalyzer {
 
 #[cfg(test)]
 mod tests {
+    use slotmap::SlotMap;
+
     use super::*;
+
+    fn create_test_image_handles(count: usize) -> (SlotMap<RgImageHandle, ()>, Vec<RgImageHandle>) {
+        let mut sm = SlotMap::with_key();
+        let handles: Vec<RgImageHandle> = (0..count).map(|_| sm.insert(())).collect();
+        (sm, handles)
+    }
 
     #[test]
     fn test_simple_dependency() {
         // Pass 0 写入 image 0
         // Pass 1 读取 image 0
-        let image_reads = vec![vec![], vec![0]];
-        let image_writes = vec![vec![0], vec![]];
+        let (_sm, handles) = create_test_image_handles(1);
+        let img0 = handles[0];
+
+        let image_reads = vec![vec![], vec![img0]];
+        let image_writes = vec![vec![img0], vec![]];
         let buffer_reads = vec![vec![], vec![]];
         let buffer_writes = vec![vec![], vec![]];
 
@@ -228,8 +234,12 @@ mod tests {
     #[test]
     fn test_chain_dependency() {
         // Pass 0 -> Pass 1 -> Pass 2
-        let image_reads = vec![vec![], vec![0], vec![1]];
-        let image_writes = vec![vec![0], vec![1], vec![]];
+        let (_sm, handles) = create_test_image_handles(2);
+        let img0 = handles[0];
+        let img1 = handles[1];
+
+        let image_reads = vec![vec![], vec![img0], vec![img1]];
+        let image_writes = vec![vec![img0], vec![img1], vec![]];
         let buffer_reads = vec![vec![], vec![], vec![]];
         let buffer_writes = vec![vec![], vec![], vec![]];
 
@@ -244,8 +254,12 @@ mod tests {
         // Pass 0 写入 image 0
         // Pass 1 写入 image 1（无依赖，可并行）
         // Pass 2 读取 image 0 和 image 1
-        let image_reads = vec![vec![], vec![], vec![0, 1]];
-        let image_writes = vec![vec![0], vec![1], vec![]];
+        let (_sm, handles) = create_test_image_handles(2);
+        let img0 = handles[0];
+        let img1 = handles[1];
+
+        let image_reads = vec![vec![], vec![], vec![img0, img1]];
+        let image_writes = vec![vec![img0], vec![img1], vec![]];
         let buffer_reads = vec![vec![], vec![], vec![]];
         let buffer_writes = vec![vec![], vec![], vec![]];
 

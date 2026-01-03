@@ -3,12 +3,16 @@
 //! 管理 RenderGraph 中的虚拟资源，维护虚拟句柄到物理句柄的映射。
 
 use ash::vk;
+use slotmap::SlotMap;
+use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_render_interface::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle};
 
 use super::handle::{RgBufferHandle, RgImageHandle};
 use super::state::{BufferState, ImageState};
 
 /// 图像资源描述（用于创建临时资源）
+///
+/// 包含创建 `vk::Image` 所需的所有信息，以及可选的默认视图描述。
 #[derive(Clone, Debug)]
 pub struct RgImageDesc {
     /// 图像宽度
@@ -29,6 +33,8 @@ pub struct RgImageDesc {
     pub samples: vk::SampleCountFlags,
     /// 图像类型
     pub image_type: vk::ImageType,
+    /// 可选的默认视图描述（用于自动创建 ImageView）
+    pub default_view_desc: Option<GfxImageViewDesc>,
 }
 
 impl Default for RgImageDesc {
@@ -43,6 +49,7 @@ impl Default for RgImageDesc {
             usage: vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::STORAGE,
             samples: vk::SampleCountFlags::TYPE_1,
             image_type: vk::ImageType::TYPE_2D,
+            default_view_desc: None,
         }
     }
 }
@@ -51,13 +58,7 @@ impl RgImageDesc {
     /// 创建 2D 图像描述
     #[inline]
     pub fn new_2d(width: u32, height: u32, format: vk::Format, usage: vk::ImageUsageFlags) -> Self {
-        Self {
-            width,
-            height,
-            format,
-            usage,
-            ..Default::default()
-        }
+        Self { width, height, format, usage, ..Default::default() }
     }
 
     /// 设置尺寸
@@ -80,6 +81,65 @@ impl RgImageDesc {
     pub fn with_usage(mut self, usage: vk::ImageUsageFlags) -> Self {
         self.usage = usage;
         self
+    }
+
+    /// 设置默认视图描述
+    #[inline]
+    pub fn with_default_view(mut self, view_desc: GfxImageViewDesc) -> Self {
+        self.default_view_desc = Some(view_desc);
+        self
+    }
+
+    /// 自动推断并生成默认视图描述
+    ///
+    /// 根据图像格式和类型推断 aspect 和 view_type
+    pub fn infer_default_view(&self) -> GfxImageViewDesc {
+        let aspect = Self::infer_aspect(self.format);
+        let view_type = Self::infer_view_type(self.image_type, self.array_layers);
+
+        GfxImageViewDesc::new(
+            self.format,
+            view_type,
+            aspect,
+            (0, self.mip_levels as u8),
+            (0, self.array_layers as u8),
+        )
+    }
+
+    /// 从格式推断 aspect
+    fn infer_aspect(format: vk::Format) -> vk::ImageAspectFlags {
+        match format {
+            vk::Format::D16_UNORM | vk::Format::D32_SFLOAT | vk::Format::X8_D24_UNORM_PACK32 => {
+                vk::ImageAspectFlags::DEPTH
+            }
+            vk::Format::S8_UINT => vk::ImageAspectFlags::STENCIL,
+            vk::Format::D16_UNORM_S8_UINT | vk::Format::D24_UNORM_S8_UINT | vk::Format::D32_SFLOAT_S8_UINT => {
+                vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL
+            }
+            _ => vk::ImageAspectFlags::COLOR,
+        }
+    }
+
+    /// 从图像类型推断视图类型
+    fn infer_view_type(image_type: vk::ImageType, array_layers: u32) -> vk::ImageViewType {
+        match image_type {
+            vk::ImageType::TYPE_1D => {
+                if array_layers > 1 {
+                    vk::ImageViewType::TYPE_1D_ARRAY
+                } else {
+                    vk::ImageViewType::TYPE_1D
+                }
+            }
+            vk::ImageType::TYPE_2D => {
+                if array_layers > 1 {
+                    vk::ImageViewType::TYPE_2D_ARRAY
+                } else {
+                    vk::ImageViewType::TYPE_2D
+                }
+            }
+            vk::ImageType::TYPE_3D => vk::ImageViewType::TYPE_3D,
+            _ => vk::ImageViewType::TYPE_2D,
+        }
     }
 }
 
@@ -245,12 +305,13 @@ impl BufferResource {
 /// 资源注册表
 ///
 /// 管理 RenderGraph 中所有声明的资源，提供虚拟句柄到资源信息的映射。
+/// 使用 SlotMap 存储资源，提供稳定的句柄和高效的访问。
 #[derive(Default)]
 pub struct ResourceRegistry {
-    /// 图像资源列表
-    images: Vec<ImageResource>,
-    /// 缓冲区资源列表
-    buffers: Vec<BufferResource>,
+    /// 图像资源表
+    images: SlotMap<RgImageHandle, ImageResource>,
+    /// 缓冲区资源表
+    buffers: SlotMap<RgBufferHandle, BufferResource>,
 }
 
 impl ResourceRegistry {
@@ -267,16 +328,12 @@ impl ResourceRegistry {
         view_handle: Option<GfxImageViewHandle>,
         initial_state: ImageState,
     ) -> RgImageHandle {
-        let id = self.images.len() as u32;
-        self.images.push(ImageResource::imported(name, image_handle, view_handle, initial_state));
-        RgImageHandle::new(id)
+        self.images.insert(ImageResource::imported(name, image_handle, view_handle, initial_state))
     }
 
     /// 注册临时图像（将在编译阶段创建）
     pub fn register_transient_image(&mut self, name: impl Into<String>, desc: RgImageDesc) -> RgImageHandle {
-        let id = self.images.len() as u32;
-        self.images.push(ImageResource::transient(name, desc));
-        RgImageHandle::new(id)
+        self.images.insert(ImageResource::transient(name, desc))
     }
 
     /// 注册导入的缓冲区
@@ -286,40 +343,36 @@ impl ResourceRegistry {
         buffer_handle: GfxBufferHandle,
         initial_state: BufferState,
     ) -> RgBufferHandle {
-        let id = self.buffers.len() as u32;
-        self.buffers.push(BufferResource::imported(name, buffer_handle, initial_state));
-        RgBufferHandle::new(id)
+        self.buffers.insert(BufferResource::imported(name, buffer_handle, initial_state))
     }
 
     /// 注册临时缓冲区
     pub fn register_transient_buffer(&mut self, name: impl Into<String>, desc: RgBufferDesc) -> RgBufferHandle {
-        let id = self.buffers.len() as u32;
-        self.buffers.push(BufferResource::transient(name, desc));
-        RgBufferHandle::new(id)
+        self.buffers.insert(BufferResource::transient(name, desc))
     }
 
     /// 获取图像资源
     #[inline]
     pub fn get_image(&self, handle: RgImageHandle) -> Option<&ImageResource> {
-        self.images.get(handle.id as usize)
+        self.images.get(handle)
     }
 
     /// 获取可变图像资源
     #[inline]
     pub fn get_image_mut(&mut self, handle: RgImageHandle) -> Option<&mut ImageResource> {
-        self.images.get_mut(handle.id as usize)
+        self.images.get_mut(handle)
     }
 
     /// 获取缓冲区资源
     #[inline]
     pub fn get_buffer(&self, handle: RgBufferHandle) -> Option<&BufferResource> {
-        self.buffers.get(handle.id as usize)
+        self.buffers.get(handle)
     }
 
     /// 获取可变缓冲区资源
     #[inline]
     pub fn get_buffer_mut(&mut self, handle: RgBufferHandle) -> Option<&mut BufferResource> {
-        self.buffers.get_mut(handle.id as usize)
+        self.buffers.get_mut(handle)
     }
 
     /// 获取图像数量
@@ -337,12 +390,12 @@ impl ResourceRegistry {
     /// 迭代所有图像资源
     #[inline]
     pub fn iter_images(&self) -> impl Iterator<Item = (RgImageHandle, &ImageResource)> {
-        self.images.iter().enumerate().map(|(i, r)| (RgImageHandle::new(i as u32), r))
+        self.images.iter()
     }
 
     /// 迭代所有缓冲区资源
     #[inline]
     pub fn iter_buffers(&self) -> impl Iterator<Item = (RgBufferHandle, &BufferResource)> {
-        self.buffers.iter().enumerate().map(|(i, r)| (RgBufferHandle::new(i as u32), r))
+        self.buffers.iter()
     }
 }

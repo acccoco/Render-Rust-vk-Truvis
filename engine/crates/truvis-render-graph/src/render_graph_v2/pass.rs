@@ -5,11 +5,12 @@
 
 use std::any::Any;
 
+use slotmap::SecondaryMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_render_interface::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle};
 
 use super::handle::{RgBufferHandle, RgImageHandle};
-use super::resource::{RgBufferDesc, RgImageDesc};
+use super::resource::{RgBufferDesc, RgImageDesc, ResourceRegistry};
 use super::state::{BufferState, ImageState};
 
 /// Pass 执行时的上下文
@@ -20,39 +21,33 @@ pub struct PassContext<'a> {
     pub cmd: &'a GfxCommandBuffer,
 
     /// 物理资源查询表（编译后填充）
-    pub(crate) image_handles: &'a [(GfxImageHandle, GfxImageViewHandle)],
-    pub(crate) buffer_handles: &'a [GfxBufferHandle],
-
-    /// 资源索引映射（RgHandle.id -> 物理资源索引）
-    pub(crate) image_index_map: &'a [usize],
-    pub(crate) buffer_index_map: &'a [usize],
+    pub(crate) image_handles: &'a SecondaryMap<RgImageHandle, (GfxImageHandle, GfxImageViewHandle)>,
+    pub(crate) buffer_handles: &'a SecondaryMap<RgBufferHandle, GfxBufferHandle>,
 }
 
 impl<'a> PassContext<'a> {
     /// 获取图像的物理句柄
     #[inline]
-    pub fn get_image(&self, handle: RgImageHandle) -> (GfxImageHandle, GfxImageViewHandle) {
-        let idx = self.image_index_map[handle.id as usize];
-        self.image_handles[idx]
+    pub fn get_image(&self, handle: RgImageHandle) -> Option<(GfxImageHandle, GfxImageViewHandle)> {
+        self.image_handles.get(handle).copied()
     }
 
     /// 获取图像的 handle
     #[inline]
-    pub fn get_image_handle(&self, handle: RgImageHandle) -> GfxImageHandle {
-        self.get_image(handle).0
+    pub fn get_image_handle(&self, handle: RgImageHandle) -> Option<GfxImageHandle> {
+        self.get_image(handle).map(|(h, _)| h)
     }
 
     /// 获取图像的 view handle
     #[inline]
-    pub fn get_image_view_handle(&self, handle: RgImageHandle) -> GfxImageViewHandle {
-        self.get_image(handle).1
+    pub fn get_image_view_handle(&self, handle: RgImageHandle) -> Option<GfxImageViewHandle> {
+        self.get_image(handle).map(|(_, v)| v)
     }
 
     /// 获取缓冲区的物理句柄
     #[inline]
-    pub fn get_buffer(&self, handle: RgBufferHandle) -> GfxBufferHandle {
-        let idx = self.buffer_index_map[handle.id as usize];
-        self.buffer_handles[idx]
+    pub fn get_buffer(&self, handle: RgBufferHandle) -> Option<GfxBufferHandle> {
+        self.buffer_handles.get(handle).copied()
     }
 }
 
@@ -68,12 +63,10 @@ pub struct ImageRead {
 /// 资源写入声明
 #[derive(Clone, Debug)]
 pub struct ImageWrite {
-    /// 资源句柄（写入前的版本）
+    /// 资源句柄
     pub handle: RgImageHandle,
     /// 期望的状态
     pub state: ImageState,
-    /// 写入后的新句柄（版本递增）
-    pub output_handle: RgImageHandle,
 }
 
 /// 缓冲区读取声明
@@ -92,8 +85,6 @@ pub struct BufferWrite {
     pub handle: RgBufferHandle,
     /// 期望的状态
     pub state: BufferState,
-    /// 写入后的新句柄
-    pub output_handle: RgBufferHandle,
 }
 
 /// Pass 构建器
@@ -101,6 +92,7 @@ pub struct BufferWrite {
 /// 在 `RgPass::setup()` 中使用，声明 Pass 的资源依赖。
 pub struct PassBuilder<'a> {
     /// Pass 名称
+    #[allow(dead_code)]
     pub(crate) name: String,
 
     /// 图像读取列表
@@ -112,18 +104,8 @@ pub struct PassBuilder<'a> {
     /// 缓冲区写入列表
     pub(crate) buffer_writes: Vec<BufferWrite>,
 
-    /// 临时图像创建请求
-    pub(crate) transient_images: Vec<(String, RgImageDesc)>,
-    /// 临时缓冲区创建请求
-    pub(crate) transient_buffers: Vec<(String, RgBufferDesc)>,
-
-    /// 下一个可用的临时资源 ID（由外部 graph 提供）
-    pub(crate) next_image_id: &'a mut u32,
-    pub(crate) next_buffer_id: &'a mut u32,
-
-    /// 当前资源版本表（用于跟踪写入）
-    pub(crate) image_versions: &'a mut Vec<u32>,
-    pub(crate) buffer_versions: &'a mut Vec<u32>,
+    /// 资源注册表引用（用于创建临时资源）
+    pub(crate) resources: &'a mut ResourceRegistry,
 }
 
 impl<'a> PassBuilder<'a> {
@@ -148,26 +130,10 @@ impl<'a> PassBuilder<'a> {
     /// - `state`: 写入时的图像状态
     ///
     /// # 返回
-    /// 返回新版本的句柄，用于后续 Pass 的依赖声明
+    /// 返回相同的句柄（依赖通过 Pass 顺序确定）
     pub fn write_image(&mut self, handle: RgImageHandle, state: ImageState) -> RgImageHandle {
-        // 确保版本表足够大
-        while self.image_versions.len() <= handle.id as usize {
-            self.image_versions.push(0);
-        }
-
-        // 递增版本
-        let current_version = self.image_versions[handle.id as usize];
-        self.image_versions[handle.id as usize] = current_version + 1;
-
-        let output_handle = RgImageHandle::with_version(handle.id, current_version + 1);
-
-        self.image_writes.push(ImageWrite {
-            handle,
-            state,
-            output_handle,
-        });
-
-        output_handle
+        self.image_writes.push(ImageWrite { handle, state });
+        handle
     }
 
     /// 声明读写图像（同时读取和写入）
@@ -182,18 +148,7 @@ impl<'a> PassBuilder<'a> {
     ///
     /// 图像将在编译阶段创建，执行完毕后自动销毁。
     pub fn create_image(&mut self, name: impl Into<String>, desc: RgImageDesc) -> RgImageHandle {
-        let id = *self.next_image_id;
-        *self.next_image_id += 1;
-
-        let name = name.into();
-        self.transient_images.push((name, desc));
-
-        // 初始化版本
-        while self.image_versions.len() <= id as usize {
-            self.image_versions.push(0);
-        }
-
-        RgImageHandle::new(id)
+        self.resources.register_transient_image(name, desc)
     }
 
     /// 声明读取缓冲区
@@ -205,37 +160,13 @@ impl<'a> PassBuilder<'a> {
 
     /// 声明写入缓冲区
     pub fn write_buffer(&mut self, handle: RgBufferHandle, state: BufferState) -> RgBufferHandle {
-        while self.buffer_versions.len() <= handle.id as usize {
-            self.buffer_versions.push(0);
-        }
-
-        let current_version = self.buffer_versions[handle.id as usize];
-        self.buffer_versions[handle.id as usize] = current_version + 1;
-
-        let output_handle = RgBufferHandle::with_version(handle.id, current_version + 1);
-
-        self.buffer_writes.push(BufferWrite {
-            handle,
-            state,
-            output_handle,
-        });
-
-        output_handle
+        self.buffer_writes.push(BufferWrite { handle, state });
+        handle
     }
 
     /// 创建临时缓冲区
     pub fn create_buffer(&mut self, name: impl Into<String>, desc: RgBufferDesc) -> RgBufferHandle {
-        let id = *self.next_buffer_id;
-        *self.next_buffer_id += 1;
-
-        let name = name.into();
-        self.transient_buffers.push((name, desc));
-
-        while self.buffer_versions.len() <= id as usize {
-            self.buffer_versions.push(0);
-        }
-
-        RgBufferHandle::new(id)
+        self.resources.register_transient_buffer(name, desc)
     }
 }
 
@@ -258,24 +189,24 @@ pub struct PassNode {
 }
 
 impl PassNode {
-    /// 获取所有读取的图像 ID
-    pub fn read_image_ids(&self) -> impl Iterator<Item = u32> + '_ {
-        self.image_reads.iter().map(|r| r.handle.id)
+    /// 获取所有读取的图像句柄
+    pub fn read_image_handles(&self) -> impl Iterator<Item = RgImageHandle> + '_ {
+        self.image_reads.iter().map(|r| r.handle)
     }
 
-    /// 获取所有写入的图像 ID
-    pub fn write_image_ids(&self) -> impl Iterator<Item = u32> + '_ {
-        self.image_writes.iter().map(|w| w.handle.id)
+    /// 获取所有写入的图像句柄
+    pub fn write_image_handles(&self) -> impl Iterator<Item = RgImageHandle> + '_ {
+        self.image_writes.iter().map(|w| w.handle)
     }
 
-    /// 获取所有读取的缓冲区 ID
-    pub fn read_buffer_ids(&self) -> impl Iterator<Item = u32> + '_ {
-        self.buffer_reads.iter().map(|r| r.handle.id)
+    /// 获取所有读取的缓冲区句柄
+    pub fn read_buffer_handles(&self) -> impl Iterator<Item = RgBufferHandle> + '_ {
+        self.buffer_reads.iter().map(|r| r.handle)
     }
 
-    /// 获取所有写入的缓冲区 ID
-    pub fn write_buffer_ids(&self) -> impl Iterator<Item = u32> + '_ {
-        self.buffer_writes.iter().map(|w| w.handle.id)
+    /// 获取所有写入的缓冲区句柄
+    pub fn write_buffer_handles(&self) -> impl Iterator<Item = RgBufferHandle> + '_ {
+        self.buffer_writes.iter().map(|w| w.handle)
     }
 }
 
