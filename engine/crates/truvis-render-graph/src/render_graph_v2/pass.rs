@@ -3,18 +3,20 @@
 //! 提供 `RgPass` trait 用于声明式定义渲染 Pass，
 //! 以及 `PassBuilder` 用于在 setup 阶段声明资源依赖。
 
+use super::resource_handle::{RgBufferHandle, RgImageHandle};
+use super::resource_registry::RgResourceRegistry;
+use crate::render_graph_v2::buffer_resource::RgBufferDesc;
+use crate::render_graph_v2::executor::RgPassExecutor;
+use crate::render_graph_v2::image_resource::RgImageDesc;
+use crate::render_graph_v2::{RgBufferResource, RgBufferState, RgImageResource, RgImageState};
 use slotmap::SecondaryMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_render_interface::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle};
 
-use super::handle::{RgBufferHandle, RgImageHandle};
-use super::resource::{RgBufferDesc, RgImageDesc, ResourceRegistry};
-use super::state::{BufferState, ImageState};
-
 /// Pass 执行时的上下文
 ///
 /// 提供 Pass 执行所需的资源访问和命令缓冲区。
-pub struct PassContext<'a> {
+pub struct RgPassContext<'a> {
     /// 命令缓冲区
     pub cmd: &'a GfxCommandBuffer,
 
@@ -26,7 +28,7 @@ pub struct PassContext<'a> {
     pub(crate) buffer_handles: &'a SecondaryMap<RgBufferHandle, GfxBufferHandle>,
 }
 
-impl<'a> PassContext<'a> {
+impl<'a> RgPassContext<'a> {
     /// 获取图像的物理句柄
     #[inline]
     pub fn get_image(&self, handle: RgImageHandle) -> Option<(GfxImageHandle, GfxImageViewHandle)> {
@@ -52,64 +54,28 @@ impl<'a> PassContext<'a> {
     }
 }
 
-/// 资源读取声明
-#[derive(Clone, Debug)]
-pub struct ImageRead {
-    /// 资源句柄
-    pub handle: RgImageHandle,
-    /// 期望的状态
-    pub state: ImageState,
-}
-
-/// 资源写入声明
-#[derive(Clone, Debug)]
-pub struct ImageWrite {
-    /// 资源句柄
-    pub handle: RgImageHandle,
-    /// 期望的状态
-    pub state: ImageState,
-}
-
-/// 缓冲区读取声明
-#[derive(Clone, Debug)]
-pub struct BufferRead {
-    /// 资源句柄
-    pub handle: RgBufferHandle,
-    /// 期望的状态
-    pub state: BufferState,
-}
-
-/// 缓冲区写入声明
-#[derive(Clone, Debug)]
-pub struct BufferWrite {
-    /// 资源句柄
-    pub handle: RgBufferHandle,
-    /// 期望的状态
-    pub state: BufferState,
-}
-
 /// Pass 构建器
 ///
 /// 在 `RgPass::setup()` 中使用，声明 Pass 的资源依赖。
-pub struct PassBuilder<'a> {
+pub struct RgPassBuilder<'a> {
     /// Pass 名称
     #[allow(dead_code)]
     pub(crate) name: String,
 
     /// 图像读取列表
-    pub(crate) image_reads: Vec<ImageRead>,
+    pub(crate) image_reads: Vec<(RgImageHandle, RgImageState)>,
     /// 图像写入列表
-    pub(crate) image_writes: Vec<ImageWrite>,
+    pub(crate) image_writes: Vec<(RgImageHandle, RgImageState)>,
     /// 缓冲区读取列表
-    pub(crate) buffer_reads: Vec<BufferRead>,
+    pub(crate) buffer_reads: Vec<(RgBufferHandle, RgBufferState)>,
     /// 缓冲区写入列表
-    pub(crate) buffer_writes: Vec<BufferWrite>,
+    pub(crate) buffer_writes: Vec<(RgBufferHandle, RgBufferState)>,
 
     /// 资源注册表引用（用于创建临时资源）
-    pub(crate) resources: &'a mut ResourceRegistry,
+    pub(crate) resources: &'a mut RgResourceRegistry,
 }
 
-impl<'a> PassBuilder<'a> {
+impl<'a> RgPassBuilder<'a> {
     /// 声明读取图像
     ///
     /// # 参数
@@ -119,8 +85,8 @@ impl<'a> PassBuilder<'a> {
     /// # 返回
     /// 返回相同的句柄（语义上表示读取后的引用）
     #[inline]
-    pub fn read_image(&mut self, handle: RgImageHandle, state: ImageState) -> RgImageHandle {
-        self.image_reads.push(ImageRead { handle, state });
+    pub fn read_image(&mut self, handle: RgImageHandle, state: RgImageState) -> RgImageHandle {
+        self.image_reads.push((handle, state));
         handle
     }
 
@@ -132,15 +98,15 @@ impl<'a> PassBuilder<'a> {
     ///
     /// # 返回
     /// 返回相同的句柄（依赖通过 Pass 顺序确定）
-    pub fn write_image(&mut self, handle: RgImageHandle, state: ImageState) -> RgImageHandle {
-        self.image_writes.push(ImageWrite { handle, state });
+    pub fn write_image(&mut self, handle: RgImageHandle, state: RgImageState) -> RgImageHandle {
+        self.image_writes.push((handle, state));
         handle
     }
 
     /// 声明读写图像（同时读取和写入）
     ///
     /// 常用于累积操作（如 RT 累积、后处理）
-    pub fn read_write_image(&mut self, handle: RgImageHandle, state: ImageState) -> RgImageHandle {
+    pub fn read_write_image(&mut self, handle: RgImageHandle, state: RgImageState) -> RgImageHandle {
         self.read_image(handle, state);
         self.write_image(handle, state)
     }
@@ -149,72 +115,44 @@ impl<'a> PassBuilder<'a> {
     ///
     /// 图像将在编译阶段创建，执行完毕后自动销毁。
     pub fn create_image(&mut self, name: impl Into<String>, desc: RgImageDesc) -> RgImageHandle {
-        self.resources.register_transient_image(name, desc)
+        self.resources.register_image(RgImageResource::transient(name, desc))
     }
 
     /// 声明读取缓冲区
     #[inline]
-    pub fn read_buffer(&mut self, handle: RgBufferHandle, state: BufferState) -> RgBufferHandle {
-        self.buffer_reads.push(BufferRead { handle, state });
+    pub fn read_buffer(&mut self, handle: RgBufferHandle, state: RgBufferState) -> RgBufferHandle {
+        self.buffer_reads.push((handle, state));
         handle
     }
 
     /// 声明写入缓冲区
-    pub fn write_buffer(&mut self, handle: RgBufferHandle, state: BufferState) -> RgBufferHandle {
-        self.buffer_writes.push(BufferWrite { handle, state });
+    pub fn write_buffer(&mut self, handle: RgBufferHandle, state: RgBufferState) -> RgBufferHandle {
+        self.buffer_writes.push((handle, state));
         handle
     }
 
     /// 创建临时缓冲区
     pub fn create_buffer(&mut self, name: impl Into<String>, desc: RgBufferDesc) -> RgBufferHandle {
-        self.resources.register_transient_buffer(name, desc)
+        self.resources.register_buffer(RgBufferResource::transient(name, desc))
     }
 }
 
 /// Pass 节点数据（编译后使用）
-pub struct PassNode<'a> {
+pub struct RgPassNode<'a> {
     /// Pass 名称
     pub name: String,
 
     /// 图像读取
-    pub image_reads: Vec<ImageRead>,
+    pub image_reads: Vec<(RgImageHandle, RgImageState)>,
     /// 图像写入
-    pub image_writes: Vec<ImageWrite>,
+    pub image_writes: Vec<(RgImageHandle, RgImageState)>,
     /// 缓冲区读取
-    pub buffer_reads: Vec<BufferRead>,
+    pub buffer_reads: Vec<(RgBufferHandle, RgBufferState)>,
     /// 缓冲区写入
-    pub buffer_writes: Vec<BufferWrite>,
+    pub buffer_writes: Vec<(RgBufferHandle, RgBufferState)>,
 
     /// 执行回调（类型擦除的 Pass 实现）
-    pub(crate) executor: Box<dyn PassExecutor + 'a>,
-}
-
-impl PassNode<'_> {
-    /// 获取所有读取的图像句柄
-    pub fn read_image_handles(&self) -> impl Iterator<Item = RgImageHandle> + '_ {
-        self.image_reads.iter().map(|r| r.handle)
-    }
-
-    /// 获取所有写入的图像句柄
-    pub fn write_image_handles(&self) -> impl Iterator<Item = RgImageHandle> + '_ {
-        self.image_writes.iter().map(|w| w.handle)
-    }
-
-    /// 获取所有读取的缓冲区句柄
-    pub fn read_buffer_handles(&self) -> impl Iterator<Item = RgBufferHandle> + '_ {
-        self.buffer_reads.iter().map(|r| r.handle)
-    }
-
-    /// 获取所有写入的缓冲区句柄
-    pub fn write_buffer_handles(&self) -> impl Iterator<Item = RgBufferHandle> + '_ {
-        self.buffer_writes.iter().map(|w| w.handle)
-    }
-}
-
-/// 类型擦除的 Pass 执行器 trait
-pub(crate) trait PassExecutor {
-    /// 执行 Pass
-    fn execute(&self, ctx: &PassContext<'_>);
+    pub(crate) executor: Box<dyn RgPassExecutor + 'a>,
 }
 
 /// RgPass trait
@@ -251,21 +189,10 @@ pub trait RgPass {
     /// 声明 Pass 的资源依赖
     ///
     /// 在此方法中使用 `PassBuilder` 声明读取和写入的资源。
-    fn setup(&mut self, builder: &mut PassBuilder);
+    fn setup(&mut self, builder: &mut RgPassBuilder);
 
     /// 执行 Pass 的渲染逻辑
     ///
     /// 命令缓冲区已经开始录制，直接录制命令即可。
-    fn execute(&self, ctx: &PassContext<'_>);
-}
-
-/// 包装用户 Pass 实现的执行器
-pub(crate) struct RgPassExecutor<P: RgPass> {
-    pub pass: P,
-}
-
-impl<P: RgPass> PassExecutor for RgPassExecutor<P> {
-    fn execute(&self, ctx: &PassContext<'_>) {
-        self.pass.execute(ctx);
-    }
+    fn execute(&self, ctx: &RgPassContext<'_>);
 }

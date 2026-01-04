@@ -2,10 +2,10 @@
 //!
 //! 演示如何使用声明式 RenderGraph 构建完整的渲染管线。
 
+use crate::outer_app::OuterApp;
 use crate::outer_app::raster_graph::bloom_pass::BloomPass;
 use crate::outer_app::raster_graph::raster_pass::{RasterPass, RasterPipeline};
 use crate::outer_app::raster_graph::ui_pass::UiPass;
-use crate::outer_app::OuterApp;
 use ash::vk;
 use imgui::Ui;
 use truvis_gfx::commands::barrier::GfxImageBarrier;
@@ -13,7 +13,7 @@ use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
 use truvis_render_graph::render_context::RenderContext;
-use truvis_render_graph::render_graph_v2::{ImageState, RenderGraphBuilder};
+use truvis_render_graph::render_graph_v2::{RenderGraphBuilder, RgImageState};
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::geometry::RtGeometry;
 use truvis_renderer::platform::camera::Camera;
@@ -65,7 +65,12 @@ pub struct RasterGraphApp {
 
 impl Default for RasterGraphApp {
     fn default() -> Self {
-        Self { raster_pipeline: None, geometry: None, cmds: None, bloom_enabled: true }
+        Self {
+            raster_pipeline: None,
+            geometry: None,
+            cmds: None,
+            bloom_enabled: true,
+        }
     }
 }
 
@@ -81,8 +86,7 @@ impl OuterApp for RasterGraphApp {
 
         // 分配命令缓冲区
         self.cmds = Some(
-            FrameCounter::frame_labes()
-                .map(|label| renderer.cmd_allocator.alloc_command_buffer(label, "raster-graph")),
+            FrameCounter::frame_labes().map(|label| renderer.cmd_allocator.alloc_command_buffer(label, "raster-graph")),
         );
     }
 
@@ -126,7 +130,7 @@ impl OuterApp for RasterGraphApp {
             render_target_img,
             Some(render_target_view),
             frame_settings.color_format,
-            ImageState::UNDEFINED,
+            RgImageState::UNDEFINED,
         );
 
         let rg_depth = builder.import_image(
@@ -134,17 +138,11 @@ impl OuterApp for RasterGraphApp {
             depth_img,
             Some(depth_view),
             frame_settings.depth_format,
-            ImageState::UNDEFINED,
+            RgImageState::UNDEFINED,
         );
 
         // 1. Raster Pass - 场景渲染
-        let raster_pass = RasterPass::new(
-            rg_render_target,
-            rg_depth,
-            pipeline,
-            geometry,
-            frame_settings.frame_extent,
-        );
+        let raster_pass = RasterPass::new(rg_render_target, rg_depth, pipeline, geometry, frame_settings.frame_extent);
         builder.add_pass("raster", raster_pass);
 
         // 2. Bloom Pass - 后处理 (简化版：读写同一个 render_target)
@@ -157,6 +155,14 @@ impl OuterApp for RasterGraphApp {
 
         // === 编译并执行 ===
         let compiled = builder.compile();
+
+        // debug
+        {
+            static PASS_DUMP: std::sync::Once = std::sync::Once::new();
+            PASS_DUMP.call_once(|| {
+                compiled.print_execution_plan();
+            });
+        }
 
         // 开始命令缓冲区
         cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "raster-graph");
@@ -172,10 +178,7 @@ impl OuterApp for RasterGraphApp {
                 .image(render_target_image.handle())
                 .image_aspect_flag(vk::ImageAspectFlags::COLOR)
                 .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::GENERAL)
-                .src_mask(
-                    vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                    vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                )
+                .src_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT, vk::AccessFlags2::COLOR_ATTACHMENT_WRITE)
                 .dst_mask(vk::PipelineStageFlags2::NONE, vk::AccessFlags2::NONE)],
         );
 

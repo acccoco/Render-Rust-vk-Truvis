@@ -124,7 +124,13 @@ impl GfxImageViewDesc {
         mip_range: (u8, u8),
         layer_range: (u8, u8),
     ) -> Self {
-        Self { format, view_type, aspect_mask, mip: mip_range, layer: layer_range }
+        Self {
+            format,
+            view_type,
+            aspect_mask,
+            mip: mip_range,
+            layer: layer_range,
+        }
     }
 
     /// 获取格式

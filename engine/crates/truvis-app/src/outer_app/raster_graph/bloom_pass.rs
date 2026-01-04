@@ -3,7 +3,7 @@
 //! 使用 RenderGraph V2 声明式定义的 Bloom 效果。
 //! 简化版本：仅演示 RenderGraph 的使用方式。
 
-use truvis_render_graph::render_graph_v2::{ImageState, PassBuilder, PassContext, RgImageHandle, RgPass};
+use truvis_render_graph::render_graph_v2::{RgImageHandle, RgImageState, RgPass, RgPassBuilder, RgPassContext};
 
 /// Bloom 后处理 Pass
 ///
@@ -31,16 +31,16 @@ impl BloomPass {
 }
 
 impl RgPass for BloomPass {
-    fn setup(&mut self, builder: &mut PassBuilder) {
+    fn setup(&mut self, builder: &mut RgPassBuilder) {
         if self.enabled {
             // 读取输入图像
-            builder.read_image(self.input, ImageState::SHADER_READ_COMPUTE);
+            builder.read_image(self.input, RgImageState::SHADER_READ_COMPUTE);
             // 写入输出图像
-            builder.write_image(self.output, ImageState::STORAGE_WRITE_COMPUTE);
+            builder.write_image(self.output, RgImageState::STORAGE_WRITE_COMPUTE);
         }
     }
 
-    fn execute(&self, ctx: &PassContext<'_>) {
+    fn execute(&self, ctx: &RgPassContext<'_>) {
         if !self.enabled {
             return;
         }

@@ -14,7 +14,7 @@ use truvis_gfx::pipelines::rendering_info::GfxRenderingInfo;
 use truvis_gfx::pipelines::shader::GfxShaderStageInfo;
 use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
-use truvis_render_graph::render_graph_v2::{ImageState, PassBuilder, PassContext, RgImageHandle, RgPass};
+use truvis_render_graph::render_graph_v2::{RgImageHandle, RgImageState, RgPass, RgPassBuilder, RgPassContext};
 use truvis_render_interface::geometry::RtGeometry;
 use truvis_render_interface::pipeline_settings::FrameSettings;
 
@@ -50,16 +50,21 @@ impl RasterPipeline {
         pipeline_ci.vertex_attribute(VertexLayoutSoA3D::vertex_input_attributes());
         pipeline_ci.depth_test(Some(vk::CompareOp::LESS), true, false);
         pipeline_ci.color_blend(
-            vec![vk::PipelineColorBlendAttachmentState::default()
-                .blend_enable(false)
-                .color_write_mask(vk::ColorComponentFlags::RGBA)],
+            vec![
+                vk::PipelineColorBlendAttachmentState::default()
+                    .blend_enable(false)
+                    .color_write_mask(vk::ColorComponentFlags::RGBA),
+            ],
             [0.0; 4],
         );
 
         let pipeline_layout = Rc::new(GfxPipelineLayout::new(&[], &[], "raster-graph-pipeline-layout"));
         let pipeline = GfxGraphicsPipeline::new(&pipeline_ci, pipeline_layout.clone(), "raster-graph-pipeline");
 
-        Self { pipeline, pipeline_layout }
+        Self {
+            pipeline,
+            pipeline_layout,
+        }
     }
 }
 
@@ -93,19 +98,25 @@ impl<'a> RasterPass<'a> {
         geometry: &'a RtGeometry,
         frame_extent: vk::Extent2D,
     ) -> Self {
-        Self { render_target, depth_target, pipeline: &pipeline.pipeline, geometry, frame_extent }
+        Self {
+            render_target,
+            depth_target,
+            pipeline: &pipeline.pipeline,
+            geometry,
+            frame_extent,
+        }
     }
 }
 
 impl RgPass for RasterPass<'_> {
-    fn setup(&mut self, builder: &mut PassBuilder) {
+    fn setup(&mut self, builder: &mut RgPassBuilder) {
         // 声明写入 render target
-        builder.write_image(self.render_target, ImageState::COLOR_ATTACHMENT_WRITE);
+        builder.write_image(self.render_target, RgImageState::COLOR_ATTACHMENT_WRITE);
         // 声明写入 depth buffer
-        builder.write_image(self.depth_target, ImageState::DEPTH_ATTACHMENT_WRITE);
+        builder.write_image(self.depth_target, RgImageState::DEPTH_ATTACHMENT_WRITE);
     }
 
-    fn execute(&self, ctx: &PassContext<'_>) {
+    fn execute(&self, ctx: &RgPassContext<'_>) {
         let cmd = ctx.cmd;
 
         // 获取物理 image view handle
@@ -120,7 +131,10 @@ impl RgPass for RasterPass<'_> {
         let rendering_info = GfxRenderingInfo::new(
             vec![render_target_view.handle()],
             Some(depth_view.handle()),
-            vk::Rect2D { offset: vk::Offset2D::default(), extent: self.frame_extent },
+            vk::Rect2D {
+                offset: vk::Offset2D::default(),
+                extent: self.frame_extent,
+            },
         );
 
         cmd.cmd_begin_rendering2(&rendering_info);
@@ -137,7 +151,13 @@ impl RgPass for RasterPass<'_> {
                 max_depth: 1.0,
             }],
         );
-        cmd.cmd_set_scissor(0, &[vk::Rect2D { offset: vk::Offset2D::default(), extent: self.frame_extent }]);
+        cmd.cmd_set_scissor(
+            0,
+            &[vk::Rect2D {
+                offset: vk::Offset2D::default(),
+                extent: self.frame_extent,
+            }],
+        );
 
         self.geometry.cmd_bind_index_buffer(cmd);
         self.geometry.cmd_bind_vertex_buffers(cmd);

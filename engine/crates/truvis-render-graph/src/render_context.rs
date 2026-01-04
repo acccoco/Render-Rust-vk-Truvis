@@ -33,3 +33,29 @@ pub struct RenderContext {
     pub frame_settings: FrameSettings,
     pub pipeline_settings: PipelineSettings,
 }
+
+/// 使用 <'a>，表示这些资源是临时的，可以被消费的，是对外展示的一个切片
+///
+/// 通过类型系统来表达架构意图，区分 Render 期间不可变的资源和可变的资源
+#[derive(Copy, Clone)]
+pub struct RenderContext2<'a> {
+    pub scene_manager: &'a SceneManager,
+    pub gpu_scene: &'a GpuScene,
+    pub asset_hub: &'a AssetHub,
+
+    pub fif_buffers: &'a FifBuffers,
+    pub bindless_manager: &'a BindlessManager,
+    pub per_frame_data_buffers: &'a [GfxStructuredBuffer<truvisl::PerFrameData>; FrameCounter::fif_count()],
+    pub gfx_resource_manager: &'a GfxResourceManager,
+    pub sampler_manager: &'a RenderSamplerManager,
+
+    pub global_descriptor_sets: &'a GlobalDescriptorSets,
+
+    pub delta_time_s: f32,
+    pub total_time_s: f32,
+    pub accum_data: AccumData,
+
+    pub frame_counter: &'a FrameCounter,
+    pub frame_settings: &'a FrameSettings,
+    pub pipeline_settings: &'a PipelineSettings,
+}

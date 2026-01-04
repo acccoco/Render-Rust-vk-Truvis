@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 
 use slotmap::SecondaryMap;
 
-use super::handle::{RgBufferHandle, RgImageHandle};
+use super::resource_handle::{RgBufferHandle, RgImageHandle};
 
 /// 依赖边：从 producer 到 consumer
 #[derive(Clone, Debug)]
@@ -66,7 +66,12 @@ impl DependencyGraph {
             self.in_degrees[consumer] += 1;
         }
 
-        self.edges.push(DependencyEdge { producer, consumer, images, buffers });
+        self.edges.push(DependencyEdge {
+            producer,
+            consumer,
+            images,
+            buffers,
+        });
     }
 
     /// 执行拓扑排序

@@ -5,26 +5,31 @@
 use ash::vk;
 use truvis_gfx::commands::barrier::{GfxBufferBarrier, GfxImageBarrier};
 
-use super::handle::{RgBufferHandle, RgImageHandle};
-use super::state::{BufferState, ImageState};
+use super::resource_handle::{RgBufferHandle, RgImageHandle};
+use super::resource_state::{RgBufferState, RgImageState};
 
 /// 图像 Barrier 描述
 #[derive(Clone, Debug)]
-pub struct ImageBarrierDesc {
+pub struct RgImageBarrierDesc {
     /// 资源句柄（RenderGraph 内部）
     pub handle: RgImageHandle,
     /// 源状态
-    pub src_state: ImageState,
+    pub src_state: RgImageState,
     /// 目标状态
-    pub dst_state: ImageState,
+    pub dst_state: RgImageState,
     /// 图像 aspect（COLOR / DEPTH / STENCIL）
     pub aspect: vk::ImageAspectFlags,
 }
 
-impl ImageBarrierDesc {
+impl RgImageBarrierDesc {
     /// 创建新的图像 barrier 描述
-    pub fn new(handle: RgImageHandle, src_state: ImageState, dst_state: ImageState) -> Self {
-        Self { handle, src_state, dst_state, aspect: vk::ImageAspectFlags::COLOR }
+    pub fn new(handle: RgImageHandle, src_state: RgImageState, dst_state: RgImageState) -> Self {
+        Self {
+            handle,
+            src_state,
+            dst_state,
+            aspect: vk::ImageAspectFlags::COLOR,
+        }
     }
 
     /// 设置 aspect
@@ -70,9 +75,9 @@ pub struct BufferBarrierDesc {
     /// 资源句柄
     pub handle: RgBufferHandle,
     /// 源状态
-    pub src_state: BufferState,
+    pub src_state: RgBufferState,
     /// 目标状态
-    pub dst_state: BufferState,
+    pub dst_state: RgBufferState,
     /// 缓冲区偏移
     pub offset: vk::DeviceSize,
     /// 缓冲区大小（WHOLE_SIZE 表示整个缓冲区）
@@ -81,8 +86,14 @@ pub struct BufferBarrierDesc {
 
 impl BufferBarrierDesc {
     /// 创建新的缓冲区 barrier 描述
-    pub fn new(handle: RgBufferHandle, src_state: BufferState, dst_state: BufferState) -> Self {
-        Self { handle, src_state, dst_state, offset: 0, size: vk::WHOLE_SIZE }
+    pub fn new(handle: RgBufferHandle, src_state: RgBufferState, dst_state: RgBufferState) -> Self {
+        Self {
+            handle,
+            src_state,
+            dst_state,
+            offset: 0,
+            size: vk::WHOLE_SIZE,
+        }
     }
 
     /// 检查是否需要 barrier
@@ -104,7 +115,7 @@ impl BufferBarrierDesc {
 #[derive(Clone, Debug, Default)]
 pub struct PassBarriers {
     /// 图像 barriers
-    pub image_barriers: Vec<ImageBarrierDesc>,
+    pub image_barriers: Vec<RgImageBarrierDesc>,
     /// 缓冲区 barriers
     pub buffer_barriers: Vec<BufferBarrierDesc>,
 }
@@ -116,7 +127,7 @@ impl PassBarriers {
     }
 
     /// 添加图像 barrier
-    pub fn add_image_barrier(&mut self, barrier: ImageBarrierDesc) {
+    pub fn add_image_barrier(&mut self, barrier: RgImageBarrierDesc) {
         if barrier.needs_barrier() {
             self.image_barriers.push(barrier);
         }
@@ -162,40 +173,21 @@ impl BarrierCalculator {
     /// 如果需要 barrier，返回 `Some(ImageBarrierDesc)`
     pub fn compute_image_barrier(
         handle: RgImageHandle,
-        current_state: ImageState,
-        required_state: ImageState,
-    ) -> Option<ImageBarrierDesc> {
-        let barrier = ImageBarrierDesc::new(handle, current_state, required_state);
+        current_state: RgImageState,
+        required_state: RgImageState,
+    ) -> Option<RgImageBarrierDesc> {
+        let barrier = RgImageBarrierDesc::new(handle, current_state, required_state);
         if barrier.needs_barrier() { Some(barrier) } else { None }
     }
 
     /// 计算单个缓冲区资源的 barrier
     pub fn compute_buffer_barrier(
         handle: RgBufferHandle,
-        current_state: BufferState,
-        required_state: BufferState,
+        current_state: RgBufferState,
+        required_state: RgBufferState,
     ) -> Option<BufferBarrierDesc> {
         let barrier = BufferBarrierDesc::new(handle, current_state, required_state);
         if barrier.needs_barrier() { Some(barrier) } else { None }
-    }
-
-    /// 推断图像的 aspect flags
-    ///
-    /// 根据 format 自动推断（简化版本）
-    pub fn infer_image_aspect(format: vk::Format) -> vk::ImageAspectFlags {
-        match format {
-            vk::Format::D16_UNORM | vk::Format::D32_SFLOAT | vk::Format::X8_D24_UNORM_PACK32 => {
-                vk::ImageAspectFlags::DEPTH
-            }
-
-            vk::Format::S8_UINT => vk::ImageAspectFlags::STENCIL,
-
-            vk::Format::D16_UNORM_S8_UINT | vk::Format::D24_UNORM_S8_UINT | vk::Format::D32_SFLOAT_S8_UINT => {
-                vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL
-            }
-
-            _ => vk::ImageAspectFlags::COLOR,
-        }
     }
 }
 
@@ -213,7 +205,7 @@ mod tests {
     #[test]
     fn test_image_barrier_layout_change() {
         let handle = create_test_image_handle();
-        let barrier = ImageBarrierDesc::new(handle, ImageState::UNDEFINED, ImageState::COLOR_ATTACHMENT_WRITE);
+        let barrier = RgImageBarrierDesc::new(handle, RgImageState::UNDEFINED, RgImageState::COLOR_ATTACHMENT_WRITE);
 
         assert!(barrier.needs_barrier());
     }
@@ -221,7 +213,8 @@ mod tests {
     #[test]
     fn test_image_barrier_read_to_read() {
         let handle = create_test_image_handle();
-        let barrier = ImageBarrierDesc::new(handle, ImageState::SHADER_READ_FRAGMENT, ImageState::SHADER_READ_COMPUTE);
+        let barrier =
+            RgImageBarrierDesc::new(handle, RgImageState::SHADER_READ_FRAGMENT, RgImageState::SHADER_READ_COMPUTE);
 
         // 同 layout 的只读到只读可以跳过
         // 但这里 layout 可能不同，取决于实际定义
@@ -232,7 +225,8 @@ mod tests {
     #[test]
     fn test_image_barrier_write_to_read() {
         let handle = create_test_image_handle();
-        let barrier = ImageBarrierDesc::new(handle, ImageState::STORAGE_WRITE_COMPUTE, ImageState::SHADER_READ_FRAGMENT);
+        let barrier =
+            RgImageBarrierDesc::new(handle, RgImageState::STORAGE_WRITE_COMPUTE, RgImageState::SHADER_READ_FRAGMENT);
 
         assert!(barrier.needs_barrier());
     }

@@ -9,7 +9,7 @@ use ash::vk;
 ///
 /// 描述图像在某个 Pass 中的使用方式，用于自动计算 barrier。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ImageState {
+pub struct RgImageState {
     /// Pipeline stage
     pub stage: vk::PipelineStageFlags2,
     /// Access mask
@@ -18,13 +18,14 @@ pub struct ImageState {
     pub layout: vk::ImageLayout,
 }
 
-impl Default for ImageState {
+impl Default for RgImageState {
     fn default() -> Self {
         Self::UNDEFINED
     }
 }
 
-impl ImageState {
+// new & 常量定义
+impl RgImageState {
     /// 创建自定义状态
     #[inline]
     pub const fn new(stage: vk::PipelineStageFlags2, access: vk::AccessFlags2, layout: vk::ImageLayout) -> Self {
@@ -189,20 +190,21 @@ impl ImageState {
 ///
 /// 描述缓冲区在某个 Pass 中的使用方式。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct BufferState {
+pub struct RgBufferState {
     /// Pipeline stage
     pub stage: vk::PipelineStageFlags2,
     /// Access mask
     pub access: vk::AccessFlags2,
 }
 
-impl Default for BufferState {
+impl Default for RgBufferState {
     fn default() -> Self {
         Self::UNDEFINED
     }
 }
 
-impl BufferState {
+// new & 常量定义
+impl RgBufferState {
     /// 创建自定义状态
     #[inline]
     pub const fn new(stage: vk::PipelineStageFlags2, access: vk::AccessFlags2) -> Self {

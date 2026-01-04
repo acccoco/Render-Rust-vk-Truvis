@@ -5846,6 +5846,7 @@ dependencies = [
  "itertools 0.10.5",
  "log",
  "slotmap",
+ "tracy-client",
  "truvis-asset",
  "truvis-crate-tools",
  "truvis-descriptor-layout-macro",
