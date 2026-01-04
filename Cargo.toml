@@ -106,6 +106,7 @@ crossbeam-utils = "0.8"
 slotmap = "1.0.7"
 indexmap = "2.12.1"
 uuid = { version = "1.16.0", features = ["v4"] }
+petgraph = { version = "0.7.1" }
 
 ###########################################################
 # 开发工具 (Development Tools)

@@ -1,20 +1,19 @@
 //! 依赖图构建和拓扑排序
 //!
 //! 分析 Pass 之间的资源依赖关系，构建 DAG 并进行拓扑排序。
+//! 使用 petgraph 库提供高效的图算法实现。
 
-use std::collections::VecDeque;
-
+use petgraph::Direction;
+use petgraph::algo::toposort;
+use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::visit::EdgeRef;
 use slotmap::SecondaryMap;
 
 use super::resource_handle::{RgBufferHandle, RgImageHandle};
 
-/// 依赖边：从 producer 到 consumer
-#[derive(Clone, Debug)]
-pub struct DependencyEdge {
-    /// 生产者 Pass 索引
-    pub producer_pass_idx: usize,
-    /// 消费者 Pass 索引
-    pub consumer_pass_idx: usize,
+/// 依赖边数据：资源依赖信息
+#[derive(Clone, Debug, Default)]
+pub struct EdgeData {
     /// 依赖的图像资源
     pub images: Vec<RgImageHandle>,
     /// 依赖的缓冲区资源
@@ -24,121 +23,15 @@ pub struct DependencyEdge {
 /// 依赖图
 ///
 /// 表示 Pass 之间的依赖关系，用于拓扑排序和执行顺序计算。
+/// 内部使用 petgraph 的 DiGraph 实现。
 pub struct DependencyGraph {
-    /// Pass 数量
-    pass_count: usize,
-    /// 邻接表（出边）：pass_index -> [(target_pass, edge_info)]
-    adjacency: Vec<Vec<usize>>,
-    /// 入度表
-    in_degrees: Vec<usize>,
-    /// 所有边
-    edges: Vec<DependencyEdge>,
+    /// 有向图：节点存储 pass 索引，边存储资源依赖
+    graph: DiGraph<usize, EdgeData>,
+    /// Pass 索引到图节点的映射
+    node_indices: Vec<NodeIndex>,
 }
 
 impl DependencyGraph {
-    /// 创建新的依赖图
-    pub fn new(pass_count: usize) -> Self {
-        Self {
-            pass_count,
-            adjacency: vec![Vec::new(); pass_count],
-            in_degrees: vec![0; pass_count],
-            edges: Vec::new(),
-        }
-    }
-
-    /// 添加依赖边
-    ///
-    /// # 参数
-    /// - `producer`: 生产者 Pass 索引（先执行）
-    /// - `consumer`: 消费者 Pass 索引（后执行）
-    /// - `images`: 涉及的图像资源
-    /// - `buffers`: 涉及的缓冲区资源
-    pub fn add_edge(
-        &mut self,
-        producer: usize,
-        consumer: usize,
-        images: Vec<RgImageHandle>,
-        buffers: Vec<RgBufferHandle>,
-    ) {
-        // 避免重复边
-        if !self.adjacency[producer].contains(&consumer) {
-            self.adjacency[producer].push(consumer);
-            self.in_degrees[consumer] += 1;
-        }
-
-        self.edges.push(DependencyEdge {
-            producer_pass_idx: producer,
-            consumer_pass_idx: consumer,
-            images,
-            buffers,
-        });
-    }
-
-    /// 执行拓扑排序
-    ///
-    /// # 返回
-    /// - `Ok(order)`: 拓扑排序后的 Pass 索引列表
-    /// - `Err(cycle)`: 检测到循环依赖，返回参与循环的 Pass 索引
-    pub fn topological_sort(&self) -> Result<Vec<usize>, Vec<usize>> {
-        let mut in_degrees = self.in_degrees.clone();
-        let mut queue = VecDeque::new();
-        let mut result = Vec::with_capacity(self.pass_count);
-
-        // 将所有入度为 0 的节点加入队列
-        for i in 0..self.pass_count {
-            if in_degrees[i] == 0 {
-                queue.push_back(i);
-            }
-        }
-
-        while let Some(node) = queue.pop_front() {
-            result.push(node);
-
-            for &neighbor in &self.adjacency[node] {
-                in_degrees[neighbor] -= 1;
-                if in_degrees[neighbor] == 0 {
-                    queue.push_back(neighbor);
-                }
-            }
-        }
-
-        if result.len() != self.pass_count {
-            // 存在循环，找出参与循环的节点
-            let remaining: Vec<usize> = (0..self.pass_count).filter(|&i| in_degrees[i] > 0).collect();
-            Err(remaining)
-        } else {
-            Ok(result)
-        }
-    }
-
-    /// 获取 Pass 的直接依赖（前驱）
-    pub fn get_predecessors(&self, pass_index: usize) -> Vec<usize> {
-        let mut predecessors = Vec::new();
-        for (i, adj) in self.adjacency.iter().enumerate() {
-            if adj.contains(&pass_index) {
-                predecessors.push(i);
-            }
-        }
-        predecessors
-    }
-
-    /// 获取 Pass 的直接后继
-    pub fn get_successors(&self, pass_index: usize) -> &[usize] {
-        &self.adjacency[pass_index]
-    }
-
-    /// 获取所有边
-    pub fn edges(&self) -> &[DependencyEdge] {
-        &self.edges
-    }
-}
-
-/// 依赖分析器
-///
-/// 从 Pass 节点列表构建依赖图。
-pub struct DependencyAnalyzer;
-
-impl DependencyAnalyzer {
     /// 分析资源依赖，构建依赖图
     ///
     /// 规则：
@@ -151,8 +44,15 @@ impl DependencyAnalyzer {
         image_writes: &[Vec<RgImageHandle>], // pass_index -> [image handles]
         buffer_reads: &[Vec<RgBufferHandle>],
         buffer_writes: &[Vec<RgBufferHandle>],
-    ) -> DependencyGraph {
-        let mut graph = DependencyGraph::new(pass_count);
+    ) -> Self {
+        let mut graph = {
+            let mut graph = DiGraph::with_capacity(pass_count, pass_count * 2);
+
+            // 为每个 pass 创建节点
+            let node_indices: Vec<NodeIndex> = (0..pass_count).map(|i| graph.add_node(i)).collect();
+
+            Self { graph, node_indices }
+        };
 
         // 跟踪每个资源的最后写入者
         let mut last_image_writer: SecondaryMap<RgImageHandle, usize> = SecondaryMap::new();
@@ -204,6 +104,64 @@ impl DependencyAnalyzer {
 
         graph
     }
+
+    /// 添加依赖边
+    ///
+    /// # 参数
+    /// - `producer`: 生产者 Pass 索引（先执行）
+    /// - `consumer`: 消费者 Pass 索引（后执行）
+    /// - `images`: 涉及的图像资源
+    /// - `buffers`: 涉及的缓冲区资源
+    pub fn add_edge(
+        &mut self,
+        producer: usize,
+        consumer: usize,
+        images: Vec<RgImageHandle>,
+        buffers: Vec<RgBufferHandle>,
+    ) {
+        let producer_node = self.node_indices[producer];
+        let consumer_node = self.node_indices[consumer];
+
+        // 检查是否已存在边，如果存在则合并资源
+        if let Some(edge_idx) = self.graph.find_edge(producer_node, consumer_node) {
+            let edge_data = self.graph.edge_weight_mut(edge_idx).unwrap();
+            edge_data.images.extend(images);
+            edge_data.buffers.extend(buffers);
+        } else {
+            self.graph.add_edge(producer_node, consumer_node, EdgeData { images, buffers });
+        }
+    }
+
+    /// 执行拓扑排序
+    ///
+    /// # 返回
+    /// - `Ok(order)`: 拓扑排序后的 Pass 索引列表
+    /// - `Err(cycle)`: 检测到循环依赖，返回参与循环的 Pass 索引
+    pub fn topological_sort(&self) -> Result<Vec<usize>, Vec<usize>> {
+        match toposort(&self.graph, None) {
+            Ok(sorted_nodes) => {
+                // 将 NodeIndex 转换回 pass 索引
+                Ok(sorted_nodes.into_iter().map(|n| self.graph[n]).collect())
+            }
+            Err(cycle) => {
+                // petgraph 返回循环中的一个节点，我们找出所有参与循环的节点
+                // 简化处理：返回循环节点
+                Err(vec![self.graph[cycle.node_id()]])
+            }
+        }
+    }
+
+    /// 获取 Pass 的直接依赖（前驱）
+    pub fn get_predecessors(&self, pass_index: usize) -> Vec<usize> {
+        let node = self.node_indices[pass_index];
+        self.graph.neighbors_directed(node, Direction::Incoming).map(|n| self.graph[n]).collect()
+    }
+
+    /// 获取 Pass 的直接后继
+    pub fn get_successors(&self, pass_index: usize) -> Vec<usize> {
+        let node = self.node_indices[pass_index];
+        self.graph.neighbors_directed(node, Direction::Outgoing).map(|n| self.graph[n]).collect()
+    }
 }
 
 #[cfg(test)]
@@ -230,7 +188,7 @@ mod tests {
         let buffer_reads = vec![vec![], vec![]];
         let buffer_writes = vec![vec![], vec![]];
 
-        let graph = DependencyAnalyzer::analyze(2, &image_reads, &image_writes, &buffer_reads, &buffer_writes);
+        let graph = DependencyGraph::analyze(2, &image_reads, &image_writes, &buffer_reads, &buffer_writes);
 
         let order = graph.topological_sort().unwrap();
         assert_eq!(order, vec![0, 1]);
@@ -248,7 +206,7 @@ mod tests {
         let buffer_reads = vec![vec![], vec![], vec![]];
         let buffer_writes = vec![vec![], vec![], vec![]];
 
-        let graph = DependencyAnalyzer::analyze(3, &image_reads, &image_writes, &buffer_reads, &buffer_writes);
+        let graph = DependencyGraph::analyze(3, &image_reads, &image_writes, &buffer_reads, &buffer_writes);
 
         let order = graph.topological_sort().unwrap();
         assert_eq!(order, vec![0, 1, 2]);
@@ -268,7 +226,7 @@ mod tests {
         let buffer_reads = vec![vec![], vec![], vec![]];
         let buffer_writes = vec![vec![], vec![], vec![]];
 
-        let graph = DependencyAnalyzer::analyze(3, &image_reads, &image_writes, &buffer_reads, &buffer_writes);
+        let graph = DependencyGraph::analyze(3, &image_reads, &image_writes, &buffer_reads, &buffer_writes);
 
         let order = graph.topological_sort().unwrap();
         // Pass 0 和 1 可以任意顺序，但都在 Pass 2 之前

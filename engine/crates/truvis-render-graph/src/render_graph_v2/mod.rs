@@ -14,7 +14,7 @@ pub use buffer_resource::RgBufferDesc;
 pub use buffer_resource::RgBufferResource;
 pub use buffer_resource::RgBufferSource;
 pub use executor::{CompiledGraph, RenderGraphBuilder};
-pub use graph::{DependencyAnalyzer, DependencyEdge, DependencyGraph};
+pub use graph::{DependencyGraph, EdgeData};
 pub use image_resource::RgImageDesc;
 pub use image_resource::RgImageResource;
 pub use image_resource::RgImageSource;

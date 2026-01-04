@@ -4,7 +4,7 @@
 //! `CompiledGraph` 用于缓存编译结果并执行渲染。
 
 use super::barrier::{BufferBarrierDesc, PassBarriers, RgImageBarrierDesc};
-use super::graph::{DependencyAnalyzer, DependencyGraph};
+use super::graph::DependencyGraph;
 use super::pass::{RgPass, RgPassBuilder, RgPassContext, RgPassNode};
 use super::resource_handle::{RgBufferHandle, RgImageHandle};
 use super::resource_registry::RgResourceRegistry;
@@ -166,7 +166,7 @@ impl<'a> RenderGraphBuilder<'a> {
 
         // 依赖分析
         let dep_graph =
-            DependencyAnalyzer::analyze(pass_count, &image_reads, &image_writes, &buffer_reads, &buffer_writes);
+            DependencyGraph::analyze(pass_count, &image_reads, &image_writes, &buffer_reads, &buffer_writes);
 
         // 拓扑排序
         let execution_order = dep_graph.topological_sort().unwrap_or_else(|cycle| {
