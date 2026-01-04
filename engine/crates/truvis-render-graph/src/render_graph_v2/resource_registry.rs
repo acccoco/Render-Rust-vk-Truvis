@@ -1,10 +1,7 @@
 use super::resource_handle::{RgBufferHandle, RgImageHandle};
-use super::resource_state::{RgBufferState, RgImageState};
-use crate::render_graph_v2::buffer_resource::{RgBufferDesc, RgBufferResource};
-use crate::render_graph_v2::image_resource::{RgImageDesc, RgImageResource};
-use ash::vk;
+use crate::render_graph_v2::buffer_resource::RgBufferResource;
+use crate::render_graph_v2::image_resource::RgImageResource;
 use slotmap::SlotMap;
-use truvis_render_interface::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle};
 
 /// 资源注册表
 ///

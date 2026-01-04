@@ -12,9 +12,9 @@ use super::resource_handle::{RgBufferHandle, RgImageHandle};
 #[derive(Clone, Debug)]
 pub struct DependencyEdge {
     /// 生产者 Pass 索引
-    pub producer: usize,
+    pub producer_pass_idx: usize,
     /// 消费者 Pass 索引
-    pub consumer: usize,
+    pub consumer_pass_idx: usize,
     /// 依赖的图像资源
     pub images: Vec<RgImageHandle>,
     /// 依赖的缓冲区资源
@@ -67,8 +67,8 @@ impl DependencyGraph {
         }
 
         self.edges.push(DependencyEdge {
-            producer,
-            consumer,
+            producer_pass_idx: producer,
+            consumer_pass_idx: consumer,
             images,
             buffers,
         });
@@ -162,20 +162,20 @@ impl DependencyAnalyzer {
             // 处理图像读取
             for &img_handle in &image_reads[pass_idx] {
                 // 如果有之前的写入者，添加依赖
-                if let Some(&writer) = last_image_writer.get(img_handle) {
-                    if writer != pass_idx {
-                        graph.add_edge(writer, pass_idx, vec![img_handle], vec![]);
-                    }
+                if let Some(&writer) = last_image_writer.get(img_handle)
+                    && writer != pass_idx
+                {
+                    graph.add_edge(writer, pass_idx, vec![img_handle], vec![]);
                 }
             }
 
             // 处理图像写入
             for &img_handle in &image_writes[pass_idx] {
                 // 如果有之前的写入者，添加 WAW 依赖
-                if let Some(&prev_writer) = last_image_writer.get(img_handle) {
-                    if prev_writer != pass_idx {
-                        graph.add_edge(prev_writer, pass_idx, vec![img_handle], vec![]);
-                    }
+                if let Some(&prev_writer) = last_image_writer.get(img_handle)
+                    && prev_writer != pass_idx
+                {
+                    graph.add_edge(prev_writer, pass_idx, vec![img_handle], vec![]);
                 }
 
                 // 更新最后写入者
@@ -184,19 +184,19 @@ impl DependencyAnalyzer {
 
             // 处理缓冲区读取
             for &buf_handle in &buffer_reads[pass_idx] {
-                if let Some(&writer) = last_buffer_writer.get(buf_handle) {
-                    if writer != pass_idx {
-                        graph.add_edge(writer, pass_idx, vec![], vec![buf_handle]);
-                    }
+                if let Some(&writer) = last_buffer_writer.get(buf_handle)
+                    && writer != pass_idx
+                {
+                    graph.add_edge(writer, pass_idx, vec![], vec![buf_handle]);
                 }
             }
 
             // 处理缓冲区写入
             for &buf_handle in &buffer_writes[pass_idx] {
-                if let Some(&prev_writer) = last_buffer_writer.get(buf_handle) {
-                    if prev_writer != pass_idx {
-                        graph.add_edge(prev_writer, pass_idx, vec![], vec![buf_handle]);
-                    }
+                if let Some(&prev_writer) = last_buffer_writer.get(buf_handle)
+                    && prev_writer != pass_idx
+                {
+                    graph.add_edge(prev_writer, pass_idx, vec![], vec![buf_handle]);
                 }
                 last_buffer_writer.insert(buf_handle, pass_idx);
             }
