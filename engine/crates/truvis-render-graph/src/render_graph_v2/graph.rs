@@ -6,7 +6,6 @@
 use petgraph::Direction;
 use petgraph::algo::toposort;
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::visit::EdgeRef;
 use slotmap::SecondaryMap;
 
 use super::resource_handle::{RgBufferHandle, RgImageHandle};

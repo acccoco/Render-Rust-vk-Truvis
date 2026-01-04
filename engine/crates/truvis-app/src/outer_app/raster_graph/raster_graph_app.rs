@@ -3,9 +3,7 @@
 //! 演示如何使用声明式 RenderGraph 构建完整的渲染管线。
 
 use crate::outer_app::OuterApp;
-use crate::outer_app::raster_graph::bloom_pass::BloomPass;
 use crate::outer_app::raster_graph::raster_pass::{RasterPass, RasterPipeline};
-use crate::outer_app::raster_graph::ui_pass::UiPass;
 use ash::vk;
 use imgui::Ui;
 use truvis_gfx::commands::barrier::GfxImageBarrier;
@@ -141,17 +139,40 @@ impl OuterApp for RasterGraphApp {
             RgImageState::UNDEFINED,
         );
 
-        // 1. Raster Pass - 场景渲染
+        // 1. Raster Pass - 场景渲染 (使用 lambda)
         let raster_pass = RasterPass::new(rg_render_target, rg_depth, pipeline, geometry, frame_settings.frame_extent);
         builder.add_pass("raster", raster_pass);
 
-        // 2. Bloom Pass - 后处理 (简化版：读写同一个 render_target)
-        let bloom_pass = BloomPass::new(rg_render_target, rg_render_target, self.bloom_enabled);
-        builder.add_pass("bloom", bloom_pass);
+        // 2. Bloom Pass - 后处理 (使用 lambda)
+        let bloom_enabled = self.bloom_enabled;
+        builder.add_pass_lambda(
+            "bloom",
+            move |b| {
+                if bloom_enabled {
+                    b.read_image(rg_render_target, RgImageState::SHADER_READ_COMPUTE);
+                    b.write_image(rg_render_target, RgImageState::STORAGE_WRITE_COMPUTE);
+                }
+            },
+            move |ctx| {
+                if !bloom_enabled {
+                    return;
+                }
+                let _cmd = ctx.cmd;
+                log::trace!("BloomPass::execute (placeholder)");
+            },
+        );
 
-        // 3. UI Pass
-        let ui_pass = UiPass::new(rg_render_target);
-        builder.add_pass("ui", ui_pass);
+        // 3. UI Pass (使用 lambda)
+        builder.add_pass_lambda(
+            "ui",
+            |b| {
+                b.read_write_image(rg_render_target, RgImageState::COLOR_ATTACHMENT_WRITE);
+            },
+            |ctx| {
+                let _cmd = ctx.cmd;
+                log::trace!("UiPass::execute (placeholder - actual UI rendered by Renderer)");
+            },
+        );
 
         // === 编译并执行 ===
         let compiled = builder.compile();

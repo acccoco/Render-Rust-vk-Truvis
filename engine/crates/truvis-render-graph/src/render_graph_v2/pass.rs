@@ -196,3 +196,68 @@ pub trait RgPass {
     /// 命令缓冲区已经开始录制，直接录制命令即可。
     fn execute(&self, ctx: &RgPassContext<'_>);
 }
+
+/// 基于闭包的 Pass 实现
+///
+/// 允许通过 lambda 快速构造 Pass，无需定义额外的结构体。
+///
+/// # 示例
+///
+/// ```ignore
+/// builder.add_pass_lambda(
+///     "my-pass",
+///     |builder| {
+///         builder.read_image(input, RgImageState::SHADER_READ);
+///         builder.write_image(output, RgImageState::COLOR_ATTACHMENT);
+///     },
+///     |ctx| {
+///         // 渲染逻辑
+///     },
+/// );
+/// ```
+///
+/// # 生命周期
+///
+/// - `'a`: 闭包可以捕获的外部资源的生命周期
+pub struct LambdaPass<'a, S, E>
+where
+    S: FnMut(&mut RgPassBuilder) + 'a,
+    E: Fn(&RgPassContext<'_>) + 'a,
+{
+    setup_fn: S,
+    execute_fn: E,
+    _marker: std::marker::PhantomData<&'a ()>,
+}
+
+impl<'a, S, E> LambdaPass<'a, S, E>
+where
+    S: FnMut(&mut RgPassBuilder) + 'a,
+    E: Fn(&RgPassContext<'_>) + 'a,
+{
+    /// 创建新的 LambdaPass
+    ///
+    /// # 参数
+    /// - `setup_fn`: setup 闭包，用于声明资源依赖
+    /// - `execute_fn`: execute 闭包，用于执行渲染逻辑
+    pub fn new(setup_fn: S, execute_fn: E) -> Self {
+        Self {
+            setup_fn,
+            execute_fn,
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<S, E> RgPass for LambdaPass<'_, S, E>
+where
+    S: FnMut(&mut RgPassBuilder),
+    E: Fn(&RgPassContext<'_>),
+{
+    fn setup(&mut self, builder: &mut RgPassBuilder) {
+        (self.setup_fn)(builder);
+    }
+
+    fn execute(&self, ctx: &RgPassContext<'_>) {
+        (self.execute_fn)(ctx);
+    }
+}

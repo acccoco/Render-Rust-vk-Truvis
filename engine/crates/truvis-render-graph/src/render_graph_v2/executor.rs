@@ -144,6 +144,46 @@ impl<'a> RenderGraphBuilder<'a> {
         self
     }
 
+    /// 通过闭包添加 Pass
+    ///
+    /// 这是一个便捷方法，允许使用闭包快速定义 Pass，无需创建额外的结构体。
+    ///
+    /// # 参数
+    /// - `name`: Pass 名称（用于调试和性能分析）
+    /// - `setup_fn`: setup 闭包，用于声明资源依赖
+    /// - `execute_fn`: execute 闘包，用于执行渲染逻辑
+    ///
+    /// # 示例
+    ///
+    /// ```ignore
+    /// let input_image = builder.import_image("input", ...);
+    /// let output_image = builder.import_image("output", ...);
+    ///
+    /// builder.add_pass_lambda(
+    ///     "my-compute-pass",
+    ///     |b| {
+    ///         b.read_image(input_image, RgImageState::SHADER_READ_COMPUTE);
+    ///         b.write_image(output_image, RgImageState::STORAGE_WRITE_COMPUTE);
+    ///     },
+    ///     move |ctx| {
+    ///         let cmd = ctx.cmd;
+    ///         // 绑定 pipeline, 设置描述符, dispatch...
+    ///     },
+    /// );
+    /// ```
+    ///
+    /// # 返回
+    /// 返回 `&mut Self` 以支持链式调用
+    pub fn add_pass_lambda<S, E>(&mut self, name: impl Into<String>, setup_fn: S, execute_fn: E) -> &mut Self
+    where
+        S: FnMut(&mut RgPassBuilder) + 'a,
+        E: Fn(&RgPassContext<'_>) + 'a,
+    {
+        use super::pass::LambdaPass;
+        let pass = LambdaPass::new(setup_fn, execute_fn);
+        self.add_pass(name, pass)
+    }
+
     /// 编译渲染图
     ///
     /// 执行依赖分析、拓扑排序、barrier 计算。
