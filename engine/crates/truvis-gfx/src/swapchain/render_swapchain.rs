@@ -32,26 +32,23 @@ impl GfxRenderSwapchain {
 
         // 确定 window 的 extent 尺寸
         // 如果 surface_capabilities.current_extent 包含特殊值 0xFFFFFFFF，则表示可以自己设置交换链的 extent
-        let extent = {
-            let surface_extent = surface_capabilities.current_extent;
-            if surface_extent.width == 0xFFFFFFFF || surface_extent.height == 0xFFFFFFFF {
-                let width = window_physical_extent
-                    .width
-                    .clamp(surface_capabilities.min_image_extent.width, surface_capabilities.max_image_extent.width);
-                let height = window_physical_extent
-                    .height
-                    .clamp(surface_capabilities.min_image_extent.height, surface_capabilities.max_image_extent.height);
-                log::info!("swapchain extent can be set by self, use window physical extent: {}x{}", width, height);
-                vk::Extent2D { width, height }
-            } else {
-                log::info!(
-                    "swapchain extent is determined by surface, use extent: {}x{}",
-                    surface_extent.width,
-                    surface_extent.height
-                );
-                surface_extent
-            }
-        };
+        let extent = Self::calculate_swapchain_extent(&surface_capabilities, window_physical_extent);
+        log::info!(
+            "create swapchain:
+            surface current extent: {}x{}, min extent: {}x{}, max extent: {}x{}
+            window physical extent: {}x{}
+            final swapchain extent: {}x{}",
+            surface_capabilities.current_extent.width,
+            surface_capabilities.current_extent.height,
+            surface_capabilities.min_image_extent.width,
+            surface_capabilities.min_image_extent.height,
+            surface_capabilities.max_image_extent.width,
+            surface_capabilities.max_image_extent.height,
+            window_physical_extent.width,
+            window_physical_extent.height,
+            extent.width,
+            extent.height
+        );
 
         let swapchain_handle =
             Self::create_swapchain(&surface, surface_format.format, surface_format.color_space, extent, present_mode);
@@ -138,6 +135,36 @@ impl GfxRenderSwapchain {
             image_extent: self.swapchain_extent,
             image_cnt: self.swapchain_images.len(),
             image_format: self.color_format,
+        }
+    }
+
+    /// 实时获取 surface capabilities
+    #[inline]
+    pub fn get_surface_capabilities(&self) -> vk::SurfaceCapabilitiesKHR {
+        self._surface.get_capabilities()
+    }
+}
+
+// tools
+impl GfxRenderSwapchain {
+    /// 确定 window 的 extent 尺寸
+    ///
+    /// 如果 surface_capabilities.current_extent 包含特殊值 0xFFFFFFFF，则表示可以自己设置交换链的 extent
+    pub fn calculate_swapchain_extent(
+        surface_capabilities: &vk::SurfaceCapabilitiesKHR,
+        window_physical_extent: vk::Extent2D,
+    ) -> vk::Extent2D {
+        let surface_extent = surface_capabilities.current_extent;
+        if surface_extent.width == 0xFFFFFFFF || surface_extent.height == 0xFFFFFFFF {
+            let width = window_physical_extent
+                .width
+                .clamp(surface_capabilities.min_image_extent.width, surface_capabilities.max_image_extent.width);
+            let height = window_physical_extent
+                .height
+                .clamp(surface_capabilities.min_image_extent.height, surface_capabilities.max_image_extent.height);
+            vk::Extent2D { width, height }
+        } else {
+            surface_extent
         }
     }
 }

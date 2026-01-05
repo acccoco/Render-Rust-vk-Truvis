@@ -271,11 +271,14 @@ impl Renderer {
 
     #[inline]
     pub fn need_resize(&mut self) -> bool {
-        self.render_present.as_ref().unwrap().need_resize()
+        self.render_present.as_mut().unwrap().need_resize()
     }
 
-    pub fn on_resize(&mut self) {
-        self.render_present.as_mut().unwrap().rebuild_after_resized(&mut self.render_context.gfx_resource_manager);
+    pub fn update_frame_settings(&mut self) {
+        let swapchain_extent = self.render_present.as_ref().unwrap().swapchain.as_ref().unwrap().extent();
+        if self.render_context.frame_settings.frame_extent == swapchain_extent {
+            return;
+        }
 
         // 更新 frame settings
         let extent = self.render_present.as_ref().unwrap().swapchain.as_ref().unwrap().extent();
@@ -285,6 +288,10 @@ impl Renderer {
             self.render_context.frame_settings.frame_extent = extent;
             self.resize_frame_buffer(extent);
         }
+    }
+
+    pub fn recreate_swapchain(&mut self) {
+        self.render_present.as_mut().unwrap().rebuild_after_resized(&mut self.render_context.gfx_resource_manager);
     }
 
     pub fn resize_frame_buffer(&mut self, new_extent: vk::Extent2D) {

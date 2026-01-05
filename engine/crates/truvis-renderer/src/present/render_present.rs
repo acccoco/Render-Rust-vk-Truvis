@@ -151,22 +151,39 @@ impl RenderPresent {
     }
 }
 
-// getter
-impl RenderPresent {
-    #[inline]
-    pub fn need_resize(&self) -> bool {
-        self.need_resize
-    }
-}
-
 // update
 impl RenderPresent {
     /// 记录窗口的最新尺寸
     #[inline]
     pub fn update_window_size(&mut self, window_physical_extent: [u32; 2]) {
+        log::info!(
+            "window size change to: {}x{}, need rebuild swapchain",
+            window_physical_extent[0],
+            window_physical_extent[1]
+        );
+
         self.window_physical_extent.width = window_physical_extent[0];
         self.window_physical_extent.height = window_physical_extent[1];
         self.need_resize = true;
+    }
+
+    /// 判断是否需要重建 swapchain
+    ///
+    /// 需要综合判断窗口尺寸是否发生变化，以及当前 surface 的实时状态
+    pub fn need_resize(&mut self) -> bool {
+        if !self.need_resize {
+            return false;
+        }
+
+        let surface_capibilities = self.swapchain.as_ref().unwrap().get_surface_capabilities();
+        let expect_swapchain_extent =
+            GfxRenderSwapchain::calculate_swapchain_extent(&surface_capibilities, self.window_physical_extent);
+
+        if expect_swapchain_extent == self.swapchain.as_ref().unwrap().extent() {
+            self.need_resize = false;
+        }
+
+        self.need_resize
     }
 
     pub fn rebuild_after_resized(&mut self, gfx_resource_manager: &mut GfxResourceManager) {
@@ -189,6 +206,8 @@ impl RenderPresent {
         ));
         (self.swapchain_images, self.swapchain_image_views) =
             Self::create_swapchain_images_and_views(self.swapchain.as_ref().unwrap(), gfx_resource_manager);
+
+        self.need_resize = false;
     }
 
     pub fn acquire_image(&mut self, frame_label: FrameLabel) {

@@ -225,9 +225,10 @@ impl RenderApp {
 
         // resize
         if self.renderer.need_resize() {
-            self.renderer.on_resize();
+            self.renderer.recreate_swapchain();
             self.outer_app.as_mut().unwrap().on_window_resized(&mut self.renderer);
         }
+        self.renderer.update_frame_settings();
 
         // GPU 帧的开始
         // acquire image 应该等到 CPU world 更新完毕再执行，但是放到这里可以简化 resize 的处理
