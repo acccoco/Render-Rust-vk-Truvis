@@ -1,12 +1,11 @@
 use crate::foundation::debug_messenger::DebugType;
 use crate::gfx::Gfx;
+use crate::gfx_core::GfxCore;
 use ash::vk;
 
 pub struct GfxSurface {
     pub(crate) handle: vk::SurfaceKHR,
     pub(crate) pf: ash::khr::surface::Instance,
-
-    pub(crate) capabilities: vk::SurfaceCapabilitiesKHR,
 }
 
 impl GfxSurface {
@@ -28,18 +27,24 @@ impl GfxSurface {
             .unwrap()
         };
 
-        let surface_capabilities = unsafe {
-            surface_pf.get_physical_device_surface_capabilities(gfx_core.physical_device.vk_handle, surface).unwrap()
-        };
-
         let surface = GfxSurface {
             handle: surface,
             pf: surface_pf,
-            capabilities: surface_capabilities,
         };
         gfx_core.gfx_device.set_debug_name(&surface, "main");
 
         surface
+    }
+}
+
+// getters
+impl GfxSurface {
+    pub fn get_capabilities(&self) -> vk::SurfaceCapabilitiesKHR {
+        unsafe {
+            self.pf
+                .get_physical_device_surface_capabilities(Gfx::get().gfx_core.physical_device.vk_handle, self.handle)
+                .unwrap()
+        }
     }
 }
 

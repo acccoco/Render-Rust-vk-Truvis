@@ -58,10 +58,11 @@ impl RenderApp {
         raw_display_handle: RawDisplayHandle,
         raw_window_handle: RawWindowHandle,
         window_scale_factor: f64,
+        window_physical_size: [u32; 2],
     ) {
         self.gui_host.hidpi_factor = window_scale_factor;
 
-        self.renderer.init_after_window(raw_display_handle, raw_window_handle);
+        self.renderer.init_after_window(raw_display_handle, raw_window_handle, window_physical_size);
 
         let (fonts_atlas, font_tex_id) = self.gui_host.init_font();
         self.renderer.render_present.as_mut().unwrap().gui_backend.register_font(
@@ -190,37 +191,48 @@ impl RenderApp {
             self.renderer.begin_frame();
         }
 
-        // 处理 swapchain resize
-        {
-            let mut need_reisze = false;
-            for event in self.input_manager.get_events() {
-                if let InputEvent::Resized {
-                    physical_width,
-                    physical_height,
-                } = event
-                {
-                    need_reisze = true;
-                    if physical_width + physical_height < 1.0 {
-                        log::error!("Invalid window size: {}x{}", physical_width, physical_height);
-                        continue;
-                    }
-                }
-            }
-            if need_reisze {
-                self.renderer.on_resize();
-                self.outer_app.as_mut().unwrap().on_window_resized(&mut self.renderer);
-            }
-        }
-
         // 处理事件
         {
             let _span = tracy_client::span!("Process Input Events");
 
             for event in self.input_manager.get_events() {
+                // imgui 处理事件
                 // TODO imgui 是否吞掉事件
                 self.gui_host.handle_event(event);
+
+                // resize 相关事件
+                if let InputEvent::Resized {
+                    physical_width,
+                    physical_height,
+                } = event
+                {
+                    if *physical_width < 1 || *physical_height < 1 {
+                        log::error!("Invalid window size: {}x{}", physical_width, physical_height);
+                        continue;
+                    } else {
+                        self.renderer
+                            .render_present
+                            .as_mut()
+                            .unwrap()
+                            .update_window_size([*physical_width, *physical_height]);
+                    }
+                }
             }
+
+            // input manager 处理事件
             self.input_manager.process_events();
+        }
+
+        // resize
+        if self.renderer.need_resize() {
+            self.renderer.on_resize();
+            self.outer_app.as_mut().unwrap().on_window_resized(&mut self.renderer);
+        }
+
+        // GPU 帧的开始
+        // acquire image 应该等到 CPU world 更新完毕再执行，但是放到这里可以简化 resize 的处理
+        {
+            self.renderer.acquire_image();
         }
 
         // GUI 绘制
@@ -236,11 +248,6 @@ impl RenderApp {
             let _span = tracy_client::span!("Renderer Update");
 
             self.update_scene(&self.input_manager.state().clone());
-        }
-
-        // GPU 帧的开始
-        {
-            self.renderer.acquire_image();
         }
 
         // 将数据上传到 GPU

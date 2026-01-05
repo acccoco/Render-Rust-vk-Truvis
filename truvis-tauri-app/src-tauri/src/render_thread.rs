@@ -52,6 +52,7 @@ pub enum RenderThreadMessage {
         raw_display_handle: SendableDisplayHandle,
         raw_window_handle: SendableWindowHandle,
         scale_factor: f64,
+        window_physical_extent: [u32; 2],
     },
     /// 退出渲染线程
     Shutdown,
@@ -110,11 +111,13 @@ impl RenderThread {
         raw_display_handle: RawDisplayHandle,
         raw_window_handle: RawWindowHandle,
         scale_factor: f64,
+        window_physical_extent: [u32; 2],
     ) {
         let _ = self.sender.send(RenderThreadMessage::InitWindow {
             raw_display_handle: SendableDisplayHandle::new(raw_display_handle),
             raw_window_handle: SendableWindowHandle::new(raw_window_handle),
             scale_factor,
+            window_physical_extent,
         });
     }
 
@@ -173,8 +176,14 @@ impl RenderThread {
                         raw_display_handle,
                         raw_window_handle,
                         scale_factor,
+                        window_physical_extent,
                     } => {
-                        render_app.init_after_window(raw_display_handle.raw(), raw_window_handle.raw(), scale_factor);
+                        render_app.init_after_window(
+                            raw_display_handle.raw(),
+                            raw_window_handle.raw(),
+                            scale_factor,
+                            window_physical_extent,
+                        );
                         window_initialized = true;
                         println!("Render thread: Window initialized");
                     }

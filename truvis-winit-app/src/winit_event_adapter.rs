@@ -37,8 +37,8 @@ impl WinitEventAdapter {
                 }
             }
             WindowEvent::Resized(physical_size) => InputEvent::Resized {
-                physical_width: physical_size.width as f64,
-                physical_height: physical_size.height as f64,
+                physical_width: physical_size.width,
+                physical_height: physical_size.height,
             },
             _ => InputEvent::Other,
         }

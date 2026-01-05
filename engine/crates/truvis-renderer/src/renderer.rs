@@ -135,13 +135,22 @@ impl Renderer {
         }
     }
 
-    pub fn init_after_window(&mut self, raw_display_handle: RawDisplayHandle, raw_window_handle: RawWindowHandle) {
+    pub fn init_after_window(
+        &mut self,
+        raw_display_handle: RawDisplayHandle,
+        raw_window_handle: RawWindowHandle,
+        window_physical_size: [u32; 2],
+    ) {
         self.render_present = Some(RenderPresent::new(
             &mut self.render_context.gfx_resource_manager,
             &self.render_context.global_descriptor_sets,
             &mut self.cmd_allocator,
             raw_display_handle,
             raw_window_handle,
+            vk::Extent2D {
+                width: window_physical_size[0],
+                height: window_physical_size[1],
+            },
         ));
     }
 
@@ -221,7 +230,7 @@ impl Renderer {
     }
 
     pub fn present_image(&mut self) {
-        self.render_present.as_ref().unwrap().present_image();
+        self.render_present.as_mut().unwrap().present_image();
     }
 
     pub fn end_frame(&mut self) {
@@ -258,6 +267,11 @@ impl Renderer {
 
     pub fn prepare_render_graph(&mut self) {
         self.render_graph.maps.clear();
+    }
+
+    #[inline]
+    pub fn need_resize(&mut self) -> bool {
+        self.render_present.as_ref().unwrap().need_resize()
     }
 
     pub fn on_resize(&mut self) {

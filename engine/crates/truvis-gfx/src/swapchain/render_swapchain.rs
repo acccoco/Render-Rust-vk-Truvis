@@ -25,9 +25,33 @@ impl GfxRenderSwapchain {
         raw_window_handle: raw_window_handle::RawWindowHandle,
         present_mode: vk::PresentModeKHR,
         surface_format: vk::SurfaceFormatKHR,
+        window_physical_extent: vk::Extent2D,
     ) -> Self {
         let surface = GfxSurface::new(raw_display_handle, raw_window_handle);
-        let extent = surface.capabilities.current_extent;
+        let surface_capabilities = surface.get_capabilities();
+
+        // 确定 window 的 extent 尺寸
+        // 如果 surface_capabilities.current_extent 包含特殊值 0xFFFFFFFF，则表示可以自己设置交换链的 extent
+        let extent = {
+            let surface_extent = surface_capabilities.current_extent;
+            if surface_extent.width == 0xFFFFFFFF || surface_extent.height == 0xFFFFFFFF {
+                let width = window_physical_extent
+                    .width
+                    .clamp(surface_capabilities.min_image_extent.width, surface_capabilities.max_image_extent.width);
+                let height = window_physical_extent
+                    .height
+                    .clamp(surface_capabilities.min_image_extent.height, surface_capabilities.max_image_extent.height);
+                log::info!("swapchain extent can be set by self, use window physical extent: {}x{}", width, height);
+                vk::Extent2D { width, height }
+            } else {
+                log::info!(
+                    "swapchain extent is determined by surface, use extent: {}x{}",
+                    surface_extent.width,
+                    surface_extent.height
+                );
+                surface_extent
+            }
+        };
 
         let swapchain_handle =
             Self::create_swapchain(&surface, surface_format.format, surface_format.color_space, extent, present_mode);
@@ -52,10 +76,12 @@ impl GfxRenderSwapchain {
     ) -> vk::SwapchainKHR {
         // 确定 image count
         // max_image_count == 0，表示不限制 image 数量
-        let image_count = if surface.capabilities.max_image_count == 0 {
-            surface.capabilities.min_image_count + 1
+        let surface_capabilities = surface.get_capabilities();
+
+        let image_count = if surface_capabilities.max_image_count == 0 {
+            surface_capabilities.min_image_count + 1
         } else {
-            u32::min(surface.capabilities.max_image_count, surface.capabilities.min_image_count + 1)
+            u32::min(surface_capabilities.max_image_count, surface_capabilities.min_image_count + 1)
         };
 
         let create_info = vk::SwapchainCreateInfoKHR::default()
@@ -67,7 +93,7 @@ impl GfxRenderSwapchain {
             .image_array_layers(1)
             // TRANSFER_DST 用于 Nsight 分析
             .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST)
-            .pre_transform(surface.capabilities.current_transform)
+            .pre_transform(surface_capabilities.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .present_mode(present_mode)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -119,32 +145,44 @@ impl GfxRenderSwapchain {
 // update
 impl GfxRenderSwapchain {
     /// timeout: nano seconds
+    /// return: need recreate
     #[inline]
-    pub fn acquire_next_image(&mut self, semaphore: Option<&GfxSemaphore>, fence: Option<&GfxFence>, timeout: u64) {
-        let (image_index, is_optimal) = unsafe {
-            Gfx::get()
-                .gfx_device()
-                .swapchain
-                .acquire_next_image(
-                    self.swapchain_handle,
-                    timeout,
-                    semaphore.map_or(vk::Semaphore::null(), |s| s.handle()),
-                    fence.map_or(vk::Fence::null(), |f| f.handle()),
-                )
-                .unwrap()
+    pub fn acquire_next_image(
+        &mut self,
+        semaphore: Option<&GfxSemaphore>,
+        fence: Option<&GfxFence>,
+        timeout: u64,
+    ) -> bool {
+        let result = unsafe {
+            Gfx::get().gfx_device().swapchain.acquire_next_image(
+                self.swapchain_handle,
+                timeout,
+                semaphore.map_or(vk::Semaphore::null(), |s| s.handle()),
+                fence.map_or(vk::Fence::null(), |f| f.handle()),
+            )
         };
 
-        // TODO 解决 suboptimal 的问题
-        if !is_optimal {
-            // log::warn!("swapchain acquire image index {} is not optimal",
-            // image_index);
+        match result {
+            Ok((image_index, is_suboptimal)) => {
+                if is_suboptimal {
+                    log::warn!("swapchain acquire image index {} is not optimal", image_index);
+                }
+                self.swapchain_image_index = image_index as usize;
+                is_suboptimal
+            }
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                log::warn!("swapchain is out of date when acquire next image");
+                true
+            }
+            Err(e) => {
+                panic!("failed to acquire next swapchain image: {:?}", e);
+            }
         }
-
-        self.swapchain_image_index = image_index as usize;
     }
 
+    /// return: need recreate
     #[inline]
-    pub fn present_image(&self, queue: &GfxCommandQueue, wait_semaphores: &[GfxSemaphore]) {
+    pub fn present_image(&self, queue: &GfxCommandQueue, wait_semaphores: &[GfxSemaphore]) -> bool {
         let wait_semaphores = wait_semaphores.iter().map(|s| s.handle()).collect_vec();
         let image_indices = [self.swapchain_image_index as u32];
         let present_info = vk::PresentInfoKHR::default()
@@ -152,7 +190,22 @@ impl GfxRenderSwapchain {
             .image_indices(&image_indices)
             .swapchains(std::slice::from_ref(&self.swapchain_handle));
 
-        unsafe { Gfx::get().gfx_device().swapchain.queue_present(queue.handle(), &present_info).unwrap() };
+        let result = unsafe { Gfx::get().gfx_device().swapchain.queue_present(queue.handle(), &present_info) };
+        match result {
+            Ok(is_suboptimal) => {
+                if is_suboptimal {
+                    log::warn!("swapchain present image index {} is not optimal", self.swapchain_image_index);
+                }
+                is_suboptimal
+            }
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                log::warn!("swapchain is out of date when present image");
+                true
+            }
+            Err(e) => {
+                panic!("failed to present swapchain image: {:?}", e);
+            }
+        }
     }
 }
 

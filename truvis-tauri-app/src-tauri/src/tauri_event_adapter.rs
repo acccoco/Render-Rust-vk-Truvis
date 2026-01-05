@@ -34,7 +34,7 @@ impl TauriEventAdapter {
     }
 
     /// 从窗口大小变化事件创建 InputEvent
-    pub fn from_resized(width: f64, height: f64) -> InputEvent {
+    pub fn from_resized(width: u32, height: u32) -> InputEvent {
         InputEvent::Resized {
             physical_width: width,
             physical_height: height,

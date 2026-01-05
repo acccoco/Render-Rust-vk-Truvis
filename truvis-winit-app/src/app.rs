@@ -45,10 +45,13 @@ impl WinitApp {
     fn init_after_window(&mut self, event_loop: &ActiveEventLoop) {
         let window = Self::create_window(event_loop, "Truvis".to_string(), [1200.0, 800.0]);
 
+        let window_size = window.inner_size();
+
         self.render_app.init_after_window(
             window.raw_display_handle().unwrap(),
             window.raw_window_handle().unwrap(),
             window.scale_factor(),
+            [window_size.width, window_size.height],
         );
 
         self.window = Some(window);

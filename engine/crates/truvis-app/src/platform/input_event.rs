@@ -52,8 +52,8 @@ pub enum InputEvent {
     },
     /// 窗口大小改变事件
     Resized {
-        physical_width: f64,
-        physical_height: f64,
+        physical_width: u32,
+        physical_height: u32,
     },
 
     Other,

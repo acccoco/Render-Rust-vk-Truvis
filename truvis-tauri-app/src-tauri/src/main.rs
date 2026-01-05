@@ -72,7 +72,13 @@ fn main() {
             let window_handle = render_window.window_handle().expect("Failed to get window handle");
             let scale_factor = render_window.scale_factor().unwrap_or(1.0);
 
-            render_thread.init_window(raw_display_handle, window_handle.as_raw(), scale_factor);
+            let window_physical_extent = render_window.inner_size().unwrap();
+            render_thread.init_window(
+                raw_display_handle,
+                window_handle.as_raw(),
+                scale_factor,
+                [window_physical_extent.width, window_physical_extent.height],
+            );
 
             // 保存渲染线程句柄
             *RENDER_THREAD.lock().unwrap() = Some(render_thread);
@@ -172,7 +178,7 @@ fn handle_render_window_event(event: &WindowEvent) {
     if let Some(ref thread) = *render_thread {
         match event {
             WindowEvent::Resized(size) => {
-                let input_event = TauriEventAdapter::from_resized(size.width as f64, size.height as f64);
+                let input_event = TauriEventAdapter::from_resized(size.width, size.height);
                 thread.send_event(input_event);
             }
             WindowEvent::Focused(focused) => {

@@ -60,6 +60,9 @@ pub struct RenderPresent {
 
     /// 数量和 swapchain image num 相同
     pub render_complete_semaphores: Vec<GfxSemaphore>,
+
+    window_physical_extent: vk::Extent2D,
+    need_resize: bool,
 }
 
 // new & init
@@ -70,12 +73,14 @@ impl RenderPresent {
         cmd_allocator: &mut CmdAllocator,
         raw_display_handle: RawDisplayHandle,
         raw_window_handle: RawWindowHandle,
+        window_physical_extent: vk::Extent2D,
     ) -> Self {
         let swapchain = GfxRenderSwapchain::new(
             raw_display_handle,
             raw_window_handle,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
+            window_physical_extent,
         );
         let (swapchain_image_handles, swapchain_image_view_handles) =
             Self::create_swapchain_images_and_views(&swapchain, gfx_resource_manager);
@@ -108,6 +113,9 @@ impl RenderPresent {
             render_complete_semaphores,
             raw_display_handle,
             raw_window_handle,
+
+            window_physical_extent,
+            need_resize: false,
         }
     }
 
@@ -143,8 +151,24 @@ impl RenderPresent {
     }
 }
 
+// getter
+impl RenderPresent {
+    #[inline]
+    pub fn need_resize(&self) -> bool {
+        self.need_resize
+    }
+}
+
 // update
 impl RenderPresent {
+    /// 记录窗口的最新尺寸
+    #[inline]
+    pub fn update_window_size(&mut self, window_physical_extent: [u32; 2]) {
+        self.window_physical_extent.width = window_physical_extent[0];
+        self.window_physical_extent.height = window_physical_extent[1];
+        self.need_resize = true;
+    }
+
     pub fn rebuild_after_resized(&mut self, gfx_resource_manager: &mut GfxResourceManager) {
         unsafe {
             Gfx::get().gfx_device().device_wait_idle().unwrap();
@@ -161,6 +185,7 @@ impl RenderPresent {
             self.raw_window_handle,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
+            self.window_physical_extent,
         ));
         (self.swapchain_images, self.swapchain_image_views) =
             Self::create_swapchain_images_and_views(self.swapchain.as_ref().unwrap(), gfx_resource_manager);
@@ -169,13 +194,15 @@ impl RenderPresent {
     pub fn acquire_image(&mut self, frame_label: FrameLabel) {
         // 从 swapchain 获取图像
         let swapchain = self.swapchain.as_mut().unwrap();
-        // let timeout_ns = 10 * 1000 * 1000 * 1000;
-        swapchain.acquire_next_image(Some(&self.present_complete_semaphores[*frame_label]), None, 0);
+        let timeout_ns = 10 * 1000 * 1000 * 1000;
+
+        self.need_resize =
+            swapchain.acquire_next_image(Some(&self.present_complete_semaphores[*frame_label]), None, timeout_ns);
     }
 
-    pub fn present_image(&self) {
+    pub fn present_image(&mut self) {
         let swapchain = self.swapchain.as_ref().unwrap();
-        swapchain.present_image(
+        self.need_resize = swapchain.present_image(
             Gfx::get().gfx_queue(),
             std::slice::from_ref(&self.render_complete_semaphores[swapchain.current_image_index()]),
         );
