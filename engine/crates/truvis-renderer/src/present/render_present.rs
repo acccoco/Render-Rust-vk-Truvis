@@ -9,7 +9,8 @@ use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::image::GfxImage;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
-use truvis_gfx::swapchain::render_swapchain::GfxRenderSwapchain;
+use truvis_gfx::swapchain::surface::GfxSurface;
+use truvis_gfx::swapchain::swapchain::GfxSwapchain;
 use truvis_gui_backend::gui_backend::GuiBackend;
 use truvis_gui_backend::gui_pass::GuiPass;
 use truvis_render_graph::render_context::RenderContext;
@@ -41,7 +42,8 @@ pub struct PresentData {
 }
 
 pub struct RenderPresent {
-    pub swapchain: Option<GfxRenderSwapchain>,
+    surface: GfxSurface,
+    pub swapchain: Option<GfxSwapchain>,
     pub swapchain_images: Vec<GfxImageHandle>,
     pub swapchain_image_views: Vec<GfxImageViewHandle>,
 
@@ -52,8 +54,8 @@ pub struct RenderPresent {
     /// resolve pass 的命令缓冲区（每帧一个）
     resolve_cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 
-    raw_display_handle: RawDisplayHandle,
-    raw_window_handle: RawWindowHandle,
+    _raw_display_handle: RawDisplayHandle,
+    _raw_window_handle: RawWindowHandle,
 
     /// 数量和 fif num 相同
     pub present_complete_semaphores: [GfxSemaphore; FrameCounter::fif_count()],
@@ -75,12 +77,13 @@ impl RenderPresent {
         raw_window_handle: RawWindowHandle,
         window_physical_extent: vk::Extent2D,
     ) -> Self {
-        let swapchain = GfxRenderSwapchain::new(
-            raw_display_handle,
-            raw_window_handle,
+        let surface = GfxSurface::new(raw_display_handle, raw_window_handle);
+        let swapchain = GfxSwapchain::new(
+            &surface,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
             window_physical_extent,
+            None,
         );
         let (swapchain_image_handles, swapchain_image_view_handles) =
             Self::create_swapchain_images_and_views(&swapchain, gfx_resource_manager);
@@ -101,6 +104,7 @@ impl RenderPresent {
             .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "resolve-pass"));
 
         Self {
+            surface,
             swapchain: Some(swapchain),
             swapchain_images: swapchain_image_handles,
             swapchain_image_views: swapchain_image_view_handles,
@@ -111,8 +115,8 @@ impl RenderPresent {
             resolve_cmds,
             present_complete_semaphores,
             render_complete_semaphores,
-            raw_display_handle,
-            raw_window_handle,
+            _raw_display_handle: raw_display_handle,
+            _raw_window_handle: raw_window_handle,
 
             window_physical_extent,
             need_resize: false,
@@ -120,7 +124,7 @@ impl RenderPresent {
     }
 
     fn create_swapchain_images_and_views(
-        swapchain: &GfxRenderSwapchain,
+        swapchain: &GfxSwapchain,
         gfx_resource_manager: &mut GfxResourceManager,
     ) -> (Vec<GfxImageHandle>, Vec<GfxImageViewHandle>) {
         let mut image_handles = Vec::new();
@@ -156,7 +160,7 @@ impl RenderPresent {
     /// 记录窗口的最新尺寸
     #[inline]
     pub fn update_window_size(&mut self, window_physical_extent: [u32; 2]) {
-        log::info!(
+        log::debug!(
             "window size change to: {}x{}, need rebuild swapchain",
             window_physical_extent[0],
             window_physical_extent[1]
@@ -175,9 +179,9 @@ impl RenderPresent {
             return false;
         }
 
-        let surface_capibilities = self.swapchain.as_ref().unwrap().get_surface_capabilities();
+        let surface_capibilities = self.surface.get_capabilities();
         let expect_swapchain_extent =
-            GfxRenderSwapchain::calculate_swapchain_extent(&surface_capibilities, self.window_physical_extent);
+            GfxSwapchain::calculate_swapchain_extent(&surface_capibilities, self.window_physical_extent);
 
         if expect_swapchain_extent == self.swapchain.as_ref().unwrap().extent() {
             self.need_resize = false;
@@ -194,15 +198,13 @@ impl RenderPresent {
         for image_handle in std::mem::take(&mut self.swapchain_images) {
             gfx_resource_manager.destroy_image_immediate(image_handle);
         }
-        if let Some(swapchain) = self.swapchain.take() {
-            swapchain.destroy();
-        }
-        self.swapchain = Some(GfxRenderSwapchain::new(
-            self.raw_display_handle,
-            self.raw_window_handle,
+        let old_swapchain = self.swapchain.take();
+        self.swapchain = Some(GfxSwapchain::new(
+            &self.surface,
             DefaultRendererSettings::DEFAULT_PRESENT_MODE,
             DefaultRendererSettings::DEFAULT_SURFACE_FORMAT,
             self.window_physical_extent,
+            old_swapchain,
         ));
         (self.swapchain_images, self.swapchain_image_views) =
             Self::create_swapchain_images_and_views(self.swapchain.as_ref().unwrap(), gfx_resource_manager);
@@ -422,5 +424,7 @@ impl RenderPresent {
         if let Some(swapchain) = self.swapchain {
             swapchain.destroy();
         }
+
+        // surface 可以在最后销毁
     }
 }

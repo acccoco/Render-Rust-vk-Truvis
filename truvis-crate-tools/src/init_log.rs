@@ -35,6 +35,6 @@ pub fn init_log() {
                 record.args()
             )
         })
-        .filter(None, log::LevelFilter::Info)
+        .filter(None, if cfg!(debug_assertions) { log::LevelFilter::Debug } else { log::LevelFilter::Info })
         .init();
 }

@@ -70,12 +70,12 @@ impl GfxPhysicalDevice {
                 // ray tracing props
                 pdevice_raytracing_props.p_next = null_mut();
                 rt_props = pdevice_raytracing_props;
-                log::info!("physical deviceray tracing props:\n{:#?}", rt_props);
+                log::debug!("physical deviceray tracing props:\n{:#?}", rt_props);
 
                 // 加速结构 props
                 pdevice_acc_props.p_next = null_mut();
                 acc_props = pdevice_acc_props;
-                log::info!("physical deivce acceleration structure props:\n{:#?}", acc_props);
+                log::debug!("physical deivce acceleration structure props:\n{:#?}", acc_props);
             }
 
             // 找到当前 gpu 支持的 extensions，并打印出来
@@ -87,14 +87,14 @@ impl GfxPhysicalDevice {
                     ext_name.to_str().unwrap().to_string()
                 })
                 .join("\n");
-            log::debug!("physical device supports extensions: {}", device_extension_strs);
+            // log::debug!("physical device supports extensions: {}", device_extension_strs);
 
             // 找到所有的队列信息并打印出来
 
             let props_cnt = instance.get_physical_device_queue_family_properties2_len(pdevice);
             let mut queue_familiy_props = vec![vk::QueueFamilyProperties2::default(); props_cnt];
             instance.get_physical_device_queue_family_properties2(pdevice, &mut queue_familiy_props);
-            log::info!("physical device: queue family props:\n{:#?}", queue_familiy_props);
+            log::debug!("physical device: queue family props:\n{:#?}", queue_familiy_props);
 
             // 找到符合条的 queue family
             let find_queue_family = |name: String, include_flags: vk::QueueFlags, exclude_flags: vk::QueueFlags| {

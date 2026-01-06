@@ -7,33 +7,31 @@ use ash::vk;
 use ash::vk::Handle;
 use itertools::Itertools;
 
-pub struct GfxRenderSwapchain {
-    _surface: GfxSurface,
+pub struct GfxSwapchain {
     swapchain_handle: vk::SwapchainKHR,
 
     swapchain_images: Vec<vk::Image>,
     swapchain_image_index: usize,
 
-    color_format: vk::Format,
+    format: vk::Format,
     swapchain_extent: vk::Extent2D,
 }
 
 // new & init
-impl GfxRenderSwapchain {
+impl GfxSwapchain {
     pub fn new(
-        raw_display_handle: raw_window_handle::RawDisplayHandle,
-        raw_window_handle: raw_window_handle::RawWindowHandle,
+        surface: &GfxSurface,
         present_mode: vk::PresentModeKHR,
         surface_format: vk::SurfaceFormatKHR,
         window_physical_extent: vk::Extent2D,
+        old_swapchain: Option<GfxSwapchain>,
     ) -> Self {
-        let surface = GfxSurface::new(raw_display_handle, raw_window_handle);
         let surface_capabilities = surface.get_capabilities();
 
         // 确定 window 的 extent 尺寸
         // 如果 surface_capabilities.current_extent 包含特殊值 0xFFFFFFFF，则表示可以自己设置交换链的 extent
         let extent = Self::calculate_swapchain_extent(&surface_capabilities, window_physical_extent);
-        log::info!(
+        log::debug!(
             "create swapchain:
             surface current extent: {}x{}, min extent: {}x{}, max extent: {}x{}
             window physical extent: {}x{}
@@ -50,17 +48,26 @@ impl GfxRenderSwapchain {
             extent.height
         );
 
-        let swapchain_handle =
-            Self::create_swapchain(&surface, surface_format.format, surface_format.color_space, extent, present_mode);
+        let swapchain_handle = Self::create_swapchain(
+            surface,
+            surface_format.format,
+            surface_format.color_space,
+            extent,
+            present_mode,
+            old_swapchain.as_ref().map(|s| s.swapchain_handle),
+        );
+        if let Some(old_swapchain) = old_swapchain {
+            old_swapchain.destroy();
+        }
+
         let images = unsafe { Gfx::get().gfx_device().swapchain.get_swapchain_images(swapchain_handle).unwrap() };
 
         Self {
-            _surface: surface,
             swapchain_handle,
             swapchain_images: images,
             swapchain_image_index: 0,
             swapchain_extent: extent,
-            color_format: surface_format.format,
+            format: surface_format.format,
         }
     }
 
@@ -70,6 +77,7 @@ impl GfxRenderSwapchain {
         color_space: vk::ColorSpaceKHR,
         extent: vk::Extent2D,
         present_mode: vk::PresentModeKHR,
+        old_swapchain: Option<vk::SwapchainKHR>,
     ) -> vk::SwapchainKHR {
         // 确定 image count
         // max_image_count == 0，表示不限制 image 数量
@@ -94,6 +102,7 @@ impl GfxRenderSwapchain {
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .present_mode(present_mode)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .old_swapchain(old_swapchain.unwrap_or_default())
             .clipped(true);
 
         let gfx_device = Gfx::get().gfx_device();
@@ -113,7 +122,7 @@ pub struct GfxSwapchainImageInfo {
 }
 
 // getters
-impl GfxRenderSwapchain {
+impl GfxSwapchain {
     #[inline]
     pub fn present_images(&self) -> Vec<vk::Image> {
         self.swapchain_images.clone()
@@ -134,19 +143,13 @@ impl GfxRenderSwapchain {
         GfxSwapchainImageInfo {
             image_extent: self.swapchain_extent,
             image_cnt: self.swapchain_images.len(),
-            image_format: self.color_format,
+            image_format: self.format,
         }
-    }
-
-    /// 实时获取 surface capabilities
-    #[inline]
-    pub fn get_surface_capabilities(&self) -> vk::SurfaceCapabilitiesKHR {
-        self._surface.get_capabilities()
     }
 }
 
 // tools
-impl GfxRenderSwapchain {
+impl GfxSwapchain {
     /// 确定 window 的 extent 尺寸
     ///
     /// 如果 surface_capabilities.current_extent 包含特殊值 0xFFFFFFFF，则表示可以自己设置交换链的 extent
@@ -170,7 +173,7 @@ impl GfxRenderSwapchain {
 }
 
 // update
-impl GfxRenderSwapchain {
+impl GfxSwapchain {
     /// timeout: nano seconds
     /// return: need recreate
     #[inline]
@@ -237,7 +240,7 @@ impl GfxRenderSwapchain {
 }
 
 // destroy
-impl GfxRenderSwapchain {
+impl GfxSwapchain {
     pub fn destroy(mut self) {
         unsafe {
             let gfx_device = Gfx::get().gfx_device();
@@ -246,7 +249,7 @@ impl GfxRenderSwapchain {
         self.swapchain_handle = vk::SwapchainKHR::null();
     }
 }
-impl Drop for GfxRenderSwapchain {
+impl Drop for GfxSwapchain {
     fn drop(&mut self) {
         assert!(self.swapchain_handle.is_null());
     }
