@@ -26,6 +26,10 @@ impl TruvisPath {
     pub fn target_path() -> PathBuf {
         Self::workspace_path().join("target")
     }
+
+    pub fn temp_dir() -> PathBuf {
+        Self::workspace_path().join(".temp")
+    }
 }
 // 根目录下
 impl TruvisPath {

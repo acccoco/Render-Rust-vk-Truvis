@@ -4,6 +4,10 @@
 //!
 //! # TruvisPath
 //! 基于工作区根目录的统一路径管理，避免硬编码相对路径。
+//!
+//! # GitHub 资源下载
+//! 支持从 GitHub 下载 zip 文件并解压，可通过 TOML 配置管理。
 
+pub mod fetch_resources;
 pub mod init_log;
 pub mod resource;
