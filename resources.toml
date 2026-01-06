@@ -1,7 +1,28 @@
 [[resources]]
 name = "sponza"
-url = "https://github.com/acccoco/assets/releases/download/fbx/sponza_0.0.2.zip"
+url = "https://github.com/acccoco/assets/releases/download/fbx/sponza_0.0.3.zip"
 resource_type = "zip"
 target_dir = "assets/fbx"
-rename_to = "sponza"  # 可选：重命名解压后的顶级目录
-force_download = false
+rename_to = "sponza"
+
+[[resources]]
+name = "cube-coord"
+url = "https://github.com/acccoco/assets/releases/download/fbx/cube-coord_0.0.1.fbx"
+resource_type = "file"
+target_dir = "assets/fbx"
+rename_to = "cube-coord.fbx"
+
+[[resources]]
+name = "slang"
+url = "https://github.com/shader-slang/slang/releases/download/v2025.24.3/slang-2025.24.3-windows-x86_64.zip"
+resource_type = "zip"
+target_dir = "tools"
+rename_to = "slang"
+
+[[resources]]
+name = "tracy"
+url = "https://github.com/wolfpld/tracy/releases/download/v0.12.2/windows-0.12.2.zip"
+resource_type = "zip"
+target_dir = "tools"
+rename_to = "tracy"
+
