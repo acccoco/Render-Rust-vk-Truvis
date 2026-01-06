@@ -5754,6 +5754,7 @@ dependencies = [
  "truvis-renderer",
  "truvis-scene",
  "truvis-shader-binding",
+ "truvis-utils",
 ]
 
 [[package]]
@@ -5850,6 +5851,7 @@ dependencies = [
  "truvis-render-graph",
  "truvis-render-interface",
  "truvis-shader-binding",
+ "truvis-utils",
 ]
 
 [[package]]
@@ -5872,6 +5874,7 @@ dependencies = [
  "truvis-render-interface",
  "truvis-scene",
  "truvis-shader-binding",
+ "truvis-utils",
  "vk-mem",
 ]
 
@@ -5922,15 +5925,12 @@ name = "truvis-scene"
 version = "0.1.0"
 dependencies = [
  "ash",
- "bytemuck",
  "glam",
  "indexmap 2.12.1",
  "itertools 0.10.5",
  "log",
  "slotmap",
- "tracy-client",
  "truvis-asset",
- "truvis-crate-tools",
  "truvis-gfx",
  "truvis-render-interface",
  "truvis-shader-binding",
@@ -5967,9 +5967,11 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-opener",
  "truvis-app",
- "truvis-render-graph",
- "truvis-renderer",
 ]
+
+[[package]]
+name = "truvis-utils"
+version = "0.1.0"
 
 [[package]]
 name = "truvis-winit-app"
@@ -5978,7 +5980,6 @@ dependencies = [
  "image",
  "log",
  "raw-window-handle",
- "tracy-client",
  "truvis-app",
  "truvis-crate-tools",
  "winit",

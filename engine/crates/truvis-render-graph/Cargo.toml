@@ -13,6 +13,7 @@ truvis-scene = { workspace = true }
 truvis-asset = { workspace = true }
 truvis-descriptor-layout-trait = { workspace = true }
 truvis-descriptor-layout-macro = { workspace = true }
+truvis-utils = { workspace = true }
 
 
 ash = { workspace = true }

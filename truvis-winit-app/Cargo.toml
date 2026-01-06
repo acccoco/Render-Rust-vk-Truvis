@@ -27,6 +27,5 @@ truvis-crate-tools = { workspace = true }
 
 log = { workspace = true }
 winit = { workspace = true }
-tracy-client = { workspace = true }
 image = { workspace = true }
 raw-window-handle = { workspace = true }

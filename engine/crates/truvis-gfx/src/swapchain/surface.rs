@@ -1,6 +1,5 @@
 use crate::foundation::debug_messenger::DebugType;
 use crate::gfx::Gfx;
-use crate::gfx_core::GfxCore;
 use ash::vk;
 
 pub struct GfxSurface {

@@ -14,12 +14,7 @@ truvis-cxx-binding = { workspace = true }
 truvis-gui-backend = { workspace = true }
 
 
-# 默认 features：
-# - debug 表示 vulkan 结构体实现了 Debut Trait
-# - loader 表示在运行时动态搜索 vulkan，体现在 Entry 对象的创建上
 ash = { workspace = true }
-# graphics math
-# bytemuck：可以转换为 bytes slices
 glam = { workspace = true }
 bytemuck = { workspace = true }
 tracy-client = { workspace = true }

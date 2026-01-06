@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     # 通用部分
     "truvis-crate-tools",
+    "engine/crates/truvis-utils",
     # RenderApp 层级
     "engine/crates/truvis-gfx",
     "engine/crates/truvis-render-interface",
@@ -40,6 +41,7 @@ panic = 'abort'    # panic 时直接终止，进一步减小体积
 
 [workspace.dependencies]
 truvis-crate-tools = { path = "truvis-crate-tools" }
+truvis-utils = { path = "engine/crates/truvis-utils" }
 truvis-gfx = { path = "engine/crates/truvis-gfx" }
 truvis-render-interface = { path = "engine/crates/truvis-render-interface" }
 truvis-render-graph = { path = "engine/crates/truvis-render-graph" }
@@ -60,7 +62,10 @@ truvis-cxx-build = { path = "engine/crates/truvis-cxx/truvis-cxx-build" }
 ###########################################################
 # 图形、窗口与 GUI (Graphics, Windowing & GUI)
 ###########################################################
-ash = { version = "0.38.0", features = ["debug"] }
+# 默认 features：
+# - debug 表示 vulkan 结构体实现了 Debut Trait
+# - loader 表示在运行时动态搜索 vulkan，体现在 Entry 对象的创建上
+ash = { version = "0.38.0+1.3.281", features = ["debug"] }
 # vk-mem-0.4.0 和 ash-0.38.0+1.3.281 匹配
 vk-mem = "0.4.0"
 glam = { version = "0.22.0", features = ["bytemuck", "rand", "serde"] }

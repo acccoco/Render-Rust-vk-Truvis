@@ -5,8 +5,6 @@ use imgui::TextureId;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
-use truvis_crate_tools::count_indexed_array;
-use truvis_crate_tools::enumed_map;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
@@ -22,6 +20,8 @@ use truvis_render_interface::handles::GfxImageViewHandle;
 use truvis_render_interface::pipeline_settings::FrameLabel;
 use truvis_shader_binding::truvisl;
 use truvis_shader_binding::truvisl::SrvHandle;
+use truvis_utils::count_indexed_array;
+use truvis_utils::enumed_map;
 
 enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {

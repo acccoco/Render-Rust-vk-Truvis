@@ -6,5 +6,4 @@
 //! 基于工作区根目录的统一路径管理，避免硬编码相对路径。
 
 pub mod init_log;
-pub mod named_array;
 pub mod resource;

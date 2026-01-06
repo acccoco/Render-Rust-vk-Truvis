@@ -8,7 +8,6 @@ description = ""
 truvis-gfx = { workspace = true }
 truvis-render-interface = { workspace = true }
 truvis-shader-binding = { workspace = true }
-truvis-crate-tools = { workspace = true }
 truvis-asset = { workspace = true }
 
 
@@ -16,7 +15,5 @@ ash = { workspace = true }
 glam = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
-bytemuck = { workspace = true }
 slotmap = { workspace = true }
-tracy-client = { workspace = true }
 indexmap = { workspace = true }

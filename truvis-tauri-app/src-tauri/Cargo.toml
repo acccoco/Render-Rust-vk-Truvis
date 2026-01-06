@@ -19,8 +19,6 @@ tauri-build = { workspace = true }
 
 [dependencies]
 truvis-app = { workspace = true }
-truvis-renderer = { workspace = true }
-truvis-render-graph = { workspace = true }
 
 
 tauri = { workspace = true }
