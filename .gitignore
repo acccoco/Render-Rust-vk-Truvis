@@ -1,6 +1,9 @@
 # build
-/target
+target
 *.spv
+
+# temp
+.temp
 
 # resource
 assets
@@ -20,7 +23,7 @@ tools/tracy
 *.ngfx-gputrace
 *.ngfx-gputrace.layout
 
-# temp configuration
+# imgui
 imgui.ini
 
 # drawio
