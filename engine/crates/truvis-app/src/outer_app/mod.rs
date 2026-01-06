@@ -4,6 +4,7 @@ use truvis_renderer::renderer::Renderer;
 
 pub mod async_load_test;
 pub mod cornell_app;
+pub mod cornell_app_v2;
 pub mod raster_graph;
 pub mod shader_toy;
 pub mod sponza_app;

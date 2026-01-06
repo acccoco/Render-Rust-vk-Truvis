@@ -8,30 +8,6 @@ use truvis_gfx::{gfx::Gfx, utilities::descriptor_cursor::GfxDescriptorCursor};
 use truvis_shader_binding::truvisl;
 
 #[derive(Copy, Clone)]
-pub struct BindlessTextureHandle(pub truvisl::TextureHandle);
-impl BindlessTextureHandle {
-    #[inline]
-    pub fn new(index: usize) -> Self {
-        Self(truvisl::TextureHandle { index: index as i32 })
-    }
-    #[inline]
-    pub fn null() -> Self {
-        Self(truvisl::TextureHandle {
-            index: truvisl::INVALID_TEX_ID,
-        })
-    }
-    #[inline]
-    pub fn index(&self) -> usize {
-        self.0.index as usize
-    }
-}
-impl Default for BindlessTextureHandle {
-    fn default() -> Self {
-        Self::null()
-    }
-}
-
-#[derive(Copy, Clone)]
 pub struct BindlessUavHandle(pub truvisl::UavHandle);
 impl BindlessUavHandle {
     #[inline]
