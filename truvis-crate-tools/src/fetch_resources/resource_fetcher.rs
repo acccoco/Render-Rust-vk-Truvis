@@ -39,8 +39,8 @@ impl GitHubResourceFetcher {
     pub fn fetch_from_config<P: AsRef<Path>>(&self, config_path: P) -> anyhow::Result<()> {
         let config = ResourceConfig::from_file(config_path)?;
 
-        for item in config.resources {
-            if let Err(e) = self.fetch_resource(&item) {
+        for item in &config.resources {
+            if let Err(e) = self.fetch_resource(item) {
                 warn!("下载资源 '{}' 失败: {:?}", item.name, e);
             }
         }
@@ -50,15 +50,17 @@ impl GitHubResourceFetcher {
 
     /// 下载单个资源
     pub fn fetch_resource(&self, item: &ResourceItem) -> anyhow::Result<()> {
+        info!("===============================");
         info!("开始处理资源: {}", item.name);
 
         // 从 URL 提取文件名
         let url_filename = self.extract_filename_from_url(&item.url)?;
         let temp_file_path = self.temp_dir.join(&url_filename);
 
-        // 检查是否需要下载
-        if !item.force_download && temp_file_path.exists() {
+        // 检查是否需要下载，并记录是否进行了下载
+        let did_download = if !item.force_download && temp_file_path.exists() {
             info!("临时目录中已存在文件，跳过下载: {:?}", temp_file_path);
+            false
         } else {
             info!("从 {} 下载资源...", item.url);
             let data = self.download_file(&item.url).with_context(|| format!("下载 {} 失败", item.name))?;
@@ -67,17 +69,56 @@ impl GitHubResourceFetcher {
 
             // 写入临时文件
             fs::write(&temp_file_path, &data).with_context(|| format!("写入临时文件失败: {:?}", temp_file_path))?;
-        }
+            true
+        };
 
         // 根据资源类型处理
         let target_path = PathBuf::from(&item.target_dir);
-        match item.resource_type {
-            ResourceType::File => {
-                self.process_file(&temp_file_path, &target_path, item.rename_to.as_deref())?;
+        let actual_target = target_path.join(&item.rename_to);
+
+        // 决定是否需要提取
+        let should_extract = if did_download {
+            // 如果进行了下载，必须提取（先删除已存在的目标）
+            if actual_target.exists() {
+                info!("下载了新文件，删除旧的目标: {:?}", actual_target);
+                if actual_target.is_dir() {
+                    fs::remove_dir_all(&actual_target)
+                        .with_context(|| format!("删除现有目录失败: {:?}", actual_target))?;
+                } else {
+                    fs::remove_file(&actual_target)
+                        .with_context(|| format!("删除现有文件失败: {:?}", actual_target))?;
+                }
             }
-            ResourceType::Zip => {
-                self.process_zip(&temp_file_path, &target_path, item.rename_to.as_deref())?;
+            true
+        } else if item.force_overwrite {
+            // 如果强制覆盖，删除并提取
+            if actual_target.exists() {
+                info!("强制覆盖，删除现有目录/文件: {:?}", actual_target);
+                if actual_target.is_dir() {
+                    fs::remove_dir_all(&actual_target)
+                        .with_context(|| format!("删除现有目录失败: {:?}", actual_target))?;
+                } else {
+                    fs::remove_file(&actual_target)
+                        .with_context(|| format!("删除现有文件失败: {:?}", actual_target))?;
+                }
             }
+            true
+        } else {
+            // 否则检查目标是否存在
+            !actual_target.exists()
+        };
+
+        if should_extract {
+            match item.resource_type {
+                ResourceType::File => {
+                    self.process_file(&temp_file_path, &target_path, &item.rename_to)?;
+                }
+                ResourceType::Zip => {
+                    self.process_zip(&temp_file_path, &target_path, &item.rename_to)?;
+                }
+            }
+        } else {
+            info!("资源已存在，跳过提取: {:?}", actual_target);
         }
 
         info!("资源 '{}' 处理完成", item.name);
@@ -116,18 +157,12 @@ impl GitHubResourceFetcher {
 
 // 提取
 impl GitHubResourceFetcher {
-    /// 处理普通文件：复制到目标目录，可选重命名
-    fn process_file(&self, temp_file: &Path, target_dir: &Path, rename_to: Option<&str>) -> anyhow::Result<()> {
+    /// 处理普通文件：复制到目标目录，重命名
+    fn process_file(&self, temp_file: &Path, target_dir: &Path, rename_to: &str) -> anyhow::Result<()> {
         // 确保目标目录存在
         fs::create_dir_all(target_dir).with_context(|| format!("创建目标目录失败: {:?}", target_dir))?;
 
-        // 确定目标文件名
-        let target_filename = rename_to
-            .map(|s| s.to_string())
-            .or_else(|| temp_file.file_name().map(|n| n.to_string_lossy().to_string()))
-            .ok_or_else(|| anyhow::anyhow!("无法确定目标文件名"))?;
-
-        let target_path = target_dir.join(target_filename);
+        let target_path = target_dir.join(rename_to);
 
         info!("复制文件: {:?} -> {:?}", temp_file, target_path);
         fs::copy(temp_file, &target_path)
@@ -136,15 +171,15 @@ impl GitHubResourceFetcher {
         Ok(())
     }
 
-    /// 处理 Zip 文件：解压到目标目录，可选重命名顶级目录
-    fn process_zip(&self, temp_file: &Path, target_dir: &Path, rename_to: Option<&str>) -> anyhow::Result<()> {
+    /// 处理 Zip 文件：解压到目标目录，重命名顶级目录
+    fn process_zip(&self, temp_file: &Path, target_dir: &Path, rename_to: &str) -> anyhow::Result<()> {
         let zip_data = fs::read(temp_file).with_context(|| format!("读取 zip 文件失败: {:?}", temp_file))?;
 
         self.extract_zip(&zip_data, target_dir, rename_to)
     }
 
     /// 解压 zip 文件到目标目录
-    fn extract_zip(&self, zip_data: &[u8], target_dir: &Path, rename_to: Option<&str>) -> anyhow::Result<()> {
+    fn extract_zip(&self, zip_data: &[u8], target_dir: &Path, rename_to: &str) -> anyhow::Result<()> {
         let cursor = Cursor::new(zip_data);
         let mut archive = zip::ZipArchive::new(cursor).context("打开 zip archive 失败")?;
 
@@ -164,7 +199,8 @@ impl GitHubResourceFetcher {
             }
 
             // 处理路径
-            let out_path = self.process_extract_path(target_dir, file_path, rename_to)?;
+            let out_path = target_dir.join(rename_to).join(file_path);
+            log::debug!("解压文件到: {:?}", out_path);
 
             if file.is_dir() {
                 // 创建目录
@@ -180,43 +216,8 @@ impl GitHubResourceFetcher {
 
                 io::copy(&mut file, &mut outfile).with_context(|| format!("写入文件失败: {:?}", out_path))?;
             }
-
-            // Unix 权限处理
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                if let Some(mode) = file.unix_mode() {
-                    fs::set_permissions(&out_path, fs::Permissions::from_mode(mode)).ok();
-                }
-            }
         }
 
         Ok(())
-    }
-
-    /// 处理解压路径，支持重命名顶级目录
-    fn process_extract_path(
-        &self,
-        target_dir: &Path,
-        file_path: &str,
-        rename_to: Option<&str>,
-    ) -> anyhow::Result<PathBuf> {
-        let path_components: Vec<&str> = file_path.split('/').collect();
-
-        if let Some(new_name) = rename_to {
-            // 重命名顶级目录
-            if path_components.len() > 1 {
-                let mut new_path = target_dir.join(new_name);
-                for component in &path_components[1..] {
-                    new_path = new_path.join(component);
-                }
-                Ok(new_path)
-            } else {
-                Ok(target_dir.join(new_name))
-            }
-        } else {
-            // 保持原始路径
-            Ok(target_dir.join(file_path))
-        }
     }
 }

@@ -1,3 +1,4 @@
+use crate::resource::TruvisPath;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -35,15 +36,17 @@ pub struct ResourceItem {
     /// 本地目标目录
     pub target_dir: String,
 
-    /// 可选：重命名
+    /// 重命名
     /// - 如果 resource_type = File，则重命名文件
     /// - 如果 resource_type = Zip，则重命名解压后的顶级目录
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rename_to: Option<String>,
+    pub rename_to: String,
 
     /// 可选：是否强制重新下载，默认 false
     #[serde(default)]
     pub force_download: bool,
+
+    #[serde(default)]
+    pub force_overwrite: bool,
 }
 
 impl ResourceConfig {
@@ -52,8 +55,11 @@ impl ResourceConfig {
         let content =
             fs::read_to_string(path.as_ref()).with_context(|| format!("读取配置文件失败: {:?}", path.as_ref()))?;
 
-        let config: ResourceConfig =
+        let mut config: ResourceConfig =
             toml::from_str(&content).with_context(|| format!("解析 TOML 配置失败: {:?}", path.as_ref()))?;
+        for item in &mut config.resources {
+            item.target_dir = TruvisPath::workspace_path().join(&item.target_dir).to_str().unwrap().to_string();
+        }
 
         Ok(config)
     }
