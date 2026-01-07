@@ -2,12 +2,12 @@
 
 // 定义矩形的 6 个顶点（两个三角形）
 static const float2 positions[6] = {
-    float2(-0.5, -0.5),  // 左下
-    float2( 0.5, -0.5),  // 右下
-    float2(-0.5,  0.5),  // 左上
-    float2(-0.5,  0.5),  // 左上
-    float2( 0.5, -0.5),  // 右下
-    float2( 0.5,  0.5)   // 右上
+    float2(-0.5, -0.5), // 左下
+    float2(0.5, -0.5),  // 右下
+    float2(-0.5, 0.5),  // 左上
+    float2(-0.5, 0.5),  // 左上
+    float2(0.5, -0.5),  // 右下
+    float2(0.5, 0.5)    // 右上
 };
 
 static const float2 uvs[6] = {
@@ -53,7 +53,9 @@ soa::PS_OUTPUT psmain(soa::CoarseVertex input)
 {
     soa::PS_OUTPUT output = (soa::PS_OUTPUT)0;
     output.Color = float4(
-        float3(input.UV, 0.0) * 0.7 + input.Normal * 0.15 + input.Tangent * 0.15,
+        input.UV.x,
+        input.UV.y,
+        1.f - (input.UV.x + input.UV.y) * 0.5f,
         1.0
     );
     return output;
