@@ -5,6 +5,7 @@
 
 use ash::vk;
 
+// TODO RgImageState 可以考虑提升到 Gfx 里面去
 /// 图像资源状态
 ///
 /// 描述图像在某个 Pass 中的使用方式，用于自动计算 barrier。
@@ -189,6 +190,7 @@ impl RgImageState {
     }
 }
 
+// TODO RgBufferState 可以考虑提升到 Gfx 里面去
 /// 缓冲区资源状态
 ///
 /// 描述缓冲区在某个 Pass 中的使用方式。

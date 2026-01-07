@@ -1,12 +1,14 @@
 mod barrier;
 mod buffer_resource;
 mod executor;
+mod export_info;
 mod graph;
 mod image_resource;
 mod pass;
 mod resource_handle;
 mod resource_manager;
 mod resource_state;
+mod semaphore_info;
 
 // Re-exports
 pub use barrier::{BufferBarrierDesc, PassBarriers, RgImageBarrierDesc};

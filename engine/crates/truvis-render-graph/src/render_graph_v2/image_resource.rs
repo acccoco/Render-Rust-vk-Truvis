@@ -2,6 +2,7 @@ use crate::render_graph_v2::RgImageState;
 use ash::vk;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle};
+use crate::render_graph_v2::semaphore_info::RgSemaphoreWait;
 
 /// 图像资源描述（用于创建临时资源）
 ///
@@ -124,6 +125,8 @@ pub enum RgImageSource {
     Imported {
         image_handle: GfxImageHandle,
         view_handle: Option<GfxImageViewHandle>,
+        /// 可选的外部 semaphore 等待（在首次使用此资源前等待）
+        wait_semaphore: Option<RgSemaphoreWait>,
     },
     /// 由 RenderGraph 创建的临时图像
     Transient { desc: RgImageDesc },
@@ -147,17 +150,27 @@ pub struct RgImageResource {
 // new & init
 impl RgImageResource {
     /// 创建导入的图像资源
+    ///
+    /// # 参数
+    /// - `name`: 资源调试名称
+    /// - `image_handle`: 物理图像句柄
+    /// - `view_handle`: 可选的图像视图句柄
+    /// - `format`: 图像格式
+    /// - `initial_state`: 图像的初始状态
+    /// - `wait_semaphore`: 可选的外部 semaphore 等待信息
     pub fn imported(
         name: impl Into<String>,
         image_handle: GfxImageHandle,
         view_handle: Option<GfxImageViewHandle>,
         format: vk::Format,
         initial_state: RgImageState,
+        wait_semaphore: Option<RgSemaphoreWait>,
     ) -> Self {
         Self {
             source: RgImageSource::Imported {
                 image_handle,
                 view_handle,
+                wait_semaphore,
             },
             current_state: initial_state,
             format,
@@ -201,6 +214,15 @@ impl RgImageResource {
     pub fn physical_view_handle(&self) -> Option<GfxImageViewHandle> {
         match &self.source {
             RgImageSource::Imported { view_handle, .. } => *view_handle,
+            RgImageSource::Transient { .. } => None,
+        }
+    }
+
+    /// 获取等待的外部 semaphore（仅对导入资源有效）
+    #[inline]
+    pub fn wait_semaphore(&self) -> Option<RgSemaphoreWait> {
+        match &self.source {
+            RgImageSource::Imported { wait_semaphore, .. } => *wait_semaphore,
             RgImageSource::Transient { .. } => None,
         }
     }

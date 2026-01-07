@@ -3,17 +3,22 @@
 //! 提供 `RenderGraphBuilder` 用于构建渲染图，
 //! `CompiledGraph` 用于缓存编译结果并执行渲染。
 
+use std::collections::HashMap;
+
 use super::barrier::{BufferBarrierDesc, PassBarriers, RgImageBarrierDesc};
 use super::graph::DependencyGraph;
-use super::pass::{RgPass, RgPassBuilder, RgPassContext, RgPassExecutor, RgPassWrapper, RgPassNode};
+use super::pass::{RgLambdaPassWrapper, RgPass, RgPassBuilder, RgPassContext, RgPassNode, RgPassWrapper};
 use super::resource_handle::{RgBufferHandle, RgImageHandle};
 use super::resource_manager::RgResourceManager;
 use super::resource_state::{RgBufferState, RgImageState};
+use crate::render_graph_v2::export_info::RgExportInfo;
+use crate::render_graph_v2::semaphore_info::{RgSemaphoreSignal, RgSemaphoreWait};
 use crate::render_graph_v2::{RgBufferResource, RgImageResource};
 use ash::vk;
 use itertools::Itertools;
 use slotmap::SecondaryMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
+use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle};
 
@@ -39,6 +44,9 @@ pub struct RenderGraphBuilder<'a> {
 
     /// Pass 节点列表（按添加顺序）
     passes: Vec<RgPassNode<'a>>,
+
+    /// 导出资源信息：指定资源的最终状态和可选的 signal semaphore
+    export_images: HashMap<RgImageHandle, RgExportInfo>,
 }
 
 impl Default for RenderGraphBuilder<'_> {
@@ -53,6 +61,7 @@ impl<'a> RenderGraphBuilder<'a> {
         Self {
             resources: RgResourceManager::new(),
             passes: Vec::new(),
+            export_images: HashMap::new(),
         }
     }
 
@@ -64,6 +73,7 @@ impl<'a> RenderGraphBuilder<'a> {
     /// - `view_handle`: 可选的图像视图句柄
     /// - `format`: 图像格式（用于推断 barrier aspect）
     /// - `initial_state`: 图像的初始状态
+    /// - `wait_semaphore`: 可选的外部 semaphore 等待（在首次使用此资源前等待）
     ///
     /// # 返回
     /// RenderGraph 内部的图像句柄
@@ -74,8 +84,44 @@ impl<'a> RenderGraphBuilder<'a> {
         view_handle: Option<GfxImageViewHandle>,
         format: vk::Format,
         initial_state: RgImageState,
+        wait_semaphore: Option<RgSemaphoreWait>,
     ) -> RgImageHandle {
-        self.resources.register_image(RgImageResource::imported(name, image_handle, view_handle, format, initial_state))
+        self.resources.register_image(RgImageResource::imported(
+            name,
+            image_handle,
+            view_handle,
+            format,
+            initial_state,
+            wait_semaphore,
+        ))
+    }
+
+    /// 导出图像资源
+    ///
+    /// 声明资源在渲染图执行完成后的最终状态，并可选地发出 semaphore 信号。
+    /// 这会在图的末尾插入必要的 barrier 将资源转换到指定的 final_state。
+    ///
+    /// # 参数
+    /// - `handle`: 要导出的图像句柄
+    /// - `final_state`: 资源的最终状态（layout, access, stage）
+    /// - `signal_semaphore`: 可选的 semaphore 信号
+    ///
+    /// # 返回
+    /// 返回 `&mut Self` 以支持链式调用
+    pub fn export_image(
+        &mut self,
+        handle: RgImageHandle,
+        final_state: RgImageState,
+        signal_semaphore: Option<RgSemaphoreSignal>,
+    ) -> &mut Self {
+        self.export_images.insert(
+            handle,
+            RgExportInfo {
+                final_state,
+                signal_semaphore,
+            },
+        );
+        self
     }
 
     /// 导入外部缓冲区资源
@@ -161,7 +207,6 @@ impl<'a> RenderGraphBuilder<'a> {
         S: FnMut(&mut RgPassBuilder) + 'a,
         E: Fn(&RgPassContext<'_>) + 'a,
     {
-        use super::pass::RgLambdaPassWrapper;
         let pass = RgLambdaPassWrapper::new(setup_fn, execute_fn);
         self.add_pass(name, pass)
     }
@@ -196,24 +241,71 @@ impl<'a> RenderGraphBuilder<'a> {
             panic!("RenderGraph: Cycle detected involving passes: {:?}", cycle_names);
         });
 
-        // 计算每个 Pass 的 barriers
-        let barriers = self.compute_barriers(&execution_order);
+        // 计算每个 Pass 的 barriers（同时返回最终的资源状态用于计算 epilogue barriers）
+        let (barriers, final_image_states) = self.compute_barriers(&execution_order);
+
+        // 收集外部 wait semaphores（来自导入资源）
+        let wait_semaphores: Vec<RgSemaphoreWait> =
+            self.resources.iter_images().filter_map(|(_, res)| res.wait_semaphore()).collect();
+
+        // 收集外部 signal semaphores（来自导出资源）
+        let signal_semaphores: Vec<RgSemaphoreSignal> =
+            self.export_images.values().filter_map(|info| info.signal_semaphore).collect();
+
+        // 计算 epilogue barriers：将导出资源从最后使用状态转换到 final_state
+        let epilogue_barriers = self.compute_epilogue_barriers(&final_image_states);
 
         CompiledGraph {
             resources: self.resources,
             passes: self.passes,
             execution_order,
             barriers,
+            epilogue_barriers,
             dep_graph,
+            wait_semaphores,
+            signal_semaphores,
         }
+    }
+
+    /// 计算 epilogue barriers
+    ///
+    /// 将导出资源从最后使用状态转换到声明的 final_state
+    fn compute_epilogue_barriers(
+        &self,
+        final_image_states: &SecondaryMap<RgImageHandle, RgImageState>,
+    ) -> PassBarriers {
+        let mut epilogue = PassBarriers::new();
+
+        for (&handle, export_info) in &self.export_images {
+            if let Some(&current_state) = final_image_states.get(handle) {
+                let final_state = export_info.final_state;
+
+                // 只有状态不同时才需要 barrier
+                if current_state != final_state
+                    && let Some(res) = self.resources.get_image(handle)
+                {
+                    let aspect = res.infer_aspect();
+                    epilogue.add_image_barrier(
+                        RgImageBarrierDesc::new(handle, current_state, final_state).with_aspect(aspect),
+                    );
+                }
+            }
+        }
+
+        epilogue
     }
 
     /// 计算每个 Pass 需要的 barriers
     ///
     /// 模拟 pass 的执行顺序，跟踪资源的状态变化，生成必要的 barriers
-    fn compute_barriers(&self, execution_order: &[usize]) -> Vec<PassBarriers> {
-        use std::collections::HashMap;
-
+    ///
+    /// # 返回
+    /// - barriers: 每个 Pass 的 barriers
+    /// - final_image_states: 所有图像资源的最终状态（用于计算 epilogue barriers）
+    fn compute_barriers(
+        &self,
+        execution_order: &[usize],
+    ) -> (Vec<PassBarriers>, SecondaryMap<RgImageHandle, RgImageState>) {
         let mut barriers = vec![PassBarriers::new(); self.passes.len()];
 
         // 跟踪每个资源的当前状态 (使用 SecondaryMap)
@@ -289,7 +381,7 @@ impl<'a> RenderGraphBuilder<'a> {
             }
         }
 
-        barriers
+        (barriers, image_states)
     }
 }
 
@@ -310,9 +402,15 @@ pub struct CompiledGraph<'a> {
     execution_order: Vec<usize>,
     /// 每个 Pass 的 barriers（按 pass 索引）
     barriers: Vec<PassBarriers>,
+    /// 尾声 barriers：将导出资源转换到最终状态
+    epilogue_barriers: PassBarriers,
     /// 依赖图（用于调试）
     #[allow(dead_code)]
     dep_graph: DependencyGraph,
+    /// 收集的外部 wait semaphores（来自导入资源）
+    wait_semaphores: Vec<RgSemaphoreWait>,
+    /// 收集的外部 signal semaphores（来自导出资源）
+    signal_semaphores: Vec<RgSemaphoreSignal>,
 }
 
 impl CompiledGraph<'_> {
@@ -381,6 +479,57 @@ impl CompiledGraph<'_> {
             // 结束 Pass debug label
             cmd.end_label();
         }
+
+        // 录制 epilogue barriers（将导出资源转换到最终状态）
+        if self.epilogue_barriers.has_barriers() {
+            cmd.begin_label("rg-epilogue", truvis_gfx::basic::color::LabelColor::COLOR_PASS);
+            self.record_barriers(cmd, &self.epilogue_barriers, resource_manager);
+            cmd.end_label();
+        }
+    }
+
+    /// 构建包含外部同步信息的 SubmitInfo
+    ///
+    /// 返回的 `GfxSubmitInfo` 包含了从导入资源收集的 wait semaphores
+    /// 和从导出资源收集的 signal semaphores。
+    ///
+    /// # 参数
+    /// - `commands`: 要提交的命令缓冲区列表
+    ///
+    /// # 示例
+    ///
+    /// ```ignore
+    /// cmd.begin(...);
+    /// compiled_graph.execute(&cmd, resource_manager);
+    /// cmd.end();
+    ///
+    /// let submit_info = compiled_graph.build_submit_info(&[cmd]);
+    /// queue.submit(vec![submit_info], fence);
+    /// ```
+    pub fn build_submit_info(&self, commands: &[GfxCommandBuffer]) -> GfxSubmitInfo {
+        let mut submit_info = GfxSubmitInfo::new(commands);
+
+        // 添加 wait semaphores
+        for wait in &self.wait_semaphores {
+            submit_info = submit_info.wait_raw(wait.info.semaphore, wait.info.stage, wait.info.value);
+        }
+
+        // 添加 signal semaphores
+        for signal in &self.signal_semaphores {
+            submit_info = submit_info.signal_raw(signal.info.semaphore, signal.info.stage, signal.info.value);
+        }
+
+        submit_info
+    }
+
+    /// 获取 wait semaphores 列表（用于调试或手动构建 submit info）
+    pub fn wait_semaphores(&self) -> &[RgSemaphoreWait] {
+        &self.wait_semaphores
+    }
+
+    /// 获取 signal semaphores 列表（用于调试或手动构建 submit info）
+    pub fn signal_semaphores(&self) -> &[RgSemaphoreSignal] {
+        &self.signal_semaphores
     }
 
     /// 录制 barriers

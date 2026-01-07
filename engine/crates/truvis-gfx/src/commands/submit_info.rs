@@ -56,11 +56,39 @@ impl GfxSubmitInfo {
         self
     }
 
+    /// 使用原始 Vulkan semaphore 句柄添加 wait 信号
+    ///
+    /// 这个方法直接接收 `vk::Semaphore` 句柄，适用于从外部传入的 semaphore。
+    #[inline]
+    pub fn wait_raw(mut self, semaphore: vk::Semaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
+        self.wait_infos.push(
+            vk::SemaphoreSubmitInfo::default()
+                .semaphore(semaphore)
+                .stage_mask(stage)
+                .value(value.unwrap_or_default()),
+        );
+        self
+    }
+
     #[inline]
     pub fn signal(mut self, semaphore: &GfxSemaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
         self.signal_infos.push(
             vk::SemaphoreSubmitInfo::default()
                 .semaphore(semaphore.handle())
+                .stage_mask(stage)
+                .value(value.unwrap_or_default()),
+        );
+        self
+    }
+
+    /// 使用原始 Vulkan semaphore 句柄添加 signal 信号
+    ///
+    /// 这个方法直接接收 `vk::Semaphore` 句柄，适用于从外部传入的 semaphore。
+    #[inline]
+    pub fn signal_raw(mut self, semaphore: vk::Semaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
+        self.signal_infos.push(
+            vk::SemaphoreSubmitInfo::default()
+                .semaphore(semaphore)
                 .stage_mask(stage)
                 .value(value.unwrap_or_default()),
         );

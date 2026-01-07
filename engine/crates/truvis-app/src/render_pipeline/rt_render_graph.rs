@@ -229,6 +229,7 @@ impl RtPipeline {
             Some(fif_buffers.color_image_view_handle()),
             vk::Format::R32G32B32A32_SFLOAT,
             RgImageState::STORAGE_READ_WRITE_RAY_TRACING,
+            None, // 无外部 semaphore 等待
         );
 
         let (render_target_image_handle, render_target_view_handle) = fif_buffers.render_target_handle(frame_label);
@@ -238,6 +239,7 @@ impl RtPipeline {
             Some(render_target_view_handle),
             vk::Format::R8G8B8A8_UNORM,
             RgImageState::UNDEFINED,
+            None, // 无外部 semaphore 等待
         );
 
         // 添加 Pass

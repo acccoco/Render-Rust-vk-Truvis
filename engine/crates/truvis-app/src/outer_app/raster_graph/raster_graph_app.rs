@@ -129,6 +129,7 @@ impl OuterApp for RasterGraphApp {
             Some(render_target_view),
             frame_settings.color_format,
             RgImageState::UNDEFINED,
+            None, // 无外部 semaphore 等待
         );
 
         let rg_depth = builder.import_image(
@@ -137,6 +138,7 @@ impl OuterApp for RasterGraphApp {
             Some(depth_view),
             frame_settings.depth_format,
             RgImageState::UNDEFINED,
+            None, // 无外部 semaphore 等待
         );
 
         // 1. Raster Pass - 场景渲染 (使用 lambda)
