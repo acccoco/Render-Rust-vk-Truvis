@@ -141,53 +141,21 @@ impl PassBarriers {
     }
 
     /// 检查是否有 barrier
+    #[inline]
     pub fn has_barriers(&self) -> bool {
         !self.image_barriers.is_empty() || !self.buffer_barriers.is_empty()
     }
 
     /// 获取图像 barrier 数量
+    #[inline]
     pub fn image_barrier_count(&self) -> usize {
         self.image_barriers.len()
     }
 
     /// 获取缓冲区 barrier 数量
+    #[inline]
     pub fn buffer_barrier_count(&self) -> usize {
         self.buffer_barriers.len()
-    }
-}
-
-/// Barrier 计算器
-///
-/// 根据资源状态跟踪信息，计算每个 Pass 需要的 barriers。
-pub struct BarrierCalculator;
-
-impl BarrierCalculator {
-    /// 计算单个图像资源的 barrier
-    ///
-    /// # 参数
-    /// - `handle`: 资源句柄
-    /// - `current_state`: 当前状态（上一个使用者留下的状态）
-    /// - `required_state`: 需要的状态
-    ///
-    /// # 返回
-    /// 如果需要 barrier，返回 `Some(ImageBarrierDesc)`
-    pub fn compute_image_barrier(
-        handle: RgImageHandle,
-        current_state: RgImageState,
-        required_state: RgImageState,
-    ) -> Option<RgImageBarrierDesc> {
-        let barrier = RgImageBarrierDesc::new(handle, current_state, required_state);
-        if barrier.needs_barrier() { Some(barrier) } else { None }
-    }
-
-    /// 计算单个缓冲区资源的 barrier
-    pub fn compute_buffer_barrier(
-        handle: RgBufferHandle,
-        current_state: RgBufferState,
-        required_state: RgBufferState,
-    ) -> Option<BufferBarrierDesc> {
-        let barrier = BufferBarrierDesc::new(handle, current_state, required_state);
-        if barrier.needs_barrier() { Some(barrier) } else { None }
     }
 }
 

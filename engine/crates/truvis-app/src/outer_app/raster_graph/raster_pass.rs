@@ -120,9 +120,9 @@ impl RgPass for RasterPass<'_> {
         let cmd = ctx.cmd;
 
         // 获取物理 image view handle
-        let (_, render_target_view_handle) =
-            ctx.get_image(self.render_target).expect("RasterPass: render_target not found");
-        let (_, depth_view_handle) = ctx.get_image(self.depth_target).expect("RasterPass: depth not found");
+        let render_target_view_handle =
+            ctx.get_image_view_handle(self.render_target).expect("RasterPass: render_target not found");
+        let depth_view_handle = ctx.get_image_view_handle(self.depth_target).expect("RasterPass: depth not found");
 
         // 从 PassContext 的 resource_manager 获取实际的 view
         let render_target_view = ctx.resource_manager.get_image_view(render_target_view_handle).unwrap();

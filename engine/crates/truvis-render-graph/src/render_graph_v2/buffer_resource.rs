@@ -77,15 +77,11 @@ impl RgBufferResource {
 // getter
 impl RgBufferResource {
     /// 获取物理 buffer handle（仅对导入资源有效）
+    #[inline]
     pub fn physical_handle(&self) -> Option<GfxBufferHandle> {
         match &self.source {
             RgBufferSource::Imported { buffer_handle } => Some(*buffer_handle),
             RgBufferSource::Transient { .. } => None,
         }
-    }
-
-    /// 检查是否为临时资源
-    pub fn is_transient(&self) -> bool {
-        matches!(&self.source, RgBufferSource::Transient { .. })
     }
 }

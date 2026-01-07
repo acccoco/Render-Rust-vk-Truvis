@@ -1,12 +1,6 @@
-//! Pass 定义和构建器
-//!
-//! 提供 `RgPass` trait 用于声明式定义渲染 Pass，
-//! 以及 `PassBuilder` 用于在 setup 阶段声明资源依赖。
-
 use super::resource_handle::{RgBufferHandle, RgImageHandle};
-use super::resource_registry::RgResourceRegistry;
+use super::resource_manager::RgResourceManager;
 use crate::render_graph_v2::buffer_resource::RgBufferDesc;
-use crate::render_graph_v2::executor::RgPassExecutor;
 use crate::render_graph_v2::image_resource::RgImageDesc;
 use crate::render_graph_v2::{RgBufferResource, RgBufferState, RgImageResource, RgImageState};
 use slotmap::SecondaryMap;
@@ -15,7 +9,7 @@ use truvis_render_interface::handles::{GfxBufferHandle, GfxImageHandle, GfxImage
 
 /// Pass 执行时的上下文
 ///
-/// 提供 Pass 执行所需的资源访问和命令缓冲区。
+/// 提供 Pass 执行所需的资源访问和 cmd
 pub struct RgPassContext<'a> {
     /// 命令缓冲区
     pub cmd: &'a GfxCommandBuffer,
@@ -38,13 +32,13 @@ impl<'a> RgPassContext<'a> {
     /// 获取图像的 handle
     #[inline]
     pub fn get_image_handle(&self, handle: RgImageHandle) -> Option<GfxImageHandle> {
-        self.get_image(handle).map(|(h, _)| h)
+        self.image_handles.get(handle).map(|(h, _)| *h)
     }
 
     /// 获取图像的 view handle
     #[inline]
     pub fn get_image_view_handle(&self, handle: RgImageHandle) -> Option<GfxImageViewHandle> {
-        self.get_image(handle).map(|(_, v)| v)
+        self.image_handles.get(handle).map(|(_, v)| *v)
     }
 
     /// 获取缓冲区的物理句柄
@@ -56,7 +50,7 @@ impl<'a> RgPassContext<'a> {
 
 /// Pass 构建器
 ///
-/// 在 `RgPass::setup()` 中使用，声明 Pass 的资源依赖。
+/// 在 Pass 的 Setup 阶段使用，声明 Pass 的资源依赖。
 pub struct RgPassBuilder<'a> {
     /// Pass 名称
     #[allow(dead_code)]
@@ -72,7 +66,7 @@ pub struct RgPassBuilder<'a> {
     pub(crate) buffer_writes: Vec<(RgBufferHandle, RgBufferState)>,
 
     /// 资源注册表引用（用于创建临时资源）
-    pub(crate) resources: &'a mut RgResourceRegistry,
+    pub(crate) resources: &'a mut RgResourceManager,
 }
 
 impl<'a> RgPassBuilder<'a> {
@@ -137,7 +131,7 @@ impl<'a> RgPassBuilder<'a> {
     }
 }
 
-/// Pass 节点数据（编译后使用）
+/// Pass 节点数据，最后会存放于 RenderGraph 内
 pub struct RgPassNode<'a> {
     /// Pass 名称
     pub name: String,
@@ -157,34 +151,7 @@ pub struct RgPassNode<'a> {
 
 /// RgPass trait
 ///
-/// 定义渲染图中的一个 Pass。用户需要实现此 trait 来创建自定义 Pass。
-///
-/// # 示例
-///
-/// ```ignore
-/// struct MyPass {
-///     input: RgImageHandle,
-///     output: RgImageHandle,
-/// }
-///
-/// impl RgPass for MyPass {
-///     fn setup(&mut self, builder: &mut PassBuilder) {
-///         builder.read_image(self.input, ImageState::SHADER_READ_COMPUTE);
-///         self.output = builder.write_image(self.output, ImageState::STORAGE_WRITE_COMPUTE);
-///     }
-///
-///     fn execute(&self, ctx: &PassContext) {
-///         let input_view = ctx.get_image_view_handle(self.input);
-///         let output_view = ctx.get_image_view_handle(self.output);
-///         // 绑定 pipeline, dispatch...
-///     }
-/// }
-/// ```
-///
-/// # 线程安全
-///
-/// Pass 不需要是 Send + Sync，因为 RenderGraph 通常在单线程中使用。
-/// Pass 可以借用外部资源，生命周期由 RenderGraphBuilder 的生命周期参数约束。
+/// 定义渲染图中的一个 Pass
 pub trait RgPass {
     /// 声明 Pass 的资源依赖
     ///
@@ -201,25 +168,10 @@ pub trait RgPass {
 ///
 /// 允许通过 lambda 快速构造 Pass，无需定义额外的结构体。
 ///
-/// # 示例
-///
-/// ```ignore
-/// builder.add_pass_lambda(
-///     "my-pass",
-///     |builder| {
-///         builder.read_image(input, RgImageState::SHADER_READ);
-///         builder.write_image(output, RgImageState::COLOR_ATTACHMENT);
-///     },
-///     |ctx| {
-///         // 渲染逻辑
-///     },
-/// );
-/// ```
-///
 /// # 生命周期
 ///
 /// - `'a`: 闭包可以捕获的外部资源的生命周期
-pub struct LambdaPass<'a, S, E>
+pub struct RgLambdaPassWrapper<'a, S, E>
 where
     S: FnMut(&mut RgPassBuilder) + 'a,
     E: Fn(&RgPassContext<'_>) + 'a,
@@ -229,7 +181,7 @@ where
     _marker: std::marker::PhantomData<&'a ()>,
 }
 
-impl<'a, S, E> LambdaPass<'a, S, E>
+impl<'a, S, E> RgLambdaPassWrapper<'a, S, E>
 where
     S: FnMut(&mut RgPassBuilder) + 'a,
     E: Fn(&RgPassContext<'_>) + 'a,
@@ -248,7 +200,7 @@ where
     }
 }
 
-impl<S, E> RgPass for LambdaPass<'_, S, E>
+impl<S, E> RgPass for RgLambdaPassWrapper<'_, S, E>
 where
     S: FnMut(&mut RgPassBuilder),
     E: Fn(&RgPassContext<'_>),
@@ -259,5 +211,22 @@ where
 
     fn execute(&self, ctx: &RgPassContext<'_>) {
         (self.execute_fn)(ctx);
+    }
+}
+
+/// 类型擦除的 Pass 执行器 trait
+pub(crate) trait RgPassExecutor {
+    /// 执行 Pass
+    fn execute(&self, ctx: &RgPassContext<'_>);
+}
+
+/// 包装用户 Pass 实现的执行器
+pub(crate) struct RgPassWrapper<P: RgPass> {
+    pub pass: P,
+}
+
+impl<P: RgPass> RgPassExecutor for RgPassWrapper<P> {
+    fn execute(&self, ctx: &RgPassContext<'_>) {
+        self.pass.execute(ctx);
     }
 }

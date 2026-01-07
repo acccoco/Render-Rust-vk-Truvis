@@ -157,16 +157,19 @@ impl RgImageState {
 
     // ============ 辅助方法 ============
 
+    /// 写操作的 access flags
+    const WRITE_ACCESS: vk::AccessFlags2 = vk::AccessFlags2::from_raw(
+        vk::AccessFlags2::SHADER_STORAGE_WRITE.as_raw()
+            | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE.as_raw()
+            | vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE.as_raw()
+            | vk::AccessFlags2::TRANSFER_WRITE.as_raw()
+            | vk::AccessFlags2::MEMORY_WRITE.as_raw(),
+    );
+
     /// 检查是否为写操作
     #[inline]
     pub fn is_write(&self) -> bool {
-        self.access.intersects(
-            vk::AccessFlags2::SHADER_STORAGE_WRITE
-                | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
-                | vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE
-                | vk::AccessFlags2::TRANSFER_WRITE
-                | vk::AccessFlags2::MEMORY_WRITE,
-        )
+        self.access.intersects(Self::WRITE_ACCESS)
     }
 
     /// 检查是否为只读操作
@@ -260,11 +263,16 @@ impl RgBufferState {
 
     // ============ 辅助方法 ============
 
+    /// 写操作的 access flags
+    const WRITE_ACCESS: vk::AccessFlags2 = vk::AccessFlags2::from_raw(
+        vk::AccessFlags2::SHADER_STORAGE_WRITE.as_raw()
+            | vk::AccessFlags2::TRANSFER_WRITE.as_raw()
+            | vk::AccessFlags2::MEMORY_WRITE.as_raw(),
+    );
+
     /// 检查是否为写操作
     #[inline]
     pub fn is_write(&self) -> bool {
-        self.access.intersects(
-            vk::AccessFlags2::SHADER_STORAGE_WRITE | vk::AccessFlags2::TRANSFER_WRITE | vk::AccessFlags2::MEMORY_WRITE,
-        )
+        self.access.intersects(Self::WRITE_ACCESS)
     }
 }

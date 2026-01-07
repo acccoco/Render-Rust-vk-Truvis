@@ -53,38 +53,17 @@ impl RgImageDesc {
     /// 创建 2D 图像描述
     #[inline]
     pub fn new_2d(width: u32, height: u32, format: vk::Format, usage: vk::ImageUsageFlags) -> Self {
-        Self {
-            width,
-            height,
-            format,
-            usage,
-            ..Default::default()
-        }
+        Self { width, height, format, usage, ..Default::default() }
     }
 
-    /// 设置尺寸
-    #[inline]
-    pub fn with_size(mut self, width: u32, height: u32) -> Self {
-        self.width = width;
-        self.height = height;
-        self
-    }
-
-    /// 设置格式
-    #[inline]
-    pub fn with_format(mut self, format: vk::Format) -> Self {
-        self.format = format;
-        self
-    }
-
-    /// 设置用途
+    /// 设置用途（链式调用）
     #[inline]
     pub fn with_usage(mut self, usage: vk::ImageUsageFlags) -> Self {
         self.usage = usage;
         self
     }
 
-    /// 设置默认视图描述
+    /// 设置默认视图描述（链式调用）
     #[inline]
     pub fn with_default_view(mut self, view_desc: GfxImageViewDesc) -> Self {
         self.default_view_desc = Some(view_desc);
@@ -202,18 +181,14 @@ impl RgImageResource {
 
 // getters
 impl RgImageResource {
-    /// 获取图像格式
-    #[inline]
-    pub fn format(&self) -> vk::Format {
-        self.format
-    }
-
     /// 根据格式推断 aspect flags
+    #[inline]
     pub fn infer_aspect(&self) -> vk::ImageAspectFlags {
         RgImageDesc::infer_aspect(self.format)
     }
 
     /// 获取物理 image handle（仅对导入资源有效）
+    #[inline]
     pub fn physical_handle(&self) -> Option<GfxImageHandle> {
         match &self.source {
             RgImageSource::Imported { image_handle, .. } => Some(*image_handle),
@@ -222,15 +197,11 @@ impl RgImageResource {
     }
 
     /// 获取物理 image view handle（仅对导入资源有效）
+    #[inline]
     pub fn physical_view_handle(&self) -> Option<GfxImageViewHandle> {
         match &self.source {
             RgImageSource::Imported { view_handle, .. } => *view_handle,
             RgImageSource::Transient { .. } => None,
         }
-    }
-
-    /// 检查是否为临时资源
-    pub fn is_transient(&self) -> bool {
-        matches!(&self.source, RgImageSource::Transient { .. })
     }
 }

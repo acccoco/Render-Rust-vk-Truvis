@@ -5,9 +5,9 @@
 
 use super::barrier::{BufferBarrierDesc, PassBarriers, RgImageBarrierDesc};
 use super::graph::DependencyGraph;
-use super::pass::{RgPass, RgPassBuilder, RgPassContext, RgPassNode};
+use super::pass::{RgPass, RgPassBuilder, RgPassContext, RgPassExecutor, RgPassWrapper, RgPassNode};
 use super::resource_handle::{RgBufferHandle, RgImageHandle};
-use super::resource_registry::RgResourceRegistry;
+use super::resource_manager::RgResourceManager;
 use super::resource_state::{RgBufferState, RgImageState};
 use crate::render_graph_v2::{RgBufferResource, RgImageResource};
 use ash::vk;
@@ -16,23 +16,6 @@ use slotmap::SecondaryMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle};
-
-/// 类型擦除的 Pass 执行器 trait
-pub(crate) trait RgPassExecutor {
-    /// 执行 Pass
-    fn execute(&self, ctx: &RgPassContext<'_>);
-}
-
-/// 包装用户 Pass 实现的执行器
-pub(crate) struct RgPassExecutorWrapper<P: RgPass> {
-    pub pass: P,
-}
-
-impl<P: RgPass> RgPassExecutor for RgPassExecutorWrapper<P> {
-    fn execute(&self, ctx: &RgPassContext<'_>) {
-        self.pass.execute(ctx);
-    }
-}
 
 /// RenderGraph 构建器
 ///
@@ -50,10 +33,9 @@ impl<P: RgPass> RgPassExecutor for RgPassExecutorWrapper<P> {
 ///
 /// `'a` 是 Pass 可以借用的外部资源的生命周期。
 /// 这允许 Pass 直接引用外部的 pipeline、geometry 等资源，
-/// 而不需要使用 Rc/Arc 包装。
 pub struct RenderGraphBuilder<'a> {
     /// 资源注册表
-    resources: RgResourceRegistry,
+    resources: RgResourceManager,
 
     /// Pass 节点列表（按添加顺序）
     passes: Vec<RgPassNode<'a>>,
@@ -69,7 +51,7 @@ impl<'a> RenderGraphBuilder<'a> {
     /// 创建新的 RenderGraph 构建器
     pub fn new() -> Self {
         Self {
-            resources: RgResourceRegistry::new(),
+            resources: RgResourceManager::new(),
             passes: Vec::new(),
         }
     }
@@ -137,7 +119,7 @@ impl<'a> RenderGraphBuilder<'a> {
             image_writes: builder.image_writes,
             buffer_reads: builder.buffer_reads,
             buffer_writes: builder.buffer_writes,
-            executor: Box::new(RgPassExecutorWrapper { pass }),
+            executor: Box::new(RgPassWrapper { pass }),
         };
 
         self.passes.push(node);
@@ -179,8 +161,8 @@ impl<'a> RenderGraphBuilder<'a> {
         S: FnMut(&mut RgPassBuilder) + 'a,
         E: Fn(&RgPassContext<'_>) + 'a,
     {
-        use super::pass::LambdaPass;
-        let pass = LambdaPass::new(setup_fn, execute_fn);
+        use super::pass::RgLambdaPassWrapper;
+        let pass = RgLambdaPassWrapper::new(setup_fn, execute_fn);
         self.add_pass(name, pass)
     }
 
@@ -321,7 +303,7 @@ impl<'a> RenderGraphBuilder<'a> {
 /// CompiledGraph 的生命周期不能超过这些外部资源。
 pub struct CompiledGraph<'a> {
     /// 资源注册表
-    resources: RgResourceRegistry,
+    resources: RgResourceManager,
     /// Pass 节点列表
     passes: Vec<RgPassNode<'a>>,
     /// 执行顺序（拓扑排序后）
@@ -583,50 +565,30 @@ impl CompiledGraph<'_> {
 
     /// 格式化 PipelineStageFlags2 为可读字符串
     fn format_pipeline_stage(stage: vk::PipelineStageFlags2) -> String {
-        let mut stages = Vec::new();
+        macro_rules! check_stages {
+            ($($flag:ident => $name:expr),* $(,)?) => {{
+                let mut stages = Vec::new();
+                $(if stage.contains(vk::PipelineStageFlags2::$flag) { stages.push($name); })*
+                stages
+            }};
+        }
 
-        if stage.contains(vk::PipelineStageFlags2::TOP_OF_PIPE) {
-            stages.push("TOP_OF_PIPE");
-        }
-        if stage.contains(vk::PipelineStageFlags2::BOTTOM_OF_PIPE) {
-            stages.push("BOTTOM_OF_PIPE");
-        }
-        if stage.contains(vk::PipelineStageFlags2::VERTEX_INPUT) {
-            stages.push("VERTEX_INPUT");
-        }
-        if stage.contains(vk::PipelineStageFlags2::VERTEX_SHADER) {
-            stages.push("VERTEX_SHADER");
-        }
-        if stage.contains(vk::PipelineStageFlags2::FRAGMENT_SHADER) {
-            stages.push("FRAGMENT_SHADER");
-        }
-        if stage.contains(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT) {
-            stages.push("COLOR_ATTACHMENT_OUTPUT");
-        }
-        if stage.contains(vk::PipelineStageFlags2::EARLY_FRAGMENT_TESTS) {
-            stages.push("EARLY_FRAGMENT_TESTS");
-        }
-        if stage.contains(vk::PipelineStageFlags2::LATE_FRAGMENT_TESTS) {
-            stages.push("LATE_FRAGMENT_TESTS");
-        }
-        if stage.contains(vk::PipelineStageFlags2::COMPUTE_SHADER) {
-            stages.push("COMPUTE_SHADER");
-        }
-        if stage.contains(vk::PipelineStageFlags2::TRANSFER) {
-            stages.push("TRANSFER");
-        }
-        if stage.contains(vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR) {
-            stages.push("RAY_TRACING_SHADER");
-        }
-        if stage.contains(vk::PipelineStageFlags2::ACCELERATION_STRUCTURE_BUILD_KHR) {
-            stages.push("ACCEL_STRUCT_BUILD");
-        }
-        if stage.contains(vk::PipelineStageFlags2::ALL_GRAPHICS) {
-            stages.push("ALL_GRAPHICS");
-        }
-        if stage.contains(vk::PipelineStageFlags2::ALL_COMMANDS) {
-            stages.push("ALL_COMMANDS");
-        }
+        let stages = check_stages![
+            TOP_OF_PIPE => "TOP_OF_PIPE",
+            BOTTOM_OF_PIPE => "BOTTOM_OF_PIPE",
+            VERTEX_INPUT => "VERTEX_INPUT",
+            VERTEX_SHADER => "VERTEX_SHADER",
+            FRAGMENT_SHADER => "FRAGMENT_SHADER",
+            COLOR_ATTACHMENT_OUTPUT => "COLOR_ATTACHMENT_OUTPUT",
+            EARLY_FRAGMENT_TESTS => "EARLY_FRAGMENT_TESTS",
+            LATE_FRAGMENT_TESTS => "LATE_FRAGMENT_TESTS",
+            COMPUTE_SHADER => "COMPUTE_SHADER",
+            TRANSFER => "TRANSFER",
+            RAY_TRACING_SHADER_KHR => "RAY_TRACING",
+            ACCELERATION_STRUCTURE_BUILD_KHR => "ACCEL_BUILD",
+            ALL_GRAPHICS => "ALL_GRAPHICS",
+            ALL_COMMANDS => "ALL_COMMANDS",
+        ];
 
         if stages.is_empty() { format!("{:?}", stage) } else { stages.join(" | ") }
     }
@@ -637,59 +599,33 @@ impl CompiledGraph<'_> {
             return "NONE".to_string();
         }
 
-        let mut flags = Vec::new();
+        macro_rules! check_access {
+            ($($flag:ident => $name:expr),* $(,)?) => {{
+                let mut flags = Vec::new();
+                $(if access.contains(vk::AccessFlags2::$flag) { flags.push($name); })*
+                flags
+            }};
+        }
 
-        if access.contains(vk::AccessFlags2::INDIRECT_COMMAND_READ) {
-            flags.push("INDIRECT_CMD_READ");
-        }
-        if access.contains(vk::AccessFlags2::INDEX_READ) {
-            flags.push("INDEX_READ");
-        }
-        if access.contains(vk::AccessFlags2::VERTEX_ATTRIBUTE_READ) {
-            flags.push("VERTEX_ATTR_READ");
-        }
-        if access.contains(vk::AccessFlags2::UNIFORM_READ) {
-            flags.push("UNIFORM_READ");
-        }
-        if access.contains(vk::AccessFlags2::SHADER_SAMPLED_READ) {
-            flags.push("SHADER_SAMPLED_READ");
-        }
-        if access.contains(vk::AccessFlags2::SHADER_STORAGE_READ) {
-            flags.push("STORAGE_READ");
-        }
-        if access.contains(vk::AccessFlags2::SHADER_STORAGE_WRITE) {
-            flags.push("STORAGE_WRITE");
-        }
-        if access.contains(vk::AccessFlags2::COLOR_ATTACHMENT_READ) {
-            flags.push("COLOR_ATTACH_READ");
-        }
-        if access.contains(vk::AccessFlags2::COLOR_ATTACHMENT_WRITE) {
-            flags.push("COLOR_ATTACH_WRITE");
-        }
-        if access.contains(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_READ) {
-            flags.push("DEPTH_ATTACH_READ");
-        }
-        if access.contains(vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE) {
-            flags.push("DEPTH_ATTACH_WRITE");
-        }
-        if access.contains(vk::AccessFlags2::TRANSFER_READ) {
-            flags.push("TRANSFER_READ");
-        }
-        if access.contains(vk::AccessFlags2::TRANSFER_WRITE) {
-            flags.push("TRANSFER_WRITE");
-        }
-        if access.contains(vk::AccessFlags2::MEMORY_READ) {
-            flags.push("MEMORY_READ");
-        }
-        if access.contains(vk::AccessFlags2::MEMORY_WRITE) {
-            flags.push("MEMORY_WRITE");
-        }
-        if access.contains(vk::AccessFlags2::ACCELERATION_STRUCTURE_READ_KHR) {
-            flags.push("ACCEL_STRUCT_READ");
-        }
-        if access.contains(vk::AccessFlags2::ACCELERATION_STRUCTURE_WRITE_KHR) {
-            flags.push("ACCEL_STRUCT_WRITE");
-        }
+        let flags = check_access![
+            INDIRECT_COMMAND_READ => "INDIRECT_CMD_READ",
+            INDEX_READ => "INDEX_READ",
+            VERTEX_ATTRIBUTE_READ => "VERTEX_ATTR_READ",
+            UNIFORM_READ => "UNIFORM_READ",
+            SHADER_SAMPLED_READ => "SAMPLED_READ",
+            SHADER_STORAGE_READ => "STORAGE_READ",
+            SHADER_STORAGE_WRITE => "STORAGE_WRITE",
+            COLOR_ATTACHMENT_READ => "COLOR_READ",
+            COLOR_ATTACHMENT_WRITE => "COLOR_WRITE",
+            DEPTH_STENCIL_ATTACHMENT_READ => "DEPTH_READ",
+            DEPTH_STENCIL_ATTACHMENT_WRITE => "DEPTH_WRITE",
+            TRANSFER_READ => "TRANSFER_READ",
+            TRANSFER_WRITE => "TRANSFER_WRITE",
+            MEMORY_READ => "MEM_READ",
+            MEMORY_WRITE => "MEM_WRITE",
+            ACCELERATION_STRUCTURE_READ_KHR => "ACCEL_READ",
+            ACCELERATION_STRUCTURE_WRITE_KHR => "ACCEL_WRITE",
+        ];
 
         if flags.is_empty() { format!("{:?}", access) } else { flags.join(" | ") }
     }

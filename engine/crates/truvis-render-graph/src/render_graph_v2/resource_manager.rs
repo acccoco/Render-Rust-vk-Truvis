@@ -8,7 +8,7 @@ use slotmap::SlotMap;
 /// 管理 RenderGraph 中所有声明的资源，提供虚拟句柄到资源信息的映射。
 /// 使用 SlotMap 存储资源，提供稳定的句柄和高效的访问。
 #[derive(Default)]
-pub struct RgResourceRegistry {
+pub struct RgResourceManager {
     /// 图像资源表
     images: SlotMap<RgImageHandle, RgImageResource>,
     /// 缓冲区资源表
@@ -16,7 +16,7 @@ pub struct RgResourceRegistry {
 }
 
 // new & init
-impl RgResourceRegistry {
+impl RgResourceManager {
     /// 创建新的资源注册表
     pub fn new() -> Self {
         Self::default()
@@ -24,7 +24,7 @@ impl RgResourceRegistry {
 }
 
 // register
-impl RgResourceRegistry {
+impl RgResourceManager {
     pub fn register_image(&mut self, rg_image_resource: RgImageResource) -> RgImageHandle {
         self.images.insert(rg_image_resource)
     }
@@ -34,7 +34,7 @@ impl RgResourceRegistry {
 }
 
 // getter & iter
-impl RgResourceRegistry {
+impl RgResourceManager {
     /// 获取图像资源
     #[inline]
     pub fn get_image(&self, handle: RgImageHandle) -> Option<&RgImageResource> {
