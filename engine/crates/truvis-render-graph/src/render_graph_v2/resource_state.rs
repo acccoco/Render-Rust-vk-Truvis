@@ -3,7 +3,6 @@
 //! 封装 Vulkan 的 pipeline stage、access mask 和 image layout，
 //! 提供预定义的常用状态组合。
 
-use crate::render_graph_v2::RgImageSource;
 use ash::vk;
 
 // TODO RgImageState 可以考虑提升到 Gfx 里面去
@@ -145,7 +144,7 @@ impl RgImageState {
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
     );
 
-    pub const PRESENT: Self =
+    pub const PRESENT_BOTTOM: Self =
         Self::new(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::NONE, vk::ImageLayout::PRESENT_SRC_KHR);
 }
 

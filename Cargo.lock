@@ -6158,6 +6158,7 @@ dependencies = [
  "truvis-asset",
  "truvis-crate-tools",
  "truvis-descriptor-layout-macro",
+ "truvis-descriptor-layout-trait",
  "truvis-gfx",
  "truvis-gui-backend",
  "truvis-render-graph",

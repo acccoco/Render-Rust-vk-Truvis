@@ -47,6 +47,8 @@ pub struct RenderGraphBuilder<'a> {
 
     /// 导出资源信息：指定资源的最终状态和可选的 signal semaphore
     export_images: HashMap<RgImageHandle, RgExportInfo>,
+
+    signal_semaphores: Vec<RgSemaphoreInfo>,
 }
 
 impl Default for RenderGraphBuilder<'_> {
@@ -55,6 +57,7 @@ impl Default for RenderGraphBuilder<'_> {
     }
 }
 
+// new & init
 impl<'a> RenderGraphBuilder<'a> {
     /// 创建新的 RenderGraph 构建器
     pub fn new() -> Self {
@@ -62,9 +65,13 @@ impl<'a> RenderGraphBuilder<'a> {
             resources: RgResourceManager::new(),
             passes: Vec::new(),
             export_images: HashMap::new(),
+            signal_semaphores: Vec::new(),
         }
     }
+}
 
+// build 阶段
+impl<'a> RenderGraphBuilder<'a> {
     /// 导入外部图像资源
     ///
     /// # 参数
@@ -142,6 +149,11 @@ impl<'a> RenderGraphBuilder<'a> {
         self.resources.register_buffer(RgBufferResource::transient(name, desc))
     }
 
+    pub fn signal_semaphore(&mut self, semaphore: RgSemaphoreInfo) -> &mut Self {
+        self.signal_semaphores.push(semaphore);
+        self
+    }
+
     /// 添加 Pass
     ///
     /// # 参数
@@ -179,36 +191,6 @@ impl<'a> RenderGraphBuilder<'a> {
         self
     }
 
-    /// 通过闭包添加 Pass
-    ///
-    /// 这是一个便捷方法，允许使用闭包快速定义 Pass，无需创建额外的结构体。
-    ///
-    /// # 参数
-    /// - `name`: Pass 名称（用于调试和性能分析）
-    /// - `setup_fn`: setup 闭包，用于声明资源依赖
-    /// - `execute_fn`: execute 闘包，用于执行渲染逻辑
-    ///
-    /// # 示例
-    ///
-    /// ```ignore
-    /// let input_image = builder.import_image("input", ...);
-    /// let output_image = builder.import_image("output", ...);
-    ///
-    /// builder.add_pass_lambda(
-    ///     "my-compute-pass",
-    ///     |b| {
-    ///         b.read_image(input_image, RgImageState::SHADER_READ_COMPUTE);
-    ///         b.write_image(output_image, RgImageState::STORAGE_WRITE_COMPUTE);
-    ///     },
-    ///     move |ctx| {
-    ///         let cmd = ctx.cmd;
-    ///         // 绑定 pipeline, 设置描述符, dispatch...
-    ///     },
-    /// );
-    /// ```
-    ///
-    /// # 返回
-    /// 返回 `&mut Self` 以支持链式调用
     pub fn add_pass_lambda<S, E>(&mut self, name: impl Into<String>, setup_fn: S, execute_fn: E) -> &mut Self
     where
         S: FnMut(&mut RgPassBuilder) + 'a,
@@ -217,7 +199,10 @@ impl<'a> RenderGraphBuilder<'a> {
         let pass = RgLambdaPassWrapper::new(setup_fn, execute_fn);
         self.add_pass(name, pass)
     }
+}
 
+// compile 阶段
+impl<'a> RenderGraphBuilder<'a> {
     /// 编译渲染图
     ///
     /// 执行依赖分析、拓扑排序、barrier 计算。
@@ -227,7 +212,7 @@ impl<'a> RenderGraphBuilder<'a> {
     ///
     /// # Panics
     /// 如果检测到循环依赖
-    pub fn compile(self) -> CompiledGraph<'a> {
+    pub fn compile(mut self) -> CompiledGraph<'a> {
         let _span = tracy_client::span!("RenderGraphBuilder::compile");
 
         let pass_count = self.passes.len();
@@ -255,7 +240,8 @@ impl<'a> RenderGraphBuilder<'a> {
         let wait_semaphores = self.resources.iter_images().filter_map(|(_, res)| res.wait_semaphore()).collect_vec();
 
         // 收集外部 signal semaphores（来自导出资源）
-        let signal_semaphores = self.export_images.values().filter_map(|info| info.signal_semaphore).collect_vec();
+        let mut signal_semaphores = self.export_images.values().filter_map(|info| info.signal_semaphore).collect_vec();
+        signal_semaphores.append(&mut self.signal_semaphores);
 
         // 计算 epilogue barriers：将导出资源从最后使用状态转换到 final_state
         let epilogue_barriers = self.compute_epilogue_barriers(&final_image_states);

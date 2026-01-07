@@ -1,4 +1,3 @@
-use crate::gui_backend::GuiBackend;
 use crate::gui_mesh::GuiMesh;
 use crate::gui_vertex_layout::ImGuiVertexLayoutAoS;
 use ash::vk;
@@ -16,10 +15,9 @@ use truvis_gfx::{
     },
 };
 use truvis_render_graph::render_context::RenderContext;
-use truvis_render_graph::render_graph_v2::{RgImageHandle, RgPass, RgPassBuilder, RgPassContext};
+use truvis_render_graph::render_graph_v2::{RgImageHandle, RgImageState, RgPass, RgPassBuilder, RgPassContext};
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::handles::GfxImageViewHandle;
-use truvis_render_interface::pipeline_settings::FrameLabel;
 use truvis_shader_binding::truvisl;
 use truvis_shader_binding::truvisl::SrvHandle;
 use truvis_utils::count_indexed_array;
@@ -99,7 +97,6 @@ impl GuiPass {
         canvas_color_view: vk::ImageView,
         canvas_extent: vk::Extent2D,
         cmd: &GfxCommandBuffer,
-        frame_label: FrameLabel,
         gui_mesh: &GuiMesh,
         draw_data: &imgui::DrawData,
         tex_map: &HashMap<TextureId, GfxImageViewHandle>,
@@ -144,6 +141,8 @@ impl GuiPass {
             _padding_0: Default::default(),
             _padding_1: Default::default(),
         };
+
+        let frame_label = render_context.frame_counter.frame_label();
 
         let render_descriptor_sets = &render_context.global_descriptor_sets;
         cmd.bind_descriptor_sets(
@@ -251,25 +250,25 @@ pub struct GuiRgPass<'a> {
 
     // TODO 暂时使用这个肮脏的实现
     pub render_context: &'a RenderContext,
-    pub gui_backend: &'a GuiBackend,
+
+    pub ui_draw_data: &'a imgui::DrawData,
+    pub gui_mesh: &'a GuiMesh,
+    pub tex_map: &'a HashMap<imgui::TextureId, GfxImageViewHandle>,
 
     pub canvas_color: RgImageHandle,
     pub canvas_extent: vk::Extent2D,
-
-    pub gui_mesh: &'a GuiMesh,
-    pub draw_data: &'a imgui::DrawData,
-    pub tex_map: &'a HashMap<TextureId, GfxImageViewHandle>,
 }
 
 impl RgPass for GuiRgPass<'_> {
     fn setup(&mut self, builder: &mut RgPassBuilder) {
-        builder.read_image(
-            self.canvas_color,
-            truvis_render_graph::render_graph_v2::RgImageState::COLOR_ATTACHMENT_READ_WRITE,
-        );
+        builder.read_write_image(self.canvas_color, RgImageState::COLOR_ATTACHMENT_READ_WRITE);
     }
 
     fn execute(&self, ctx: &RgPassContext<'_>) {
+        if self.ui_draw_data.total_vtx_count == 0 {
+            return;
+        }
+
         let cmd = ctx.cmd;
 
         let canvas_color_view_handle =
@@ -281,9 +280,8 @@ impl RgPass for GuiRgPass<'_> {
             canvas_color_view.handle(),
             self.canvas_extent,
             cmd,
-            truvis_render_interface::pipeline_settings::FrameLabel::Main,
             self.gui_mesh,
-            self.draw_data,
+            self.ui_draw_data,
             self.tex_map,
         );
     }

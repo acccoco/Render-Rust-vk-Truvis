@@ -4,11 +4,9 @@ use crate::gui_mesh::GuiMesh;
 use ash::vk;
 use imgui::{DrawData, FontAtlasTexture, TextureId};
 use std::collections::HashMap;
-use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_gfx::{basic::color::LabelColor, gfx::Gfx, resources::image::GfxImage};
 use truvis_render_interface::bindless_manager::BindlessManager;
-use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::handles::GfxImageViewHandle;
@@ -19,8 +17,6 @@ const FONT_TEXTURE_ID: usize = 0;
 const RENDER_IMAGE_ID: usize = 1;
 
 pub struct GuiBackend {
-    pub cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
-
     /// 存放多帧 imgui 的 mesh 数据
     pub gui_meshes: [GuiMesh; FrameCounter::fif_count()],
 
@@ -29,19 +25,21 @@ pub struct GuiBackend {
 
     pub tex_map: HashMap<TextureId, GfxImageViewHandle>,
 }
-// 创建过程
-impl GuiBackend {
-    pub fn new(cmd_allocator: &mut CmdAllocator) -> Self {
-        let gui_meshes = FrameCounter::frame_labes().map(GuiMesh::new);
+impl Default for GuiBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-        let cmds = FrameCounter::frame_labes()
-            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "window-present"));
+// new & init
+impl GuiBackend {
+    pub fn new() -> Self {
+        let gui_meshes = FrameCounter::frame_labes().map(GuiMesh::new);
 
         Self {
             gui_meshes,
             fonts_image_view_handle: None,
             font_tex_id: TextureId::new(0),
-            cmds,
 
             tex_map: Default::default(),
         }
@@ -75,9 +73,11 @@ impl GuiBackend {
     /// 使用 imgui 将 ui 操作编译为 draw data；构建 draw 需要的 mesh 数据
     pub fn prepare_render_data(&mut self, draw_data: &DrawData, frame_label: FrameLabel) {
         Gfx::get().gfx_queue().begin_label("[ui-pass]create-mesh", LabelColor::COLOR_STAGE);
-        self.gui_meshes[*frame_label].grow_if_needed(draw_data);
-        self.gui_meshes[*frame_label].fill_vertex_buffer(draw_data);
-        self.gui_meshes[*frame_label].fill_index_buffer(draw_data);
+        {
+            self.gui_meshes[*frame_label].grow_if_needed(draw_data);
+            self.gui_meshes[*frame_label].fill_vertex_buffer(draw_data);
+            self.gui_meshes[*frame_label].fill_index_buffer(draw_data);
+        }
         Gfx::get().gfx_queue().end_label();
 
         self.tex_map = HashMap::from([(

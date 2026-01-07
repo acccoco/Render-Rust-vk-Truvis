@@ -1,8 +1,8 @@
-use crate::outer_app::OuterApp;
+use crate::outer_app::base::OuterApp;
+use crate::render_pipeline::rt_render_graph::RtPipeline;
 use imgui::Ui;
 use truvis_crate_tools::resource::TruvisPath;
-use truvis_render_graph::render_context::RenderContext;
-use crate::render_pipeline::rt_pass::RtRenderPass;
+use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_renderer::model_loader::assimp_loader::AssimpSceneLoader;
 use truvis_renderer::platform::camera::Camera;
 use truvis_renderer::renderer::Renderer;
@@ -10,7 +10,7 @@ use truvis_shader_binding::truvisl;
 
 #[derive(Default)]
 pub struct CornellApp {
-    rt_pipeline: Option<RtRenderPass>,
+    rt_pipeline: Option<RtPipeline>,
 }
 
 impl CornellApp {
@@ -57,8 +57,11 @@ impl CornellApp {
 
 impl OuterApp for CornellApp {
     fn init(&mut self, renderer: &mut Renderer, camera: &mut Camera) {
-        let rt_pipeline =
-            RtRenderPass::new(&renderer.render_context.global_descriptor_sets, &mut renderer.cmd_allocator);
+        let rt_pipeline = RtPipeline::new(
+            &renderer.render_context.global_descriptor_sets,
+            renderer.render_present.as_ref().unwrap().swapchain.as_ref().unwrap(),
+            &mut renderer.cmd_allocator,
+        );
 
         Self::create_scene(renderer, camera);
 
@@ -67,7 +70,14 @@ impl OuterApp for CornellApp {
 
     fn draw_ui(&mut self, _ui: &Ui) {}
 
-    fn draw(&self, render_context: &RenderContext) {
-        self.rt_pipeline.as_ref().unwrap().render(render_context);
+    fn update(&mut self, _renderer: &mut Renderer) {}
+
+    fn draw(&self, renderer: &Renderer, gui_draw_data: &imgui::DrawData, fence: &GfxSemaphore) {
+        self.rt_pipeline.as_ref().unwrap().render(
+            &renderer.render_context,
+            renderer.render_present.as_ref().unwrap(),
+            gui_draw_data,
+            fence,
+        );
     }
 }

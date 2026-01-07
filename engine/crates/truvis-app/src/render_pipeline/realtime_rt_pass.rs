@@ -10,9 +10,8 @@ use truvis_gfx::{
     pipelines::shader::{GfxShaderGroupInfo, GfxShaderModuleCache, GfxShaderStageInfo},
     resources::special_buffers::sbt_buffer::GfxSBTBuffer,
 };
-use truvis_render_graph::graph::node::ImageNode;
 use truvis_render_graph::render_context::RenderContext;
-use truvis_render_graph::render_graph_v2::{RgImageHandle, RgImageState, RgPass};
+use truvis_render_graph::render_graph_v2::{RgImageHandle, RgImageState, RgPass, RgPassBuilder, RgPassContext};
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle};
 use truvis_shader_binding::truvisl;
@@ -482,11 +481,11 @@ pub struct RealtimeRtRgPass<'a> {
     pub accum_image_extent: vk::Extent2D,
 }
 impl RgPass for RealtimeRtRgPass<'_> {
-    fn setup(&mut self, builder: &mut truvis_render_graph::render_graph_v2::RgPassBuilder) {
+    fn setup(&mut self, builder: &mut RgPassBuilder) {
         builder.read_write_image(self.accum_image, RgImageState::STORAGE_READ_WRITE_RAY_TRACING);
     }
 
-    fn execute(&self, ctx: &truvis_render_graph::render_graph_v2::RgPassContext<'_>) {
+    fn execute(&self, ctx: &RgPassContext<'_>) {
         let (accum_image, accum_image_view) =
             ctx.get_image_and_view_handle(self.accum_image).expect("RealtimeRtRgPass: accum_image_view not found");
 
@@ -496,7 +495,7 @@ impl RgPass for RealtimeRtRgPass<'_> {
             RealtimeRtPassData {
                 accum_image,
                 accum_image_view,
-                accum_image_extent,
+                accum_image_extent: self.accum_image_extent,
             },
         );
     }

@@ -1,22 +1,19 @@
 use ash::vk;
 use truvis_render_graph::render_context::RenderContext;
-use truvis_render_graph::render_graph_v2::{
-    CompiledGraph, RenderGraphBuilder, RgImageHandle, RgImageState, RgPassContext, RgSemaphoreInfo,
-};
+use truvis_render_graph::render_graph_v2::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
 
-use crate::render_pipeline::blit_subpass::{BlitPass, BlitPassData, BlitRgPass};
-use crate::render_pipeline::realtime_rt_subpass::{RealtimeRtPass, RealtimeRtPassData, RealtimeRtRgPass};
-use crate::render_pipeline::resolve_subpass::{ResolvePass, ResolveRgPass};
-use crate::render_pipeline::sdr_subpass::{SdrPass, SdrPassData, SdrRgPass};
+use crate::render_pipeline::blit_pass::{BlitPass, BlitRgPass};
+use crate::render_pipeline::realtime_rt_pass::{RealtimeRtPass, RealtimeRtRgPass};
+use crate::render_pipeline::resolve_pass::{ResolvePass, ResolveRgPass};
+use crate::render_pipeline::sdr_pass::{SdrPass, SdrRgPass};
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
-use truvis_gfx::commands::submit_info::GfxSubmitInfo;
+use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::gfx::Gfx;
 use truvis_gfx::swapchain::swapchain::GfxSwapchain;
-use truvis_gui_backend::gui_pass::GuiPass;
+use truvis_gui_backend::gui_pass::{GuiPass, GuiRgPass};
 use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
-use truvis_render_interface::pipeline_settings::FrameLabel;
 use truvis_renderer::present::render_present::RenderPresent;
 
 pub struct RtPipeline {
@@ -66,43 +63,76 @@ impl RtPipeline {
 
 // render
 impl RtPipeline {
-    pub fn render(&self, render_context: &RenderContext, render_present: &RenderPresent) {
+    pub fn render(
+        &self,
+        render_context: &RenderContext,
+        render_present: &RenderPresent,
+        gui_draw_data: &imgui::DrawData,
+        frame_fence: &GfxSemaphore,
+    ) {
         let frame_label = render_context.frame_counter.frame_label();
+        let frame_id = render_context.frame_counter.frame_id();
 
         // compute subgraph
         let compute_subgraph_submit = {
-            let compute_cmd = self.compute_cmds[*frame_label].clone();
-            let compute_graph = self.prepare_compute_graph(render_context);
+            let mut compute_graph_builder = RenderGraphBuilder::new();
+            self.prepare_compute_graph(&mut compute_graph_builder, render_context);
+            let compute_graph = compute_graph_builder.compile();
 
+            // 调试输出执行计划
+            if log::log_enabled!(log::Level::Debug) {
+                static PRINT_DEBUG_INFO: std::sync::Once = std::sync::Once::new();
+                PRINT_DEBUG_INFO.call_once(|| {
+                    compute_graph.print_execution_plan();
+                });
+            }
+
+            let compute_cmd = &self.compute_cmds[*frame_label];
             compute_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "rt-render-graph");
-            compute_graph.execute(&compute_cmd, &render_context.gfx_resource_manager);
+            compute_graph.execute(compute_cmd, &render_context.gfx_resource_manager);
             compute_cmd.end();
 
-            compute_graph.build_submit_info(std::slice::from_ref(&compute_cmd))
+            compute_graph.build_submit_info(std::slice::from_ref(compute_cmd))
         };
 
         // present subgraph
         let present_subgraph_submit = {
-            let present_cmd = self.present_cmds[*frame_label].clone();
-            let present_graph = self.prepare_present_graph(render_context, render_present);
+            let mut present_graph_builder = RenderGraphBuilder::new();
+            present_graph_builder.signal_semaphore(RgSemaphoreInfo::timeline(
+                frame_fence.handle(),
+                vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
+                frame_id,
+            ));
 
+            self.prepare_present_graph(&mut present_graph_builder, render_context, render_present, gui_draw_data);
+            let present_graph = present_graph_builder.compile();
+
+            // 调试输出执行计划
+            if log::log_enabled!(log::Level::Debug) {
+                static PRINT_DEBUG_INFO: std::sync::Once = std::sync::Once::new();
+                PRINT_DEBUG_INFO.call_once(|| {
+                    present_graph.print_execution_plan();
+                });
+            }
+
+            let present_cmd = &self.present_cmds[*frame_label];
             present_cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "rt-present-graph");
-            present_graph.execute(&present_cmd, &render_context.gfx_resource_manager);
+            present_graph.execute(present_cmd, &render_context.gfx_resource_manager);
             present_cmd.end();
 
-            present_graph.build_submit_info(std::slice::from_ref(&present_cmd))
+            present_graph.build_submit_info(std::slice::from_ref(present_cmd))
         };
 
-        // TODO 在 RenderGraph 的提交时插入 fence
         Gfx::get().gfx_queue().submit(vec![compute_subgraph_submit, present_subgraph_submit], None);
     }
 
-    pub fn prepare_compute_graph(&self, render_context: &RenderContext) -> CompiledGraph {
+    pub fn prepare_compute_graph<'a>(
+        &'a self,
+        rg_builder: &mut RenderGraphBuilder<'a>,
+        render_context: &'a RenderContext,
+    ) {
         let frame_label = render_context.frame_counter.frame_label();
         let fif_buffers = &render_context.fif_buffers;
-
-        // 构建 RenderGraph
-        let mut rg_builder = RenderGraphBuilder::new();
 
         // 导入外部资源
         let accum_image = rg_builder.import_image(
@@ -160,31 +190,17 @@ impl RtPipeline {
                     dst_image_extent: render_context.frame_settings.frame_extent,
                 },
             );
-
-        // 编译 RenderGraph
-        let compiled_graph = rg_builder.compile();
-
-        // 调试输出执行计划
-        if log::log_enabled!(log::Level::Debug) {
-            static PRINT_DEBUG_INFO: std::sync::Once = std::sync::Once::new();
-            PRINT_DEBUG_INFO.call_once(|| {
-                compiled_graph.print_execution_plan();
-            });
-        }
-
-        compiled_graph
     }
 
-    pub fn prepare_present_graph(
-        &self,
-        render_context: &RenderContext,
-        render_present: &RenderPresent,
-    ) -> CompiledGraph {
+    pub fn prepare_present_graph<'a>(
+        &'a self,
+        rg_builder: &mut RenderGraphBuilder<'a>,
+        render_context: &'a RenderContext,
+        render_present: &'a RenderPresent,
+        gui_draw_data: &'a imgui::DrawData,
+    ) {
         let frame_label = render_context.frame_counter.frame_label();
         let fif_buffers = &render_context.fif_buffers;
-
-        // 构建 RenderGraph
-        let mut rg_builder = RenderGraphBuilder::new();
 
         // 导入外部资源
         let (render_target_image_handle, render_target_view_handle) = fif_buffers.render_target_handle(frame_label);
@@ -213,10 +229,10 @@ impl RtPipeline {
         // 导出渲染目标（用于后续呈现）
         rg_builder.export_image(
             present_image,
-            RgImageState::PRESENT,
+            RgImageState::PRESENT_BOTTOM,
             Some(RgSemaphoreInfo::binary(
                 render_present.current_render_compute_semaphore().handle(),
-                vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+                vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
             )),
         );
 
@@ -232,20 +248,20 @@ impl RtPipeline {
                     swapchain_extent: render_present.swapchain_image_info().image_extent,
                 },
             )
-            .add_pass("gui", ());
+            .add_pass(
+                "gui",
+                GuiRgPass {
+                    gui_pass: &self.gui_pass,
+                    render_context,
 
-        // 编译 RenderGraph
-        let compiled_graph = rg_builder.compile();
+                    ui_draw_data: gui_draw_data,
+                    gui_mesh: &render_present.gui_backend.gui_meshes[*frame_label],
+                    tex_map: &render_present.gui_backend.tex_map,
 
-        // 调试输出执行计划
-        if log::log_enabled!(log::Level::Debug) {
-            static PRINT_DEBUG_INFO: std::sync::Once = std::sync::Once::new();
-            PRINT_DEBUG_INFO.call_once(|| {
-                compiled_graph.print_execution_plan();
-            });
-        }
-
-        compiled_graph
+                    canvas_color: present_image,
+                    canvas_extent: render_present.swapchain_image_info().image_extent,
+                },
+            );
     }
 }
 

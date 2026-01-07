@@ -72,14 +72,14 @@ impl<'a> RgPass for SdrRgPass<'a> {
     }
 
     fn execute(&self, ctx: &RgPassContext<'_>) {
-        let src_image = ctx.get_image_view(self.src_image).unwrap();
-        let dst_image = ctx.get_image_view(self.dst_image).unwrap();
+        let src_image = ctx.get_image_view_handle(self.src_image).unwrap();
+        let dst_image = ctx.get_image_view_handle(self.dst_image).unwrap();
 
-        self.exec(
+        self.sdr_pass.exec(
             ctx.cmd,
             SdrPassData {
-                src_image: src_image.handle(),
-                dst_image: dst_image.handle(),
+                src_image,
+                dst_image,
                 src_image_size: self.src_image_extent,
                 dst_image_size: self.dst_image_extent,
             },

@@ -173,7 +173,8 @@ mod tests {
     #[test]
     fn test_image_barrier_layout_change() {
         let handle = create_test_image_handle();
-        let barrier = RgImageBarrierDesc::new(handle, RgImageState::UNDEFINED_TOP, RgImageState::COLOR_ATTACHMENT_WRITE);
+        let barrier =
+            RgImageBarrierDesc::new(handle, RgImageState::UNDEFINED_TOP, RgImageState::COLOR_ATTACHMENT_WRITE);
 
         assert!(barrier.needs_barrier());
     }

@@ -16,9 +16,6 @@ path = "src/bin/sponza_app.rs"
 [[bin]]
 name = "triangle"
 path = "src/bin/triangle_app.rs"
-[[bin]]
-name = "async-test"
-path = "src/bin/async_load_app.rs"
 
 
 [dependencies]

@@ -1,14 +1,14 @@
 use crate::platform::camera::Camera;
 use crate::platform::timer::Timer;
-use crate::present::render_present::{PresentData, RenderPresent};
+use crate::present::render_present::RenderPresent;
 use ash::vk;
-use imgui::DrawData;
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use std::ffi::CStr;
 use truvis_asset::asset_hub::AssetHub;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
+use truvis_gfx::swapchain::swapchain::GfxSwapchainImageInfo;
 use truvis_gfx::utilities::descriptor_cursor::GfxDescriptorCursor;
 use truvis_gfx::{
     commands::{
@@ -25,7 +25,9 @@ use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::global_descriptor_sets::{GlobalDescriptorSets, PerFrameDescriptorBinding};
 use truvis_render_interface::gpu_scene::GpuScene;
-use truvis_render_interface::pipeline_settings::{AccumData, DefaultRendererSettings, FrameSettings, PipelineSettings};
+use truvis_render_interface::pipeline_settings::{
+    AccumData, DefaultRendererSettings, FrameLabel, FrameSettings, PipelineSettings,
+};
 use truvis_render_interface::sampler_manager::RenderSamplerManager;
 use truvis_scene::scene_manager::SceneManager;
 use truvis_shader_binding::truvisl;
@@ -140,8 +142,6 @@ impl Renderer {
     ) {
         self.render_present = Some(RenderPresent::new(
             &mut self.render_context.gfx_resource_manager,
-            &self.render_context.global_descriptor_sets,
-            &mut self.cmd_allocator,
             raw_display_handle,
             raw_window_handle,
             vk::Extent2D {
@@ -162,6 +162,18 @@ impl Renderer {
             .first()
             .copied()
             .unwrap_or(vk::Format::UNDEFINED)
+    }
+}
+// getter
+impl Renderer {
+    #[inline]
+    pub fn swapchain_image_info(&self) -> GfxSwapchainImageInfo {
+        self.render_present.as_ref().unwrap().swapchain_image_info()
+    }
+
+    #[inline]
+    pub fn frame_label(&self) -> FrameLabel {
+        self.render_context.frame_counter.frame_label()
     }
 }
 // destroy
@@ -232,16 +244,6 @@ impl Renderer {
 
     pub fn end_frame(&mut self) {
         let _span = tracy_client::span!("Renderer::end_frame");
-
-        // 设置当前帧结束的 semaphore，用于保护当前帧的资源
-        {
-            let submit_info = GfxSubmitInfo::new(&[]).signal(
-                &self.fif_timeline_semaphore,
-                vk::PipelineStageFlags2::NONE,
-                Some(self.render_context.frame_counter.frame_id()),
-            );
-            Gfx::get().gfx_queue().submit(vec![submit_info], None);
-        }
 
         self.render_context.frame_counter.next_frame();
     }
@@ -395,28 +397,5 @@ impl Renderer {
             PerFrameDescriptorBinding::per_frame_data().write_buffer(perframe_set, 0, perframe_data_buffer_info),
             PerFrameDescriptorBinding::gpu_scene().write_buffer(perframe_set, 0, gpu_scene_buffer_info),
         ]);
-    }
-
-    pub fn draw_to_window(&mut self, ui_draw_data: Option<&DrawData>) {
-        let _span = tracy_client::span!("Renderer::draw_to_window");
-
-        let frame_label = self.render_context.frame_counter.frame_label();
-
-        let present_data = {
-            let (render_target_image_handle, render_target_view_handle) =
-                self.render_context.fif_buffers.render_target_handle(frame_label);
-
-            PresentData {
-                render_target_image_handle,
-                render_target_view_handle,
-                render_target_barrier: GfxBarrierMask {
-                    src_stage: vk::PipelineStageFlags2::COMPUTE_SHADER,
-                    src_access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
-                    dst_stage: vk::PipelineStageFlags2::NONE,
-                    dst_access: vk::AccessFlags2::NONE,
-                },
-            }
-        };
-        self.render_present.as_mut().unwrap().draw(&self.render_context, ui_draw_data, present_data);
     }
 }

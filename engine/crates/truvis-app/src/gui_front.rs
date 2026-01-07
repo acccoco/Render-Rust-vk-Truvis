@@ -248,8 +248,7 @@ impl GuiHost {
     }
 
     /// 确保之前调用过 compile_ui
-    pub fn get_render_data(&self) -> Option<&DrawData> {
-        let draw_data = unsafe { &*(imgui::sys::igGetDrawData() as *mut DrawData) };
-        if draw_data.total_vtx_count == 0 { None } else { Some(draw_data) }
+    pub fn get_render_data(&self) -> &DrawData {
+        unsafe { &*(imgui::sys::igGetDrawData() as *mut DrawData) }
     }
 }

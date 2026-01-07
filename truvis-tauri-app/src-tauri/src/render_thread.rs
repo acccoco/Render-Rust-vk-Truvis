@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
-use truvis_app::outer_app::OuterApp;
+use truvis_app::outer_app::base::OuterApp;
 use truvis_app::platform::input_event::InputEvent;
 use truvis_app::render_app::RenderApp;
 

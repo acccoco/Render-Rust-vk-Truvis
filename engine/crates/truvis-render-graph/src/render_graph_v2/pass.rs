@@ -58,7 +58,7 @@ impl<'a> RgPassContext<'a> {
         self.image_handles.get(handle).map(|(image_handle, view_handle)| {
             let image = self.resource_manager.get_image(*image_handle).unwrap();
             let view = self.resource_manager.get_image_view(*view_handle).unwrap();
-            ((image, view))
+            (image, view)
         })
     }
 }

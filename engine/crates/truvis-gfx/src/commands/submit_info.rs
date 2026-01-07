@@ -62,10 +62,7 @@ impl GfxSubmitInfo {
     #[inline]
     pub fn wait_raw(mut self, semaphore: vk::Semaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
         self.wait_infos.push(
-            vk::SemaphoreSubmitInfo::default()
-                .semaphore(semaphore)
-                .stage_mask(stage)
-                .value(value.unwrap_or_default()),
+            vk::SemaphoreSubmitInfo::default().semaphore(semaphore).stage_mask(stage).value(value.unwrap_or_default()),
         );
         self
     }
@@ -87,10 +84,7 @@ impl GfxSubmitInfo {
     #[inline]
     pub fn signal_raw(mut self, semaphore: vk::Semaphore, stage: vk::PipelineStageFlags2, value: Option<u64>) -> Self {
         self.signal_infos.push(
-            vk::SemaphoreSubmitInfo::default()
-                .semaphore(semaphore)
-                .stage_mask(stage)
-                .value(value.unwrap_or_default()),
+            vk::SemaphoreSubmitInfo::default().semaphore(semaphore).stage_mask(stage).value(value.unwrap_or_default()),
         );
         self
     }

@@ -1,26 +1,18 @@
 use ash::vk;
-use imgui::DrawData;
 use itertools::Itertools;
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
-use truvis_gfx::commands::barrier::{GfxBarrierMask, GfxImageBarrier};
-use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
+use truvis_gfx::commands::barrier::GfxBarrierMask;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
-use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::image::GfxImage;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_gfx::swapchain::surface::GfxSurface;
 use truvis_gfx::swapchain::swapchain::{GfxSwapchain, GfxSwapchainImageInfo};
 use truvis_gui_backend::gui_backend::GuiBackend;
-use truvis_gui_backend::gui_pass::GuiPass;
-use truvis_render_graph::render_context::RenderContext;
-use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
-use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle};
 use truvis_render_interface::pipeline_settings::{DefaultRendererSettings, FrameLabel};
-use truvis_shader_binding::truvisl;
 
 /// 渲染演示数据结构
 ///
@@ -48,12 +40,6 @@ pub struct RenderPresent {
 
     pub gui_backend: GuiBackend,
 
-    /// resolve pass 的命令缓冲区（每帧一个）
-    resolve_cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
-
-    _raw_display_handle: RawDisplayHandle,
-    _raw_window_handle: RawWindowHandle,
-
     /// 数量和 fif num 相同
     pub present_complete_semaphores: [GfxSemaphore; FrameCounter::fif_count()],
 
@@ -68,8 +54,6 @@ pub struct RenderPresent {
 impl RenderPresent {
     pub fn new(
         gfx_resource_manager: &mut GfxResourceManager,
-        global_descriptor_sets: &GlobalDescriptorSets,
-        cmd_allocator: &mut CmdAllocator,
         raw_display_handle: RawDisplayHandle,
         raw_window_handle: RawWindowHandle,
         window_physical_extent: vk::Extent2D,
@@ -87,16 +71,13 @@ impl RenderPresent {
 
         let swapchain_image_infos = swapchain.image_infos();
 
-        let gui_backend = GuiBackend::new(cmd_allocator);
+        let gui_backend = GuiBackend::new();
 
         let present_complete_semaphores = FrameCounter::frame_labes()
             .map(|frame_label| GfxSemaphore::new(&format!("window-present-complete-{}", frame_label)));
         let render_complete_semaphores = (0..swapchain_image_infos.image_cnt)
             .map(|i| GfxSemaphore::new(&format!("window-render-complete-{}", i)))
             .collect_vec();
-
-        let resolve_cmds = FrameCounter::frame_labes()
-            .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "resolve-pass"));
 
         Self {
             surface,
@@ -105,11 +86,8 @@ impl RenderPresent {
             swapchain_image_views: swapchain_image_view_handles,
 
             gui_backend,
-            resolve_cmds,
             present_complete_semaphores,
             render_complete_semaphores,
-            _raw_display_handle: raw_display_handle,
-            _raw_window_handle: raw_window_handle,
 
             window_physical_extent,
             need_resize: false,
@@ -246,107 +224,6 @@ impl RenderPresent {
             Gfx::get().gfx_queue(),
             std::slice::from_ref(&self.render_complete_semaphores[swapchain.current_image_index()]),
         );
-    }
-
-    pub fn draw(&mut self, render_context: &RenderContext, ui_draw_data: Option<&DrawData>, present_data: PresentData) {
-        let resolve_cmd = self.resolve_render_target(render_context, present_data);
-        let gui_cmd = self.draw_gui(render_context, ui_draw_data);
-
-        let swapchain = self.swapchain.as_ref().unwrap();
-        let swapchain_image_idx = swapchain.current_image_index();
-        let frame_label = render_context.frame_counter.frame_label();
-
-        // 合并提交 resolve 和 gui 命令缓冲区
-        // 等待 swapchain 的 image 准备好；通知 swapchain 的 image 已经绘制完成
-        let submit_info = GfxSubmitInfo::new(&[resolve_cmd, gui_cmd])
-            .wait(
-                &self.present_complete_semaphores[*frame_label],
-                vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                None,
-            )
-            .signal(
-                &self.render_complete_semaphores[swapchain_image_idx],
-                vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                None,
-            );
-
-        Gfx::get().gfx_queue().submit(vec![submit_info], None);
-    }
-
-    fn draw_gui(&mut self, render_context: &RenderContext, ui_draw_data: Option<&DrawData>) -> GfxCommandBuffer {
-        let swapchain = self.swapchain.as_ref().unwrap();
-        let frame_label = render_context.frame_counter.frame_label();
-
-        let swapchain_image_handle = self.swapchain_images[swapchain.current_image_index()];
-        let swapchain_image = render_context.gfx_resource_manager.get_image(swapchain_image_handle).unwrap();
-        let swapchain_image_view_handle = self.swapchain_image_views[swapchain.current_image_index()];
-        let swapchain_image_view =
-            render_context.gfx_resource_manager.get_image_view(swapchain_image_view_handle).unwrap();
-
-        let cmd = self.gui_backend.cmds[*frame_label].clone();
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "window-present");
-        {
-            // 注意：swapchain image 已经在 resolve_render_target 中被转换为 COLOR_ATTACHMENT_OPTIMAL
-            // 这里需要等待 resolve pass 完成后再开始绘制 UI
-            cmd.image_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[
-                    // 等待 resolve pass 完成对 swapchain image 的写入
-                    // 注：resolve pass 之后 swapchain image 已经是 COLOR_ATTACHMENT_OPTIMAL
-                    GfxImageBarrier::new()
-                        .image(swapchain_image.handle())
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                        .layout_transfer(
-                            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                        )
-                        .src_mask(
-                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                        )
-                        .dst_mask(
-                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-                        ),
-                ],
-            );
-
-            if let Some(draw_data) = ui_draw_data {
-                self.gui_backend.prepare_render_data(draw_data, render_context.frame_counter.frame_label());
-
-                self.gui_pass.draw(
-                    render_context,
-                    swapchain_image_view.handle(),
-                    swapchain.extent(),
-                    &cmd,
-                    frame_label,
-                    &self.gui_backend.gui_meshes[*frame_label],
-                    draw_data,
-                    &self.gui_backend.tex_map,
-                );
-            }
-
-            cmd.image_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[
-                    // 将 swapchain image layout 转换为 PRESENT_SRC_KHR
-                    // 注意：dst_stage 需要与 submit 时 signal semaphore 的 stage 匹配
-                    // 这样 present 等待 semaphore 时才能确保 layout transition 已完成
-                    GfxImageBarrier::new()
-                        .image(swapchain_image.handle())
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                        .layout_transfer(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, vk::ImageLayout::PRESENT_SRC_KHR)
-                        .src_mask(
-                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-                        )
-                        .dst_mask(vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT, vk::AccessFlags2::empty()),
-                ],
-            );
-        }
-        cmd.end();
-
-        cmd
     }
 }
 

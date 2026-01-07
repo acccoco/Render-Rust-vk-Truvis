@@ -16,6 +16,7 @@ truvis-render-graph = { workspace = true }
 truvis-scene = { workspace = true }
 truvis-utils = { workspace = true }
 truvis-descriptor-layout-macro = { workspace = true }
+truvis-descriptor-layout-trait = { workspace = true }
 truvis-gui-backend = { workspace = true }
 
 log = { workspace = true }

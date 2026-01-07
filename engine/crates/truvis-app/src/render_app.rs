@@ -1,5 +1,5 @@
 use crate::gui_front::GuiHost;
-use crate::outer_app::OuterApp;
+use crate::outer_app::base::OuterApp;
 use crate::platform::camera_controller::CameraController;
 use crate::platform::input_event::InputEvent;
 use crate::platform::input_manager::InputManager;
@@ -28,7 +28,7 @@ pub struct RenderApp {
 }
 // new & init
 impl RenderApp {
-    pub fn new(raw_display_handle: RawDisplayHandle, mut outer_app: Box<dyn OuterApp>) -> Self {
+    pub fn new(raw_display_handle: RawDisplayHandle, outer_app: Box<dyn OuterApp>) -> Self {
         // 追加 window system 需要的 extension，在 windows 下也就是 khr::Surface
         let extra_instance_ext = ash_window::enumerate_required_extensions(raw_display_handle)
             .unwrap()
@@ -36,13 +36,8 @@ impl RenderApp {
             .map(|ext| unsafe { CStr::from_ptr(*ext) })
             .collect();
 
-        let mut renderer = Renderer::new(extra_instance_ext);
-        let mut camera_controller = CameraController::new();
-
-        {
-            let _span = tracy_client::span!("OuterApp::init");
-            outer_app.init(&mut renderer, camera_controller.camera_mut());
-        };
+        let renderer = Renderer::new(extra_instance_ext);
+        let camera_controller = CameraController::new();
 
         Self {
             renderer,
@@ -63,6 +58,11 @@ impl RenderApp {
         self.gui_host.hidpi_factor = window_scale_factor;
 
         self.renderer.init_after_window(raw_display_handle, raw_window_handle, window_physical_size);
+
+        {
+            let _span = tracy_client::span!("OuterApp::init");
+            self.outer_app.as_mut().unwrap().init(&mut self.renderer, self.camera_controller.camera_mut());
+        };
 
         let (fonts_atlas, font_tex_id) = self.gui_host.init_font();
         self.renderer.render_present.as_mut().unwrap().gui_backend.register_font(
@@ -242,6 +242,14 @@ impl RenderApp {
 
             self.build_ui();
             self.gui_host.compile_ui();
+
+            let frame_label = self.renderer.frame_label();
+            self.renderer
+                .render_present
+                .as_mut()
+                .unwrap()
+                .gui_backend
+                .prepare_render_data(self.gui_host.get_render_data(), frame_label);
         }
 
         // 更新 CPU world
@@ -261,8 +269,11 @@ impl RenderApp {
         {
             let _span = tracy_client::span!("Renderer Render");
 
-            self.outer_app.as_mut().unwrap().draw(&self.renderer.render_context);
-            self.renderer.draw_to_window(self.gui_host.get_render_data());
+            self.outer_app.as_mut().unwrap().draw(
+                &self.renderer,
+                self.gui_host.get_render_data(),
+                &self.renderer.fif_timeline_semaphore,
+            );
         }
 
         // GPU 帧的结束

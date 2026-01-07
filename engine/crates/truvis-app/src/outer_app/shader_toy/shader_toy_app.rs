@@ -1,7 +1,14 @@
-use crate::outer_app::OuterApp;
+use crate::outer_app::base::OuterApp;
 use crate::outer_app::shader_toy::shader_toy_pass::ShaderToyPass;
+use ash::vk;
 use imgui::Ui;
-use truvis_render_graph::render_context::RenderContext;
+use itertools::Itertools;
+use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
+use truvis_gfx::commands::semaphore::GfxSemaphore;
+use truvis_gfx::gfx::Gfx;
+use truvis_gui_backend::gui_pass::{GuiPass, GuiRgPass};
+use truvis_render_graph::render_graph_v2::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
+use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::geometry::RtGeometry;
 use truvis_renderer::platform::camera::Camera;
 use truvis_renderer::renderer::Renderer;
@@ -10,23 +17,119 @@ use truvis_scene::shapes::rect::RectSoA;
 #[derive(Default)]
 pub struct ShaderToy {
     rectangle: Option<RtGeometry>,
-    pipeline: Option<ShaderToyPass>,
+    shader_toy_pass: Option<ShaderToyPass>,
+
+    gui_pass: Option<GuiPass>,
+
+    cmds: Vec<GfxCommandBuffer>,
 }
 impl OuterApp for ShaderToy {
     fn init(&mut self, renderer: &mut Renderer, _camera: &mut Camera) {
         log::info!("shader toy.");
 
-        self.pipeline =
-            Some(ShaderToyPass::new(renderer.render_context.frame_settings.color_format, &mut renderer.cmd_allocator));
+        self.shader_toy_pass = Some(ShaderToyPass::new(renderer.swapchain_image_info().image_format));
         self.rectangle = Some(RectSoA::create_mesh());
+        self.gui_pass = Some(GuiPass::new(
+            &renderer.render_context.global_descriptor_sets,
+            renderer.swapchain_image_info().image_format,
+        ));
+
+        self.cmds = FrameCounter::frame_labes()
+            .iter()
+            .map(|label| renderer.cmd_allocator.alloc_command_buffer(*label, "triangle-app"))
+            .collect_vec();
     }
 
     fn draw_ui(&mut self, ui: &Ui) {
         ui.text_wrapped("Hello world!");
         ui.text_wrapped("こんにちは世界！");
     }
+    fn update(&mut self, _renderer: &mut Renderer) {}
 
-    fn draw(&self, render_context: &RenderContext) {
-        self.pipeline.as_ref().unwrap().render(render_context, self.rectangle.as_ref().unwrap());
+    fn draw(&self, renderer: &Renderer, gui_draw_data: &imgui::DrawData, fence: &GfxSemaphore) {
+        let frame_label = renderer.render_context.frame_counter.frame_label();
+        let frame_id = renderer.render_context.frame_counter.frame_id();
+        let render_present = renderer.render_present.as_ref().unwrap();
+
+        let (swapchain_image_handle, swapchain_view_handle) = render_present.current_image_and_view();
+
+        let mut graph = RenderGraphBuilder::new();
+        graph.signal_semaphore(RgSemaphoreInfo::timeline(
+            fence.handle(),
+            vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
+            frame_id,
+        ));
+
+        let swapchain_image_rg_handle = graph.import_image(
+            "swapchain-image",
+            swapchain_image_handle,
+            Some(swapchain_view_handle),
+            render_present.swapchain_image_info().image_format,
+            RgImageState::UNDEFINED_BOTTOM,
+            Some(RgSemaphoreInfo::binary(
+                render_present.current_present_complete_semaphore(frame_label).handle(),
+                vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+            )),
+        );
+
+        graph.export_image(
+            swapchain_image_rg_handle,
+            RgImageState::PRESENT_BOTTOM,
+            Some(RgSemaphoreInfo::binary(
+                render_present.current_render_compute_semaphore().handle(),
+                vk::PipelineStageFlags2::BOTTOM_OF_PIPE,
+            )),
+        );
+
+        graph
+            .add_pass_lambda(
+                "shader-toy",
+                |builder| {
+                    builder.read_write_image(swapchain_image_rg_handle, RgImageState::COLOR_ATTACHMENT_READ_WRITE);
+                },
+                |context| {
+                    let canvas_view = context.get_image_view(swapchain_image_rg_handle).unwrap();
+                    self.shader_toy_pass.as_ref().unwrap().draw(
+                        &renderer.render_context,
+                        context.cmd,
+                        canvas_view,
+                        render_present.swapchain_image_info().image_extent,
+                        self.rectangle.as_ref().unwrap(),
+                    );
+                },
+            )
+            .add_pass(
+                "gui",
+                GuiRgPass {
+                    gui_pass: self.gui_pass.as_ref().unwrap(),
+                    render_context: &renderer.render_context,
+
+                    ui_draw_data: gui_draw_data,
+                    gui_mesh: &render_present.gui_backend.gui_meshes[*frame_label],
+                    tex_map: &render_present.gui_backend.tex_map,
+
+                    canvas_color: swapchain_image_rg_handle,
+                    canvas_extent: render_present.swapchain_image_info().image_extent,
+                },
+            );
+
+        let compiled_graph = graph.compile();
+
+        // 调试输出执行计划
+        if log::log_enabled!(log::Level::Debug) {
+            static PRINT_DEBUG_INFO: std::sync::Once = std::sync::Once::new();
+            PRINT_DEBUG_INFO.call_once(|| {
+                compiled_graph.print_execution_plan();
+            });
+        }
+
+        let cmd = &self.cmds[*frame_label];
+        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "rt-present-graph");
+        compiled_graph.execute(cmd, &renderer.render_context.gfx_resource_manager);
+        cmd.end();
+
+        let submit_info = compiled_graph.build_submit_info(std::slice::from_ref(cmd));
+
+        Gfx::get().gfx_queue().submit(vec![submit_info], None);
     }
 }
