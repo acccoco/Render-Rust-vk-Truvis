@@ -12,6 +12,7 @@ use truvis_gfx::{
 };
 use truvis_render_graph::graph::node::ImageNode;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_render_graph::render_graph_v2::{RgImageHandle, RgImageState, RgPass};
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle};
 use truvis_shader_binding::truvisl;
@@ -32,7 +33,7 @@ impl Drop for GfxRtPipeline {
     }
 }
 
-enumed_map!(ShaderStage<GfxShaderStageInfo>: {
+enumed_map!(ShaderStages<GfxShaderStageInfo>: {
     RayGen: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::RAYGEN_KHR,
         entry_point: c"main_ray_gen",
@@ -68,28 +69,28 @@ enumed_map!(ShaderStage<GfxShaderStageInfo>: {
 enumed_map!(ShaderGroups<GfxShaderGroupInfo>: {
     RayGen: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
-        general: ShaderStage::RayGen.index() as u32,
+        general: ShaderStages::RayGen.index() as u32,
         ..GfxShaderGroupInfo::unused()
     },
     SkyMiss: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
-        general: ShaderStage::SkyMiss.index() as u32,
+        general: ShaderStages::SkyMiss.index() as u32,
         ..GfxShaderGroupInfo::unused()
     },
     ShadowMiss: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
-        general: ShaderStage::ShadowMiss.index() as u32,
+        general: ShaderStages::ShadowMiss.index() as u32,
         ..GfxShaderGroupInfo::unused()
     },
     Hit: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
-        closest_hit: ShaderStage::ClosestHit.index() as u32,
-        any_hit: ShaderStage::TransAny.index() as u32,
+        closest_hit: ShaderStages::ClosestHit.index() as u32,
+        any_hit: ShaderStages::TransAny.index() as u32,
         ..GfxShaderGroupInfo::unused()
     },
     DiffuseCall: GfxShaderGroupInfo {
         ty: vk::RayTracingShaderGroupTypeKHR::GENERAL,
-        general: ShaderStage::DiffuseCall.index() as u32,
+        general: ShaderStages::DiffuseCall.index() as u32,
         ..GfxShaderGroupInfo::unused()
     },
 });
@@ -247,30 +248,15 @@ impl Drop for SBTRegions {
     }
 }
 
-/// pass 的依赖信息
-pub struct SimpleRtPassDep {
-    pub accum_image: ImageNode,
-}
-impl Default for SimpleRtPassDep {
-    fn default() -> Self {
-        Self {
-            accum_image: ImageNode {
-                stage: vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
-                access: vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
-                layout: vk::ImageLayout::GENERAL,
-            },
-        }
-    }
-}
-
 /// 传入 pass 的数据
-pub struct SimpleRtPassData {
+pub struct RealtimeRtPassData {
     pub accum_image: GfxImageHandle,
     pub accum_image_view: GfxImageViewHandle,
+    pub accum_image_extent: vk::Extent2D,
 }
 
 #[derive(DescriptorBinding)]
-struct SimpleRtDescriptorBinding {
+struct RealtimeRtDescriptorBinding {
     #[binding = 0]
     #[descriptor_type = "ACCELERATION_STRUCTURE_KHR"]
     #[stage = "RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR"]
@@ -287,12 +273,12 @@ struct SimpleRtDescriptorBinding {
 pub struct RealtimeRtPass {
     pipeline: GfxRtPipeline,
     _sbt: SBTRegions,
-    _rt_descriptor_set_layout: GfxDescriptorSetLayout<SimpleRtDescriptorBinding>,
+    _rt_descriptor_set_layout: GfxDescriptorSetLayout<RealtimeRtDescriptorBinding>,
 }
 impl RealtimeRtPass {
     pub fn new(render_descriptor_sets: &GlobalDescriptorSets) -> Self {
         let mut shader_module_cache = GfxShaderModuleCache::new();
-        let stage_infos = ShaderStage::iter()
+        let stage_infos = ShaderStages::iter()
             .map(|stage| stage.value())
             .map(|stage| {
                 vk::PipelineShaderStageCreateInfo::default()
@@ -325,7 +311,7 @@ impl RealtimeRtPass {
             .offset(0)
             .size(size_of::<truvisl::rt::PushConstants>() as u32);
 
-        let rt_descriptor_set_layout = GfxDescriptorSetLayout::<SimpleRtDescriptorBinding>::new(
+        let rt_descriptor_set_layout = GfxDescriptorSetLayout::<RealtimeRtDescriptorBinding>::new(
             vk::DescriptorSetLayoutCreateFlags::PUSH_DESCRIPTOR_KHR,
             "simple-rt-descriptor-set-layout",
         );
@@ -376,7 +362,7 @@ impl RealtimeRtPass {
             _rt_descriptor_set_layout: rt_descriptor_set_layout,
         }
     }
-    pub fn ray_trace(&self, render_context: &RenderContext, cmd: &GfxCommandBuffer, pass_data: SimpleRtPassData) {
+    pub fn ray_trace(&self, render_context: &RenderContext, cmd: &GfxCommandBuffer, pass_data: RealtimeRtPassData) {
         let frame_label = render_context.frame_counter.frame_label();
 
         let _rt_handle = render_context.bindless_manager.get_shader_uav_handle(pass_data.accum_image_view);
@@ -393,12 +379,12 @@ impl RealtimeRtPass {
             self.pipeline.pipeline_layout,
             truvisl::RT_SET_NUM,
             &[
-                SimpleRtDescriptorBinding::tlas().write_tals(
+                RealtimeRtDescriptorBinding::tlas().write_tals(
                     vk::DescriptorSet::null(),
                     0,
                     vec![render_context.gpu_scene.tlas(frame_label).unwrap().handle()],
                 ),
-                SimpleRtDescriptorBinding::rt_color().write_image(
+                RealtimeRtDescriptorBinding::rt_color().write_image(
                     vk::DescriptorSet::null(),
                     0,
                     vec![
@@ -461,8 +447,8 @@ impl RealtimeRtPass {
                 &self._sbt.sbt_region_hit,
                 &self._sbt.sbt_region_callable,
                 [
-                    render_context.frame_settings.frame_extent.width,
-                    render_context.frame_settings.frame_extent.height,
+                    pass_data.accum_image_extent.width,
+                    pass_data.accum_image_extent.height,
                     1,
                 ],
             );
@@ -479,9 +465,39 @@ impl Drop for RealtimeRtPass {
 
 mod helper {
     /// round x up to a multiple of align
-    ///
-    /// * align must be a power of 2
     pub fn align_up(x: u32, align: u32) -> u32 {
+        assert!(align.is_power_of_two());
+
         (x + (align - 1)) & !(align - 1)
+    }
+}
+
+pub struct RealtimeRtRgPass<'a> {
+    pub rt_pass: &'a RealtimeRtPass,
+
+    // TODO 暂时使用这个肮脏的实现
+    pub render_context: &'a RenderContext,
+
+    pub accum_image: RgImageHandle,
+    pub accum_image_extent: vk::Extent2D,
+}
+impl RgPass for RealtimeRtRgPass<'_> {
+    fn setup(&mut self, builder: &mut truvis_render_graph::render_graph_v2::RgPassBuilder) {
+        builder.read_write_image(self.accum_image, RgImageState::STORAGE_READ_WRITE_RAY_TRACING);
+    }
+
+    fn execute(&self, ctx: &truvis_render_graph::render_graph_v2::RgPassContext<'_>) {
+        let (accum_image, accum_image_view) =
+            ctx.get_image_and_view_handle(self.accum_image).expect("RealtimeRtRgPass: accum_image_view not found");
+
+        self.rt_pass.ray_trace(
+            self.render_context,
+            ctx.cmd,
+            RealtimeRtPassData {
+                accum_image,
+                accum_image_view,
+                accum_image_extent,
+            },
+        );
     }
 }

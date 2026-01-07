@@ -12,7 +12,7 @@ pub struct RgSemaphoreInfo {
 }
 
 impl RgSemaphoreInfo {
-    /// 创建 binary semaphore 等待
+    /// 创建 binary semaphore
     #[inline]
     pub fn binary(semaphore: vk::Semaphore, stage: vk::PipelineStageFlags2) -> Self {
         Self {
@@ -22,7 +22,7 @@ impl RgSemaphoreInfo {
         }
     }
 
-    /// 创建 timeline semaphore 等待
+    /// 创建 timeline semaphore
     #[inline]
     pub fn timeline(semaphore: vk::Semaphore, stage: vk::PipelineStageFlags2, value: u64) -> Self {
         Self {
@@ -31,22 +31,4 @@ impl RgSemaphoreInfo {
             value: Some(value),
         }
     }
-}
-
-/// 外部 semaphore 等待信息
-///
-/// 用于声明导入资源需要等待的外部信号。
-/// 在渲染图执行时，会将此信息添加到 queue submit 中。
-#[derive(Clone, Copy, Debug)]
-pub struct RgSemaphoreWait {
-    pub info: RgSemaphoreInfo,
-}
-
-/// 外部 semaphore 信号信息
-///
-/// 用于声明导出资源完成后需要发出的信号。
-/// 在渲染图执行时，会将此信息添加到 queue submit 中。
-#[derive(Clone, Copy, Debug)]
-pub struct RgSemaphoreSignal {
-    pub info: RgSemaphoreInfo,
 }

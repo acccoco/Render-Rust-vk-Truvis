@@ -1,10 +1,9 @@
 use super::resource_handle::{RgBufferHandle, RgImageHandle};
-use super::resource_manager::RgResourceManager;
-use crate::render_graph_v2::buffer_resource::RgBufferDesc;
-use crate::render_graph_v2::image_resource::RgImageDesc;
-use crate::render_graph_v2::{RgBufferResource, RgBufferState, RgImageResource, RgImageState};
+use crate::render_graph_v2::{RgBufferState, RgImageState};
 use slotmap::SecondaryMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
+use truvis_gfx::resources::image::GfxImage;
+use truvis_gfx::resources::image_view::GfxImageView;
 use truvis_render_interface::handles::{GfxBufferHandle, GfxImageHandle, GfxImageViewHandle};
 
 /// Pass 执行时的上下文
@@ -25,7 +24,7 @@ pub struct RgPassContext<'a> {
 impl<'a> RgPassContext<'a> {
     /// 获取图像的物理句柄
     #[inline]
-    pub fn get_image(&self, handle: RgImageHandle) -> Option<(GfxImageHandle, GfxImageViewHandle)> {
+    pub fn get_image_and_view_handle(&self, handle: RgImageHandle) -> Option<(GfxImageHandle, GfxImageViewHandle)> {
         self.image_handles.get(handle).copied()
     }
 
@@ -43,15 +42,31 @@ impl<'a> RgPassContext<'a> {
 
     /// 获取缓冲区的物理句柄
     #[inline]
-    pub fn get_buffer(&self, handle: RgBufferHandle) -> Option<GfxBufferHandle> {
+    pub fn get_buffer_handle(&self, handle: RgBufferHandle) -> Option<GfxBufferHandle> {
         self.buffer_handles.get(handle).copied()
+    }
+
+    #[inline]
+    pub fn get_image_view(&self, handle: RgImageHandle) -> Option<&GfxImageView> {
+        self.image_handles
+            .get(handle)
+            .map(|(_, view_handle)| self.resource_manager.get_image_view(*view_handle).unwrap())
+    }
+
+    #[inline]
+    pub fn get_image_and_view(&self, handle: RgImageHandle) -> Option<(&GfxImage, &GfxImageView)> {
+        self.image_handles.get(handle).map(|(image_handle, view_handle)| {
+            let image = self.resource_manager.get_image(*image_handle).unwrap();
+            let view = self.resource_manager.get_image_view(*view_handle).unwrap();
+            ((image, view))
+        })
     }
 }
 
 /// Pass 构建器
 ///
 /// 在 Pass 的 Setup 阶段使用，声明 Pass 的资源依赖。
-pub struct RgPassBuilder<'a> {
+pub struct RgPassBuilder {
     /// Pass 名称
     #[allow(dead_code)]
     pub(crate) name: String,
@@ -64,12 +79,9 @@ pub struct RgPassBuilder<'a> {
     pub(crate) buffer_reads: Vec<(RgBufferHandle, RgBufferState)>,
     /// 缓冲区写入列表
     pub(crate) buffer_writes: Vec<(RgBufferHandle, RgBufferState)>,
-
-    /// 资源注册表引用（用于创建临时资源）
-    pub(crate) resources: &'a mut RgResourceManager,
 }
 
-impl<'a> RgPassBuilder<'a> {
+impl RgPassBuilder {
     /// 声明读取图像
     ///
     /// # 参数
@@ -105,13 +117,6 @@ impl<'a> RgPassBuilder<'a> {
         self.write_image(handle, state)
     }
 
-    /// 创建临时图像
-    ///
-    /// 图像将在编译阶段创建，执行完毕后自动销毁。
-    pub fn create_image(&mut self, name: impl Into<String>, desc: RgImageDesc) -> RgImageHandle {
-        self.resources.register_image(RgImageResource::transient(name, desc))
-    }
-
     /// 声明读取缓冲区
     #[inline]
     pub fn read_buffer(&mut self, handle: RgBufferHandle, state: RgBufferState) -> RgBufferHandle {
@@ -123,11 +128,6 @@ impl<'a> RgPassBuilder<'a> {
     pub fn write_buffer(&mut self, handle: RgBufferHandle, state: RgBufferState) -> RgBufferHandle {
         self.buffer_writes.push((handle, state));
         handle
-    }
-
-    /// 创建临时缓冲区
-    pub fn create_buffer(&mut self, name: impl Into<String>, desc: RgBufferDesc) -> RgBufferHandle {
-        self.resources.register_buffer(RgBufferResource::transient(name, desc))
     }
 }
 

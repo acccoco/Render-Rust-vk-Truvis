@@ -12,8 +12,8 @@ use super::resource_handle::{RgBufferHandle, RgImageHandle};
 use super::resource_manager::RgResourceManager;
 use super::resource_state::{RgBufferState, RgImageState};
 use crate::render_graph_v2::export_info::RgExportInfo;
-use crate::render_graph_v2::semaphore_info::{RgSemaphoreSignal, RgSemaphoreWait};
-use crate::render_graph_v2::{RgBufferResource, RgImageResource};
+use crate::render_graph_v2::semaphore_info::RgSemaphoreInfo;
+use crate::render_graph_v2::{RgBufferDesc, RgBufferResource, RgImageDesc, RgImageResource};
 use ash::vk;
 use itertools::Itertools;
 use slotmap::SecondaryMap;
@@ -84,7 +84,7 @@ impl<'a> RenderGraphBuilder<'a> {
         view_handle: Option<GfxImageViewHandle>,
         format: vk::Format,
         initial_state: RgImageState,
-        wait_semaphore: Option<RgSemaphoreWait>,
+        wait_semaphore: Option<RgSemaphoreInfo>,
     ) -> RgImageHandle {
         self.resources.register_image(RgImageResource::imported(
             name,
@@ -112,7 +112,7 @@ impl<'a> RenderGraphBuilder<'a> {
         &mut self,
         handle: RgImageHandle,
         final_state: RgImageState,
-        signal_semaphore: Option<RgSemaphoreSignal>,
+        signal_semaphore: Option<RgSemaphoreInfo>,
     ) -> &mut Self {
         self.export_images.insert(
             handle,
@@ -134,6 +134,14 @@ impl<'a> RenderGraphBuilder<'a> {
         self.resources.register_buffer(RgBufferResource::imported(name, buffer_handle, initial_state))
     }
 
+    pub fn create_image(&mut self, name: impl Into<String>, desc: RgImageDesc) -> RgImageHandle {
+        self.resources.register_image(RgImageResource::transient(name, desc))
+    }
+
+    pub fn create_buffer(&mut self, name: impl Into<String>, desc: RgBufferDesc) -> RgBufferHandle {
+        self.resources.register_buffer(RgBufferResource::transient(name, desc))
+    }
+
     /// 添加 Pass
     ///
     /// # 参数
@@ -152,7 +160,6 @@ impl<'a> RenderGraphBuilder<'a> {
             image_writes: Vec::new(),
             buffer_reads: Vec::new(),
             buffer_writes: Vec::new(),
-            resources: &mut self.resources,
         };
 
         // 调用 Pass 的 setup 方法
@@ -245,12 +252,10 @@ impl<'a> RenderGraphBuilder<'a> {
         let (barriers, final_image_states) = self.compute_barriers(&execution_order);
 
         // 收集外部 wait semaphores（来自导入资源）
-        let wait_semaphores: Vec<RgSemaphoreWait> =
-            self.resources.iter_images().filter_map(|(_, res)| res.wait_semaphore()).collect();
+        let wait_semaphores = self.resources.iter_images().filter_map(|(_, res)| res.wait_semaphore()).collect_vec();
 
         // 收集外部 signal semaphores（来自导出资源）
-        let signal_semaphores: Vec<RgSemaphoreSignal> =
-            self.export_images.values().filter_map(|info| info.signal_semaphore).collect();
+        let signal_semaphores = self.export_images.values().filter_map(|info| info.signal_semaphore).collect_vec();
 
         // 计算 epilogue barriers：将导出资源从最后使用状态转换到 final_state
         let epilogue_barriers = self.compute_epilogue_barriers(&final_image_states);
@@ -408,9 +413,9 @@ pub struct CompiledGraph<'a> {
     #[allow(dead_code)]
     dep_graph: DependencyGraph,
     /// 收集的外部 wait semaphores（来自导入资源）
-    wait_semaphores: Vec<RgSemaphoreWait>,
+    wait_semaphores: Vec<RgSemaphoreInfo>,
     /// 收集的外部 signal semaphores（来自导出资源）
-    signal_semaphores: Vec<RgSemaphoreSignal>,
+    signal_semaphores: Vec<RgSemaphoreInfo>,
 }
 
 impl CompiledGraph<'_> {
@@ -511,24 +516,24 @@ impl CompiledGraph<'_> {
 
         // 添加 wait semaphores
         for wait in &self.wait_semaphores {
-            submit_info = submit_info.wait_raw(wait.info.semaphore, wait.info.stage, wait.info.value);
+            submit_info = submit_info.wait_raw(wait.semaphore, wait.stage, wait.value);
         }
 
         // 添加 signal semaphores
         for signal in &self.signal_semaphores {
-            submit_info = submit_info.signal_raw(signal.info.semaphore, signal.info.stage, signal.info.value);
+            submit_info = submit_info.signal_raw(signal.semaphore, signal.stage, signal.value);
         }
 
         submit_info
     }
 
     /// 获取 wait semaphores 列表（用于调试或手动构建 submit info）
-    pub fn wait_semaphores(&self) -> &[RgSemaphoreWait] {
+    pub fn wait_semaphores(&self) -> &[RgSemaphoreInfo] {
         &self.wait_semaphores
     }
 
     /// 获取 signal semaphores 列表（用于调试或手动构建 submit info）
-    pub fn signal_semaphores(&self) -> &[RgSemaphoreSignal] {
+    pub fn signal_semaphores(&self) -> &[RgSemaphoreInfo] {
         &self.signal_semaphores
     }
 

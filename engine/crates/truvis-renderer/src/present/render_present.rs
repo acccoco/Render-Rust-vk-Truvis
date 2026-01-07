@@ -10,7 +10,7 @@ use truvis_gfx::gfx::Gfx;
 use truvis_gfx::resources::image::GfxImage;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_gfx::swapchain::surface::GfxSurface;
-use truvis_gfx::swapchain::swapchain::GfxSwapchain;
+use truvis_gfx::swapchain::swapchain::{GfxSwapchain, GfxSwapchainImageInfo};
 use truvis_gui_backend::gui_backend::GuiBackend;
 use truvis_gui_backend::gui_pass::GuiPass;
 use truvis_render_graph::render_context::RenderContext;
@@ -148,6 +148,32 @@ impl RenderPresent {
     }
 }
 
+// getter
+impl RenderPresent {
+    pub fn current_image_and_view(&self) -> (GfxImageHandle, GfxImageViewHandle) {
+        let swapchain = self.swapchain.as_ref().unwrap();
+        let image_idx = swapchain.current_image_index();
+
+        (self.swapchain_images[image_idx], self.swapchain_image_views[image_idx])
+    }
+
+    #[inline]
+    pub fn swapchain_image_info(&self) -> GfxSwapchainImageInfo {
+        self.swapchain.as_ref().unwrap().image_infos()
+    }
+
+    #[inline]
+    pub fn current_render_compute_semaphore(&self) -> &GfxSemaphore {
+        let swapchain = self.swapchain.as_ref().unwrap();
+        &self.render_complete_semaphores[swapchain.current_image_index()]
+    }
+
+    #[inline]
+    pub fn current_present_complete_semaphore(&self, frame_label: FrameLabel) -> &GfxSemaphore {
+        &self.present_complete_semaphores[*frame_label]
+    }
+}
+
 // update
 impl RenderPresent {
     /// 记录窗口的最新尺寸
@@ -220,84 +246,6 @@ impl RenderPresent {
             Gfx::get().gfx_queue(),
             std::slice::from_ref(&self.render_complete_semaphores[swapchain.current_image_index()]),
         );
-    }
-
-    fn resolve_render_target(&mut self, render_context: &RenderContext, present_data: PresentData) -> GfxCommandBuffer {
-        let swapchain = self.swapchain.as_ref().unwrap();
-        let frame_label = render_context.frame_counter.frame_label();
-
-        let swapchain_image_handle = self.swapchain_images[swapchain.current_image_index()];
-        let swapchain_image = render_context.gfx_resource_manager.get_image(swapchain_image_handle).unwrap();
-        let swapchain_image_view_handle = self.swapchain_image_views[swapchain.current_image_index()];
-        let swapchain_image_view =
-            render_context.gfx_resource_manager.get_image_view(swapchain_image_view_handle).unwrap();
-
-        let render_target_image =
-            render_context.gfx_resource_manager.get_image(present_data.render_target_image_handle).unwrap();
-
-        let cmd = self.resolve_cmds[*frame_label].clone();
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "resolve-pass");
-        {
-            // 设置 image barriers
-            cmd.image_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[
-                    // 将 swapchain image layout 转换为 COLOR_ATTACHMENT_OPTIMAL
-                    GfxImageBarrier::new()
-                        .image(swapchain_image.handle())
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                        .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                        // bottom 表示等待 present
-                        .src_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
-                        .dst_mask(
-                            vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                            vk::AccessFlags2::COLOR_ATTACHMENT_WRITE | vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-                        ),
-                    // 将 render target 转换为 SHADER_READ_ONLY_OPTIMAL 以便采样
-                    GfxImageBarrier::new()
-                        .image(render_target_image.handle())
-                        .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                        .layout_transfer(vk::ImageLayout::GENERAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                        .src_mask(
-                            present_data.render_target_barrier.src_stage,
-                            present_data.render_target_barrier.src_access,
-                        )
-                        .dst_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ),
-                ],
-            );
-
-            // 绘制 render target 到 swapchain image（全屏）
-            let target_extent = swapchain.extent();
-            let draw_params = ResolveDrawParams {
-                src_texture: present_data.render_target_view_handle,
-                sampler_type: truvisl::ESamplerType_LinearClamp,
-                offset: glam::Vec2::ZERO,
-                size: glam::vec2(target_extent.width as f32, target_extent.height as f32),
-            };
-
-            self.resolve_subpass.draw(
-                &cmd,
-                render_context,
-                frame_label,
-                swapchain_image_view.handle(),
-                target_extent,
-                &draw_params,
-            );
-
-            // 将 render target 恢复为 GENERAL layout
-            cmd.image_memory_barrier(
-                vk::DependencyFlags::empty(),
-                &[GfxImageBarrier::new()
-                    .image(render_target_image.handle())
-                    .image_aspect_flag(vk::ImageAspectFlags::COLOR)
-                    .layout_transfer(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL, vk::ImageLayout::GENERAL)
-                    .src_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER, vk::AccessFlags2::SHADER_READ)
-                    .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())],
-            );
-        }
-        cmd.end();
-
-        cmd
     }
 
     pub fn draw(&mut self, render_context: &RenderContext, ui_draw_data: Option<&DrawData>, present_data: PresentData) {

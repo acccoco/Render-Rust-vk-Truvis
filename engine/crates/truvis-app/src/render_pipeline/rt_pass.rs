@@ -1,8 +1,8 @@
 use ash::vk;
 
 use crate::render_pipeline::blit_subpass::{BlitPass, BlitPassData, BlitSubpassDep};
-use crate::render_pipeline::sdr_subpass::{SdrPass, SdrSubpassData, SdrSubpassDep};
-use crate::render_pipeline::simple_rt_subpass::{SimpleRtPassData, SimpleRtPassDep, RealtimeRtPass};
+use crate::render_pipeline::sdr_subpass::{SdrPass, SdrPassData, SdrSubpassDep};
+use crate::render_pipeline::realtime_rt_subpass::{RealtimeRtPassData, SimpleRtPassDep, RealtimeRtPass};
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, submit_info::GfxSubmitInfo},
@@ -83,7 +83,7 @@ impl RtRenderPass {
             self.simple_rt_subpass.ray_trace(
                 render_context,
                 &cmd,
-                SimpleRtPassData {
+                RealtimeRtPassData {
                     accum_image_view: fif_buffers.color_image_view_handle(),
                     accum_image: fif_buffers.color_image_handle(),
                 },
@@ -148,7 +148,7 @@ impl RtRenderPass {
 
             self.sdr_subpass.exec(
                 &cmd,
-                SdrSubpassData {
+                SdrPassData {
                     src_image: fif_buffers.color_image_view_handle(),
                     dst_image: render_target_view_handle,
                     src_image_size: frame_settings.frame_extent,

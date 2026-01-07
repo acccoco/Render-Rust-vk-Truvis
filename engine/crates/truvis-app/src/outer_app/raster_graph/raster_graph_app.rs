@@ -128,7 +128,7 @@ impl OuterApp for RasterGraphApp {
             render_target_img,
             Some(render_target_view),
             frame_settings.color_format,
-            RgImageState::UNDEFINED,
+            RgImageState::UNDEFINED_TOP,
             None, // 无外部 semaphore 等待
         );
 
@@ -137,7 +137,7 @@ impl OuterApp for RasterGraphApp {
             depth_img,
             Some(depth_view),
             frame_settings.depth_format,
-            RgImageState::UNDEFINED,
+            RgImageState::UNDEFINED_TOP,
             None, // 无外部 semaphore 等待
         );
 

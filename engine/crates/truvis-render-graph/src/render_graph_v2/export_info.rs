@@ -1,5 +1,5 @@
 use crate::render_graph_v2::RgImageState;
-use crate::render_graph_v2::semaphore_info::RgSemaphoreSignal;
+use crate::render_graph_v2::semaphore_info::RgSemaphoreInfo;
 
 /// 导出资源信息
 ///
@@ -9,7 +9,7 @@ pub struct RgExportInfo {
     /// 资源的最终状态（layout, access, stage）
     pub final_state: RgImageState,
     /// 可选的信号 semaphore
-    pub signal_semaphore: Option<RgSemaphoreSignal>,
+    pub signal_semaphore: Option<RgSemaphoreInfo>,
 }
 
 impl RgExportInfo {
@@ -24,7 +24,7 @@ impl RgExportInfo {
 
     /// 创建导出信息（带 semaphore）
     #[inline]
-    pub fn with_signal(final_state: RgImageState, signal_semaphore: RgSemaphoreSignal) -> Self {
+    pub fn with_signal(final_state: RgImageState, signal_semaphore: RgSemaphoreInfo) -> Self {
         Self {
             final_state,
             signal_semaphore: Some(signal_semaphore),

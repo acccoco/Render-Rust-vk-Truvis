@@ -1,8 +1,8 @@
 use crate::render_graph_v2::RgImageState;
+use crate::render_graph_v2::semaphore_info::RgSemaphoreInfo;
 use ash::vk;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle};
-use crate::render_graph_v2::semaphore_info::RgSemaphoreWait;
 
 /// 图像资源描述（用于创建临时资源）
 ///
@@ -54,7 +54,13 @@ impl RgImageDesc {
     /// 创建 2D 图像描述
     #[inline]
     pub fn new_2d(width: u32, height: u32, format: vk::Format, usage: vk::ImageUsageFlags) -> Self {
-        Self { width, height, format, usage, ..Default::default() }
+        Self {
+            width,
+            height,
+            format,
+            usage,
+            ..Default::default()
+        }
     }
 
     /// 设置用途（链式调用）
@@ -126,7 +132,7 @@ pub enum RgImageSource {
         image_handle: GfxImageHandle,
         view_handle: Option<GfxImageViewHandle>,
         /// 可选的外部 semaphore 等待（在首次使用此资源前等待）
-        wait_semaphore: Option<RgSemaphoreWait>,
+        wait_semaphore: Option<RgSemaphoreInfo>,
     },
     /// 由 RenderGraph 创建的临时图像
     Transient { desc: RgImageDesc },
@@ -164,7 +170,7 @@ impl RgImageResource {
         view_handle: Option<GfxImageViewHandle>,
         format: vk::Format,
         initial_state: RgImageState,
-        wait_semaphore: Option<RgSemaphoreWait>,
+        wait_semaphore: Option<RgSemaphoreInfo>,
     ) -> Self {
         Self {
             source: RgImageSource::Imported {
@@ -184,7 +190,7 @@ impl RgImageResource {
         let format = desc.format;
         Self {
             source: RgImageSource::Transient { desc },
-            current_state: RgImageState::UNDEFINED,
+            current_state: RgImageState::UNDEFINED_TOP,
             format,
             name: name.into(),
             version: 0,
@@ -220,7 +226,7 @@ impl RgImageResource {
 
     /// 获取等待的外部 semaphore（仅对导入资源有效）
     #[inline]
-    pub fn wait_semaphore(&self) -> Option<RgSemaphoreWait> {
+    pub fn wait_semaphore(&self) -> Option<RgSemaphoreInfo> {
         match &self.source {
             RgImageSource::Imported { wait_semaphore, .. } => *wait_semaphore,
             RgImageSource::Transient { .. } => None,

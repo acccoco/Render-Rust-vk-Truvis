@@ -1,3 +1,4 @@
+use crate::gui_backend::GuiBackend;
 use crate::gui_mesh::GuiMesh;
 use crate::gui_vertex_layout::ImGuiVertexLayoutAoS;
 use ash::vk;
@@ -15,6 +16,7 @@ use truvis_gfx::{
     },
 };
 use truvis_render_graph::render_context::RenderContext;
+use truvis_render_graph::render_graph_v2::{RgImageHandle, RgPass, RgPassBuilder, RgPassContext};
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::handles::GfxImageViewHandle;
 use truvis_render_interface::pipeline_settings::FrameLabel;
@@ -241,5 +243,48 @@ impl GuiPass {
             vertex_offset += draw_list.vtx_buffer().len() as i32;
         }
         cmd.end_rendering();
+    }
+}
+
+pub struct GuiRgPass<'a> {
+    pub gui_pass: &'a GuiPass,
+
+    // TODO 暂时使用这个肮脏的实现
+    pub render_context: &'a RenderContext,
+    pub gui_backend: &'a GuiBackend,
+
+    pub canvas_color: RgImageHandle,
+    pub canvas_extent: vk::Extent2D,
+
+    pub gui_mesh: &'a GuiMesh,
+    pub draw_data: &'a imgui::DrawData,
+    pub tex_map: &'a HashMap<TextureId, GfxImageViewHandle>,
+}
+
+impl RgPass for GuiRgPass<'_> {
+    fn setup(&mut self, builder: &mut RgPassBuilder) {
+        builder.read_image(
+            self.canvas_color,
+            truvis_render_graph::render_graph_v2::RgImageState::COLOR_ATTACHMENT_READ_WRITE,
+        );
+    }
+
+    fn execute(&self, ctx: &RgPassContext<'_>) {
+        let cmd = ctx.cmd;
+
+        let canvas_color_view_handle =
+            ctx.get_image_view_handle(self.canvas_color).expect("GuiPass: canvas_color not found");
+        let canvas_color_view = ctx.resource_manager.get_image_view(canvas_color_view_handle).unwrap();
+
+        self.gui_pass.draw(
+            self.render_context,
+            canvas_color_view.handle(),
+            self.canvas_extent,
+            cmd,
+            truvis_render_interface::pipeline_settings::FrameLabel::Main,
+            self.gui_mesh,
+            self.draw_data,
+            self.tex_map,
+        );
     }
 }

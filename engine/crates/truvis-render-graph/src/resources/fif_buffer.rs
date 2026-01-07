@@ -19,13 +19,19 @@ pub struct FifBuffers {
     /// RT 计算的累积结果
     pub accum_image: GfxImageHandle,
     pub accum_image_view: GfxImageViewHandle,
+    accum_format: vk::Format,
+    accum_extent: vk::Extent2D,
 
     pub depth_image: GfxImageHandle,
     pub depth_image_view: GfxImageViewHandle,
+    depth_format: vk::Format,
+    depth_extent: vk::Extent2D,
 
     /// 离屏渲染的结果，数量和 fif 相同
     pub off_screen_target_image_handles: [GfxImageHandle; FrameCounter::fif_count()],
     pub off_screen_target_view_handles: [GfxImageViewHandle; FrameCounter::fif_count()],
+    render_target_format: vk::Format,
+    render_target_extent: vk::Extent2D,
 }
 // new & init
 impl FifBuffers {
@@ -35,20 +41,40 @@ impl FifBuffers {
         gfx_resource_manager: &mut GfxResourceManager,
         frame_counter: &FrameCounter,
     ) -> Self {
+        let accum_format = frame_settigns.color_format;
+        let accum_extent = frame_settigns.frame_extent;
         let (color_image, color_image_view) =
-            Self::create_color_image(gfx_resource_manager, frame_settigns, frame_counter);
+            Self::create_color_image(gfx_resource_manager, accum_format, accum_extent, frame_counter);
+
+        let depth_format = frame_settigns.depth_format;
+        let depth_extent = frame_settigns.frame_extent;
         let (depth_image, depth_image_view) =
-            Self::create_depth_image(gfx_resource_manager, frame_settigns, frame_counter);
-        let (render_target_image_handles, render_target_image_view_handles) =
-            Self::create_render_targets(gfx_resource_manager, frame_settigns, frame_counter);
+            Self::create_depth_image(gfx_resource_manager, depth_format, depth_extent, frame_counter);
+
+        let render_target_format = frame_settigns.color_format;
+        let render_target_extent = frame_settigns.frame_extent;
+        let (render_target_image_handles, render_target_image_view_handles) = Self::create_render_targets(
+            gfx_resource_manager,
+            render_target_format,
+            render_target_extent,
+            frame_counter,
+        );
 
         let fif_buffers = Self {
             accum_image: color_image,
             accum_image_view: color_image_view,
+            accum_format,
+            accum_extent,
+
             depth_image,
             depth_image_view,
+            depth_extent,
+            depth_format,
+
             off_screen_target_image_handles: render_target_image_handles,
             off_screen_target_view_handles: render_target_image_view_handles,
+            render_target_format,
+            render_target_extent,
         };
         fif_buffers.register_bindless(bindless_manager);
         fif_buffers
@@ -85,12 +111,13 @@ impl FifBuffers {
     /// 创建 RayTracing 需要的 image
     fn create_color_image(
         gfx_resource_manager: &mut GfxResourceManager,
-        frame_settings: &FrameSettings,
+        format: vk::Format,
+        extent: vk::Extent2D,
         frame_counter: &FrameCounter,
     ) -> (GfxImageHandle, GfxImageViewHandle) {
         let color_image_create_info = GfxImageCreateInfo::new_image_2d_info(
-            frame_settings.frame_extent,
-            frame_settings.color_format,
+            extent,
+            format,
             vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED,
         );
 
@@ -122,7 +149,7 @@ impl FifBuffers {
         let color_image_handle = gfx_resource_manager.register_image(color_image);
         let color_image_view_handle = gfx_resource_manager.get_or_create_image_view(
             color_image_handle,
-            GfxImageViewDesc::new_2d(frame_settings.color_format, vk::ImageAspectFlags::COLOR),
+            GfxImageViewDesc::new_2d(format, vk::ImageAspectFlags::COLOR),
             format!("fif-buffer-color-{}", frame_counter.frame_id()),
         );
 
@@ -131,14 +158,12 @@ impl FifBuffers {
 
     fn create_depth_image(
         gfx_resource_manager: &mut GfxResourceManager,
-        frame_settings: &FrameSettings,
+        format: vk::Format,
+        extent: vk::Extent2D,
         frame_counter: &FrameCounter,
     ) -> (GfxImageHandle, GfxImageViewHandle) {
-        let depth_image_create_info = GfxImageCreateInfo::new_image_2d_info(
-            frame_settings.frame_extent,
-            frame_settings.depth_format,
-            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-        );
+        let depth_image_create_info =
+            GfxImageCreateInfo::new_image_2d_info(extent, format, vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT);
         let depth_image = GfxImage::new(
             &depth_image_create_info,
             &vk_mem::AllocationCreateInfo {
@@ -150,7 +175,7 @@ impl FifBuffers {
         let depth_image_handle = gfx_resource_manager.register_image(depth_image);
         let depth_image_view_handle = gfx_resource_manager.get_or_create_image_view(
             depth_image_handle,
-            GfxImageViewDesc::new_2d(frame_settings.depth_format, vk::ImageAspectFlags::DEPTH),
+            GfxImageViewDesc::new_2d(format, vk::ImageAspectFlags::DEPTH),
             format!("fif-buffer-depth-{}", frame_counter.frame_id()),
         );
 
@@ -159,15 +184,16 @@ impl FifBuffers {
 
     fn create_render_targets(
         gfx_resource_manager: &mut GfxResourceManager,
-        frame_settings: &FrameSettings,
+        format: vk::Format,
+        extent: vk::Extent2D,
         frame_counter: &FrameCounter,
     ) -> ([GfxImageHandle; FrameCounter::fif_count()], [GfxImageViewHandle; FrameCounter::fif_count()]) {
         let create_one_target = |fif_labe: FrameLabel| {
             let name = format!("render-target-{}-{}", fif_labe, frame_counter.frame_id());
 
             let image_create_info = GfxImageCreateInfo::new_image_2d_info(
-                frame_settings.frame_extent,
-                frame_settings.color_format,
+                extent,
+                format,
                 vk::ImageUsageFlags::STORAGE
                     | vk::ImageUsageFlags::TRANSFER_SRC
                     | vk::ImageUsageFlags::SAMPLED
@@ -209,7 +235,7 @@ impl FifBuffers {
         let image_view_handles = FrameCounter::frame_labes().map(|frame_label| {
             gfx_resource_manager.get_or_create_image_view(
                 image_handles[*frame_label],
-                GfxImageViewDesc::new_2d(frame_settings.color_format, vk::ImageAspectFlags::COLOR),
+                GfxImageViewDesc::new_2d(format, vk::ImageAspectFlags::COLOR),
                 format!("render-target-{}-{}", frame_label, frame_counter.frame_id()),
             )
         });
@@ -273,5 +299,20 @@ impl FifBuffers {
     #[inline]
     pub fn color_image_view_handle(&self) -> GfxImageViewHandle {
         self.accum_image_view
+    }
+
+    #[inline]
+    pub fn color_image_format(&self) -> vk::Format {
+        self.accum_format
+    }
+
+    #[inline]
+    pub fn color_image_extent(&self) -> vk::Extent2D {
+        self.accum_extent
+    }
+
+    #[inline]
+    pub fn render_target_format(&self) -> vk::Format {
+        self.render_target_format
     }
 }

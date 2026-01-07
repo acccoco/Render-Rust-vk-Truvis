@@ -9,9 +9,9 @@ use truvis_gfx::pipelines::graphics_pipeline::{GfxGraphicsPipeline, GfxGraphicsP
 use truvis_gfx::pipelines::rendering_info::GfxRenderingInfo;
 use truvis_gfx::pipelines::shader::GfxShaderStageInfo;
 use truvis_render_graph::render_context::RenderContext;
+use truvis_render_graph::render_graph_v2::{RgImageHandle, RgImageState, RgPass, RgPassBuilder, RgPassContext};
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::handles::GfxImageViewHandle;
-use truvis_render_interface::pipeline_settings::FrameLabel;
 use truvis_shader_binding::truvisl;
 use truvis_utils::count_indexed_array;
 use truvis_utils::enumed_map;
@@ -30,9 +30,9 @@ enumed_map!(ShaderStage<GfxShaderStageInfo>: {
 });
 
 /// 用于绘制的参数
-pub struct ResolveDrawParams {
+pub struct ResolvePassData {
     /// 源图像的 texture handle（将从 bindless_textures 中采样）
-    pub src_texture: GfxImageViewHandle,
+    pub render_target: GfxImageViewHandle,
     /// 采样器类型
     pub sampler_type: truvisl::ESamplerType,
     /// 在 color attachment 上的偏移量（像素坐标）
@@ -121,13 +121,14 @@ impl ResolvePass {
         &self,
         cmd: &GfxCommandBuffer,
         render_context: &RenderContext,
-        frame_label: FrameLabel,
         color_attachment: vk::ImageView,
         target_extent: vk::Extent2D,
-        params: &ResolveDrawParams,
+        params: &ResolvePassData,
     ) {
+        let frame_label = render_context.frame_counter.frame_label();
+
         // 获取源图像的 bindless handle
-        let src_srv_handle = render_context.bindless_manager.get_shader_srv_handle(params.src_texture);
+        let src_srv_handle = render_context.bindless_manager.get_shader_srv_handle(params.render_target);
 
         // 构造 push constant
         let push_constant = truvisl::resolve::PushConstant {
@@ -194,5 +195,46 @@ impl ResolvePass {
         cmd.cmd_draw(6, 1, 0, 0);
 
         cmd.end_rendering();
+    }
+}
+
+pub struct ResolveRgPass<'a> {
+    pub resolve_pass: &'a ResolvePass,
+
+    // TODO 暂时使用这个肮脏的实现
+    pub render_context: &'a RenderContext,
+
+    pub render_target: RgImageHandle,
+    pub swapchain_image: RgImageHandle,
+
+    pub swapchain_extent: vk::Extent2D,
+}
+
+impl RgPass for ResolveRgPass<'_> {
+    fn setup(&mut self, builder: &mut RgPassBuilder) {
+        // 声明写入 render target
+        builder.read_image(self.render_target, RgImageState::SHADER_READ_FRAGMENT);
+        builder.write_image(self.swapchain_image, RgImageState::COLOR_ATTACHMENT_READ_WRITE);
+    }
+
+    fn execute(&self, ctx: &RgPassContext<'_>) {
+        let cmd = ctx.cmd;
+
+        let swapchain_image_view = ctx.get_image_view(self.swapchain_image).expect("ResolvePass: src_image not found");
+        let render_target_view_handle =
+            ctx.get_image_view_handle(self.render_target).expect("ResolvePass: render_target not found");
+
+        self.resolve_pass.draw(
+            cmd,
+            self.render_context,
+            swapchain_image_view.handle(),
+            self.swapchain_extent,
+            &ResolvePassData {
+                render_target: render_target_view_handle,
+                sampler_type: truvisl::ESamplerType_LinearClamp,
+                offset: glam::vec2(0.0, 0.0),
+                size: glam::vec2(self.swapchain_extent.width as f32, self.swapchain_extent.height as f32),
+            },
+        );
     }
 }

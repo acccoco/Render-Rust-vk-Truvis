@@ -20,3 +20,4 @@ pub use pass::{RgPass, RgPassBuilder, RgPassContext, RgPassNode};
 pub use resource_handle::{RgBufferHandle, RgImageHandle};
 pub use resource_manager::RgResourceManager;
 pub use resource_state::{RgBufferState, RgImageState};
+pub use semaphore_info::RgSemaphoreInfo;
