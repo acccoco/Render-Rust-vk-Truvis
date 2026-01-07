@@ -3,13 +3,12 @@ use std::rc::Rc;
 use ash::vk;
 use itertools::Itertools;
 
-use crate::apis::render_pass::RenderSubpass;
-use crate::render_context::RenderContext;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::pipelines::graphics_pipeline::{GfxGraphicsPipeline, GfxGraphicsPipelineCreateInfo, GfxPipelineLayout};
 use truvis_gfx::pipelines::rendering_info::GfxRenderingInfo;
 use truvis_gfx::pipelines::shader::GfxShaderStageInfo;
+use truvis_render_graph::render_context::RenderContext;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::handles::GfxImageViewHandle;
 use truvis_render_interface::pipeline_settings::FrameLabel;
@@ -49,20 +48,18 @@ pub struct ResolveDrawParams {
 /// - 使用固定的边长为1的正方形作为顶点（无需顶点缓冲区，顶点数据在着色器中内置）
 /// - 通过 bindless descriptor 指定需要绘制的 image
 /// - 使用 push constant 传递 offset、size 等参数
-pub struct ResolveSubpass {
+pub struct ResolvePass {
     pipeline: GfxGraphicsPipeline,
     pipeline_layout: Rc<GfxPipelineLayout>,
 }
 
-impl RenderSubpass for ResolveSubpass {}
-
-impl ResolveSubpass {
+impl ResolvePass {
     /// 创建 ResolveSubpass
     ///
     /// # 参数
     /// - `color_format`: color attachment 的格式
     /// - `render_descriptor_sets`: 全局描述符集
-    pub fn new(color_format: vk::Format, render_descriptor_sets: &GlobalDescriptorSets) -> Self {
+    pub fn new(global_descriptor_sets: &GlobalDescriptorSets, color_format: vk::Format) -> Self {
         let mut pipeline_ci = GfxGraphicsPipelineCreateInfo::default();
 
         // 着色器阶段
@@ -98,7 +95,7 @@ impl ResolveSubpass {
             .size(size_of::<truvisl::resolve::PushConstant>() as u32);
 
         let pipeline_layout = Rc::new(GfxPipelineLayout::new(
-            &render_descriptor_sets.global_set_layouts(),
+            &global_descriptor_sets.global_set_layouts(),
             &[push_constant_range],
             "resolve-pass",
         ));

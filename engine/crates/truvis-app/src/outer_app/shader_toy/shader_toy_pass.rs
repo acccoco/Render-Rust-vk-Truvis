@@ -175,8 +175,6 @@ pub struct ShaderToyPass {
     shader_toy_cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 }
 
-impl RenderPass for ShaderToyPass {}
-
 impl ShaderToyPass {
     pub fn new(color_format: vk::Format, cmd_allocator: &mut CmdAllocator) -> Self {
         let shader_toy_pass = ShaderToySubpass::new(color_format);

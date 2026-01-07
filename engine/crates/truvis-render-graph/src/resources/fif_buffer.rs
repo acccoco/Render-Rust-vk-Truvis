@@ -13,6 +13,7 @@ use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
 use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle};
 use truvis_render_interface::pipeline_settings::{FrameLabel, FrameSettings};
 
+// TODO FifBuffers 放到 app 里面去，由 App 进行管理
 /// 所有帧会用到的 buffers
 pub struct FifBuffers {
     /// RT 计算的累积结果

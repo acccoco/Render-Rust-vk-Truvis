@@ -18,7 +18,6 @@ use truvis_gfx::{
     gfx::Gfx,
 };
 use truvis_render_graph::render_context::RenderContext;
-use truvis_render_graph::render_graph::RenderGraph;
 use truvis_render_graph::resources::fif_buffer::FifBuffers;
 use truvis_render_interface::bindless_manager::BindlessManager;
 use truvis_render_interface::cmd_allocator::CmdAllocator;
@@ -51,7 +50,6 @@ pub struct Renderer {
 
     pub timer: Timer,
     pub fif_timeline_semaphore: GfxSemaphore,
-    pub render_graph: RenderGraph,
 
     gpu_scene_update_cmds: Vec<GfxCommandBuffer>,
 
@@ -111,7 +109,6 @@ impl Renderer {
             fif_timeline_semaphore,
             gpu_scene_update_cmds: cmds,
             render_present: None,
-            render_graph: RenderGraph::default(),
 
             render_context: RenderContext {
                 asset_hub,
@@ -261,12 +258,6 @@ impl Renderer {
         self.render_context.accum_data.update_accum_frames(current_camera_dir, camera.position);
         self.update_gpu_scene(camera);
         self.update_perframe_descriptor_set();
-
-        self.prepare_render_graph();
-    }
-
-    pub fn prepare_render_graph(&mut self) {
-        self.render_graph.maps.clear();
     }
 
     #[inline]

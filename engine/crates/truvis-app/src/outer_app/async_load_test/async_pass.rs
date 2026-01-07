@@ -15,7 +15,6 @@ use truvis_gfx::{
         shader::GfxShaderStageInfo,
     },
 };
-use truvis_render_graph::apis::render_pass::{RenderPass, RenderSubpass};
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
@@ -42,7 +41,6 @@ pub struct AsyncSubpass {
     pipeline: GfxGraphicsPipeline,
     pipeline_layout: Rc<GfxPipelineLayout>,
 }
-impl RenderSubpass for AsyncSubpass {}
 impl AsyncSubpass {
     pub fn new(render_descriptor_sets: &GlobalDescriptorSets, frame_settings: &FrameSettings) -> Self {
         let mut pipeline_ci = GfxGraphicsPipelineCreateInfo::default();
@@ -154,8 +152,6 @@ pub struct AsyncPass {
 
     cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 }
-
-impl RenderPass for AsyncPass {}
 
 impl AsyncPass {
     pub fn new(

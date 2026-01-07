@@ -1,19 +1,18 @@
 use std::ffi::CStr;
 
-use crate::apis::render_pass::RenderSubpass;
 use crate::render_context::RenderContext;
 use ash::vk;
 use truvis_gfx::{commands::command_buffer::GfxCommandBuffer, gfx::Gfx, pipelines::shader::GfxShaderModule};
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 
 /// 泛型参数 P 表示 compute shader 的参数，以 push constant 的形式传入 shader
-pub struct ComputeSubpass<P: bytemuck::Pod> {
+pub struct ComputePass<P: bytemuck::Pod> {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
 
     _phantom: std::marker::PhantomData<P>,
 }
-impl<P: bytemuck::Pod> ComputeSubpass<P> {
+impl<P: bytemuck::Pod> ComputePass<P> {
     pub fn new(global_descriptor_sets: &GlobalDescriptorSets, entry_point: &CStr, shader_path: &str) -> Self {
         let shader_module = GfxShaderModule::new(std::path::Path::new(shader_path));
         let stage_info = vk::PipelineShaderStageCreateInfo::default()
@@ -74,8 +73,7 @@ impl<P: bytemuck::Pod> ComputeSubpass<P> {
         // drop
     }
 }
-impl<P: bytemuck::Pod> RenderSubpass for ComputeSubpass<P> {}
-impl<P: bytemuck::Pod> Drop for ComputeSubpass<P> {
+impl<P: bytemuck::Pod> Drop for ComputePass<P> {
     fn drop(&mut self) {
         let gfx_device = Gfx::get().gfx_device();
         unsafe {

@@ -1,9 +1,9 @@
-use crate::graph::node::ImageNode;
-use crate::render_context::RenderContext;
-use crate::render_pipeline::compute_subpass::ComputeSubpass;
+use truvis_render_graph::graph::node::ImageNode;
+use truvis_render_graph::render_context::RenderContext;
 use ash::vk;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
+use truvis_render_graph::compute_pass::ComputePass;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::handles::GfxImageViewHandle;
 use truvis_shader_binding::truvisl;
@@ -37,12 +37,12 @@ pub struct SdrSubpassData {
     pub dst_image_size: vk::Extent2D,
 }
 
-pub struct SdrSubpass {
-    sdr_pass: ComputeSubpass<truvisl::sdr::PushConstant>,
+pub struct SdrPass {
+    sdr_pass: ComputePass<truvisl::sdr::PushConstant>,
 }
-impl SdrSubpass {
+impl SdrPass {
     pub fn new(render_descriptor_sets: &GlobalDescriptorSets) -> Self {
-        let sdr_pass = ComputeSubpass::<truvisl::sdr::PushConstant>::new(
+        let sdr_pass = ComputePass::<truvisl::sdr::PushConstant>::new(
             render_descriptor_sets,
             c"main",
             TruvisPath::shader_build_path_str("pass/pp/sdr.slang").as_str(),

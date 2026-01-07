@@ -7,3 +7,4 @@ pub mod gui_front;
 pub mod outer_app;
 pub mod platform;
 pub mod render_app;
+pub mod render_pipeline;

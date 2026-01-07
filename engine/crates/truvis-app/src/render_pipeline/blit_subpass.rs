@@ -1,9 +1,10 @@
-use crate::graph::node::ImageNode;
-use crate::render_context::RenderContext;
-use crate::render_pipeline::compute_subpass::ComputeSubpass;
 use ash::vk;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
+use truvis_render_graph::compute_pass::ComputePass;
+use truvis_render_graph::graph::node::ImageNode;
+use truvis_render_graph::render_context::RenderContext;
+use truvis_render_interface::bindless_manager::BindlessUavHandle;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::handles::GfxImageViewHandle;
 use truvis_shader_binding::truvisl;
@@ -29,20 +30,20 @@ impl Default for BlitSubpassDep {
     }
 }
 
-pub struct BlitSubpassData {
-    pub src_image: GfxImageViewHandle,
-    pub dst_image: GfxImageViewHandle,
+pub struct BlitPassData {
+    pub src_bindless_uav_handle: BindlessUavHandle,
+    pub dst_bindless_uav_handle: BindlessUavHandle,
 
     pub src_image_size: vk::Extent2D,
     pub dst_image_size: vk::Extent2D,
 }
 
-pub struct BlitSubpass {
-    blit_pass: ComputeSubpass<truvisl::blit::PushConstant>,
+pub struct BlitPass {
+    blit_pass: ComputePass<truvisl::blit::PushConstant>,
 }
-impl BlitSubpass {
+impl BlitPass {
     pub fn new(render_descriptor_sets: &GlobalDescriptorSets) -> Self {
-        let blit_pass = ComputeSubpass::<truvisl::blit::PushConstant>::new(
+        let blit_pass = ComputePass::<truvisl::blit::PushConstant>::new(
             render_descriptor_sets,
             c"main",
             TruvisPath::shader_build_path_str("imgui/blit.slang").as_str(),
@@ -51,15 +52,13 @@ impl BlitSubpass {
         Self { blit_pass }
     }
 
-    pub fn exec(&self, cmd: &GfxCommandBuffer, data: BlitSubpassData, render_context: &RenderContext) {
-        let src_image_bindless_handle = render_context.bindless_manager.get_shader_uav_handle(data.src_image);
-        let dst_image_bindless_handle = render_context.bindless_manager.get_shader_uav_handle(data.dst_image);
+    pub fn exec(&self, cmd: &GfxCommandBuffer, data: BlitPassData, render_context: &RenderContext) {
         self.blit_pass.exec(
             cmd,
             render_context,
             &truvisl::blit::PushConstant {
-                src_image: src_image_bindless_handle.0,
-                dst_image: dst_image_bindless_handle.0,
+                src_image: data.src_bindless_uav_handle.0,
+                dst_image: data.dst_bindless_uav_handle.0,
                 src_image_size: glam::uvec2(data.src_image_size.width, data.dst_image_size.height).into(),
                 offset: glam::uvec2(0, 0).into(),
             },

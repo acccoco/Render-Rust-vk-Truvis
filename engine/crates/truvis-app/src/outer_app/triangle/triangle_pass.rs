@@ -128,8 +128,6 @@ pub struct TrianglePass {
     cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 }
 
-impl RenderPass for TrianglePass {}
-
 impl TrianglePass {
     pub fn new(frame_settings: &FrameSettings, cmd_allocator: &mut CmdAllocator) -> Self {
         let triangle_pass = TriangleSubpass::new(frame_settings);

@@ -1,5 +1,4 @@
 pub mod blit_subpass;
-pub mod compute_subpass;
 pub mod phong_subpass;
 pub mod resolve_subpass;
 pub mod rt_pass;

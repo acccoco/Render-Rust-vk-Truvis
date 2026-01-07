@@ -1,25 +1,23 @@
 use ash::vk;
 
-use crate::apis::render_pass::RenderPass;
-use crate::render_context::RenderContext;
-use crate::render_pipeline::blit_subpass::{BlitSubpass, BlitSubpassData, BlitSubpassDep};
-use crate::render_pipeline::sdr_subpass::{SdrSubpass, SdrSubpassData, SdrSubpassDep};
-use crate::render_pipeline::simple_rt_subpass::SimpleRtSubpass;
-use crate::render_pipeline::simple_rt_subpass::{SimpleRtPassData, SimpleRtPassDep};
+use crate::render_pipeline::blit_subpass::{BlitPass, BlitPassData, BlitSubpassDep};
+use crate::render_pipeline::sdr_subpass::{SdrPass, SdrSubpassData, SdrSubpassDep};
+use crate::render_pipeline::simple_rt_subpass::{SimpleRtPassData, SimpleRtPassDep, RealtimeRtPass};
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, submit_info::GfxSubmitInfo},
     gfx::Gfx,
 };
+use truvis_render_graph::render_context::RenderContext;
 use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 
 /// 整个 RT 管线
 pub struct RtRenderPass {
-    simple_rt_subpass: SimpleRtSubpass,
-    blit_subpass: BlitSubpass,
-    sdr_subpass: SdrSubpass,
+    simple_rt_subpass: RealtimeRtPass,
+    blit_subpass: BlitPass,
+    sdr_subpass: SdrPass,
 
     rt_cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
     blit_cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
@@ -28,9 +26,9 @@ pub struct RtRenderPass {
 
 impl RtRenderPass {
     pub fn new(render_descriptor_sets: &GlobalDescriptorSets, cmd_allocator: &mut CmdAllocator) -> Self {
-        let rt_pass = SimpleRtSubpass::new(render_descriptor_sets);
-        let blit_subpass = BlitSubpass::new(render_descriptor_sets);
-        let sdr_subpass = SdrSubpass::new(render_descriptor_sets);
+        let rt_pass = RealtimeRtPass::new(render_descriptor_sets);
+        let blit_subpass = BlitPass::new(render_descriptor_sets);
+        let sdr_subpass = SdrPass::new(render_descriptor_sets);
 
         let rt_cmds = FrameCounter::frame_labes()
             .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "ray-tracing"));
@@ -117,7 +115,7 @@ impl RtRenderPass {
 
             self.blit_subpass.exec(
                 &cmd,
-                BlitSubpassData {
+                BlitPassData {
                     src_image: fif_buffers.color_image_view_handle(),
                     dst_image: render_target_view_handle,
                     src_image_size: frame_settings.frame_extent,
@@ -166,7 +164,6 @@ impl RtRenderPass {
         Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(&submit_cmds)], None);
     }
 }
-impl RenderPass for RtRenderPass {}
 impl Drop for RtRenderPass {
     fn drop(&mut self) {
         log::info!("RtPipeline drop");

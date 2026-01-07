@@ -1,4 +1,4 @@
-use crate::render_context::RenderContext;
+use truvis_render_graph::render_context::RenderContext;
 use ash::vk;
 use std::{mem::offset_of, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;

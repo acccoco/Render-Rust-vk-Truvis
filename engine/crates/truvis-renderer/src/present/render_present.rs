@@ -14,7 +14,6 @@ use truvis_gfx::swapchain::swapchain::GfxSwapchain;
 use truvis_gui_backend::gui_backend::GuiBackend;
 use truvis_gui_backend::gui_pass::GuiPass;
 use truvis_render_graph::render_context::RenderContext;
-use truvis_render_graph::render_pipeline::resolve_subpass::{ResolveDrawParams, ResolveSubpass};
 use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::gfx_resource_manager::GfxResourceManager;
@@ -48,9 +47,7 @@ pub struct RenderPresent {
     pub swapchain_image_views: Vec<GfxImageViewHandle>,
 
     pub gui_backend: GuiBackend,
-    pub gui_pass: GuiPass,
 
-    pub resolve_subpass: ResolveSubpass,
     /// resolve pass 的命令缓冲区（每帧一个）
     resolve_cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 
@@ -91,7 +88,6 @@ impl RenderPresent {
         let swapchain_image_infos = swapchain.image_infos();
 
         let gui_backend = GuiBackend::new(cmd_allocator);
-        let gui_pass = GuiPass::new(global_descriptor_sets, swapchain_image_infos.image_format);
 
         let present_complete_semaphores = FrameCounter::frame_labes()
             .map(|frame_label| GfxSemaphore::new(&format!("window-present-complete-{}", frame_label)));
@@ -99,7 +95,6 @@ impl RenderPresent {
             .map(|i| GfxSemaphore::new(&format!("window-render-complete-{}", i)))
             .collect_vec();
 
-        let resolve_subpass = ResolveSubpass::new(swapchain_image_infos.image_format, global_descriptor_sets);
         let resolve_cmds = FrameCounter::frame_labes()
             .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "resolve-pass"));
 
@@ -110,8 +105,6 @@ impl RenderPresent {
             swapchain_image_views: swapchain_image_view_handles,
 
             gui_backend,
-            gui_pass,
-            resolve_subpass,
             resolve_cmds,
             present_complete_semaphores,
             render_complete_semaphores,

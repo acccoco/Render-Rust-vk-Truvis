@@ -1,6 +1,3 @@
-use crate::apis::render_pass::RenderSubpass;
-use crate::graph::node::ImageNode;
-use crate::render_context::RenderContext;
 use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::resource::TruvisPath;
@@ -13,6 +10,8 @@ use truvis_gfx::{
     pipelines::shader::{GfxShaderGroupInfo, GfxShaderModuleCache, GfxShaderStageInfo},
     resources::special_buffers::sbt_buffer::GfxSBTBuffer,
 };
+use truvis_render_graph::graph::node::ImageNode;
+use truvis_render_graph::render_context::RenderContext;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle};
 use truvis_shader_binding::truvisl;
@@ -285,12 +284,12 @@ struct SimpleRtDescriptorBinding {
     _rt_color: (),
 }
 
-pub struct SimpleRtSubpass {
+pub struct RealtimeRtPass {
     pipeline: GfxRtPipeline,
     _sbt: SBTRegions,
     _rt_descriptor_set_layout: GfxDescriptorSetLayout<SimpleRtDescriptorBinding>,
 }
-impl SimpleRtSubpass {
+impl RealtimeRtPass {
     pub fn new(render_descriptor_sets: &GlobalDescriptorSets) -> Self {
         let mut shader_module_cache = GfxShaderModuleCache::new();
         let stage_infos = ShaderStage::iter()
@@ -472,8 +471,7 @@ impl SimpleRtSubpass {
         cmd.end_label();
     }
 }
-impl RenderSubpass for SimpleRtSubpass {}
-impl Drop for SimpleRtSubpass {
+impl Drop for RealtimeRtPass {
     fn drop(&mut self) {
         log::info!("Destroy SimlpeRtPass");
     }

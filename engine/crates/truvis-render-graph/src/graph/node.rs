@@ -1,5 +1,6 @@
 use ash::vk;
 
+// TODO 移除 ImageNode
 pub struct ImageNode {
     pub stage: vk::PipelineStageFlags2,
     pub access: vk::AccessFlags2,

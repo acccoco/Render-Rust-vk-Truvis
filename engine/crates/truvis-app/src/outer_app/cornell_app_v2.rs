@@ -8,7 +8,7 @@ use imgui::Ui;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_graph_v2::RgPassContext;
-use truvis_render_graph::render_pipeline::rt_render_graph::RtRenderGraph;
+use crate::render_pipeline::rt_render_graph::RtPipeline;
 use truvis_renderer::model_loader::assimp_loader::AssimpSceneLoader;
 use truvis_renderer::platform::camera::Camera;
 use truvis_renderer::renderer::Renderer;
@@ -17,7 +17,7 @@ use truvis_shader_binding::truvisl;
 /// 使用 RenderGraph V2 的 Cornell Box 应用
 #[derive(Default)]
 pub struct CornellAppV2 {
-    rt_pipeline: Option<RtRenderGraph>,
+    rt_pipeline: Option<RtPipeline>,
 }
 
 impl CornellAppV2 {
@@ -61,7 +61,7 @@ impl CornellAppV2 {
 impl OuterApp for CornellAppV2 {
     fn init(&mut self, renderer: &mut Renderer, camera: &mut Camera) {
         let rt_pipeline =
-            RtRenderGraph::new(&renderer.render_context.global_descriptor_sets, &mut renderer.cmd_allocator);
+            RtPipeline::new(&renderer.render_context.global_descriptor_sets, &mut renderer.cmd_allocator);
 
         Self::create_scene(renderer, camera);
 

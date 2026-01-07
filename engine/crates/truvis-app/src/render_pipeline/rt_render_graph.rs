@@ -1,53 +1,69 @@
 use ash::vk;
+use std::mem::swap;
 
-use crate::render_context::RenderContext;
-use crate::render_graph_v2::{CompiledGraph, RenderGraphBuilder, RgImageHandle, RgImageState, RgPassContext};
-use crate::render_pipeline::blit_subpass::{BlitSubpass, BlitSubpassData};
-use crate::render_pipeline::sdr_subpass::{SdrSubpass, SdrSubpassData};
-use crate::render_pipeline::simple_rt_subpass::{SimpleRtPassData, SimpleRtSubpass};
+use truvis_render_graph::render_context::RenderContext;
+use truvis_render_graph::render_graph_v2::{
+    CompiledGraph, RenderGraphBuilder, RgImageHandle, RgImageState, RgPassContext,
+};
 
+use crate::render_pipeline::blit_subpass::{BlitPass, BlitPassData};
+use crate::render_pipeline::resolve_subpass::ResolvePass;
+use crate::render_pipeline::sdr_subpass::{SdrPass, SdrSubpassData};
+use crate::render_pipeline::simple_rt_subpass::{RealtimeRtPass, SimpleRtPassData};
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::submit_info::GfxSubmitInfo;
 use truvis_gfx::gfx::Gfx;
+use truvis_gfx::swapchain::swapchain::GfxSwapchain;
+use truvis_gui_backend::gui_pass::GuiPass;
 use truvis_render_interface::cmd_allocator::CmdAllocator;
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::pipeline_settings::FrameLabel;
 
-pub struct RtRenderGraph {
+pub struct RtPipeline {
     /// 光追 pass
-    simple_rt_subpass: SimpleRtSubpass,
+    realtime_rt_pass: RealtimeRtPass,
     /// Blit pass
-    blit_subpass: BlitSubpass,
+    blit_pass: BlitPass,
     /// SDR pass
-    sdr_subpass: SdrSubpass,
+    sdr_pass: SdrPass,
+    resolve_pass: ResolvePass,
+    gui_pass: GuiPass,
 
     /// 每帧的命令缓冲区
     cmds: [GfxCommandBuffer; FrameCounter::fif_count()],
 }
 
 // new & init
-impl RtRenderGraph {
+impl RtPipeline {
     /// 创建新的 RT 渲染管线
-    pub fn new(global_descriptor_sets: &GlobalDescriptorSets, cmd_allocator: &mut CmdAllocator) -> Self {
-        let simple_rt_subpass = SimpleRtSubpass::new(global_descriptor_sets);
-        let blit_subpass = BlitSubpass::new(global_descriptor_sets);
-        let sdr_subpass = SdrSubpass::new(global_descriptor_sets);
+    pub fn new(
+        global_descriptor_sets: &GlobalDescriptorSets,
+        swapchain: &GfxSwapchain,
+        cmd_allocator: &mut CmdAllocator,
+    ) -> Self {
+        let realtime_rt_pass = RealtimeRtPass::new(global_descriptor_sets);
+        let blit_pass = BlitPass::new(global_descriptor_sets);
+        let sdr_pass = SdrPass::new(global_descriptor_sets);
+        let resolve_pass = ResolvePass::new(global_descriptor_sets, swapchain.image_infos().image_format);
+        let gui_pass = GuiPass::new(global_descriptor_sets, swapchain.image_infos().image_format);
 
         let cmds = FrameCounter::frame_labes()
             .map(|frame_label| cmd_allocator.alloc_command_buffer(frame_label, "rt-render-graph"));
 
         Self {
-            simple_rt_subpass,
-            blit_subpass,
-            sdr_subpass,
+            realtime_rt_pass,
+            blit_pass,
+            sdr_pass,
+            resolve_pass,
+            gui_pass,
             cmds,
         }
     }
 }
 
 // 各种 pass
-impl RtRenderGraph {
+impl RtPipeline {
     /// 添加光线追踪 Pass
     ///
     /// # 参数
@@ -60,7 +76,7 @@ impl RtRenderGraph {
         accum_image: RgImageHandle,
         render_context: &'a RenderContext,
     ) {
-        let subpass = &self.simple_rt_subpass;
+        let subpass = &self.realtime_rt_pass;
         let fif_buffers = &render_context.fif_buffers;
 
         builder.add_pass_lambda(
@@ -100,7 +116,7 @@ impl RtRenderGraph {
         render_context: &'a RenderContext,
         frame_label: FrameLabel,
     ) {
-        let subpass = &self.blit_subpass;
+        let subpass = &self.blit_pass;
         let fif_buffers = &render_context.fif_buffers;
         let frame_extent = render_context.frame_settings.frame_extent;
 
@@ -113,11 +129,16 @@ impl RtRenderGraph {
             move |ctx| {
                 let (_, render_target_view_handle) = fif_buffers.render_target_handle(frame_label);
 
+                let src_bindless_handle =
+                    render_context.bindless_manager.get_shader_uav_handle(fif_buffers.color_image_view_handle());
+                let dst_bindless_handle =
+                    render_context.bindless_manager.get_shader_uav_handle(render_target_view_handle);
+
                 subpass.exec(
                     ctx.cmd,
-                    BlitSubpassData {
-                        src_image: fif_buffers.color_image_view_handle(),
-                        dst_image: render_target_view_handle,
+                    BlitPassData {
+                        src_bindless_uav_handle: src_bindless_handle,
+                        dst_bindless_uav_handle: dst_bindless_handle,
                         src_image_size: frame_extent,
                         dst_image_size: frame_extent,
                     },
@@ -145,7 +166,7 @@ impl RtRenderGraph {
         render_context: &'a RenderContext,
         frame_label: FrameLabel,
     ) {
-        let subpass = &self.sdr_subpass;
+        let subpass = &self.sdr_pass;
         let fif_buffers = &render_context.fif_buffers;
         let frame_extent = render_context.frame_settings.frame_extent;
 
@@ -172,54 +193,29 @@ impl RtRenderGraph {
         );
     }
 
-    /// 添加 UI Pass
-    ///
-    /// # 参数
-    /// - `builder`: RenderGraph 构建器
-    /// - `target_image`: 目标图像句柄（渲染目标）
-    /// - `ui_draw_fn`: UI 绘制闘包
-    fn add_ui_pass<'a, F>(builder: &mut RenderGraphBuilder<'a>, target_image: RgImageHandle, ui_draw_fn: F)
-    where
-        F: Fn(&RgPassContext<'_>) + 'a,
-    {
+    fn add_resolve_pass<'a>(
+        &'a self,
+        builder: &mut RenderGraphBuilder<'a>,
+        src_image: RgImageHandle,
+        dst_image: RgImageHandle,
+        render_context: &'a RenderContext,
+        frame_label: FrameLabel,
+    ) {
         builder.add_pass_lambda(
-            "ui",
-            move |b| {
-                // UI 在渲染目标上叠加绘制，需要读写
-                b.read_write_image(target_image, RgImageState::COLOR_ATTACHMENT_READ_WRITE);
-            },
-            ui_draw_fn,
+            "resolve",
+            move |b| {},
+            move |ctx| {},
         );
     }
 }
 
 // render
-impl RtRenderGraph {
+impl RtPipeline {
     /// 执行渲染（不包含 UI）
     ///
     /// # 参数
     /// - `render_context`: 渲染上下文
     pub fn render(&self, render_context: &RenderContext) {
-        self.render_with_ui_lambda(render_context, None::<fn(&RgPassContext<'_>)>);
-    }
-
-    /// 执行渲染（包含 UI），UI 绘制通过闘包注入
-    ///
-    /// # 参数
-    /// - `render_context`: 渲染上下文
-    /// - `ui_draw_fn`: UI 绘制闘包，接收 `RgPassContext`，在其中执行 UI 绘制
-    ///
-    /// # 示例
-    ///
-    /// ```ignore
-    /// rt_graph.render_with_ui_lambda(render_context, Some(|ctx| {
-    ///     gui_pass.draw(render_context, canvas_view, canvas_extent, ctx.cmd, ...);
-    /// }));
-    /// ```
-    pub fn render_with_ui_lambda<F>(&self, render_context: &RenderContext, ui_draw_fn: Option<F>)
-    where
-        F: Fn(&RgPassContext<'_>) + 'static,
-    {
         let frame_label = render_context.frame_counter.frame_label();
         let fif_buffers = &render_context.fif_buffers;
 
@@ -248,11 +244,6 @@ impl RtRenderGraph {
         self.add_rt_pass(&mut rg_builder, accum_image, render_context);
         self.add_blit_pass(&mut rg_builder, accum_image, render_target, render_context, frame_label);
         self.add_sdr_pass(&mut rg_builder, accum_image, render_target, render_context, frame_label);
-
-        // 可选：添加 UI Pass
-        if let Some(ui_fn) = ui_draw_fn {
-            Self::add_ui_pass(&mut rg_builder, render_target, ui_fn);
-        }
 
         // 编译 RenderGraph
         let compiled_graph = rg_builder.compile();
@@ -286,7 +277,7 @@ impl RtRenderGraph {
     }
 }
 
-impl Drop for RtRenderGraph {
+impl Drop for RtPipeline {
     fn drop(&mut self) {
         log::info!("RtRenderGraph drop");
     }
