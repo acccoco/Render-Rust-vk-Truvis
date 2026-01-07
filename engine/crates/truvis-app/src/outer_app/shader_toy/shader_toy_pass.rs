@@ -6,8 +6,6 @@ use itertools::Itertools;
 
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_gfx::resources::image_view::GfxImageView;
-use truvis_gfx::resources::layout::GfxVertexLayout;
-use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
 use truvis_gfx::{
     commands::command_buffer::GfxCommandBuffer,
     pipelines::{
@@ -17,7 +15,6 @@ use truvis_gfx::{
     },
 };
 use truvis_render_graph::render_context::RenderContext;
-use truvis_render_interface::geometry::RtGeometry;
 use truvis_utils::count_indexed_array;
 use truvis_utils::enumed_map;
 
@@ -62,8 +59,7 @@ impl ShaderToyPass {
         let mut pipeline_ci = GfxGraphicsPipelineCreateInfo::default();
         pipeline_ci.shader_stages(ShaderStage::iter().map(|stage| stage.value().clone()).collect_vec());
         pipeline_ci.attach_info(vec![color_format], None, Some(vk::Format::UNDEFINED));
-        pipeline_ci.vertex_binding(VertexLayoutSoA3D::vertex_input_bindings());
-        pipeline_ci.vertex_attribute(VertexLayoutSoA3D::vertex_input_attributes());
+        // 不再需要 vertex binding 和 attribute，因为顶点数据在 shader 中定义
         pipeline_ci.color_blend(
             vec![
                 vk::PipelineColorBlendAttachmentState::default()
@@ -96,7 +92,6 @@ impl ShaderToyPass {
         cmd: &GfxCommandBuffer,
         canvas: &GfxImageView,
         canvas_extent: vk::Extent2D,
-        rect: &RtGeometry,
     ) {
         let viewport_extent = canvas_extent;
 
@@ -139,9 +134,9 @@ impl ShaderToyPass {
                 0,
                 &[vk::Viewport {
                     x: 0.0,
-                    y: 0.0,
+                    y: viewport_extent.height as f32,
                     width: viewport_extent.width as f32,
-                    height: viewport_extent.height as f32,
+                    height: -(viewport_extent.height as f32),
                     min_depth: 0.0,
                     max_depth: 1.0,
                 }],
@@ -154,9 +149,8 @@ impl ShaderToyPass {
                 }],
             );
 
-            rect.cmd_bind_index_buffer(cmd);
-            rect.cmd_bind_vertex_buffers(cmd);
-            cmd.draw_indexed(rect.index_cnt(), 0, 1, 0, 0);
+            // 绘制 6 个顶点组成的全屏矩形（两个三角形）
+            cmd.cmd_draw(6, 1, 0, 0);
             cmd.end_rendering();
         }
     }

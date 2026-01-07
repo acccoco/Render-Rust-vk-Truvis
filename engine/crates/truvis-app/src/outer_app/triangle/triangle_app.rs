@@ -9,15 +9,12 @@ use truvis_gfx::gfx::Gfx;
 use truvis_gui_backend::gui_pass::{GuiPass, GuiRgPass};
 use truvis_render_graph::render_graph_v2::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
 use truvis_render_interface::frame_counter::FrameCounter;
-use truvis_render_interface::geometry::RtGeometry;
 use truvis_renderer::platform::camera::Camera;
 use truvis_renderer::renderer::Renderer;
-use truvis_scene::shapes::triangle::TriangleSoA;
 
 #[derive(Default)]
 pub struct HelloTriangleApp {
     triangle_pass: Option<TrianglePass>,
-    triangle: Option<RtGeometry>,
 
     gui_pass: Option<GuiPass>,
 
@@ -28,7 +25,6 @@ impl OuterApp for HelloTriangleApp {
         log::info!("hello triangle init.");
 
         self.triangle_pass = Some(TrianglePass::new(renderer.swapchain_image_info().image_format));
-        self.triangle = Some(TriangleSoA::create_mesh());
         self.gui_pass = Some(GuiPass::new(
             &renderer.render_context.global_descriptor_sets,
             renderer.swapchain_image_info().image_format,
@@ -92,7 +88,6 @@ impl OuterApp for HelloTriangleApp {
                         context.cmd,
                         canvas_view,
                         render_present.swapchain_image_info().image_extent,
-                        self.triangle.as_ref().unwrap(),
                     );
                 },
             )

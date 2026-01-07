@@ -9,14 +9,11 @@ use truvis_gfx::gfx::Gfx;
 use truvis_gui_backend::gui_pass::{GuiPass, GuiRgPass};
 use truvis_render_graph::render_graph_v2::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
 use truvis_render_interface::frame_counter::FrameCounter;
-use truvis_render_interface::geometry::RtGeometry;
 use truvis_renderer::platform::camera::Camera;
 use truvis_renderer::renderer::Renderer;
-use truvis_scene::shapes::rect::RectSoA;
 
 #[derive(Default)]
 pub struct ShaderToy {
-    rectangle: Option<RtGeometry>,
     shader_toy_pass: Option<ShaderToyPass>,
 
     gui_pass: Option<GuiPass>,
@@ -28,7 +25,6 @@ impl OuterApp for ShaderToy {
         log::info!("shader toy.");
 
         self.shader_toy_pass = Some(ShaderToyPass::new(renderer.swapchain_image_info().image_format));
-        self.rectangle = Some(RectSoA::create_mesh());
         self.gui_pass = Some(GuiPass::new(
             &renderer.render_context.global_descriptor_sets,
             renderer.swapchain_image_info().image_format,
@@ -94,7 +90,6 @@ impl OuterApp for ShaderToy {
                         context.cmd,
                         canvas_view,
                         render_present.swapchain_image_info().image_extent,
-                        self.rectangle.as_ref().unwrap(),
                     );
                 },
             )

@@ -1,13 +1,50 @@
 #include "vertex_attribute.slangi"
 
+// 定义矩形的 6 个顶点（两个三角形）
+static const float2 positions[6] = {
+    float2(-0.5, -0.5),  // 左下
+    float2( 0.5, -0.5),  // 右下
+    float2(-0.5,  0.5),  // 左上
+    float2(-0.5,  0.5),  // 左上
+    float2( 0.5, -0.5),  // 右下
+    float2( 0.5,  0.5)   // 右上
+};
+
+static const float2 uvs[6] = {
+    float2(0.0, 0.0),
+    float2(1.0, 0.0),
+    float2(0.0, 1.0),
+    float2(0.0, 1.0),
+    float2(1.0, 0.0),
+    float2(1.0, 1.0)
+};
+
+static const float3 normals[6] = {
+    float3(0.0, 0.0, 1.0),
+    float3(0.0, 0.0, 1.0),
+    float3(0.0, 0.0, 1.0),
+    float3(0.0, 0.0, 1.0),
+    float3(0.0, 0.0, 1.0),
+    float3(0.0, 0.0, 1.0)
+};
+
+static const float3 tangents[6] = {
+    float3(1.0, 0.0, 0.0),
+    float3(1.0, 0.0, 0.0),
+    float3(1.0, 0.0, 0.0),
+    float3(1.0, 0.0, 0.0),
+    float3(1.0, 0.0, 0.0),
+    float3(1.0, 0.0, 0.0)
+};
+
 [shader("vertex")]
-soa::VsOutput vsmain(soa::VsInput input, uint VertexIndex: SV_VertexID)
+soa::VsOutput vsmain(uint VertexIndex: SV_VertexID)
 {
     soa::VsOutput output = (soa::VsOutput)0;
-    output.coarse_vertex.UV = input.UV;
-    output.coarse_vertex.Normal = input.Normal;
-    output.coarse_vertex.Tangent = input.Tangent;
-    output.Pos = float4(input.Position, 1.0);
+    output.coarse_vertex.UV = uvs[VertexIndex];
+    output.coarse_vertex.Normal = normals[VertexIndex];
+    output.coarse_vertex.Tangent = tangents[VertexIndex];
+    output.Pos = float4(positions[VertexIndex], 0.0, 1.0);
     return output;
 }
 
