@@ -5,6 +5,18 @@
 
 基于 Rust 和 Vulkan 的现代渲染引擎，支持自动化着色器绑定和光线追踪技术。
 
+- **光线追踪支持**: 硬件加速光线追踪，支持 Sponza 和 Cornell Box 场景
+- **自动着色器绑定**: 基于 Slang 的自动 Rust 绑定生成系统
+- **模块化架构**: 基于 Workspace 的清晰分层设计
+- **跨平台支持**: Windows 平台完整支持，CMake + vcpkg 自动依赖管理
+- **现代 Vulkan**: Vulkan 1.3+ RHI 抽象层
+- **实时 GUI**: 集成 ImGui 调试界面
+- **多格式模型**: 通过 Assimp 支持 FBX、glTF、OBJ 等格式
+- **Bindless 渲染**: 现代 GPU 驱动的渲染管线
+- **剖切**：支持剖切体和填充面渲染效果
+- **RenderGraph**：基于渲染图的资源和依赖管理
+- **SER 优化**：使用 Shader Execution Reordering 提升光线追踪性能
+
 ![Result](./docs/imgs/Result.PNG)
 ![rt-sponza](./docs/imgs/rt-sponza.png)
 
@@ -68,15 +80,6 @@ cargo run --bin shader-toy
 ```
 
 ## 🌟 特性
-
-- **光线追踪支持**: 硬件加速光线追踪，支持 Sponza 和 Cornell Box 场景
-- **自动着色器绑定**: 基于 Slang 的自动 Rust 绑定生成系统
-- **模块化架构**: 基于 Workspace 的清晰分层设计
-- **跨平台支持**: Windows 平台完整支持，CMake + vcpkg 自动依赖管理
-- **现代 Vulkan**: Vulkan 1.3+ RHI 抽象层
-- **实时 GUI**: 集成 ImGui 调试界面
-- **多格式模型**: 通过 Assimp 支持 FBX、glTF、OBJ 等格式
-- **Bindless 渲染**: 现代 GPU 驱动的渲染管线
 
 ### 剖切体和填充面
 
