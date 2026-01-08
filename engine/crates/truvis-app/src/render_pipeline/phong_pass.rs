@@ -16,10 +16,10 @@ use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_render_interface::pipeline_settings::FrameLabel;
 use truvis_shader_binding::truvisl;
 
-pub struct PhongSubpass {
+pub struct PhongPass {
     pipeline: GfxGraphicsPipeline,
 }
-impl PhongSubpass {
+impl PhongPass {
     pub fn new(
         color_format: vk::Format,
         depth_format: vk::Format,

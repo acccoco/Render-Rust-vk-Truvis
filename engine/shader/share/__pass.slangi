@@ -1,0 +1,8 @@
+#pragma once
+
+#include "share/pass/blit.slangi"
+#include "share/pass/imgui.slangi"
+#include "share/pass/raster.slangi"
+#include "share/pass/resolve.slangi"
+#include "share/pass/rt.slangi"
+#include "share/pass/sdr.slangi"

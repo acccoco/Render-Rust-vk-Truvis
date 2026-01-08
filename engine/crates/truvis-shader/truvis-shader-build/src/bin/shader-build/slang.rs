@@ -25,7 +25,7 @@ impl ShaderCompiler for SlangCompiler {
         let output = std::process::Command::new(EnvPath::slangc_path())
             .args([
                 "-I",
-                EnvPath::shader_include_path().to_str().unwrap(),
+                EnvPath::shader_root_path().to_str().unwrap(),
                 "-g2",                         // 生成 debug info (默认是 g2)
                 "-matrix-layout-column-major", // 列主序
                 "-fvk-use-entrypoint-name",    // 具有多个 entry 时需要此选项
@@ -41,4 +41,3 @@ impl ShaderCompiler for SlangCompiler {
         self.process_cmd_output(output);
     }
 }
-

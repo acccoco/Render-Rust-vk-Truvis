@@ -44,10 +44,14 @@ pub enum ShaderCompilerType {
 pub struct EnvPath;
 
 impl EnvPath {
-    /// Shader 源码路径
-    pub fn shader_src_path() -> &'static std::path::Path {
+    pub fn shader_root_path() -> &'static std::path::Path {
         static PATH: OnceLock<std::path::PathBuf> = OnceLock::new();
-        PATH.get_or_init(|| TruvisPath::shader_root_path().join("src"))
+        PATH.get_or_init(TruvisPath::shader_root_path)
+    }
+
+    pub fn shader_entry_path() -> &'static std::path::Path {
+        static PATH: OnceLock<std::path::PathBuf> = OnceLock::new();
+        PATH.get_or_init(|| TruvisPath::shader_root_path().join("entry"))
     }
 
     /// 编译 shader 的输出路径
@@ -56,10 +60,9 @@ impl EnvPath {
         PATH.get_or_init(|| TruvisPath::shader_root_path().join(".build"))
     }
 
-    /// Shader 的 include 目录
-    pub fn shader_include_path() -> &'static std::path::Path {
+    pub fn shader_share_path() -> &'static std::path::Path {
         static PATH: OnceLock<std::path::PathBuf> = OnceLock::new();
-        PATH.get_or_init(|| TruvisPath::shader_root_path().join("include"))
+        PATH.get_or_init(|| TruvisPath::shader_root_path().join("share"))
     }
 
     /// Slang 编译器路径
@@ -115,7 +118,7 @@ impl ShaderCompileTask {
         let shader_path = std::path::Path::new(&shader_path);
 
         // 相对于 shader src 的路径
-        let relative_path = shader_path.strip_prefix(EnvPath::shader_src_path()).ok()?;
+        let relative_path = shader_path.strip_prefix(EnvPath::shader_entry_path()).ok()?;
         let shader_name = entry.file_name().to_str()?;
 
         // 构造输出路径
@@ -139,17 +142,11 @@ impl ShaderCompileTask {
     fn parse_shader_stage(shader_name: &str) -> Option<ShaderStage> {
         let stage = match () {
             // Vertex shaders
-            _ if shader_name.ends_with(".vert") || shader_name.ends_with(".vs.hlsl") => {
-                ShaderStage::Vertex
-            }
+            _ if shader_name.ends_with(".vert") || shader_name.ends_with(".vs.hlsl") => ShaderStage::Vertex,
             // Fragment/Pixel shaders
-            _ if shader_name.ends_with(".frag") || shader_name.ends_with(".ps.hlsl") => {
-                ShaderStage::Fragment
-            }
+            _ if shader_name.ends_with(".frag") || shader_name.ends_with(".ps.hlsl") => ShaderStage::Fragment,
             // Compute shaders
-            _ if shader_name.ends_with(".comp") || shader_name.ends_with(".cs.hlsl") => {
-                ShaderStage::Compute
-            }
+            _ if shader_name.ends_with(".comp") || shader_name.ends_with(".cs.hlsl") => ShaderStage::Compute,
             // Ray Tracing shaders
             _ if shader_name.ends_with(".rgen") => ShaderStage::RayGen,
             _ if shader_name.ends_with(".rchit") => ShaderStage::ClosestHit,
@@ -165,16 +162,10 @@ impl ShaderCompileTask {
                 ShaderStage::TessellationEvaluation
             }
             // Geometry shader
-            _ if shader_name.ends_with(".geom") || shader_name.ends_with(".gs.hlsl") => {
-                ShaderStage::Geometry
-            }
+            _ if shader_name.ends_with(".geom") || shader_name.ends_with(".gs.hlsl") => ShaderStage::Geometry,
             // Mesh shaders
-            _ if shader_name.ends_with(".task") || shader_name.ends_with(".as.hlsl") => {
-                ShaderStage::Task
-            }
-            _ if shader_name.ends_with(".mesh") || shader_name.ends_with(".ms.hlsl") => {
-                ShaderStage::Mesh
-            }
+            _ if shader_name.ends_with(".task") || shader_name.ends_with(".as.hlsl") => ShaderStage::Task,
+            _ if shader_name.ends_with(".mesh") || shader_name.ends_with(".ms.hlsl") => ShaderStage::Mesh,
             // Slang (通用)
             _ if shader_name.ends_with(".slang") => ShaderStage::General,
             _ => return None,

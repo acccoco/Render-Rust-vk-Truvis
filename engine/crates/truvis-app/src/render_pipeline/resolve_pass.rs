@@ -20,12 +20,12 @@ enumed_map!(ShaderStage<GfxShaderStageInfo>: {
     Vertex: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::VERTEX,
         entry_point: c"vsmain",
-        path: TruvisPath::shader_build_path_str("pass/resolve/resolve.slang"),
+        path: TruvisPath::shader_build_path_str("resolve/resolve.slang"),
     },
     Fragment: GfxShaderStageInfo {
         stage: vk::ShaderStageFlags::FRAGMENT,
         entry_point: c"psmain",
-        path: TruvisPath::shader_build_path_str("pass/resolve/resolve.slang"),
+        path: TruvisPath::shader_build_path_str("resolve/resolve.slang"),
     },
 });
 
@@ -41,7 +41,7 @@ pub struct ResolvePassData {
     pub size: glam::Vec2,
 }
 
-/// Resolve Subpass
+/// Resolve Pass
 ///
 /// 功能：将指定的 image 按照给定的 offset 和 size 绘制到 color attachment
 ///
@@ -54,8 +54,6 @@ pub struct ResolvePass {
 }
 
 impl ResolvePass {
-    /// 创建 ResolveSubpass
-    ///
     /// # 参数
     /// - `color_format`: color attachment 的格式
     /// - `render_descriptor_sets`: 全局描述符集

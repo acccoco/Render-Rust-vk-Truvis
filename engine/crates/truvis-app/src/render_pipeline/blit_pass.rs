@@ -9,27 +9,6 @@ use truvis_render_interface::bindless_manager::BindlessUavHandle;
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 use truvis_shader_binding::truvisl;
 
-pub struct BlitSubpassDep {
-    pub src_image: ImageNode,
-    pub dst_image: ImageNode,
-}
-impl Default for BlitSubpassDep {
-    fn default() -> Self {
-        Self {
-            src_image: ImageNode {
-                stage: vk::PipelineStageFlags2::COMPUTE_SHADER,
-                access: vk::AccessFlags2::SHADER_READ,
-                layout: vk::ImageLayout::GENERAL,
-            },
-            dst_image: ImageNode {
-                stage: vk::PipelineStageFlags2::COMPUTE_SHADER,
-                access: vk::AccessFlags2::SHADER_WRITE,
-                layout: vk::ImageLayout::GENERAL,
-            },
-        }
-    }
-}
-
 pub struct BlitPassData {
     pub src_bindless_uav_handle: BindlessUavHandle,
     pub dst_bindless_uav_handle: BindlessUavHandle,

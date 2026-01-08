@@ -24,8 +24,8 @@ impl ShaderCompiler for GlslCompiler {
     fn compile(&self, task: &ShaderCompileTask) {
         let output = std::process::Command::new("glslc")
             .args([
-                &format!("-I{:?}", EnvPath::shader_include_path()),
-                "-g",                  // 生成调试信息
+                &format!("-I{:?}", EnvPath::shader_root_path()),
+                "-g", // 生成调试信息
                 "--target-env=vulkan1.2",
                 "--target-spv=spv1.4", // Ray tracing 最低版本为 spv1.4
                 "-o",
@@ -38,4 +38,3 @@ impl ShaderCompiler for GlslCompiler {
         self.process_cmd_output(output);
     }
 }
-

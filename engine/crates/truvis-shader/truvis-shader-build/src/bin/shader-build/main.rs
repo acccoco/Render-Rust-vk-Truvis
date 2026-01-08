@@ -26,12 +26,12 @@ fn get_compiler(compiler_type: ShaderCompilerType) -> Box<dyn ShaderCompiler> {
 fn main() {
     init_log();
 
-    log::info!("Shader include path: {:?}", EnvPath::shader_include_path());
-    log::info!("Shader source path: {:?}", EnvPath::shader_src_path());
+    log::info!("Shader include path: {:?}", EnvPath::shader_share_path());
+    log::info!("Shader entry path: {:?}", EnvPath::shader_entry_path());
     log::info!("Shader output path: {:?}", EnvPath::shader_build_path());
 
     // 编译 shader 目录下的所有 shader 文件
-    walkdir::WalkDir::new(EnvPath::shader_src_path())
+    walkdir::WalkDir::new(EnvPath::shader_entry_path())
         .into_iter()
         .filter_map(Result::ok)
         .filter(|entry| entry.path().is_file())

@@ -1,0 +1,52 @@
+/// @file payload.slangi
+/// @brief 光线追踪载荷结构体定义
+///
+/// 定义光线追踪过程中各着色器阶段共享的数据结构
+
+#pragma once
+#include "share/pass/rt.slangi"
+
+/// Push Constants 声明（所有 RT 着色器共享）
+[[vk::push_constant]]
+rt::PushConstants push_const;
+
+/// 路径追踪最大深度
+const static uint max_depth = 16;
+
+/// 超过一定数量后，就不再重新计算了
+const static uint max_accum_samples = 4096;
+
+/// 主光线追踪载荷
+struct HitPayload
+{
+    /// 命中点的自发光颜色
+    float3 radiance;
+    /// 当前命中位置的衰减：BRDF * cos(theta) / pdf
+    float3 weight;
+    /// 是否需要提前中止
+    bool done;
+    /// 下一次光线的起点
+    float3 ray_origin;
+    /// 下一次光线的方向
+    float3 ray_dir;
+    uint random_seed;
+    /// 进入剖切体时 +1，离开剖切体时 -1
+    int section_stack;
+    /// 在剖切体内，进入物体时 +1，离开物体时 -1
+    int object_stack;
+};
+
+/// 阴影光线载荷
+struct ShadowMissPayload
+{
+    bool miss;
+};
+
+/// 材质采样载荷（用于 callable shader）
+struct MatPayload
+{
+    uint instance_id;
+    uint geometry_id;
+    float2 uv;
+    float3 out_color;
+};

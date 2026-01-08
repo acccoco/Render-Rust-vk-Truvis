@@ -1,0 +1,15 @@
+#include "share/__common.slangi"
+
+namespace imgui
+{
+
+struct PushConstant
+{
+    float4x4 ortho;
+
+    SrvHandle texture;
+    ESamplerType texture_sampler_type;
+    int _padding_0;
+    int _padding_1;
+};
+};
