@@ -25,6 +25,11 @@
 
 ### 支持填充面
 
+### 使用 SER 增加 threads coherence
+
+在 tlas 求交后，使用 Shader Execution Reordering (SER)，基于 material 的类型进行重排序，
+以提升后续 shading 阶段的线程局部性和缓存命中率，从而提高整体渲染性能。
+
 ![Section-Fill](./docs/Section-Fill-Result.PNG)
 
 ## 🏗️ 项目结构

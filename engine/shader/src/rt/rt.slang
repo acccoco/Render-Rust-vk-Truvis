@@ -5,6 +5,11 @@
 #include "scene.slangi"
 #include "bindless_op.slangi"
 
+// 开启后，虽然 active threads 的 coherence 指标从 50% 上升到了 70%
+// 但是由于现阶段的实现开销主要在 TLAS 求交上面，而不是 closest shader 上面
+// 因此整体性能并没有提升，反而略有下降
+#define USE_HIT_OBJECT_SER 1
+
 const static uint max_depth = 16;
 
 /// 超过一定数量后，就不再重新计算了
@@ -12,6 +17,42 @@ const static uint max_accum_samples = 4096;
 
 [[vk::push_constant]]
 rt::PushConstants push_const;
+
+uint computeCoherenceHint(uint instance_id, uint geometry_id, PBRMaterial* mat)
+{
+    const static uint MAT_TYPE_SECTION_PLANE = 0; // emissive.x > 100
+    const static uint MAT_TYPE_EMISSIVE = 1;      // emissive.x > 0
+    const static uint MAT_TYPE_DIFFUSE = 2;       // opaque=1, roughness>0.5
+    const static uint MAT_TYPE_SPECULAR = 3;      // opaque=1, roughness<0.5
+    const static uint MAT_TYPE_TRANSPARENT = 4;   // opaque<1
+
+    uint material_type = MAT_TYPE_DIFFUSE;
+
+    // 判断材质类型
+    if (mat.emissive.x > 100.f)
+    {
+        material_type = MAT_TYPE_SECTION_PLANE;
+    }
+    else if (mat.emissive.x > 0.f)
+    {
+        material_type = MAT_TYPE_EMISSIVE;
+    }
+    else if (mat.opaque < 1.f)
+    {
+        material_type = MAT_TYPE_TRANSPARENT;
+    }
+    else if (mat.roughness < 0.5f)
+    {
+        material_type = MAT_TYPE_SPECULAR;
+    }
+    else
+    {
+        material_type = MAT_TYPE_DIFFUSE;
+    }
+
+    // 组合 coherence hint
+    return material_type;
+}
 
 struct HitPayload
 {
@@ -89,12 +130,51 @@ void main_ray_gen()
     //      + w_0 * ... * w_n * Li_n
     float3 color = float3(0.0f, 0.0f, 0.0f);
     float3 weight = float3(1.f, 1.f, 1.f);
+
+#if USE_HIT_OBJECT_SER
+    // 使用 Hit Object API 实现 Shader Execution Reordering
+    HitObject hit_obj;
+
+    for (uint depth = 0; depth < max_depth && !payload.done; ++depth)
+    {
+        hit_obj = HitObject::TraceRay(
+            rt::rt_tlas, RAY_FLAG_NONE, 0xFF, //
+            0,                                // sbt record offset
+            0,                                // sbt record stride
+            0,                                // sky miss shader
+            ray, payload
+        );
+
+        uint coherence_hint = 0;
+        if (hit_obj.IsHit())
+        {
+            uint instance_id = hit_obj.GetInstanceIndex();
+            uint geometry_id = hit_obj.GetGeometryIndex();
+            PBRMaterial* mat = gpu_scene.get_material(instance_id, geometry_id);
+            coherence_hint = computeCoherenceHint(instance_id, geometry_id, mat);
+        }
+
+        // 参考
+        // https://www.khronos.org/blog/boosting-ray-tracing-performance-with-shader-execution-reordering-introducing-vk-ext-ray-tracing-invocation-reorder
+        // hint 使用的 bits 越少越好
+        // reorder 的原则：首先是 shader，然后是 hint
+        ReorderThread(coherence_hint, 4);
+
+        HitObject::Invoke(rt::rt_tlas, hit_obj, payload);
+
+        color += payload.radiance * weight;
+        weight *= payload.weight;
+        ray.Origin = payload.ray_origin;
+        ray.Direction = payload.ray_dir;
+    }
+#else
+    // 标准路径：使用传统 TraceRay
     for (uint depth = 0; depth < max_depth && !payload.done; ++depth)
     {
         TraceRay(rt::rt_tlas, RAY_FLAG_NONE, 0xFF, //
-                 0,                            // sbt record offset
-                 0,                            // sbt record stride
-                 0,                            // sky miss shader
+                 0,                                // sbt record offset
+                 0,                                // sbt record stride
+                 0,                                // sky miss shader
                  ray, payload);
 
         color += payload.radiance * weight;
@@ -102,6 +182,7 @@ void main_ray_gen()
         ray.Origin = payload.ray_origin;
         ray.Direction = payload.ray_dir;
     }
+#endif
 
     if (accum_samples > 0 && push_const.channel == 0)
     {
