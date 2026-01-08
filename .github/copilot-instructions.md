@@ -7,52 +7,54 @@
 ```
 engine/
 ├── crates/
-│   ├── truvis-gfx/              # Vulkan RHI 抽象（Gfx 单例，GfxBuffer/GfxImage）
-│   ├── truvis-app/              # 应用框架（OuterApp trait）
-│   │   └── src/outer_app/       # 内置应用：triangle/, shader_toy/, cornell_app.rs
-│   ├── truvis-render-interface/ # CmdAllocator, FrameCounter, GfxResourceManager, Handle 系统
-│   ├── truvis-renderer/         # Renderer, Camera, Timer
-│   ├── truvis-render-graph/     # RenderContext, Pass/Subpass, FifBuffers
-│   ├── truvis-scene/            # RtGeometry, 几何体形状（shapes/triangle.rs）
-│   ├── truvis-shader/           # 着色器系统
-│   │   ├── truvis-shader-binding/   # Slang → Rust 自动绑定
-│   │   └── truvis-shader-build/     # 着色器编译（slangc）
+│   ├── truvis-gfx/              # Vulkan RHI 抽象（Gfx 单例）
+│   ├── truvis-render-interface/ # FrameCounter, CmdAllocator, GfxResourceManager, Handle 系统
+│   ├── truvis-render-graph/     # RenderGraphBuilder, RenderContext, FifBuffers
+│   ├── truvis-renderer/         # Renderer 核心，Camera, Timer, RenderPresent
+│   ├── truvis-app/              # OuterApp trait，内置应用实现
+│   ├── truvis-scene/            # 几何体、场景数据
+│   ├── truvis-shader/           # 着色器编译与绑定生成
 │   ├── truvis-cxx/              # C++ FFI（Assimp 场景加载）
-│   ├── truvis-asset/            # 异步资产加载
-│   └── truvis-gui-backend/      # ImGui 后端
+│   └── truvis-asset/            # 异步资产加载
 ├── shader/
-│   ├── src/                     # .slang 源码（按 pass 组织：rt/, hello_triangle/）
+│   ├── src/                     # .slang 源码（按 pass 组织）
 │   ├── include/                 # 共享头文件（.slangi）
 │   └── .build/                  # 编译后 .spv（自动生成）
 └── cxx/                         # C++ 源码 + CMakeLists.txt
 
 truvis-crate-tools/              # 独立 crate：TruvisPath 路径工具
-truvis-winit-app/                # 可运行的演示应用
-├── src/bin/                     # 应用入口：triangle_app.rs, rt_cornell.rs...
+truvis-winit-app/
+├── src/bin/                     # 应用入口点
 └── src/app.rs                   # WinitApp 窗口管理
 ```
 
-**依赖层次**: `truvis-gfx` → `truvis-render-interface` → `truvis-render-graph` → `truvis-app` → `truvis-winit-app`
+**依赖层次**: `truvis-gfx` → `truvis-render-interface` → `truvis-render-graph` → `truvis-renderer` → `truvis-app` → `truvis-winit-app`
 
 ## 🚀 构建流程（必须按顺序）
 
 ```powershell
-# 1. 首次构建（自动处理 CMake + vcpkg 依赖）
-cargo build --release
+# 1. 拉取资源和工具（首次克隆后）
+cargo run --bin fetch_res
 
-# 2. 编译着色器（运行前必需！）
+# 2. 构建 C++ 模块
+cargo run --bin cxx-build
+
+# 3. 编译着色器（运行前必需！）
 cargo run --bin shader-build
 
-# 3. 运行演示（从 truvis-winit-app 目录）
-cd truvis-winit-app
-cargo run --bin triangle_app       # 基础三角形
-cargo run --bin rt_cornell         # Cornell Box 光追
-cargo run --bin shader_toy_app     # 着色器实验场
+# 4. 项目构建
+cargo build --all
+
+# 5. 运行演示
+cargo run --bin triangle          # 基础三角形
+cargo run --bin rt-cornell        # Cornell Box 光追
+cargo run --bin rt-sponza         # Sponza 光追场景
+cargo run --bin shader-toy        # 着色器实验场
 ```
 
 **⚠️ 关键约束**:
 - `shader-build` 必须在运行任何渲染应用前执行
-- 使用 rayon 并行编译 `.slang` → `.spv`，输出到 `engine/shader/.build/`
+- 着色器使用 rayon 并行编译 `.slang` → `.spv`，输出到 `engine/shader/.build/`
 
 **自动生成系统**:
 - 着色器绑定: `truvis-shader-binding/build.rs` 从 `.slangi` 生成 Rust 类型
@@ -76,46 +78,62 @@ fn main() {
 // truvis-app/src/outer_app/my_app.rs
 #[derive(Default)]
 pub struct MyAppImpl {
-    pipeline: Option<MyPass>,
-    geometry: Option<RtGeometry>,
+    triangle_pass: Option<TrianglePass>,
+    gui_pass: Option<GuiPass>,
+    cmds: Vec<GfxCommandBuffer>,
 }
 impl OuterApp for MyAppImpl {
     fn init(&mut self, renderer: &mut Renderer, _camera: &mut Camera) {
-        self.pipeline = Some(MyPass::new(&renderer.render_context.frame_settings, &mut renderer.cmd_allocator));
-        self.geometry = Some(TriangleSoA::create_mesh());
+        self.triangle_pass = Some(TrianglePass::new(renderer.swapchain_image_info().image_format));
+        self.gui_pass = Some(GuiPass::new(...));
+        // 每帧预分配 CommandBuffer
+        self.cmds = FrameCounter::frame_labes()
+            .iter()
+            .map(|label| renderer.cmd_allocator.alloc_command_buffer(*label, "my-app"))
+            .collect_vec();
     }
-    fn draw(&self, render_context: &RenderContext) {
-        self.pipeline.as_ref().unwrap().render(render_context, self.geometry.as_ref().unwrap());
+    fn draw(&self, renderer: &Renderer, gui_draw_data: &imgui::DrawData, fence: &GfxSemaphore) {
+        // 使用 RenderGraph 构建渲染流程
+        let mut graph = RenderGraphBuilder::new();
+        graph.add_pass_lambda("my-pass", |builder| { ... }, |context| { ... });
+        let compiled = graph.compile();
+        compiled.execute(&cmd, &renderer.render_context.gfx_resource_manager);
     }
-    // 可选: draw_ui(), update(), on_window_resized()
+    fn draw_ui(&mut self, _ui: &imgui::Ui) { /* ImGui 绘制 */ }
+    fn update(&mut self, _renderer: &mut Renderer) { /* 每帧逻辑 */ }
+    fn on_window_resized(&mut self, _renderer: &mut Renderer) { /* 窗口重建 */ }
 }
 ```
 
-### Pass/Subpass 架构
+### RenderGraph 模式
 
-| 层级 | 职责 |
-|------|------|
-| **Subpass** (`*_subpass.rs`) | 封装着色器、描述符布局、Pipeline，实现 `RenderSubpass` trait |
-| **Pass** (`*_pass.rs`) | 命令缓冲区分配、图像屏障、调用 subpass.draw() |
+使用声明式 RenderGraph 构建渲染流程，自动处理图像屏障和信号量同步：
 
 ```rust
-// Pass 模式：每帧 label 预分配 CommandBuffer
-impl MyPass {
-    pub fn new(frame_settings: &FrameSettings, cmd_allocator: &mut CmdAllocator) -> Self {
-        let cmds = FrameCounter::frame_labes()
-            .map(|label| cmd_allocator.alloc_command_buffer(label, "my-pass"));
-        Self { subpass: MySubpass::new(frame_settings), cmds }
-    }
-    
-    pub fn render(&self, render_context: &RenderContext, geometry: &RtGeometry) {
-        let frame_label = render_context.frame_counter.frame_label();
-        let cmd = self.cmds[*frame_label].clone();
-        cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "my-pass");
-        self.subpass.draw(&cmd, render_context, frame_label, geometry);
-        cmd.end();
-        Gfx::get().gfx_queue().submit(vec![GfxSubmitInfo::new(&[cmd])], None);
-    }
-}
+let mut graph = RenderGraphBuilder::new();
+
+// 信号量同步（timeline semaphore）
+graph.signal_semaphore(RgSemaphoreInfo::timeline(fence.handle(), vk::PipelineStageFlags2::BOTTOM_OF_PIPE, frame_id));
+
+// 导入外部资源
+let swapchain_rg = graph.import_image("swapchain", image_handle, Some(view_handle), format, 
+    RgImageState::UNDEFINED_BOTTOM,
+    Some(RgSemaphoreInfo::binary(present_semaphore.handle(), vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)));
+
+// 导出资源状态
+graph.export_image(swapchain_rg, RgImageState::PRESENT_BOTTOM, Some(RgSemaphoreInfo::binary(...)));
+
+// 添加渲染 Pass（lambda 或 trait 实现）
+graph.add_pass_lambda("my-pass", |builder| {
+    builder.read_write_image(swapchain_rg, RgImageState::COLOR_ATTACHMENT_READ_WRITE);
+}, |context| {
+    let view = context.get_image_view(swapchain_rg).unwrap();
+    // 绘制逻辑
+});
+
+// 编译并执行
+let compiled = graph.compile();
+compiled.execute(&cmd, &gfx_resource_manager);
 ```
 
 
@@ -207,7 +225,7 @@ cmd.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, "ray-tracing");
 # 3. 如需新着色器，在 engine/shader/src/ 添加 .slang 文件
 # 4. 运行构建流程
 cargo run --bin shader-build
-cd truvis-winit-app && cargo run --bin my_app
+cargo run --bin my_app
 ```
 
 参考示例：`truvis-winit-app/src/bin/triangle_app.rs` + `engine/crates/truvis-app/src/outer_app/triangle/`
@@ -323,8 +341,13 @@ let viewport = vk::Viewport {
     ..
 };
 
-// ❌ 错误：OuterApp::draw() 签名（旧版本无参数）
+// ❌ 错误：OuterApp::draw() 签名（必须包含所有参数）
 fn draw(&self) { }
-// ✅ 正确：当前版本接收 RenderContext
-fn draw(&self, render_context: &RenderContext) { /* 通过 render_context 访问状态 */ }
+// ✅ 正确：当前版本接收 Renderer、DrawData 和 fence
+fn draw(&self, renderer: &Renderer, gui_draw_data: &imgui::DrawData, fence: &GfxSemaphore) { ... }
+
+// ❌ 错误：直接访问 render_context
+let ctx = renderer.render_context;  // 无法移动
+// ✅ 正确：借用访问
+let frame_label = renderer.render_context.frame_counter.frame_label();
 ```
