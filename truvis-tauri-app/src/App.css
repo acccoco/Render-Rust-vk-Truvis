@@ -7,7 +7,9 @@
     @apply m-0 p-0 box-border;
   }
 
-  html, body, #root {
+  html,
+  body,
+  #root {
     @apply w-full h-full overflow-hidden;
   }
 
@@ -17,7 +19,7 @@
     line-height: 1.4;
     font-weight: 400;
     color: #cccccc;
-    background-color: #1e1e1e;
+    background-color: transparent;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -26,6 +28,7 @@
 }
 
 @layer utilities {
+
   /* 滚动条样式 */
   ::-webkit-scrollbar {
     @apply w-2 h-2;

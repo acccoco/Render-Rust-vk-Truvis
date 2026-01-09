@@ -26,17 +26,17 @@ function App() {
   const [bottomHeight, setBottomHeight] = useState(DEFAULT_BOTTOM_HEIGHT);
   const [leftWidth, setLeftWidth] = useState(DEFAULT_LEFT_WIDTH);
   const [rightWidth, setRightWidth] = useState(DEFAULT_RIGHT_WIDTH);
-  
+
   // 拖拽状态
   const [resizing, setResizing] = useState<string | null>(null);
-  
+
   // Vulkan 区域引用
   const vulkanRef = useRef<HTMLDivElement>(null);
 
   // 通知后端更新 Vulkan 区域布局
   const updateVulkanBounds = useCallback(async (bounds: VulkanBounds) => {
     try {
-      await invoke("update_vulkan_bounds", { 
+      await invoke("update_vulkan_bounds", {
         top: Math.round(bounds.top),
         left: Math.round(bounds.left),
         right: Math.round(bounds.right),
@@ -163,7 +163,7 @@ function App() {
   }, []);
 
   return (
-    <div className="flex flex-col w-full h-screen bg-editor-bg">
+    <div className="flex flex-col w-full h-screen">
       {/* 顶部工具栏 */}
       <div className="bg-editor-toolbar border-b border-editor-border flex flex-col shrink-0" style={{ height: topHeight }}>
         <div className="flex-1 flex items-center px-3 gap-4">
@@ -175,7 +175,7 @@ function App() {
             <button className="bg-transparent border-none text-editor-text-primary px-2.5 py-1 rounded cursor-pointer text-[13px] hover:bg-editor-border transition-colors">Help</button>
           </div>
         </div>
-        <div 
+        <div
           className={`h-1 bg-transparent cursor-ns-resize shrink-0 transition-colors hover:bg-editor-accent ${resizing === 'top' ? 'bg-editor-accent' : ''}`}
           onMouseDown={handleMouseDown('top')}
         />
@@ -194,14 +194,14 @@ function App() {
               <div className="px-2 py-1 cursor-pointer rounded hover:bg-editor-hover pl-6">📷 Camera</div>
             </div>
           </div>
-          <div 
+          <div
             className={`w-1 bg-transparent cursor-ew-resize shrink-0 transition-colors absolute right-0 top-0 bottom-0 hover:bg-editor-accent ${resizing === 'left' ? 'bg-editor-accent' : ''}`}
             onMouseDown={handleMouseDown('left')}
           />
         </div>
 
         {/* Vulkan 渲染区域（透明占位，捕获鼠标事件） */}
-        <div 
+        <div
           ref={vulkanRef}
           className="flex-1 bg-transparent cursor-crosshair outline-none"
           tabIndex={0}
@@ -218,7 +218,7 @@ function App() {
 
         {/* 右侧面板 */}
         <div className="bg-editor-panel flex shrink-0 relative" style={{ width: rightWidth }}>
-          <div 
+          <div
             className={`w-1 bg-transparent cursor-ew-resize shrink-0 transition-colors absolute left-0 top-0 bottom-0 hover:bg-editor-accent ${resizing === 'right' ? 'bg-editor-accent' : ''}`}
             onMouseDown={handleMouseDown('right')}
           />
@@ -246,7 +246,7 @@ function App() {
 
       {/* 底部状态栏 */}
       <div className="bg-editor-accent flex flex-col shrink-0" style={{ height: bottomHeight }}>
-        <div 
+        <div
           className={`h-1 bg-transparent cursor-ns-resize shrink-0 transition-colors hover:bg-editor-accent ${resizing === 'bottom' ? 'bg-editor-accent' : ''}`}
           onMouseDown={handleMouseDown('bottom')}
         />

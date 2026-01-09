@@ -29,7 +29,6 @@ static APP_HANDLE: Mutex<Option<tauri::AppHandle>> = Mutex::new(None);
 /// 当前布局边距（用于窗口 resize 时保持布局）
 static CURRENT_MARGINS: Mutex<(i32, i32, i32, i32)> = Mutex::new((40, 200, 200, 24)); // (top, left, right, bottom);
 
-
 /// 从前端接收的鼠标移动事件
 #[derive(Debug, Clone, Deserialize)]
 struct MouseMovePayload {
@@ -70,11 +69,9 @@ fn main() {
         .setup(|app| {
             // 保存 AppHandle 供后续使用
             *APP_HANDLE.lock().unwrap() = Some(app.handle().clone());
-            
+
             // 获取主窗口 (Tauri 2 默认会创建 "main" 窗口)
-            let main_window = app
-                .get_webview_window("main")
-                .expect("Failed to get main window");
+            let main_window = app.get_webview_window("main").expect("Failed to get main window");
 
             // 设置主窗口大小
             main_window
@@ -88,7 +85,7 @@ fn main() {
             #[cfg(windows)]
             {
                 init_vulkan_child_window(&main_window)?;
-                
+
                 // 新版布局：WebView 覆盖整个窗口（透明背景），Vulkan 区域通过前端控制
                 // 不再需要手动调整 WebView bounds
                 println!("WebView set to cover entire window (transparent mode)");
@@ -129,14 +126,10 @@ fn main() {
 #[cfg(windows)]
 fn init_vulkan_child_window(main_window: &WebviewWindow) -> Result<(), Box<dyn std::error::Error>> {
     // 获取主窗口的 raw-window-handle
-    let display_handle = main_window
-        .display_handle()
-        .expect("Failed to get display handle");
+    let display_handle = main_window.display_handle().expect("Failed to get display handle");
     let raw_display_handle = display_handle.as_raw();
 
-    let window_handle = main_window
-        .window_handle()
-        .expect("Failed to get window handle");
+    let window_handle = main_window.window_handle().expect("Failed to get window handle");
     let raw_window_handle = window_handle.as_raw();
 
     // 获取主窗口大小
@@ -155,26 +148,16 @@ fn init_vulkan_child_window(main_window: &WebviewWindow) -> Result<(), Box<dyn s
     );
 
     // 创建子窗口
-    let (child_window, child_raw_handle) =
-        ChildWindow::create(raw_window_handle, x, y, width, height)
-            .map_err(|e| format!("Failed to create child window: {}", e))?;
+    let (child_window, child_raw_handle) = ChildWindow::create(raw_window_handle, x, y, width, height)
+        .map_err(|e| format!("Failed to create child window: {}", e))?;
 
-    println!(
-        "Created Vulkan child window at ({}, {}) with size {}x{}",
-        x, y, width, height
-    );
+    println!("Created Vulkan child window at ({}, {}) with size {}x{}", x, y, width, height);
 
     // 在独立线程中启动渲染器
-    let render_thread =
-        RenderThread::spawn(raw_display_handle, || Box::new(CornellApp::default()));
+    let render_thread = RenderThread::spawn(raw_display_handle, || Box::new(CornellApp::default()));
 
     // 发送窗口初始化消息（使用子窗口的句柄）
-    render_thread.init_window(
-        raw_display_handle,
-        child_raw_handle,
-        scale_factor,
-        [width as u32, height as u32],
-    );
+    render_thread.init_window(raw_display_handle, child_raw_handle, scale_factor, [width as u32, height as u32]);
 
     // 保存渲染线程和子窗口句柄
     *RENDER_THREAD.lock().unwrap() = Some(render_thread);
@@ -269,7 +252,7 @@ fn update_sidebar_width(sidebar_width: i32) {
 fn update_vulkan_bounds(top: i32, left: i32, right: i32, bottom: i32) {
     // 保存当前边距
     *CURRENT_MARGINS.lock().unwrap() = (top, left, right, bottom);
-    
+
     #[cfg(windows)]
     {
         let child_window = CHILD_WINDOW.lock().unwrap();
@@ -282,14 +265,11 @@ fn update_vulkan_bounds(top: i32, left: i32, right: i32, bottom: i32) {
                     eprintln!("Failed to update child window position: {}", e);
                 } else {
                     println!("Vulkan region updated: pos({}, {}) size({}x{})", x, y, width, height);
-                    
+
                     // 通知渲染线程窗口大小变化
                     let render_thread = RENDER_THREAD.lock().unwrap();
                     if let Some(ref thread) = *render_thread {
-                        thread.send_event(TauriEventAdapter::from_resized(
-                            width as u32,
-                            height as u32,
-                        ));
+                        thread.send_event(TauriEventAdapter::from_resized(width as u32, height as u32));
                     }
                 }
             }
@@ -305,8 +285,7 @@ fn update_child_window_layout(sidebar_width: i32) {
         let child_window = CHILD_WINDOW.lock().unwrap();
         if let Some(ref cw) = *child_window {
             if let Ok((parent_width, parent_height)) = cw.get_parent_client_size() {
-                let (x, y, width, height) =
-                    calculate_vulkan_region(parent_width, parent_height, sidebar_width);
+                let (x, y, width, height) = calculate_vulkan_region(parent_width, parent_height, sidebar_width);
 
                 if let Err(e) = cw.set_position(x, y, width, height) {
                     eprintln!("Failed to update child window position: {}", e);
@@ -314,10 +293,7 @@ fn update_child_window_layout(sidebar_width: i32) {
                     // 通知渲染线程窗口大小变化
                     let render_thread = RENDER_THREAD.lock().unwrap();
                     if let Some(ref thread) = *render_thread {
-                        thread.send_event(TauriEventAdapter::from_resized(
-                            width as u32,
-                            height as u32,
-                        ));
+                        thread.send_event(TauriEventAdapter::from_resized(width as u32, height as u32));
                     }
                 }
             }
@@ -359,14 +335,11 @@ fn handle_main_window_event(event: &WindowEvent) {
                         // 通知渲染线程窗口大小变化
                         let render_thread = RENDER_THREAD.lock().unwrap();
                         if let Some(ref thread) = *render_thread {
-                            thread.send_event(TauriEventAdapter::from_resized(
-                                width as u32,
-                                height as u32,
-                            ));
+                            thread.send_event(TauriEventAdapter::from_resized(width as u32, height as u32));
                         }
                     }
                 }
-                
+
                 // 注意：新布局下 WebView 覆盖整个窗口，不再需要手动调整 bounds
                 // 因为我们使用 auto_resize = true 让 WebView 自动跟随窗口大小
             }
