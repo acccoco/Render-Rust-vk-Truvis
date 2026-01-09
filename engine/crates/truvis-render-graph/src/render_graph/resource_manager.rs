@@ -1,6 +1,6 @@
 use super::resource_handle::{RgBufferHandle, RgImageHandle};
-use crate::render_graph_v2::buffer_resource::RgBufferResource;
-use crate::render_graph_v2::image_resource::RgImageResource;
+use crate::render_graph::buffer_resource::RgBufferResource;
+use crate::render_graph::image_resource::RgImageResource;
 use slotmap::SlotMap;
 
 /// 资源注册表

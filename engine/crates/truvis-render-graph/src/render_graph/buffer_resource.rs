@@ -1,4 +1,4 @@
-use crate::render_graph_v2::RgBufferState;
+use crate::render_graph::RgBufferState;
 use ash::vk;
 use truvis_render_interface::handles::GfxBufferHandle;
 

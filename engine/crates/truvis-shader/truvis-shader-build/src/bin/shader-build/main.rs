@@ -51,4 +51,3 @@ fn main() {
 
     log::info!("Shader compilation completed.");
 }
-

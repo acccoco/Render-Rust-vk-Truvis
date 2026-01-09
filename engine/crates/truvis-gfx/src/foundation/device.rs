@@ -125,7 +125,9 @@ impl GfxDevice {
             Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::default().buffer_device_address(true)),
             Box::new(vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::default().ray_tracing_pipeline(true)),
             Box::new(vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default().acceleration_structure(true)),
-            Box::new(vk::PhysicalDeviceRayTracingInvocationReorderFeaturesNV::default().ray_tracing_invocation_reorder(true)),
+            Box::new(
+                vk::PhysicalDeviceRayTracingInvocationReorderFeaturesNV::default().ray_tracing_invocation_reorder(true),
+            ),
             Box::new(vk::PhysicalDeviceHostQueryResetFeatures::default().host_query_reset(true)),
             Box::new(vk::PhysicalDeviceSynchronization2Features::default().synchronization2(true)),
             Box::new(vk::PhysicalDeviceTimelineSemaphoreFeatures::default().timeline_semaphore(true)),

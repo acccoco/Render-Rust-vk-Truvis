@@ -1,5 +1,5 @@
-use crate::render_graph_v2::RgImageState;
-use crate::render_graph_v2::semaphore_info::RgSemaphoreInfo;
+use crate::render_graph::RgImageState;
+use crate::render_graph::semaphore_info::RgSemaphoreInfo;
 
 /// 导出资源信息
 ///

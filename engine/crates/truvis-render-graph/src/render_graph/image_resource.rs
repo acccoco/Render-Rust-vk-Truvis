@@ -1,5 +1,5 @@
-use crate::render_graph_v2::RgImageState;
-use crate::render_graph_v2::semaphore_info::RgSemaphoreInfo;
+use crate::render_graph::RgImageState;
+use crate::render_graph::semaphore_info::RgSemaphoreInfo;
 use ash::vk;
 use truvis_gfx::resources::image_view::GfxImageViewDesc;
 use truvis_render_interface::handles::{GfxImageHandle, GfxImageViewHandle};

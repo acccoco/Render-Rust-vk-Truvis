@@ -23,7 +23,7 @@ impl HlslCompiler {
     fn get_shader_model_target(stage: ShaderStage) -> &'static str {
         match stage {
             ShaderStage::Vertex => "vs",
-            ShaderStage::TessellationControl => "hs", // Hull Shader
+            ShaderStage::TessellationControl => "hs",    // Hull Shader
             ShaderStage::TessellationEvaluation => "ds", // Domain Shader
             ShaderStage::Geometry => "gs",
             ShaderStage::Fragment => "ps", // Pixel Shader
@@ -74,4 +74,3 @@ impl ShaderCompiler for HlslCompiler {
         self.process_cmd_output(output);
     }
 }
-

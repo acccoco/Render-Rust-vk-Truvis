@@ -7,7 +7,7 @@ use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::gfx::Gfx;
 use truvis_gui_backend::gui_pass::{GuiPass, GuiRgPass};
-use truvis_render_graph::render_graph_v2::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
+use truvis_render_graph::render_graph::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
 use truvis_render_interface::frame_counter::FrameCounter;
 use truvis_renderer::platform::camera::Camera;
 use truvis_renderer::renderer::Renderer;

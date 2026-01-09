@@ -1,5 +1,5 @@
 use super::resource_handle::{RgBufferHandle, RgImageHandle};
-use crate::render_graph_v2::{RgBufferState, RgImageState};
+use crate::render_graph::{RgBufferState, RgImageState};
 use slotmap::SecondaryMap;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::resources::image::GfxImage;

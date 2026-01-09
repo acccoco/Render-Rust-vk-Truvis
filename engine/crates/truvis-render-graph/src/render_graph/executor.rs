@@ -11,9 +11,9 @@ use super::pass::{RgLambdaPassWrapper, RgPass, RgPassBuilder, RgPassContext, RgP
 use super::resource_handle::{RgBufferHandle, RgImageHandle};
 use super::resource_manager::RgResourceManager;
 use super::resource_state::{RgBufferState, RgImageState};
-use crate::render_graph_v2::export_info::RgExportInfo;
-use crate::render_graph_v2::semaphore_info::RgSemaphoreInfo;
-use crate::render_graph_v2::{RgBufferDesc, RgBufferResource, RgImageDesc, RgImageResource};
+use crate::render_graph::export_info::RgExportInfo;
+use crate::render_graph::semaphore_info::RgSemaphoreInfo;
+use crate::render_graph::{RgBufferDesc, RgBufferResource, RgImageDesc, RgImageResource};
 use ash::vk;
 use itertools::Itertools;
 use slotmap::SecondaryMap;

@@ -1,6 +1,6 @@
 use ash::vk;
 use truvis_render_graph::render_context::RenderContext;
-use truvis_render_graph::render_graph_v2::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
+use truvis_render_graph::render_graph::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
 
 use crate::render_pipeline::blit_pass::{BlitPass, BlitRgPass};
 use crate::render_pipeline::realtime_rt_pass::{RealtimeRtPass, RealtimeRtRgPass};
