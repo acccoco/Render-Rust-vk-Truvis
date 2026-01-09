@@ -163,39 +163,39 @@ function App() {
   }, []);
 
   return (
-    <div className="editor-container">
+    <div className="flex flex-col w-full h-screen bg-editor-bg">
       {/* 顶部工具栏 */}
-      <div className="toolbar" style={{ height: topHeight }}>
-        <div className="toolbar-content">
-          <span className="logo">🎮 Truvis Editor</span>
-          <div className="toolbar-actions">
-            <button className="toolbar-btn">File</button>
-            <button className="toolbar-btn">Edit</button>
-            <button className="toolbar-btn">View</button>
-            <button className="toolbar-btn">Help</button>
+      <div className="bg-editor-toolbar border-b border-editor-border flex flex-col shrink-0" style={{ height: topHeight }}>
+        <div className="flex-1 flex items-center px-3 gap-4">
+          <span className="font-semibold text-sm text-editor-text-white">🎮 Truvis Editor</span>
+          <div className="flex gap-1">
+            <button className="bg-transparent border-none text-editor-text-primary px-2.5 py-1 rounded cursor-pointer text-[13px] hover:bg-editor-border transition-colors">File</button>
+            <button className="bg-transparent border-none text-editor-text-primary px-2.5 py-1 rounded cursor-pointer text-[13px] hover:bg-editor-border transition-colors">Edit</button>
+            <button className="bg-transparent border-none text-editor-text-primary px-2.5 py-1 rounded cursor-pointer text-[13px] hover:bg-editor-border transition-colors">View</button>
+            <button className="bg-transparent border-none text-editor-text-primary px-2.5 py-1 rounded cursor-pointer text-[13px] hover:bg-editor-border transition-colors">Help</button>
           </div>
         </div>
         <div 
-          className={`resize-handle-h ${resizing === 'top' ? 'active' : ''}`}
+          className={`h-1 bg-transparent cursor-ns-resize shrink-0 transition-colors hover:bg-editor-accent ${resizing === 'top' ? 'bg-editor-accent' : ''}`}
           onMouseDown={handleMouseDown('top')}
         />
       </div>
 
       {/* 中间区域 */}
-      <div className="middle-area">
+      <div className="flex-1 flex overflow-hidden">
         {/* 左侧面板 */}
-        <div className="left-panel" style={{ width: leftWidth }}>
-          <div className="panel-content">
-            <h3>Scene</h3>
-            <div className="tree-view">
-              <div className="tree-item">📁 Root</div>
-              <div className="tree-item indent">📦 Mesh</div>
-              <div className="tree-item indent">💡 Light</div>
-              <div className="tree-item indent">📷 Camera</div>
+        <div className="bg-editor-panel flex shrink-0 relative" style={{ width: leftWidth }}>
+          <div className="flex-1 overflow-y-auto p-2">
+            <h3 className="text-[11px] font-semibold text-editor-text-secondary px-2 py-1.5 bg-[#333333] -mx-2 -mt-2 mb-2 uppercase tracking-wide border-b border-editor-border">Scene</h3>
+            <div className="text-[13px]">
+              <div className="px-2 py-1 cursor-pointer rounded hover:bg-editor-hover">📁 Root</div>
+              <div className="px-2 py-1 cursor-pointer rounded hover:bg-editor-hover pl-6">📦 Mesh</div>
+              <div className="px-2 py-1 cursor-pointer rounded hover:bg-editor-hover pl-6">💡 Light</div>
+              <div className="px-2 py-1 cursor-pointer rounded hover:bg-editor-hover pl-6">📷 Camera</div>
             </div>
           </div>
           <div 
-            className={`resize-handle-v ${resizing === 'left' ? 'active' : ''}`}
+            className={`w-1 bg-transparent cursor-ew-resize shrink-0 transition-colors absolute right-0 top-0 bottom-0 hover:bg-editor-accent ${resizing === 'left' ? 'bg-editor-accent' : ''}`}
             onMouseDown={handleMouseDown('left')}
           />
         </div>
@@ -203,7 +203,7 @@ function App() {
         {/* Vulkan 渲染区域（透明占位，捕获鼠标事件） */}
         <div 
           ref={vulkanRef}
-          className="vulkan-placeholder"
+          className="flex-1 bg-transparent cursor-crosshair outline-none"
           tabIndex={0}
           onMouseMove={handleVulkanMouseMove}
           onMouseDown={handleVulkanMouseDown}
@@ -217,24 +217,24 @@ function App() {
         </div>
 
         {/* 右侧面板 */}
-        <div className="right-panel" style={{ width: rightWidth }}>
+        <div className="bg-editor-panel flex shrink-0 relative" style={{ width: rightWidth }}>
           <div 
-            className={`resize-handle-v left ${resizing === 'right' ? 'active' : ''}`}
+            className={`w-1 bg-transparent cursor-ew-resize shrink-0 transition-colors absolute left-0 top-0 bottom-0 hover:bg-editor-accent ${resizing === 'right' ? 'bg-editor-accent' : ''}`}
             onMouseDown={handleMouseDown('right')}
           />
-          <div className="panel-content">
-            <h3>Properties</h3>
-            <div className="property-group">
-              <label>Position</label>
-              <div className="property-row">
+          <div className="flex-1 overflow-y-auto p-2">
+            <h3 className="text-[11px] font-semibold text-editor-text-secondary px-2 py-1.5 bg-[#333333] -mx-2 -mt-2 mb-2 uppercase tracking-wide border-b border-editor-border">Properties</h3>
+            <div className="mb-3">
+              <label className="block text-[11px] text-editor-text-muted mb-1 uppercase">Position</label>
+              <div className="flex gap-2 text-xs text-editor-text-primary">
                 <span>X: 0.0</span>
                 <span>Y: 0.0</span>
                 <span>Z: 0.0</span>
               </div>
             </div>
-            <div className="property-group">
-              <label>Rotation</label>
-              <div className="property-row">
+            <div className="mb-3">
+              <label className="block text-[11px] text-editor-text-muted mb-1 uppercase">Rotation</label>
+              <div className="flex gap-2 text-xs text-editor-text-primary">
                 <span>X: 0°</span>
                 <span>Y: 0°</span>
                 <span>Z: 0°</span>
@@ -245,14 +245,14 @@ function App() {
       </div>
 
       {/* 底部状态栏 */}
-      <div className="statusbar" style={{ height: bottomHeight }}>
+      <div className="bg-editor-accent flex flex-col shrink-0" style={{ height: bottomHeight }}>
         <div 
-          className={`resize-handle-h top ${resizing === 'bottom' ? 'active' : ''}`}
+          className={`h-1 bg-transparent cursor-ns-resize shrink-0 transition-colors hover:bg-editor-accent ${resizing === 'bottom' ? 'bg-editor-accent' : ''}`}
           onMouseDown={handleMouseDown('bottom')}
         />
-        <div className="statusbar-content">
+        <div className="flex-1 flex items-center justify-between px-3 text-xs text-editor-text-white">
           <span>Ready</span>
-          <span className="status-right">FPS: -- | Draw Calls: -- | Triangles: --</span>
+          <span className="opacity-80">FPS: -- | Draw Calls: -- | Triangles: --</span>
         </div>
       </div>
     </div>
