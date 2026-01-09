@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "truvis-tauri-app",
-        "width": 800,
-        "height": 600
+        "title": "Truvis Editor",
+        "width": 1280,
+        "height": 720,
+        "transparent": true,
+        "decorations": true
       }
     ],
     "security": {
