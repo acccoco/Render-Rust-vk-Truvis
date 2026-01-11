@@ -1,57 +1,27 @@
 /// @file rt_raygen.slang
-/// @brief 光线生成着色器
+/// @brief 光线生成着色器（重构版）
 ///
-/// 实现路径追踪的主循环，支持 SER (Shader Execution Reordering) 优化
+/// 所有材质计算都在 ray gen 中进行：
+/// - BRDF 采样和计算
+/// - throughput 计算
+/// - radiance 累积
+/// - 俄罗斯轮盘赌终止
 
 #include "./payload.slangi"
 
 #include "lib/bindless_op.slangi"
+#include "lib/pbr.slangi"
+#include "lib/sample/random.slangi"
 #include "lib/sample/sample.slangi"
 
 // 开启后，虽然 active threads 的 coherence 指标从 50% 上升到了 70%
 // 但是由于现阶段的实现开销主要在 TLAS 求交上面，而不是 closest shader 上面
 // 因此整体性能并没有提升，反而略有下降
-#define USE_HIT_OBJECT_SER 0
+#define USE_HIT_OBJECT_SER 1
 
-/// 计算 SER coherence hint，用于光线重排序优化
-/// @param instance_id 实例 ID
-/// @param geometry_id 几何体 ID
-/// @param mat 材质指针
-/// @return coherence hint 值（0-4）
-uint computeCoherenceHint(uint instance_id, uint geometry_id, PBRMaterial* mat)
-{
-    const static uint MAT_TYPE_SECTION_PLANE = 0; // emissive.x > 100
-    const static uint MAT_TYPE_EMISSIVE = 1;      // emissive.x > 0
-    const static uint MAT_TYPE_DIFFUSE = 2;       // opaque=1, roughness>0.5
-    const static uint MAT_TYPE_SPECULAR = 3;      // opaque=1, roughness<0.5
-    const static uint MAT_TYPE_TRANSPARENT = 4;   // opaque<1
-
-    uint material_type = MAT_TYPE_DIFFUSE;
-
-    // 判断材质类型
-    if (mat.emissive.x > 100.f)
-    {
-        material_type = MAT_TYPE_SECTION_PLANE;
-    }
-    else if (mat.emissive.x > 0.f)
-    {
-        material_type = MAT_TYPE_EMISSIVE;
-    }
-    else if (mat.opaque < 1.f)
-    {
-        material_type = MAT_TYPE_TRANSPARENT;
-    }
-    else if (mat.roughness < 0.5f)
-    {
-        material_type = MAT_TYPE_SPECULAR;
-    }
-    else
-    {
-        material_type = MAT_TYPE_DIFFUSE;
-    }
-
-    return material_type;
-}
+// ============================================================================
+// 相机和初始化
+// ============================================================================
 
 /// 生成相机光线
 /// @param thread_id 当前线程 ID
@@ -78,14 +48,358 @@ RayDesc generateCameraRay(uint2 thread_id, float2 subpixel_jitter)
 HitPayload initPayload(uint random_seed)
 {
     HitPayload payload = {};
-    payload.emission = float3(0.0f, 0.0f, 0.0f);
-    payload.throughput = float3(1.0f, 1.0f, 1.0f);
-    payload.done = false;
+    payload.hit = false;
     payload.random_seed = random_seed;
     payload.section_stack = 0;
     payload.object_stack = 0;
     return payload;
 }
+
+// ============================================================================
+// BRDF 采样函数
+// ============================================================================
+
+/// 漫反射采样
+/// @param info 命中信息
+/// @param random_seed 随机种子
+/// @param out_dir 输出：采样方向
+/// @param out_throughput 输出：throughput = BRDF * cos / pdf
+void sampleDiffuse(
+    const HitInfo info,
+    inout uint random_seed,
+    out float3 out_dir,
+    out float3 out_throughput
+)
+{
+    // 半球 cos 采样
+    // BRDF = diffuse_color / pi
+    // pdf = cos(theta) / pi
+    // throughput = BRDF * cos(theta) / pdf = diffuse_color
+    const float3 local_dir = Sample::get_cos_hemisphere_sample(random_seed);
+    float3 tangent, bitangent;
+    Sample::create_local_coord(info.normal, tangent, bitangent);
+    out_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * info.normal);
+
+    const float3 diffuse_color = (1.f - info.metallic) * info.base_color;
+    out_throughput = diffuse_color;
+}
+
+/// 镜面反射采样（GGX）
+/// @param info 命中信息
+/// @param view_dir 观察方向（从命中点到相机）
+/// @param random_seed 随机种子
+/// @param out_dir 输出：采样方向
+/// @param out_throughput 输出：throughput = BRDF * cos / pdf
+void sampleSpecular(
+    const HitInfo info,
+    const float3 view_dir,
+    inout uint random_seed,
+    out float3 out_dir,
+    out float3 out_throughput
+)
+{
+    const float reflectance = 0.8f;
+    const float3 f0 = lerp(0.16 * reflectance * reflectance, info.base_color, info.metallic);
+    const float real_roughness = info.roughness * info.roughness;
+
+    // 根据 NDF 采样半程向量 H
+    float3 h = SpecularBrdf::ggx_sample(random_seed, real_roughness, info.normal);
+    SpecularBrdf specular_brdf = SpecularBrdf(f0, real_roughness, info.normal, view_dir, h);
+
+    out_throughput = specular_brdf.brdf_with_pdf() * specular_brdf.get_ndotl();
+    out_dir = specular_brdf.light;
+}
+
+/// 完美镜面反射（delta 路径）
+/// @param info 命中信息
+/// @param ray_dir 入射光线方向
+/// @param out_dir 输出：反射方向
+/// @param out_throughput 输出：throughput
+void samplePerfectReflection(
+    const HitInfo info,
+    const float3 ray_dir,
+    out float3 out_dir,
+    out float3 out_throughput
+)
+{
+    out_dir = reflect(ray_dir, info.normal);
+    // 完美镜面反射的 throughput 基于菲涅尔
+    const float reflectance = 0.8f;
+    const float3 f0 = lerp(0.16 * reflectance * reflectance, info.base_color, info.metallic);
+    const float cos_theta = saturate(dot(-ray_dir, info.normal));
+    const float fresnel = pow(1.f - cos_theta, 5.f);
+    out_throughput = f0 + (1.f - f0) * fresnel;
+}
+
+/// 折射采样
+/// @param info 命中信息
+/// @param ray_dir 入射光线方向
+/// @param out_dir 输出：折射方向
+/// @param out_throughput 输出：throughput
+/// @return true 表示折射成功，false 表示全内反射
+bool sampleRefraction(
+    const HitInfo info,
+    const float3 ray_dir,
+    out float3 out_dir,
+    out float3 out_throughput
+)
+{
+    // 根据光线与原始法线的夹角判断是进入还是离开介质
+    const float eta = dot(ray_dir, info.origin_normal) > 0.f ? info.ior : 1.f / info.ior;
+
+    out_dir = refract(ray_dir, info.normal, eta);
+    if (length(out_dir) < 1e-6f)
+    {
+        // 全内反射
+        return false;
+    }
+
+    out_throughput = info.base_color;
+    return true;
+}
+
+// ============================================================================
+// 材质处理
+// ============================================================================
+
+/// 处理剖切体逻辑
+/// @param payload 光线载荷
+/// @param info 命中信息
+/// @param ray_dir 当前光线方向
+/// @param out_origin 输出：下一条光线起点
+/// @param out_dir 输出：下一条光线方向
+/// @param out_emission 输出：自发光
+/// @param out_done 输出：是否终止
+/// @return true 表示是剖切体，已处理
+bool handleSectionPlane(
+    inout HitPayload payload,
+    const HitInfo info,
+    const float3 ray_dir,
+    out float3 out_origin,
+    out float3 out_dir,
+    out float3 out_emission,
+    out bool out_done
+)
+{
+    out_emission = float3(0.f);
+    out_done = false;
+
+    if (info.material_type != MaterialType::SECTION)
+    {
+        return false;
+    }
+
+    payload.section_stack += dot(ray_dir, info.origin_normal) < 0.f ? 1 : -1;
+
+    if (payload.section_stack == 0)
+    {
+        // 离开剖切体
+        if (payload.object_stack > 0)
+        {
+            // 在物体内部，设为填充面
+            out_done = true;
+            out_emission = float3(0.8f, 0.1f, 0.8f); // 紫色
+        }
+        else
+        {
+            // 继续穿透
+            out_origin = info.position + 0.0001f * ray_dir;
+            out_dir = ray_dir;
+        }
+    }
+    else
+    {
+        // 仍然在剖切体内部，继续穿透
+        out_origin = info.position + 0.0001f * ray_dir;
+        out_dir = ray_dir;
+    }
+
+    return true;
+}
+
+/// 处理剖切体内部的物体
+/// @param payload 光线载荷
+/// @param info 命中信息
+/// @param ray_dir 当前光线方向
+/// @param out_origin 输出：下一条光线起点
+/// @param out_dir 输出：下一条光线方向
+/// @return true 表示在剖切体内部，已处理
+bool handleInsideSection(
+    inout HitPayload payload,
+    const HitInfo info,
+    const float3 ray_dir,
+    out float3 out_origin,
+    out float3 out_dir
+)
+{
+    if (payload.section_stack <= 0)
+    {
+        return false;
+    }
+
+    // 在剖切体内部，穿透物体
+    out_origin = info.position + 0.0001f * ray_dir;
+    out_dir = ray_dir;
+    payload.object_stack += dot(ray_dir, info.origin_normal) < 0.f ? 1 : -1;
+    return true;
+}
+
+/// 处理材质并采样下一条光线
+/// @param payload 光线载荷
+/// @param info 命中信息
+/// @param ray_dir 当前光线方向
+/// @param out_origin 输出：下一条光线起点
+/// @param out_dir 输出：下一条光线方向
+/// @param out_throughput 输出：throughput
+/// @param out_emission 输出：自发光
+/// @param out_done 输出：是否终止
+void processMaterial(
+    inout HitPayload payload,
+    const HitInfo info,
+    const float3 ray_dir,
+    out float3 out_origin,
+    out float3 out_dir,
+    out float3 out_throughput,
+    out float3 out_emission,
+    out bool out_done
+)
+{
+    out_emission = float3(0.f);
+    out_throughput = float3(1.f);
+    out_done = false;
+    out_origin = info.position;
+    out_dir = ray_dir;
+
+    // 处理剖切体
+    if (handleSectionPlane(payload, info, ray_dir, out_origin, out_dir, out_emission, out_done))
+    {
+        return;
+    }
+
+    // 处理天空/自发光
+    if (info.material_type == MaterialType::SKY || info.material_type == MaterialType::EMISSIVE)
+    {
+        out_emission = info.emissive;
+        out_done = true;
+        return;
+    }
+
+    // 处理剖切体内部的物体
+    if (handleInsideSection(payload, info, ray_dir, out_origin, out_dir))
+    {
+        return;
+    }
+
+    // 观察方向（从命中点到相机）
+    const float3 view_dir = -ray_dir;
+
+    // 根据材质类型采样
+    switch (info.material_type)
+    {
+    case MaterialType::TRANSPARENT: {
+        // 折射 vs 反射的选择
+        const bool choose_refract = Random::rnd(payload.random_seed) >= info.opaque;
+        if (choose_refract)
+        {
+            if (!sampleRefraction(info, ray_dir, out_dir, out_throughput))
+            {
+                // 全内反射
+                samplePerfectReflection(info, ray_dir, out_dir, out_throughput);
+            }
+            out_origin = info.position + 0.0001f * out_dir;
+        }
+        else
+        {
+            // 反射
+            samplePerfectReflection(info, ray_dir, out_dir, out_throughput);
+            out_origin = info.position + 0.0001f * out_dir;
+        }
+    }
+    break;
+
+    case MaterialType::SPECULAR: {
+        // Delta 镜面反射
+        samplePerfectReflection(info, ray_dir, out_dir, out_throughput);
+        out_origin = info.position + 0.0001f * out_dir;
+    }
+    break;
+
+    case MaterialType::DIFFUSE:
+    default: {
+        // 漫反射 + 镜面反射的混合
+        const float prob_diffuse = info.roughness;
+        const bool choose_diffuse = Random::rnd(payload.random_seed) < prob_diffuse;
+
+        if (choose_diffuse)
+        {
+            sampleDiffuse(info, payload.random_seed, out_dir, out_throughput);
+            out_throughput /= prob_diffuse; // 重要性采样补偿
+        }
+        else
+        {
+            sampleSpecular(info, view_dir, payload.random_seed, out_dir, out_throughput);
+            out_throughput /= (1.f - prob_diffuse); // 重要性采样补偿
+        }
+        out_origin = info.position + 0.0001f * out_dir;
+    }
+    break;
+    }
+}
+
+// ============================================================================
+// 调试通道
+// ============================================================================
+
+/// 处理调试通道
+/// @param info 命中信息
+/// @param channel 调试通道号
+/// @param out_color 输出颜色
+/// @return true 表示是调试模式
+bool handleDebugChannel(const HitInfo info, uint channel, out float3 out_color)
+{
+    out_color = float3(0.f);
+
+    if (channel == 0)
+    {
+        return false;
+    }
+
+    // 通道 1：法线可视化
+    if (channel == 1)
+    {
+        out_color = info.normal * 0.5f + 0.5f;
+        return true;
+    }
+
+    // 通道 2：基础颜色
+    if (channel == 2)
+    {
+        out_color = info.base_color;
+        return true;
+    }
+
+    return false;
+}
+
+// ============================================================================
+// SER (Shader Execution Reordering)
+// ============================================================================
+
+/// 计算 SER coherence hint
+uint computeCoherenceHint(const HitInfo info)
+{
+    return uint(info.material_type);
+}
+
+/// 计算 luminance
+float luminance(float3 color)
+{
+    return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+}
+
+// ============================================================================
+// 主函数
+// ============================================================================
 
 [shader("raygeneration")]
 void main_ray_gen()
@@ -93,81 +407,146 @@ void main_ray_gen()
     const uint accum_samples = per_frame_data.accum_frames * push_const.spp + push_const.spp_idx;
     if (accum_samples >= max_accum_samples)
     {
-        // 达到最大累积帧数，直接返回
         return;
     }
 
     uint2 thread_id = DispatchRaysIndex().xy;
 
-    // 子像素抖动：0.375 来自于 Blender 的 Cycles
+    // 子像素抖动
     uint random_seed = Random::tea(thread_id.y * DispatchRaysDimensions().x + thread_id.x, accum_samples);
-    const float2 subpixel_jitter = (accum_samples == 0 || push_const.channel != 0) ? float2(0.5f) : float2(0.5) + 0.375 * Random::rand_gaussian(random_seed);
+    const float2 subpixel_jitter = (accum_samples == 0 || push_const.channel != 0) ? float2(0.5f) : float2(0.5f) + 0.375f * Random::rand_gaussian(random_seed);
 
     RayDesc ray = generateCameraRay(thread_id, subpixel_jitter);
     HitPayload payload = initPayload(random_seed);
 
     // 路径追踪主循环
-    // E 直接光照
-    // w = BRDF * cos(theta) / pdf
-    // Lo = w_0 * Li_0 + E_0
-    // Li_0 = w_1 * Li_1 + E_1
-    // Lo = E_0 + w_0 * E_1 + w_0 * w_1 * E_2 + ...
-    //      + w_0 * ... * w_n * Li_n
-    float3 radiance = float3(0.0f, 0.0f, 0.0f);
-    float3 throughput = float3(1.f, 1.f, 1.f);
+    // Lo = E_0 + w_0 * E_1 + w_0 * w_1 * E_2 + ... + w_0 * ... * w_n * Li_n
+    float3 radiance = float3(0.f);
+    float3 throughput = float3(1.f);
+    bool has_diffuse = false; // 跟踪路径上是否遇到了 diffuse
 
 #if USE_HIT_OBJECT_SER
-    // 使用 Hit Object API 实现 Shader Execution Reordering
     HitObject hit_obj;
 
-    for (uint depth = 0; depth < max_depth && !payload.done; ++depth)
+    for (uint depth = 0; depth < max_depth; ++depth)
     {
         hit_obj = HitObject::TraceRay(
             rt::rt_tlas, RAY_FLAG_NONE, 0xFF,
-            0, // sbt record offset
-            0, // sbt record stride
-            0, // sky miss shader
+            0, 0, 0,
             ray, payload
         );
 
         uint coherence_hint = 0;
         if (hit_obj.IsHit())
         {
-            uint instance_id = hit_obj.GetInstanceIndex();
-            uint geometry_id = hit_obj.GetGeometryIndex();
-            PBRMaterial* mat = gpu_scene.get_material(instance_id, geometry_id);
-            coherence_hint = computeCoherenceHint(instance_id, geometry_id, mat);
+            coherence_hint = computeCoherenceHint(payload.info);
         }
 
-        // 参考
-        // https://www.khronos.org/blog/boosting-ray-tracing-performance-with-shader-execution-reordering-introducing-vk-ext-ray-tracing-invocation-reorder
-        // hint 使用的 bits 越少越好
-        // reorder 的原则：首先是 shader，然后是 hint
         ReorderThread(coherence_hint, 4);
-
         HitObject::Invoke(rt::rt_tlas, hit_obj, payload);
 
-        radiance += payload.emission * throughput;
-        throughput *= payload.throughput;
-        ray.Origin = payload.ray_origin;
-        ray.Direction = payload.ray_dir;
+        // 调试通道
+        float3 debug_color;
+        if (handleDebugChannel(payload.info, push_const.channel, debug_color))
+        {
+            radiance = debug_color;
+            break;
+        }
+
+        // 处理材质，计算下一条光线
+        float3 next_origin, next_dir, mat_throughput, emission;
+        bool done;
+        processMaterial(payload, payload.info, ray.Direction, next_origin, next_dir, mat_throughput, emission, done);
+
+        // 累积辐射度
+        radiance += emission * throughput;
+
+        if (done)
+        {
+            break;
+        }
+
+        // 更新 throughput
+        throughput *= mat_throughput;
+
+        // 检测是否遇到了 diffuse（在 BRDF 采样之后）
+        if (payload.info.material_type == MaterialType::DIFFUSE)
+        {
+            has_diffuse = true;
+        }
+
+        // 俄罗斯轮盘赌
+        bool enable_rr = (depth >= 2) && (has_diffuse || luminance(throughput) < 0.2f);
+        if (enable_rr)
+        {
+            float p = max(throughput.x, max(throughput.y, throughput.z));
+            p = min(0.95f, p);
+            if (Random::rnd(payload.random_seed) > p)
+            {
+                break;
+            }
+            throughput /= p;
+        }
+
+        // 设置下一条光线
+        ray.Origin = next_origin;
+        ray.Direction = next_dir;
     }
 #else
-    // 标准路径：使用传统 TraceRay
-    for (uint depth = 0; depth < max_depth && !payload.done; ++depth)
+    for (uint depth = 0; depth < max_depth; ++depth)
     {
         TraceRay(
             rt::rt_tlas, RAY_FLAG_NONE, 0xFF,
-            0, // sbt record offset
-            0, // sbt record stride
-            0, // sky miss shader
+            0, 0, 0,
             ray, payload
         );
 
-        radiance += payload.emission * throughput;
-        throughput *= payload.throughput;
-        ray.Origin = payload.ray_origin;
-        ray.Direction = payload.ray_dir;
+        // 调试通道
+        float3 debug_color;
+        if (handleDebugChannel(payload.info, push_const.channel, debug_color))
+        {
+            radiance = debug_color;
+            break;
+        }
+
+        // 处理材质，计算下一条光线
+        float3 next_origin, next_dir, mat_throughput, emission;
+        bool done;
+        processMaterial(payload, payload.info, ray.Direction, next_origin, next_dir, mat_throughput, emission, done);
+
+        // 累积辐射度
+        radiance += emission * throughput;
+
+        if (done)
+        {
+            break;
+        }
+
+        // 更新 throughput
+        throughput *= mat_throughput;
+
+        // 检测是否遇到了 diffuse（在 BRDF 采样之后）
+        if (payload.info.material_type == MaterialType::DIFFUSE)
+        {
+            has_diffuse = true;
+        }
+
+        // 俄罗斯轮盘赌
+        bool enable_rr = (depth >= 2) && (has_diffuse || luminance(throughput) < 0.2f); 
+        if (enable_rr)
+        {
+            float p = max(throughput.x, max(throughput.y, throughput.z));
+            p = min(0.95f, p);
+            if (Random::rnd(payload.random_seed) > p)
+            {
+                break;
+            }
+            throughput /= p;
+        }
+
+        // 设置下一条光线
+        ray.Origin = next_origin;
+        ray.Direction = next_dir;
     }
 #endif
 

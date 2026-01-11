@@ -1,7 +1,8 @@
 /// @file payload.slangi
-/// @brief 光线追踪载荷结构体定义
+/// @brief 光线追踪载荷结构体定义（重构版）
 ///
-/// 定义光线追踪过程中各着色器阶段共享的数据结构
+/// Payload 职责简化：只负责 hit -> raygen 的信息回传
+/// 所有 BRDF 计算、throughput 计算、radiance 更新都在 ray gen 中进行
 
 #pragma once
 #include "share/pass/rt.slangi"
@@ -16,20 +17,71 @@ const static uint max_depth = 16;
 /// 超过一定数量后，就不再重新计算了
 const static uint max_accum_samples = 4096;
 
-/// 主光线追踪载荷
+/// 材质类型枚举
+enum MaterialType : uint
+{
+    DIFFUSE = 0,     ///< 漫反射材质
+    SPECULAR = 1,    ///< 镜面反射材质（delta 路径）
+    TRANSPARENT = 2, ///< 透明/折射材质（delta 路径）
+    EMISSIVE = 3,    ///< 自发光材质
+    SECTION = 4,     ///< 剖切体材质
+    SKY = 5,         ///< 天空（miss）
+};
+
+/// 命中信息结构体
+/// 包含 hit shader 提取的所有几何和材质信息
+struct HitInfo
+{
+    // ========== 几何信息 ==========
+    /// 世界空间命中位置
+    float3 position;
+    /// 世界空间法线（已根据光线方向翻转）
+    float3 normal;
+    /// 原始世界空间法线（未翻转，用于判断正反面）
+    float3 origin_normal;
+    /// 纹理坐标
+    float2 uv;
+
+    // ========== 材质参数 ==========
+    /// 基础颜色（漫反射颜色）
+    float3 base_color;
+    /// 金属度
+    float metallic;
+    /// 粗糙度
+    float roughness;
+    /// 不透明度（1.0 = 完全不透明）
+    float opaque;
+    /// 折射率
+    float ior;
+
+    // ========== 自发光 ==========
+    /// 自发光颜色
+    float3 emissive;
+
+    // ========== 材质类型 ==========
+    /// 材质类型
+    MaterialType material_type;
+
+    /// 是否为 delta 路径（镜面反射或透明折射）
+    bool is_delta_path()
+    {
+        return material_type == MaterialType::SPECULAR ||
+            material_type == MaterialType::TRANSPARENT;
+    }
+};
+
+/// 主光线追踪载荷（重构版）
+/// 只负责从 hit shader 向 ray gen 传递命中信息
 struct HitPayload
 {
-    /// 命中点的自发光颜色
-    float3 emission;
-    /// 当前命中位置的衰减：BRDF * cos(theta) / pdf
-    float3 throughput;
-    /// 是否需要提前中止
-    bool done;
-    /// 下一次光线的起点
-    float3 ray_origin;
-    /// 下一次光线的方向
-    float3 ray_dir;
+    /// 是否命中几何体
+    bool hit;
+    /// 命中信息（仅当 hit == true 时有效）
+    HitInfo info;
+    /// 随机数种子
     uint random_seed;
+
+    // ========== 剖切体状态 ==========
     /// 进入剖切体时 +1，离开剖切体时 -1
     int section_stack;
     /// 在剖切体内，进入物体时 +1，离开物体时 -1

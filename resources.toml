@@ -13,6 +13,20 @@ target_dir = "assets/fbx"
 rename_to = "cube-coord.fbx"
 
 [[resources]]
+name = "cornell-box"
+url = "https://github.com/acccoco/assets/releases/download/fbx/cornell-box_0.0.1.zip"
+resource_type = "zip"
+target_dir = "assets/fbx"
+rename_to = "cornell-box"
+
+[[resources]]
+name = "sponza-1"
+url = "https://github.com/acccoco/assets/releases/download/fbx/sponza-1_0.0.1.zip"
+resource_type = "zip"
+target_dir = "assets/fbx"
+rename_to = "sponza-1"
+
+[[resources]]
 name = "slang"
 url = "https://github.com/shader-slang/slang/releases/download/v2025.24.3/slang-2025.24.3-windows-x86_64.zip"
 resource_type = "zip"
