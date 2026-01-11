@@ -15,9 +15,9 @@
 #include "lib/sample/sample.slangi"
 
 // 开启后，虽然 active threads 的 coherence 指标从 50% 上升到了 70%
-// 但是由于现阶段的实现开销主要在 TLAS 求交上面，而不是 closest shader 上面
-// 因此整体性能并没有提升，反而略有下降
-#define USE_HIT_OBJECT_SER 1
+// SER 主要用于提升后续新的 shader invocation 的一致性
+// 当前的架构重 ray-gen，轻 hit/miss shader，SER 带来的提升有限
+#define USE_HIT_OBJECT_SER 0
 
 // ============================================================================
 // 相机和初始化
@@ -425,25 +425,13 @@ void main_ray_gen()
     float3 throughput = float3(1.f);
     bool has_diffuse = false; // 跟踪路径上是否遇到了 diffuse
 
-#if USE_HIT_OBJECT_SER
-    HitObject hit_obj;
-
     for (uint depth = 0; depth < max_depth; ++depth)
     {
-        hit_obj = HitObject::TraceRay(
+        TraceRay(
             rt::rt_tlas, RAY_FLAG_NONE, 0xFF,
             0, 0, 0,
             ray, payload
         );
-
-        uint coherence_hint = 0;
-        if (hit_obj.IsHit())
-        {
-            coherence_hint = computeCoherenceHint(payload.info);
-        }
-
-        ReorderThread(coherence_hint, 4);
-        HitObject::Invoke(rt::rt_tlas, hit_obj, payload);
 
         // 调试通道
         float3 debug_color;
@@ -492,63 +480,6 @@ void main_ray_gen()
         ray.Origin = next_origin;
         ray.Direction = next_dir;
     }
-#else
-    for (uint depth = 0; depth < max_depth; ++depth)
-    {
-        TraceRay(
-            rt::rt_tlas, RAY_FLAG_NONE, 0xFF,
-            0, 0, 0,
-            ray, payload
-        );
-
-        // 调试通道
-        float3 debug_color;
-        if (handleDebugChannel(payload.info, push_const.channel, debug_color))
-        {
-            radiance = debug_color;
-            break;
-        }
-
-        // 处理材质，计算下一条光线
-        float3 next_origin, next_dir, mat_throughput, emission;
-        bool done;
-        processMaterial(payload, payload.info, ray.Direction, next_origin, next_dir, mat_throughput, emission, done);
-
-        // 累积辐射度
-        radiance += emission * throughput;
-
-        if (done)
-        {
-            break;
-        }
-
-        // 更新 throughput
-        throughput *= mat_throughput;
-
-        // 检测是否遇到了 diffuse（在 BRDF 采样之后）
-        if (payload.info.material_type == MaterialType::DIFFUSE)
-        {
-            has_diffuse = true;
-        }
-
-        // 俄罗斯轮盘赌
-        bool enable_rr = (depth >= 2) && (has_diffuse || luminance(throughput) < 0.2f); 
-        if (enable_rr)
-        {
-            float p = max(throughput.x, max(throughput.y, throughput.z));
-            p = min(0.95f, p);
-            if (Random::rnd(payload.random_seed) > p)
-            {
-                break;
-            }
-            throughput /= p;
-        }
-
-        // 设置下一条光线
-        ray.Origin = next_origin;
-        ray.Direction = next_dir;
-    }
-#endif
 
     // 累积帧混合
     if (accum_samples > 0 && push_const.channel == 0)
