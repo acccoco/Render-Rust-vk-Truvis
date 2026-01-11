@@ -20,9 +20,9 @@ const static uint max_accum_samples = 4096;
 struct HitPayload
 {
     /// 命中点的自发光颜色
-    float3 radiance;
+    float3 emission;
     /// 当前命中位置的衰减：BRDF * cos(theta) / pdf
-    float3 weight;
+    float3 throughput;
     /// 是否需要提前中止
     bool done;
     /// 下一次光线的起点

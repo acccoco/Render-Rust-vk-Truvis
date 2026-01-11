@@ -18,7 +18,7 @@
 void sky_miss(inout HitPayload payload)
 {
     const float2 uv = dir_to_env_uv(WorldRayDirection());
-    payload.radiance = float3(bindless_srv::sample_level(gpu_scene.sky, uv, gpu_scene.sky_sampler_type, 0.0).xyz) * 8.f;
+    payload.emission = float3(bindless_srv::sample_level(gpu_scene.sky, uv, gpu_scene.sky_sampler_type, 0.0).xyz) * 8.f;
     payload.done = true;
 }
 

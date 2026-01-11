@@ -56,12 +56,12 @@ bool handleSectionPlane(
             if (payload.object_stack > 0)
             {
                 payload.done = true;
-                payload.radiance = float3(0.8f, 0.1f, 0.8f); // 紫色
+                payload.emission = float3(0.8f, 0.1f, 0.8f); // 紫色
             }
             else
             {
-                payload.radiance = 0.f;
-                payload.weight = 1.f;
+                payload.emission = 0.f;
+                payload.throughput = 1.f;
                 payload.ray_origin = world_pos + 0.0001 * WorldRayDirection();
                 payload.ray_dir = WorldRayDirection();
             }
@@ -69,8 +69,8 @@ bool handleSectionPlane(
         else
         {
             // 仍然在剖切体内部
-            payload.radiance = 0.f;
-            payload.weight = 1.f;
+            payload.emission = 0.f;
+            payload.throughput = 1.f;
             payload.ray_origin = world_pos + 0.0001 * WorldRayDirection();
             payload.ray_dir = WorldRayDirection();
         }
@@ -92,7 +92,7 @@ bool handleEmissive(
 {
     if (mat.emissive.x > 0.f)
     {
-        payload.radiance = mat.emissive * base_color;
+        payload.emission = mat.emissive * base_color;
         payload.done = true;
         return true;
     }
@@ -112,8 +112,8 @@ bool handleInsideSection(
 {
     if (payload.section_stack > 0)
     {
-        payload.radiance = 0.f;
-        payload.weight = 1.f;
+        payload.emission = 0.f;
+        payload.throughput = 1.f;
         payload.ray_origin = world_pos + 0.0001 * WorldRayDirection();
         payload.ray_dir = WorldRayDirection();
         payload.object_stack += dot(WorldRayDirection(), origin_world_normal) < 0.f ? 1 : -1;
@@ -139,14 +139,14 @@ void sampleDiffuse(
     // 半球 cos 采样
     // BRDF = diffuse_color / pi
     // pdf = cos(theta) / pi
-    // weight = BRDF * cos(theta) / pdf = diffuse_color
+    // throughput  = BRDF * cos(theta) / pdf = diffuse_color
     const float3 local_dir = Sample::get_cos_hemisphere_sample(payload.random_seed);
     float3 tangent, bitangent;
     Sample::create_local_coord(world_normal, tangent, bitangent);
     payload.ray_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * world_normal);
 
     const float3 diffuse_color = (1.f - mat_metallic) * base_color;
-    payload.weight = diffuse_color / prob_diffuse;
+    payload.throughput = diffuse_color / prob_diffuse;
 }
 
 /// 处理镜面反射采样
@@ -173,7 +173,7 @@ void sampleSpecular(
     float3 h = SpecularBrdf::ggx_sample(payload.random_seed, real_roughness, world_normal);
     SpecularBrdf specular_brdf = SpecularBrdf(f0, real_roughness, world_normal, -WorldRayDirection(), h);
 
-    payload.weight = specular_brdf.brdf_with_pdf() * specular_brdf.get_ndotl() / prob_specular;
+    payload.throughput = specular_brdf.brdf_with_pdf() * specular_brdf.get_ndotl() / prob_specular;
     payload.ray_dir = specular_brdf.light;
 }
 
@@ -203,7 +203,7 @@ bool sampleRefraction(
         return false;
     }
 
-    payload.weight = base_color;
+    payload.throughput = base_color;
     payload.ray_origin = world_pos + 0.0001 * payload.ray_dir;
     payload.done = false;
     return true;
@@ -257,7 +257,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     // 调试通道：法线着色
     if (push_const.channel == 1)
     {
-        payload.radiance = world_normal * 0.5f + 0.5f;
+        payload.emission = world_normal * 0.5f + 0.5f;
         payload.done = true;
         return;
     }
@@ -265,7 +265,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     // 调试通道：基础颜色
     if (push_const.channel == 2)
     {
-        payload.radiance = base_color;
+        payload.emission = base_color;
         payload.done = true;
         return;
     }
