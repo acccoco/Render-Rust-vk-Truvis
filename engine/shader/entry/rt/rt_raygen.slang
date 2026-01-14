@@ -150,6 +150,8 @@ bool sampleRefraction(
     out_dir = refract(ray_dir, info.normal, eta);
     if (length(out_dir) < 1e-6f)
     {
+        out_dir = float3(0.f);
+        out_throughput = float3(0.f);
         // 全内反射
         return false;
     }
@@ -186,6 +188,10 @@ bool handleSectionPlane(
 
     if (info.material_type != MaterialType::SECTION)
     {
+        out_origin = float3(0.f);
+        out_dir = float3(0.f);
+        out_emission = float3(0.f);
+        out_done = false;
         return false;
     }
 
@@ -234,6 +240,8 @@ bool handleInsideSection(
 {
     if (payload.section_stack <= 0)
     {
+        out_origin = float3(0.f);
+        out_dir = float3(0.f);
         return false;
     }
 
@@ -428,8 +436,12 @@ void main_ray_gen()
     for (uint depth = 0; depth < max_depth; ++depth)
     {
         TraceRay(
-            rt::rt_tlas, RAY_FLAG_NONE, 0xFF,
-            0, 0, 0,
+            rt::rt_tlas,
+            RAY_FLAG_NONE,
+            0xFF, // cull mask
+            0,    // ray type
+            0,    // hit group index
+            0,    // miss shader index
             ray, payload
         );
 

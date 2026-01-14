@@ -1,35 +1,5 @@
-/// @file rt_hit.slang
-/// @brief 命中着色器（重构版）
-///
-/// 职责简化：只做求交、法线插值、读取材质
-/// 不进行 BRDF 采样或 throughput 计算
-
 #include "./payload.slangi"
 #include "lib/bindless_op.slangi"
-
-// ============================================================================
-// Callable Shader
-// ============================================================================
-
-/// 漫反射颜色采样
-/// 根据材质的 diffuse_map 或 base_color 返回漫反射颜色
-[shader("callable")]
-void diffuse_callable(inout MatPayload payload)
-{
-    PBRMaterial* mat = gpu_scene.get_material(payload.instance_id, payload.geometry_id);
-    if (bindless_srv::is_valid(mat.diffuse_map))
-    {
-        payload.out_color = bindless_srv::sample_level(mat.diffuse_map, payload.uv, mat.diffuse_map_sampler_type, 0.0).xyz;
-    }
-    else
-    {
-        payload.out_color = mat.base_color;
-    }
-}
-
-// ============================================================================
-// Closest Hit Shader
-// ============================================================================
 
 /// 确定材质类型
 /// @param mat 材质指针
@@ -93,12 +63,14 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     // 获取基础颜色
     float3 base_color;
     {
-        MatPayload mat_payload = {};
-        mat_payload.instance_id = instance_id;
-        mat_payload.geometry_id = geometry_id;
-        mat_payload.uv = interp_uv;
-        diffuse_callable(mat_payload);
-        base_color = mat_payload.out_color;
+        if (bindless_srv::is_valid(mat.diffuse_map))
+        {
+            base_color = bindless_srv::sample_level(mat.diffuse_map, interp_uv, mat.diffuse_map_sampler_type, 0.0).xyz;
+        }
+        else
+        {
+            base_color = mat.base_color;
+        }
     }
 
     // ========== 填充命中信息 ==========
@@ -124,27 +96,3 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     payload.info.material_type = determineMaterialType(mat);
 }
 
-// ============================================================================
-// Any Hit Shader
-// ============================================================================
-
-/// 根据 texture 的透明度，判断光线是否应该穿过
-[shader("anyhit")]
-void trans_any(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
-{
-    const uint instance_id = InstanceIndex();
-    const uint geometry_id = GeometryIndex();
-    const uint primitive_id = PrimitiveIndex();
-
-    PBRMaterial* mat = gpu_scene.get_material(instance_id, geometry_id);
-    Geometry* geometry = gpu_scene.get_geometry(instance_id, geometry_id);
-    const uint3 triangle = geometry.get_triangle(primitive_id);
-    const float2 interp_uv = geometry.get_interp_uv(triangle, attr.barycentrics);
-
-    // 当前命中位置 diffuse 贴图是透的，直接忽略该命中
-    const float4 base_color = bindless_srv::sample_level(mat.diffuse_map, interp_uv, mat.diffuse_map_sampler_type, 0.0);
-    if (base_color.w == 0.f)
-    {
-        IgnoreHit();
-    }
-}
