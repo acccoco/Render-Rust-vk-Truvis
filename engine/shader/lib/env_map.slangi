@@ -5,6 +5,7 @@
 
 #pragma once
 #include "lib/common.slangi"
+#include "lib/sample/random.slangi"
 
 /// 将方向向量转换为球面角度
 /// @param dir 方向向量（右手坐标系，-Z 朝前，Y 朝上）
@@ -40,4 +41,39 @@ float2 angle_to_uv(const float2 angle)
 float2 dir_to_env_uv(const float3 dir)
 {
     return angle_to_uv(dir_to_angle(dir));
+}
+
+// ============================================================================
+// 环境贴图采样（用于 NEE）
+// ============================================================================
+
+/// 均匀球面采样的 PDF
+/// @return 1 / (4 * pi)
+float envMapUniformPdf()
+{
+    return 1.f / (4.f * M_PI);
+}
+
+/// 均匀球面采样
+/// @param seed 随机种子（会被修改）
+/// @param out_dir 输出采样方向
+/// @param out_pdf 输出 PDF 值
+void sampleEnvMapUniform(inout uint seed, out float3 out_dir, out float out_pdf)
+{
+    // 均匀球面采样
+    // u1 -> phi: [0, 2*pi]
+    // u2 -> cos_theta: [-1, 1]
+    const float u1 = Random::rnd(seed);
+    const float u2 = Random::rnd(seed);
+
+    const float phi = 2.f * M_PI * u1;
+    const float cos_theta = 1.f - 2.f * u2; // 映射到 [-1, 1]
+    const float sin_theta = sqrt(max(0.f, 1.f - cos_theta * cos_theta));
+
+    out_dir = float3(
+        sin_theta * cos(phi),
+        cos_theta,  // Y-up
+        sin_theta * sin(phi)
+    );
+    out_pdf = envMapUniformPdf();
 }

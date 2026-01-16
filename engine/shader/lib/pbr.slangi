@@ -119,6 +119,16 @@ struct DiffuseBrdf
         return float3(1.f, 1.f, 1.f) / M_PI;
     }
 
+    /// cos-weighted 半球采样的 PDF
+    /// @param normal 表面法线
+    /// @param dir 采样方向（朝外）
+    /// @return PDF = cos(theta) / pi
+    static float pdf(float3 normal, float3 dir)
+    {
+        const float cos_theta = max(dot(normal, dir), 0.f);
+        return cos_theta / M_PI;
+    }
+
     static float3 cos_sample(inout Random rand, float3 normal)
     {
         const float3 local_dir = Sample::get_cos_hemisphere_sample(rand.rng_stage);
