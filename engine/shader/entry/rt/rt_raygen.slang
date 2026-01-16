@@ -692,11 +692,9 @@ void main_ray_gen()
         }
 
         // 俄罗斯轮盘赌
-        bool enable_rr = (depth >= 2) && (has_diffuse || luminance(throughput) < 0.2f);
-        if (enable_rr)
         {
             float p = max(throughput.x, max(throughput.y, throughput.z));
-            p = min(0.95f, p);
+            p = clamp(p, 0.05f, 0.95f);
             if (Random::rnd(payload.random_seed) > p)
             {
                 break;

@@ -402,7 +402,7 @@ impl RealtimeRtPass {
             &render_context.global_descriptor_sets.global_sets(frame_label),
             None,
         );
-        let spp = 2;
+        let spp = 4;
         let mut push_constant = truvisl::rt::PushConstants {
             spp,
             spp_idx: 0,
