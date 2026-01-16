@@ -52,8 +52,6 @@ HitPayload init_payload(uint random_seed)
     HitPayload payload = {};
     payload.hit = false;
     payload.random_seed = random_seed;
-    payload.section_stack = 0;
-    payload.object_stack = 0;
     return payload;
 }
 
@@ -172,21 +170,13 @@ bool sample_refraction(
 // 材质处理
 // ============================================================================
 
-/// 处理剖切体逻辑
-/// @param payload 光线载荷
+/// 处理自发光材质（EMISSIVE）
 /// @param info 命中信息
-/// @param ray_dir 当前光线方向
-/// @param out_origin 输出：下一条光线起点
-/// @param out_dir 输出：下一条光线方向
 /// @param out_emission 输出：自发光
 /// @param out_done 输出：是否终止
-/// @return true 表示是剖切体，已处理
-bool handle_section_plane(
-    inout HitPayload payload,
+/// @return true 表示是自发光材质，已处理
+bool handle_emissive(
     const HitInfo info,
-    const float3 ray_dir,
-    out float3 out_origin,
-    out float3 out_dir,
     out float3 out_emission,
     out bool out_done
 )
@@ -194,70 +184,131 @@ bool handle_section_plane(
     out_emission = float3(0.f);
     out_done = false;
 
-    if (info.material_type != MaterialType::SECTION)
+    if (info.material_type == MaterialType::EMISSIVE)
     {
-        out_origin = float3(0.f);
-        out_dir = float3(0.f);
-        out_emission = float3(0.f);
-        out_done = false;
-        return false;
+        out_emission = info.emissive;
+        out_done = true;
+        return true;
     }
 
-    payload.section_stack += dot(ray_dir, info.origin_normal) < 0.f ? 1 : -1;
-
-    if (payload.section_stack == 0)
-    {
-        // 离开剖切体
-        if (payload.object_stack > 0)
-        {
-            // 在物体内部，设为填充面
-            out_done = true;
-            out_emission = float3(0.8f, 0.1f, 0.8f); // 紫色
-        }
-        else
-        {
-            // 继续穿透
-            out_origin = info.position + 0.0001f * ray_dir;
-            out_dir = ray_dir;
-        }
-    }
-    else
-    {
-        // 仍然在剖切体内部，继续穿透
-        out_origin = info.position + 0.0001f * ray_dir;
-        out_dir = ray_dir;
-    }
-
-    return true;
+    return false;
 }
 
-/// 处理剖切体内部的物体
+/// 处理透明材质（TRANSPARENT）- Delta 路径
 /// @param payload 光线载荷
 /// @param info 命中信息
 /// @param ray_dir 当前光线方向
 /// @param out_origin 输出：下一条光线起点
 /// @param out_dir 输出：下一条光线方向
-/// @return true 表示在剖切体内部，已处理
-bool handle_inside_section(
+/// @param out_throughput 输出：throughput
+void handle_transparent(
     inout HitPayload payload,
     const HitInfo info,
     const float3 ray_dir,
     out float3 out_origin,
-    out float3 out_dir
+    out float3 out_dir,
+    out float3 out_throughput
 )
 {
-    if (payload.section_stack <= 0)
+    // 折射 vs 反射的选择
+    const bool choose_refract = Random::rnd(payload.random_seed) >= info.opaque;
+    if (choose_refract)
     {
-        out_origin = float3(0.f);
-        out_dir = float3(0.f);
-        return false;
+        if (!sample_refraction(info, ray_dir, out_dir, out_throughput))
+        {
+            // 全内反射
+            sample_perfect_reflection(info, ray_dir, out_dir, out_throughput);
+        }
+    }
+    else
+    {
+        // 反射
+        sample_perfect_reflection(info, ray_dir, out_dir, out_throughput);
+    }
+    out_origin = info.position + 0.0001f * out_dir;
+}
+
+/// 处理镜面材质（SPECULAR）- Delta 路径
+/// @param info 命中信息
+/// @param ray_dir 当前光线方向
+/// @param out_origin 输出：下一条光线起点
+/// @param out_dir 输出：下一条光线方向
+/// @param out_throughput 输出：throughput
+void handle_specular(
+    const HitInfo info,
+    const float3 ray_dir,
+    out float3 out_origin,
+    out float3 out_dir,
+    out float3 out_throughput
+)
+{
+    // Delta 镜面反射
+    sample_perfect_reflection(info, ray_dir, out_dir, out_throughput);
+    out_origin = info.position + 0.0001f * out_dir;
+}
+
+/// 处理漫反射材质（DIFFUSE）
+/// 随机选择 diffuse 或 NDF 采样策略，计算完整 BRDF = diffuse + specular
+/// @param payload 光线载荷
+/// @param info 命中信息
+/// @param ray_dir 当前光线方向
+/// @param out_origin 输出：下一条光线起点
+/// @param out_dir 输出：下一条光线方向
+/// @param out_throughput 输出：throughput = BRDF / PDF
+/// @param out_brdf_pdf 输出：混合 BRDF 采样 PDF（用于 MIS）
+void handle_diffuse(
+    inout HitPayload payload,
+    const HitInfo info,
+    const float3 ray_dir,
+    out float3 out_origin,
+    out float3 out_dir,
+    out float3 out_throughput,
+    out float out_brdf_pdf
+)
+{
+    const float3 view_dir = -ray_dir;
+    const float prob_diffuse = info.roughness;
+    const bool choose_diffuse = Random::rnd(payload.random_seed) < prob_diffuse;
+
+    // 根据选择的策略采样方向
+    if (choose_diffuse)
+    {
+        // Diffuse 采样：cos-weighted hemisphere
+        const float3 local_dir = Sample::get_cos_hemisphere_sample(payload.random_seed);
+        float3 tangent, bitangent;
+        Sample::create_local_coord(info.normal, tangent, bitangent);
+        out_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * info.normal);
+    }
+    else
+    {
+        // NDF 采样：GGX
+        const float reflectance = 0.8f;
+        const float3 f0 = lerp(0.16 * reflectance * reflectance, info.base_color, info.metallic);
+        const float real_roughness = info.roughness * info.roughness;
+        float3 h = SpecularBrdf::ggx_sample(payload.random_seed, real_roughness, info.normal);
+        out_dir = reflect(-view_dir, h);
     }
 
-    // 在剖切体内部，穿透物体
-    out_origin = info.position + 0.0001f * ray_dir;
-    out_dir = ray_dir;
-    payload.object_stack += dot(ray_dir, info.origin_normal) < 0.f ? 1 : -1;
-    return true;
+    // 检查采样方向是否有效（在表面上方）
+    const float ndotl = dot(info.normal, out_dir);
+    if (ndotl <= 0.f)
+    {
+        out_throughput = float3(0.f);
+        out_brdf_pdf = 1.f;
+        out_origin = info.position;
+        return;
+    }
+
+    // 计算完整的 BRDF = diffuse + specular（使用 eval_brdf）
+    const float3 brdf_cos = eval_brdf(info, view_dir, out_dir);
+
+    // 计算混合 PDF（使用 eval_brdf_pdf 保证一致性）
+    out_brdf_pdf = eval_brdf_pdf(info, view_dir, out_dir);
+
+    // throughput = BRDF * cos / PDF（带数值保护）
+    out_throughput = brdf_cos / max(out_brdf_pdf, 1e-7f);
+
+    out_origin = info.position + 0.0001f * out_dir;
 }
 
 /// 处理材质并采样下一条光线
@@ -282,6 +333,7 @@ void process_material(
     out float out_brdf_pdf
 )
 {
+    // 初始化输出
     out_emission = float3(0.f);
     out_throughput = float3(1.f);
     out_done = false;
@@ -289,84 +341,29 @@ void process_material(
     out_dir = ray_dir;
     out_brdf_pdf = 1.f; // Delta 路径的 PDF 设为 1（不参与 MIS）
 
-    // 处理剖切体
-    if (handle_section_plane(payload, info, ray_dir, out_origin, out_dir, out_emission, out_done))
+    // 处理自发光材质
+    if (handle_emissive(info, out_emission, out_done))
     {
         return;
     }
 
-    // 处理天空/自发光
-    if (info.material_type == MaterialType::SKY || info.material_type == MaterialType::EMISSIVE)
-    {
-        out_emission = info.emissive;
-        out_done = true;
-        return;
-    }
-
-    // 处理剖切体内部的物体
-    if (handle_inside_section(payload, info, ray_dir, out_origin, out_dir))
-    {
-        return;
-    }
-
-    // 观察方向（从命中点到相机）
-    const float3 view_dir = -ray_dir;
-
-    // 根据材质类型采样
+    // 根据材质类型分发处理
     switch (info.material_type)
     {
-    case MaterialType::TRANSPARENT: {
-        // 折射 vs 反射的选择
-        const bool choose_refract = Random::rnd(payload.random_seed) >= info.opaque;
-        if (choose_refract)
-        {
-            if (!sample_refraction(info, ray_dir, out_dir, out_throughput))
-            {
-                // 全内反射
-                sample_perfect_reflection(info, ray_dir, out_dir, out_throughput);
-            }
-            out_origin = info.position + 0.0001f * out_dir;
-        }
-        else
-        {
-            // 反射
-            sample_perfect_reflection(info, ray_dir, out_dir, out_throughput);
-            out_origin = info.position + 0.0001f * out_dir;
-        }
+    case MaterialType::TRANSPARENT:
+        handle_transparent(payload, info, ray_dir, out_origin, out_dir, out_throughput);
         // Delta 路径，out_brdf_pdf 保持为 1
-    }
-    break;
+        break;
 
-    case MaterialType::SPECULAR: {
-        // Delta 镜面反射
-        sample_perfect_reflection(info, ray_dir, out_dir, out_throughput);
-        out_origin = info.position + 0.0001f * out_dir;
+    case MaterialType::SPECULAR:
+        handle_specular(info, ray_dir, out_origin, out_dir, out_throughput);
         // Delta 路径，out_brdf_pdf 保持为 1
-    }
-    break;
+        break;
 
     case MaterialType::DIFFUSE:
-    default: {
-        // 漫反射 + 镜面反射的混合
-        const float prob_diffuse = info.roughness;
-        const bool choose_diffuse = Random::rnd(payload.random_seed) < prob_diffuse;
-        float sample_pdf;
-
-        if (choose_diffuse)
-        {
-            sample_diffuse(info, payload.random_seed, out_dir, out_throughput, sample_pdf);
-            out_throughput /= prob_diffuse;           // 重要性采样补偿
-            out_brdf_pdf = sample_pdf * prob_diffuse; // 混合 PDF
-        }
-        else
-        {
-            sample_specular(info, view_dir, payload.random_seed, out_dir, out_throughput, sample_pdf);
-            out_throughput /= (1.f - prob_diffuse);           // 重要性采样补偿
-            out_brdf_pdf = sample_pdf * (1.f - prob_diffuse); // 混合 PDF
-        }
-        out_origin = info.position + 0.0001f * out_dir;
-    }
-    break;
+    default:
+        handle_diffuse(payload, info, ray_dir, out_origin, out_dir, out_throughput, out_brdf_pdf);
+        break;
     }
 }
 
@@ -538,7 +535,6 @@ void main_ray_gen()
     HitPayload payload = init_payload(random_seed);
 
     // 路径追踪主循环
-    // Lo = E_0 + w_0 * E_1 + w_0 * w_1 * E_2 + ... + w_0 * ... * w_n * Li_n
     float3 radiance = float3(0.f);
     float3 throughput = float3(1.f);
     float prev_brdf_pdf = 1.f;

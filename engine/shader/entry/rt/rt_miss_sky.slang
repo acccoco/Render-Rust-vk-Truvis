@@ -26,5 +26,5 @@ void sky_miss(inout HitPayload payload)
     payload.info.ior = 1.f;
 
     payload.info.emissive = sky_color;
-    payload.info.material_type = MaterialType::SKY;
+    payload.info.material_type = MaterialType::NO_HIT;
 }

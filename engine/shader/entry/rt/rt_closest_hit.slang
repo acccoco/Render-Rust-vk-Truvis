@@ -4,13 +4,8 @@
 /// 确定材质类型
 /// @param mat 材质指针
 /// @return 材质类型
-MaterialType determineMaterialType(PBRMaterial* mat)
+MaterialType determine_material_type(PBRMaterial* mat)
 {
-    // 剖切体: 自发光 > 100.f 就视为剖切体
-    if (mat.emissive.x > 100.f)
-    {
-        return MaterialType::SECTION;
-    }
     // 自发光材质
     if (mat.emissive.x > 0.f)
     {
@@ -93,6 +88,6 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     payload.info.emissive = mat.emissive * base_color;
 
     // 材质类型
-    payload.info.material_type = determineMaterialType(mat);
+    payload.info.material_type = determine_material_type(mat);
 }
 

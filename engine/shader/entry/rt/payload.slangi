@@ -24,8 +24,7 @@ enum MaterialType : uint
     SPECULAR = 1,    ///< 镜面反射材质（delta 路径）
     TRANSPARENT = 2, ///< 透明/折射材质（delta 路径）
     EMISSIVE = 3,    ///< 自发光材质
-    SECTION = 4,     ///< 剖切体材质
-    SKY = 5,         ///< 天空（miss）
+    NO_HIT = 4, ///< 未命中任何几何体
 };
 
 /// 命中信息结构体
@@ -80,12 +79,6 @@ struct HitPayload
     HitInfo info;
     /// 随机数种子
     uint random_seed;
-
-    // ========== 剖切体状态 ==========
-    /// 进入剖切体时 +1，离开剖切体时 -1
-    int section_stack;
-    /// 在剖切体内，进入物体时 +1，离开物体时 -1
-    int object_stack;
 };
 
 /// 阴影光线载荷
