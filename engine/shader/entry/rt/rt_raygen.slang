@@ -355,13 +355,13 @@ void processMaterial(
         if (choose_diffuse)
         {
             sampleDiffuse(info, payload.random_seed, out_dir, out_throughput, sample_pdf);
-            out_throughput /= prob_diffuse; // 重要性采样补偿
+            out_throughput /= prob_diffuse;           // 重要性采样补偿
             out_brdf_pdf = sample_pdf * prob_diffuse; // 混合 PDF
         }
         else
         {
             sampleSpecular(info, view_dir, payload.random_seed, out_dir, out_throughput, sample_pdf);
-            out_throughput /= (1.f - prob_diffuse); // 重要性采样补偿
+            out_throughput /= (1.f - prob_diffuse);           // 重要性采样补偿
             out_brdf_pdf = sample_pdf * (1.f - prob_diffuse); // 混合 PDF
         }
         out_origin = info.position + 0.0001f * out_dir;
@@ -436,11 +436,15 @@ float3 evalBrdf(const HitInfo info, const float3 view_dir, const float3 light_di
 // 调试通道
 // ============================================================================
 
-/// 处理调试通道
+/// 处理调试通道（首次
 /// @param info 命中信息
 /// @param channel 调试通道号
 /// @param out_color 输出颜色
 /// @return true 表示是调试模式
+/// @note 通道 0: 正常渲染
+///       通道 1: 法线可视化
+///       通道 2: 基础颜色
+///       通道 4/5/6: 需要完整路径追踪，在此函数中不处理
 bool handleDebugChannel(const HitInfo info, uint channel, out float3 out_color)
 {
     out_color = float3(0.f);
@@ -529,9 +533,14 @@ void main_ray_gen()
     // Lo = E_0 + w_0 * E_1 + w_0 * w_1 * E_2 + ... + w_0 * ... * w_n * Li_n
     float3 radiance = float3(0.f);
     float3 throughput = float3(1.f);
-    bool has_diffuse = false; // 跟踪路径上是否遇到了 diffuse
-    float prev_brdf_pdf = 1.f; // 上一次 BRDF 采样的 PDF（用于 MIS）
+    float prev_brdf_pdf = 1.f;
+    bool has_diffuse = false;  // 跟踪路径上是否遇到了 diffuse
     bool prev_is_delta = true; // 上一次是否为 delta 路径（首次弹射视为 delta）
+
+    // 调试通道 4/5/6：分离的 radiance 累积
+    float3 nee_radiance = float3(0.f);      // 通道 4：NEE 命中 HDRI 的贡献
+    float3 emissive_radiance = float3(0.f); // 通道 5：自发光物体的贡献
+    float3 hdri_radiance = float3(0.f);     // 通道 6：最终命中 HDRI 的贡献
 
     for (uint depth = 0; depth < max_depth; ++depth)
     {
@@ -564,14 +573,18 @@ void main_ray_gen()
             if (prev_is_delta || depth == 0)
             {
                 // Delta 路径或首次弹射：直接累加，不使用 MIS
-                radiance += sky_color * throughput;
+                const float3 contrib = sky_color * throughput;
+                radiance += contrib;
+                hdri_radiance += contrib; // 调试通道 6
             }
             else
             {
                 // 非 delta 路径：使用 MIS 加权
                 const float env_pdf = envMapUniformPdf();
                 const float mis_weight = MIS::powerHeuristic(prev_brdf_pdf, env_pdf);
-                radiance += sky_color * throughput * mis_weight;
+                const float3 contrib = sky_color * throughput * mis_weight;
+                radiance += contrib;
+                hdri_radiance += contrib; // 调试通道 6
             }
             break;
         }
@@ -582,7 +595,9 @@ void main_ray_gen()
         if (payload.info.material_type == MaterialType::EMISSIVE)
         {
             // 自发光物体：直接累加，不使用 MIS 权重
-            radiance += payload.info.emissive * throughput;
+            const float3 contrib = payload.info.emissive * throughput;
+            radiance += contrib;
+            emissive_radiance += contrib; // 调试通道 5
             break;
         }
 
@@ -622,7 +637,9 @@ void main_ray_gen()
                     const float mis_weight = MIS::powerHeuristic(env_pdf, brdf_pdf);
 
                     // 累加 NEE 贡献: throughput * Li * brdf * cos / env_pdf * mis_weight
-                    radiance += throughput * Li * brdf_cos / max(env_pdf, 1e-7f) * mis_weight;
+                    const float3 nee_contrib = throughput * Li * brdf_cos / max(env_pdf, 1e-7f) * mis_weight;
+                    radiance += nee_contrib;
+                    nee_radiance += nee_contrib; // 调试通道 4
                 }
             }
         }
@@ -674,16 +691,31 @@ void main_ray_gen()
         ray.Direction = next_dir;
     }
 
+    // 根据调试通道选择输出
+    float3 output_radiance = radiance;
+    if (push_const.channel == 4)
+    {
+        output_radiance = nee_radiance; // NEE 命中 HDRI 的贡献
+    }
+    else if (push_const.channel == 5)
+    {
+        output_radiance = emissive_radiance; // 自发光物体的贡献
+    }
+    else if (push_const.channel == 6)
+    {
+        output_radiance = hdri_radiance; // 最终命中 HDRI 的贡献
+    }
+
     // 累积帧混合
     if (accum_samples > 0 && push_const.channel == 0)
     {
         float a = 1.f / float(accum_samples + 1);
         const float3 old_color = rt::rt_color.Load(thread_id).xyz;
-        rt::rt_color.Store(thread_id, float4(lerp(old_color, radiance, a), 1.f));
+        rt::rt_color.Store(thread_id, float4(lerp(old_color, output_radiance, a), 1.f));
     }
     else
     {
-        rt::rt_color.Store(thread_id, float4(radiance, 1.f));
+        rt::rt_color.Store(thread_id, float4(output_radiance, 1.f));
     }
 }
 
