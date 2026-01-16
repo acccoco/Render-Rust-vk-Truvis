@@ -537,10 +537,12 @@ void main_ray_gen()
     bool has_diffuse = false;  // 跟踪路径上是否遇到了 diffuse
     bool prev_is_delta = true; // 上一次是否为 delta 路径（首次弹射视为 delta）
 
-    // 调试通道 4/5/6：分离的 radiance 累积
-    float3 nee_radiance = float3(0.f);      // 通道 4：NEE 命中 HDRI 的贡献
-    float3 emissive_radiance = float3(0.f); // 通道 5：自发光物体的贡献
-    float3 hdri_radiance = float3(0.f);     // 通道 6：最终命中 HDRI 的贡献
+    // 调试通道 4/5/6/7/8：分离的 radiance 累积
+    float3 nee_radiance = float3(0.f);           // 通道 4：NEE 命中 HDRI 的贡献
+    float3 emissive_radiance = float3(0.f);      // 通道 5：自发光物体的贡献
+    float3 hdri_radiance = float3(0.f);          // 通道 6：最终命中 HDRI 的贡献
+    float3 nee_bounce1_radiance = float3(0.f);   // 通道 7：第一次 bounce 的 NEE 贡献
+    float3 nee_bounce2_radiance = float3(0.f);   // 通道 8：第二次 bounce 的 NEE 贡献
 
     for (uint depth = 0; depth < max_depth; ++depth)
     {
@@ -640,6 +642,14 @@ void main_ray_gen()
                     const float3 nee_contrib = throughput * Li * brdf_cos / max(env_pdf, 1e-7f) * mis_weight;
                     radiance += nee_contrib;
                     nee_radiance += nee_contrib; // 调试通道 4
+                    if (depth == 0)
+                    {
+                        nee_bounce1_radiance += nee_contrib; // 调试通道 7
+                    }
+                    else if (depth == 1)
+                    {
+                        nee_bounce2_radiance += nee_contrib; // 调试通道 8
+                    }
                 }
             }
         }
@@ -704,6 +714,14 @@ void main_ray_gen()
     else if (push_const.channel == 6)
     {
         output_radiance = hdri_radiance; // 最终命中 HDRI 的贡献
+    }
+    else if (push_const.channel == 7)
+    {
+        output_radiance = nee_bounce1_radiance; // 第一次 bounce 的 NEE 贡献
+    }
+    else if (push_const.channel == 8)
+    {
+        output_radiance = nee_bounce2_radiance; // 第二次 bounce 的 NEE 贡献
     }
 
     // 累积帧混合
