@@ -487,24 +487,29 @@ float luminance(float3 color)
     return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 }
 
-// trace shadow ray inline
-bool shadow_ray(RaytracingAccelerationStructure tlas, const RayDesc ray)
+/// 发射 shadow ray，判断是否命中任何物体
+/// @return true 表示命中任何物体，false 表示未命中
+bool shadow_ray_any_hit(RaytracingAccelerationStructure tlas, const RayDesc ray)
 {
     RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER> rq;
     rq.TraceRayInline(
         tlas,
-        RAY_FLAG_NONE, // 上面已经限制了范围
+        RAY_FLAG_NONE, // 前面已经限制了 flag
         0xFF,          // cull mask
         ray
     );
     while (rq.Proceed())
     {
-        if (rq.CommittedStatus() != COMMITTED_NOTHING)
+        if (rq.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
         {
-            return false; // hit
+            rq.CommitNonOpaqueTriangleHit();
         }
+        // if (rq.CommittedStatus() != COMMITTED_NOTHING)
+        // {
+        //     return false; // hit
+        // }
     }
-    return true; // miss
+    return rq.CommittedStatus() == COMMITTED_TRIANGLE_HIT; // miss
 }
 
 // ============================================================================
@@ -523,7 +528,10 @@ void main_ray_gen()
     uint2 thread_id = DispatchRaysIndex().xy;
 
     // 子像素抖动
-    uint random_seed = Random::tea(thread_id.y * DispatchRaysDimensions().x + thread_id.x, accum_samples);
+    uint random_seed = Random::tea(
+        thread_id.y * DispatchRaysDimensions().x + thread_id.x,
+        (uint)per_frame_data.frame_id + push_const.spp_idx
+    );
     const float2 subpixel_jitter = (accum_samples == 0 || push_const.channel != 0) ? float2(0.5f) : float2(0.5f) + 0.375f * Random::rand_gaussian(random_seed);
 
     RayDesc ray = generate_camera_ray(thread_id, subpixel_jitter);
@@ -538,11 +546,11 @@ void main_ray_gen()
     bool prev_is_delta = true; // 上一次是否为 delta 路径（首次弹射视为 delta）
 
     // 调试通道 4/5/6/7/8：分离的 radiance 累积
-    float3 nee_radiance = float3(0.f);           // 通道 4：NEE 命中 HDRI 的贡献
-    float3 emissive_radiance = float3(0.f);      // 通道 5：自发光物体的贡献
-    float3 hdri_radiance = float3(0.f);          // 通道 6：最终命中 HDRI 的贡献
-    float3 nee_bounce1_radiance = float3(0.f);   // 通道 7：第一次 bounce 的 NEE 贡献
-    float3 nee_bounce2_radiance = float3(0.f);   // 通道 8：第二次 bounce 的 NEE 贡献
+    float3 nee_radiance = float3(0.f);         // 通道 4：NEE 命中 HDRI 的贡献
+    float3 emissive_radiance = float3(0.f);    // 通道 5：自发光物体的贡献
+    float3 hdri_radiance = float3(0.f);        // 通道 6：最终命中 HDRI 的贡献
+    float3 nee_bounce1_radiance = float3(0.f); // 通道 7：第一次 bounce 的 NEE 贡献
+    float3 nee_bounce2_radiance = float3(0.f); // 通道 8：第二次 bounce 的 NEE 贡献
 
     for (uint depth = 0; depth < max_depth; ++depth)
     {
@@ -625,7 +633,7 @@ void main_ray_gen()
                 shadow_ray_desc.TMax = 10000.0f;
 
                 // 检测可见性
-                if (shadow_ray(rt::rt_tlas, shadow_ray_desc))
+                if (!shadow_ray_any_hit(rt::rt_tlas, shadow_ray_desc))
                 {
                     // 可见：计算直接光照贡献
                     const float2 env_uv = dir_to_env_uv(light_dir);
@@ -644,11 +652,11 @@ void main_ray_gen()
                     nee_radiance += nee_contrib; // 调试通道 4
                     if (depth == 0)
                     {
-                        nee_bounce1_radiance += nee_contrib; // 调试通道 7
+                        nee_bounce1_radiance = nee_contrib; // 调试通道 7
                     }
                     else if (depth == 1)
                     {
-                        nee_bounce2_radiance += nee_contrib; // 调试通道 8
+                        nee_bounce2_radiance = nee_contrib; // 调试通道 8
                     }
                 }
             }
