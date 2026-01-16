@@ -49,7 +49,7 @@ float2 dir_to_env_uv(const float3 dir)
 
 /// 均匀球面采样的 PDF
 /// @return 1 / (4 * pi)
-float envMapUniformPdf()
+float env_map_uniform_pdf()
 {
     return 1.f / (4.f * M_PI);
 }
@@ -58,7 +58,7 @@ float envMapUniformPdf()
 /// @param seed 随机种子（会被修改）
 /// @param out_dir 输出采样方向
 /// @param out_pdf 输出 PDF 值
-void sampleEnvMapUniform(inout uint seed, out float3 out_dir, out float out_pdf)
+void sample_env_map_uniform(inout uint seed, out float3 out_dir, out float out_pdf)
 {
     // 均匀球面采样
     // u1 -> phi: [0, 2*pi]
@@ -75,5 +75,5 @@ void sampleEnvMapUniform(inout uint seed, out float3 out_dir, out float out_pdf)
         cos_theta,  // Y-up
         sin_theta * sin(phi)
     );
-    out_pdf = envMapUniformPdf();
+    out_pdf = env_map_uniform_pdf();
 }

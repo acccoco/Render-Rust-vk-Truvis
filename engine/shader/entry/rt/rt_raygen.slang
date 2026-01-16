@@ -29,7 +29,7 @@
 /// @param thread_id 当前线程 ID
 /// @param subpixel_jitter 子像素抖动偏移
 /// @return 光线描述
-RayDesc generateCameraRay(uint2 thread_id, float2 subpixel_jitter)
+RayDesc generate_camera_ray(uint2 thread_id, float2 subpixel_jitter)
 {
     const float2 pixel_center = float2(thread_id) + subpixel_jitter;
     const float2 in_uv = pixel_center / float2(DispatchRaysDimensions().xy);
@@ -47,7 +47,7 @@ RayDesc generateCameraRay(uint2 thread_id, float2 subpixel_jitter)
 /// 初始化光线载荷
 /// @param random_seed 随机种子
 /// @return 初始化的载荷
-HitPayload initPayload(uint random_seed)
+HitPayload init_payload(uint random_seed)
 {
     HitPayload payload = {};
     payload.hit = false;
@@ -67,7 +67,7 @@ HitPayload initPayload(uint random_seed)
 /// @param out_dir 输出：采样方向
 /// @param out_throughput 输出：throughput = BRDF * cos / pdf
 /// @param out_pdf 输出：采样 PDF
-void sampleDiffuse(
+void sample_diffuse(
     const HitInfo info,
     inout uint random_seed,
     out float3 out_dir,
@@ -96,7 +96,7 @@ void sampleDiffuse(
 /// @param out_dir 输出：采样方向
 /// @param out_throughput 输出：throughput = BRDF * cos / pdf
 /// @param out_pdf 输出：采样 PDF
-void sampleSpecular(
+void sample_specular(
     const HitInfo info,
     const float3 view_dir,
     inout uint random_seed,
@@ -123,7 +123,7 @@ void sampleSpecular(
 /// @param ray_dir 入射光线方向
 /// @param out_dir 输出：反射方向
 /// @param out_throughput 输出：throughput
-void samplePerfectReflection(
+void sample_perfect_reflection(
     const HitInfo info,
     const float3 ray_dir,
     out float3 out_dir,
@@ -145,7 +145,7 @@ void samplePerfectReflection(
 /// @param out_dir 输出：折射方向
 /// @param out_throughput 输出：throughput
 /// @return true 表示折射成功，false 表示全内反射
-bool sampleRefraction(
+bool sample_refraction(
     const HitInfo info,
     const float3 ray_dir,
     out float3 out_dir,
@@ -181,7 +181,7 @@ bool sampleRefraction(
 /// @param out_emission 输出：自发光
 /// @param out_done 输出：是否终止
 /// @return true 表示是剖切体，已处理
-bool handleSectionPlane(
+bool handle_section_plane(
     inout HitPayload payload,
     const HitInfo info,
     const float3 ray_dir,
@@ -238,7 +238,7 @@ bool handleSectionPlane(
 /// @param out_origin 输出：下一条光线起点
 /// @param out_dir 输出：下一条光线方向
 /// @return true 表示在剖切体内部，已处理
-bool handleInsideSection(
+bool handle_inside_section(
     inout HitPayload payload,
     const HitInfo info,
     const float3 ray_dir,
@@ -270,7 +270,7 @@ bool handleInsideSection(
 /// @param out_emission 输出：自发光
 /// @param out_done 输出：是否终止
 /// @param out_brdf_pdf 输出：BRDF 采样 PDF（用于 MIS）
-void processMaterial(
+void process_material(
     inout HitPayload payload,
     const HitInfo info,
     const float3 ray_dir,
@@ -290,7 +290,7 @@ void processMaterial(
     out_brdf_pdf = 1.f; // Delta 路径的 PDF 设为 1（不参与 MIS）
 
     // 处理剖切体
-    if (handleSectionPlane(payload, info, ray_dir, out_origin, out_dir, out_emission, out_done))
+    if (handle_section_plane(payload, info, ray_dir, out_origin, out_dir, out_emission, out_done))
     {
         return;
     }
@@ -304,7 +304,7 @@ void processMaterial(
     }
 
     // 处理剖切体内部的物体
-    if (handleInsideSection(payload, info, ray_dir, out_origin, out_dir))
+    if (handle_inside_section(payload, info, ray_dir, out_origin, out_dir))
     {
         return;
     }
@@ -320,17 +320,17 @@ void processMaterial(
         const bool choose_refract = Random::rnd(payload.random_seed) >= info.opaque;
         if (choose_refract)
         {
-            if (!sampleRefraction(info, ray_dir, out_dir, out_throughput))
+            if (!sample_refraction(info, ray_dir, out_dir, out_throughput))
             {
                 // 全内反射
-                samplePerfectReflection(info, ray_dir, out_dir, out_throughput);
+                sample_perfect_reflection(info, ray_dir, out_dir, out_throughput);
             }
             out_origin = info.position + 0.0001f * out_dir;
         }
         else
         {
             // 反射
-            samplePerfectReflection(info, ray_dir, out_dir, out_throughput);
+            sample_perfect_reflection(info, ray_dir, out_dir, out_throughput);
             out_origin = info.position + 0.0001f * out_dir;
         }
         // Delta 路径，out_brdf_pdf 保持为 1
@@ -339,7 +339,7 @@ void processMaterial(
 
     case MaterialType::SPECULAR: {
         // Delta 镜面反射
-        samplePerfectReflection(info, ray_dir, out_dir, out_throughput);
+        sample_perfect_reflection(info, ray_dir, out_dir, out_throughput);
         out_origin = info.position + 0.0001f * out_dir;
         // Delta 路径，out_brdf_pdf 保持为 1
     }
@@ -354,13 +354,13 @@ void processMaterial(
 
         if (choose_diffuse)
         {
-            sampleDiffuse(info, payload.random_seed, out_dir, out_throughput, sample_pdf);
+            sample_diffuse(info, payload.random_seed, out_dir, out_throughput, sample_pdf);
             out_throughput /= prob_diffuse;           // 重要性采样补偿
             out_brdf_pdf = sample_pdf * prob_diffuse; // 混合 PDF
         }
         else
         {
-            sampleSpecular(info, view_dir, payload.random_seed, out_dir, out_throughput, sample_pdf);
+            sample_specular(info, view_dir, payload.random_seed, out_dir, out_throughput, sample_pdf);
             out_throughput /= (1.f - prob_diffuse);           // 重要性采样补偿
             out_brdf_pdf = sample_pdf * (1.f - prob_diffuse); // 混合 PDF
         }
@@ -379,7 +379,7 @@ void processMaterial(
 /// @param view_dir 观察方向（从命中点到相机）
 /// @param light_dir 光照方向（从命中点到光源）
 /// @return 混合 BRDF 的 PDF
-float evalBrdfPdf(const HitInfo info, const float3 view_dir, const float3 light_dir)
+float eval_brdf_pdf(const HitInfo info, const float3 view_dir, const float3 light_dir)
 {
     // Delta 材质没有 PDF（不参与 NEE）
     if (info.is_delta_path())
@@ -409,7 +409,7 @@ float evalBrdfPdf(const HitInfo info, const float3 view_dir, const float3 light_
 /// @param view_dir 观察方向（从命中点到相机）
 /// @param light_dir 光照方向（从命中点到光源）
 /// @return BRDF * cos(theta)
-float3 evalBrdf(const HitInfo info, const float3 view_dir, const float3 light_dir)
+float3 eval_brdf(const HitInfo info, const float3 view_dir, const float3 light_dir)
 {
     const float ndotl = max(dot(info.normal, light_dir), 0.f);
     if (ndotl <= 0.f)
@@ -445,7 +445,7 @@ float3 evalBrdf(const HitInfo info, const float3 view_dir, const float3 light_di
 ///       通道 1: 法线可视化
 ///       通道 2: 基础颜色
 ///       通道 4/5/6: 需要完整路径追踪，在此函数中不处理
-bool handleDebugChannel(const HitInfo info, uint channel, out float3 out_color)
+bool handle_debug_channel(const HitInfo info, uint channel, out float3 out_color)
 {
     out_color = float3(0.f);
 
@@ -476,7 +476,7 @@ bool handleDebugChannel(const HitInfo info, uint channel, out float3 out_color)
 // ============================================================================
 
 /// 计算 SER coherence hint
-uint computeCoherenceHint(const HitInfo info)
+uint compute_coherence_hint(const HitInfo info)
 {
     return uint(info.material_type);
 }
@@ -526,8 +526,8 @@ void main_ray_gen()
     uint random_seed = Random::tea(thread_id.y * DispatchRaysDimensions().x + thread_id.x, accum_samples);
     const float2 subpixel_jitter = (accum_samples == 0 || push_const.channel != 0) ? float2(0.5f) : float2(0.5f) + 0.375f * Random::rand_gaussian(random_seed);
 
-    RayDesc ray = generateCameraRay(thread_id, subpixel_jitter);
-    HitPayload payload = initPayload(random_seed);
+    RayDesc ray = generate_camera_ray(thread_id, subpixel_jitter);
+    HitPayload payload = init_payload(random_seed);
 
     // 路径追踪主循环
     // Lo = E_0 + w_0 * E_1 + w_0 * w_1 * E_2 + ... + w_0 * ... * w_n * Li_n
@@ -558,7 +558,7 @@ void main_ray_gen()
 
         // 调试通道
         float3 debug_color;
-        if (handleDebugChannel(payload.info, push_const.channel, debug_color))
+        if (handle_debug_channel(payload.info, push_const.channel, debug_color))
         {
             radiance = debug_color;
             break;
@@ -582,8 +582,8 @@ void main_ray_gen()
             else
             {
                 // 非 delta 路径：使用 MIS 加权
-                const float env_pdf = envMapUniformPdf();
-                const float mis_weight = MIS::powerHeuristic(prev_brdf_pdf, env_pdf);
+                const float env_pdf = env_map_uniform_pdf();
+                const float mis_weight = MIS::power_heuristic(prev_brdf_pdf, env_pdf);
                 const float3 contrib = sky_color * throughput * mis_weight;
                 radiance += contrib;
                 hdri_radiance += contrib; // 调试通道 6
@@ -611,7 +611,7 @@ void main_ray_gen()
             // 在 HDRI 上均匀采样光源方向
             float3 light_dir;
             float env_pdf;
-            sampleEnvMapUniform(payload.random_seed, light_dir, env_pdf);
+            sample_env_map_uniform(payload.random_seed, light_dir, env_pdf);
 
             // 检查光源方向是否在表面上方
             const float ndotl = dot(payload.info.normal, light_dir);
@@ -632,11 +632,11 @@ void main_ray_gen()
                     const float3 Li = bindless_srv::sample(gpu_scene.sky, env_uv, gpu_scene.sky_sampler_type).xyz * 8.f;
 
                     const float3 view_dir = -ray.Direction;
-                    const float3 brdf_cos = evalBrdf(payload.info, view_dir, light_dir);
-                    const float brdf_pdf = evalBrdfPdf(payload.info, view_dir, light_dir);
+                    const float3 brdf_cos = eval_brdf(payload.info, view_dir, light_dir);
+                    const float brdf_pdf = eval_brdf_pdf(payload.info, view_dir, light_dir);
 
                     // MIS 权重（光源采样策略）
-                    const float mis_weight = MIS::powerHeuristic(env_pdf, brdf_pdf);
+                    const float mis_weight = MIS::power_heuristic(env_pdf, brdf_pdf);
 
                     // 累加 NEE 贡献: throughput * Li * brdf * cos / env_pdf * mis_weight
                     const float3 nee_contrib = throughput * Li * brdf_cos / max(env_pdf, 1e-7f) * mis_weight;
@@ -660,7 +660,7 @@ void main_ray_gen()
         float3 next_origin, next_dir, mat_throughput, emission;
         bool done;
         float brdf_pdf;
-        processMaterial(payload, payload.info, ray.Direction, next_origin, next_dir, mat_throughput, emission, done, brdf_pdf);
+        process_material(payload, payload.info, ray.Direction, next_origin, next_dir, mat_throughput, emission, done, brdf_pdf);
 
         // 累积自发光（如 SKY 材质类型）
         radiance += emission * throughput;
