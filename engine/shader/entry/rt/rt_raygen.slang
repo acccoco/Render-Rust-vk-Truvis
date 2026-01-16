@@ -637,7 +637,7 @@ void main_ray_gen()
                 {
                     // 可见：计算直接光照贡献
                     const float2 env_uv = dir_to_env_uv(light_dir);
-                    const float3 Li = bindless_srv::sample(gpu_scene.sky, env_uv, gpu_scene.sky_sampler_type).xyz * 8.f;
+                    const float3 Li = bindless_srv::sample_level(gpu_scene.sky, env_uv, gpu_scene.sky_sampler_type, 0.0).xyz * 8.f;
 
                     const float3 view_dir = -ray.Direction;
                     const float3 brdf_cos = eval_brdf(payload.info, view_dir, light_dir);

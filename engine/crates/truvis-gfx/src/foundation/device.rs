@@ -125,6 +125,7 @@ impl GfxDevice {
             Box::new(vk::PhysicalDeviceBufferDeviceAddressFeatures::default().buffer_device_address(true)),
             Box::new(vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::default().ray_tracing_pipeline(true)),
             Box::new(vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default().acceleration_structure(true)),
+            Box::new(vk::PhysicalDeviceRayQueryFeaturesKHR::default().ray_query(true)),
             Box::new(
                 vk::PhysicalDeviceRayTracingInvocationReorderFeaturesNV::default().ray_tracing_invocation_reorder(true),
             ),
@@ -171,6 +172,7 @@ impl GfxDevice {
             // ash::khr::spirv_1_4::NAME,
             // ash::khr::shader_float_controls::NAME,
             ash::khr::ray_tracing_pipeline::NAME, // 主要的 ext
+            ash::khr::ray_query::NAME,             // RayQuery 支持
             ash::khr::deferred_host_operations::NAME,
         ]);
 
