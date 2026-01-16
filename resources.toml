@@ -35,7 +35,7 @@ rename_to = "slang"
 
 [[resources]]
 name = "tracy"
-url = "https://github.com/wolfpld/tracy/releases/download/v0.12.2/windows-0.12.2.zip"
+url = "https://github.com/wolfpld/tracy/releases/download/v0.13.1/windows-0.13.1.zip"
 resource_type = "zip"
 target_dir = "tools"
 rename_to = "tracy"
