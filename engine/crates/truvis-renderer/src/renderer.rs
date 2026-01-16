@@ -205,6 +205,7 @@ impl Renderer {
 impl Renderer {
     pub fn begin_frame(&mut self) {
         let _span = tracy_client::span!("Renderer::begin_frame");
+        self.timer.tick();
 
         // 等待 fif 的同一帧渲染完成
         {
@@ -223,7 +224,6 @@ impl Renderer {
             self.render_context.gfx_resource_manager.cleanup(self.render_context.frame_counter.frame_id());
         }
 
-        self.timer.tick();
         self.render_context.delta_time_s = self.timer.delta_time_s();
         self.render_context.total_time_s = self.timer.total_time_s();
 
@@ -249,8 +249,8 @@ impl Renderer {
     }
 
     pub fn time_to_render(&mut self) -> bool {
-        let limit_elapsed_us = 1000.0 * 1000.0 / self.render_context.frame_counter.frame_limit();
-        limit_elapsed_us < self.timer.elapsed_since_tick().as_micros() as f32
+        self.render_context.frame_counter.frame_delta_time_limit_us()
+            < self.timer.elapsed_since_tick().as_micros() as f32
     }
 
     pub fn before_render(&mut self, camera: &Camera) {

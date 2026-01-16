@@ -33,6 +33,10 @@ impl FrameCounter {
         self.frame_limit
     }
     #[inline]
+    pub fn frame_delta_time_limit_us(&self) -> f32 {
+        1000.0 * 1000.0 / self.frame_limit()
+    }
+    #[inline]
     pub const fn fif_count() -> usize {
         Self::FIF_COUNT
     }
