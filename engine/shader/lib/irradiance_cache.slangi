@@ -1,0 +1,310 @@
+#pragma once
+
+#include "share/ptr.slangi"
+
+namespace ic
+{
+
+// ============================================================================
+// 常量定义
+// ============================================================================
+
+const static uint MAX_ENTRY_IN_BUCKET = 8;
+const static uint MAX_ENTRY_NUM = 1024;
+const static uint BUCKET_NUM = 256;
+
+/// 每个 cell 的大小（世界单位）
+const static float CELL_SIZE = 4.0f;
+
+/// 有效采样数阈值，超过此值后更新权重固定
+const static uint VALID_SAMPLE_COUNT = 64;
+
+/// 最小权重阈值，低于此值认为查找失败
+const static float MIN_WEIGHT_THRESHOLD = 0.001f;
+
+/// 法线相似度阈值（cos 值），约 25° 夹角
+const static float NORMAL_THRESHOLD = 0.9f;
+
+/// 默认 entry 半径
+const static float DEFAULT_RADIUS = CELL_SIZE * 0.5f;
+
+/// 空间哈希使用的质数
+const static uint HASH_PRIME_1 = 73856093u;
+const static uint HASH_PRIME_2 = 19349663u;
+const static uint HASH_PRIME_3 = 83492791u;
+
+// ============================================================================
+// 数据结构
+// ============================================================================
+
+/// Bucket 结构：存储一个 cell 内的 entry 索引
+/// bucket 内的 entry 无法预先分配，因为有些 cell 细节较少，使用很少的 entry 就足够了
+struct Bucket
+{
+    uint entry_count;
+    uint entry_indices[MAX_ENTRY_IN_BUCKET];
+};
+
+/// SOA 的结构，缓存友好
+struct EntryPool
+{
+    float3 positions[MAX_ENTRY_NUM];
+    float3 normals[MAX_ENTRY_NUM];
+    float3 irradiances[MAX_ENTRY_NUM];
+    float radius[MAX_ENTRY_NUM];
+    uint sample_counts[MAX_ENTRY_NUM];
+    uint entry_count;
+};
+
+/// 哈希表，存储所有 bucket
+struct Table
+{
+    Bucket buckets[BUCKET_NUM];
+};
+
+// ============================================================================
+// 辅助函数
+// ============================================================================
+
+/// 世界坐标转换为 cell 坐标
+int3 world_to_cell(float3 world_pos)
+{
+    return int3(floor(world_pos / CELL_SIZE));
+}
+
+/// 3D 空间哈希，使用质数乘法 + XOR
+uint spatial_hash(int3 cell_coord)
+{
+    return (uint(cell_coord.x) * HASH_PRIME_1) ^
+        (uint(cell_coord.y) * HASH_PRIME_2) ^
+        (uint(cell_coord.z) * HASH_PRIME_3);
+}
+
+/// 获取 cell 对应的 bucket 索引
+uint get_bucket_index(int3 cell_coord)
+{
+    return spatial_hash(cell_coord) % BUCKET_NUM;
+}
+
+/// 计算 entry 对查询点的权重
+/// 基于 Ward 的 1/R 权重公式，结合法线相似度
+/// @param query_pos 查询位置
+/// @param query_normal 查询法线
+/// @param entry_pos entry 位置
+/// @param entry_normal entry 法线
+/// @param entry_radius entry 影响半径
+/// @return 权重值，0 表示无效
+float compute_entry_weight(
+    float3 query_pos,
+    float3 query_normal,
+    float3 entry_pos,
+    float3 entry_normal,
+    float entry_radius
+)
+{
+    // 检查法线相似度
+    float normal_dot = dot(query_normal, entry_normal);
+    if (normal_dot < NORMAL_THRESHOLD)
+    {
+        return 0.0f;
+    }
+
+    // 计算距离
+    float3 diff = query_pos - entry_pos;
+    float dist_sq = dot(diff, diff);
+    float radius_sq = entry_radius * entry_radius;
+
+    // 距离超出影响半径
+    if (dist_sq > radius_sq)
+    {
+        return 0.0f;
+    }
+
+    // Ward 权重公式: w = 1 / (dist / radius + epsilon)
+    // 加入法线因子进行调制
+    float dist = sqrt(dist_sq);
+    float dist_factor = 1.0f / (dist / entry_radius + 0.01f);
+    float normal_factor = (normal_dot - NORMAL_THRESHOLD) / (1.0f - NORMAL_THRESHOLD);
+
+    return dist_factor * normal_factor;
+}
+
+// ============================================================================
+// Irradiance Cache 主结构
+// ============================================================================
+
+struct IrradianceCache
+{
+    /// GPU 指针：指向 entry 池
+    PTR(EntryPool, entry_pool);
+
+    /// GPU 指针：指向哈希表
+    PTR(Table, hash_table);
+
+    /// 查询 Irradiance Cache
+    /// @param position 查询位置
+    /// @param normal 查询法线
+    /// @param irradiance [out] 输出插值后的辐照度
+    /// @param weight [out] 输出总权重
+    /// @param max_weight_entry_index [out] 输出最大权重的 entry 索引，用于后续 update
+    /// @param max_weight [out] 输出最大权重值
+    /// @return 如果找到有效的缓存，返回 true
+    bool lookup(
+        float3 position,
+        float3 normal,
+        out float3 irradiance,
+        out float weight,
+        out uint max_weight_entry_index,
+        out float max_weight
+    )
+    {
+        // 初始化输出
+        irradiance = float3(0.0f);
+        weight = 0.0f;
+        max_weight_entry_index = 0xFFFFFFFF;
+        max_weight = 0.0f;
+
+        float3 weighted_irradiance = float3(0.0f);
+        float total_weight = 0.0f;
+
+        // 获取当前位置所在的 cell
+        int3 center_cell = world_to_cell(position);
+
+        // 遍历 3x3x3 邻域
+        for (int dz = -1; dz <= 1; dz++)
+        {
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    int3 neighbor_cell = center_cell + int3(dx, dy, dz);
+                    uint bucket_idx = get_bucket_index(neighbor_cell);
+
+                    // 获取 bucket
+                    Bucket bucket = hash_table->buckets[bucket_idx];
+                    uint entry_count = min(bucket.entry_count, MAX_ENTRY_IN_BUCKET);
+
+                    // 遍历 bucket 内的所有 entry
+                    for (uint i = 0; i < entry_count; i++)
+                    {
+                        uint entry_idx = bucket.entry_indices[i];
+
+                        // 边界检查
+                        if (entry_idx >= MAX_ENTRY_NUM)
+                        {
+                            continue;
+                        }
+
+                        // 获取 entry 数据
+                        float3 entry_pos = entry_pool->positions[entry_idx];
+                        float3 entry_normal = entry_pool->normals[entry_idx];
+                        float3 entry_irradiance = entry_pool->irradiances[entry_idx];
+                        float entry_radius = entry_pool->radius[entry_idx];
+
+                        // 计算权重
+                        float w = compute_entry_weight(
+                            position, normal,
+                            entry_pos, entry_normal,
+                            entry_radius
+                        );
+
+                        if (w > 0.0f)
+                        {
+                            weighted_irradiance += entry_irradiance * w;
+                            total_weight += w;
+
+                            // 记录最大权重的 entry
+                            if (w > max_weight)
+                            {
+                                max_weight = w;
+                                max_weight_entry_index = entry_idx;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 检查是否找到有效缓存
+        if (total_weight > MIN_WEIGHT_THRESHOLD)
+        {
+            irradiance = weighted_irradiance / total_weight;
+            weight = total_weight;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// 更新现有 entry 的辐照度
+    /// 使用增量移动平均，权重基于 sample count 衰减
+    /// @param entry_idx 要更新的 entry 索引
+    /// @param new_irradiance 新的辐照度样本
+    void update(uint entry_idx, float3 new_irradiance)
+    {
+        // 边界检查
+        if (entry_idx >= MAX_ENTRY_NUM)
+        {
+            return;
+        }
+
+        // 获取当前采样数
+        uint current_count = entry_pool->sample_counts[entry_idx];
+
+        // 计算更新权重
+        // 当 sample_count > VALID_SAMPLE_COUNT 时，权重固定为 1/VALID_SAMPLE_COUNT
+        uint effective_count = min(current_count + 1, VALID_SAMPLE_COUNT);
+        float update_weight = 1.0f / float(effective_count);
+
+        // 增量平均更新
+        float3 old_irradiance = entry_pool->irradiances[entry_idx];
+        entry_pool->irradiances[entry_idx] = lerp(old_irradiance, new_irradiance, update_weight);
+
+        // 递增采样计数（使用原子操作）
+        InterlockedAdd(entry_pool->sample_counts[entry_idx], 1u);
+    }
+
+    /// 插入新的 entry 到 Irradiance Cache
+    /// @param position entry 位置
+    /// @param normal entry 法线
+    /// @param irradiance 初始辐照度
+    /// @return 成功返回 true，失败（entry 池满）返回 false
+    bool insert(float3 position, float3 normal, float3 irradiance)
+    {
+        // 原子分配新 entry 索引
+        uint entry_idx;
+        InterlockedAdd(entry_pool->entry_count, 1u, entry_idx);
+
+        // 检查是否超出最大 entry 数
+        if (entry_idx >= MAX_ENTRY_NUM)
+        {
+            // 回滚 entry_count
+            InterlockedAdd(entry_pool->entry_count, -1);
+            return false;
+        }
+
+        // 初始化 entry 数据
+        entry_pool->positions[entry_idx] = position;
+        entry_pool->normals[entry_idx] = normal;
+        entry_pool->irradiances[entry_idx] = irradiance;
+        entry_pool->radius[entry_idx] = DEFAULT_RADIUS;
+        entry_pool->sample_counts[entry_idx] = 1u;
+
+        // 获取对应的 bucket
+        int3 cell_coord = world_to_cell(position);
+        uint bucket_idx = get_bucket_index(cell_coord);
+
+        // 原子分配 bucket 内的 slot
+        uint slot;
+        InterlockedAdd(hash_table->buckets[bucket_idx].entry_count, 1u, slot);
+
+        // 使用环形缓冲区策略：当 bucket 满时替换旧的 entry
+        // slot % MAX_ENTRY_IN_BUCKET 确保索引在有效范围内
+        uint actual_slot = slot % MAX_ENTRY_IN_BUCKET;
+        hash_table->buckets[bucket_idx].entry_indices[actual_slot] = entry_idx;
+
+        return true; 
+    }
+};
+
+} 

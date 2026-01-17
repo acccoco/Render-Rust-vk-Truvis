@@ -433,7 +433,7 @@ float3 eval_brdf(const HitInfo info, const float3 view_dir, const float3 light_d
 // 调试通道
 // ============================================================================
 
-/// 处理调试通道（首次
+/// 处理调试通道（首次命中）
 /// @param info 命中信息
 /// @param channel 调试通道号
 /// @param out_color 输出颜色
@@ -441,7 +441,8 @@ float3 eval_brdf(const HitInfo info, const float3 view_dir, const float3 light_d
 /// @note 通道 0: 正常渲染
 ///       通道 1: 法线可视化
 ///       通道 2: 基础颜色
-///       通道 4/5/6: 需要完整路径追踪，在此函数中不处理
+///       通道 4/5/6/7/8: 需要完整路径追踪，在此函数中不处理
+///       通道 9: 首次命中位置的 IC 查询结果（需要完整路径追踪）
 bool handle_debug_channel(const HitInfo info, uint channel, out float3 out_color)
 {
     out_color = float3(0.f);
@@ -482,6 +483,19 @@ uint compute_coherence_hint(const HitInfo info)
 float luminance(float3 color)
 {
     return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+}
+
+// ============================================================================
+// Irradiance Cache 辅助函数
+// ============================================================================
+
+/// 判断当前表面是否满足 diffuse 条件（用于 IC 查询）
+/// @param info 命中信息
+/// @return true 表示满足 diffuse 条件
+bool is_diffuse_surface(const HitInfo info)
+{
+    return info.material_type == MaterialType::DIFFUSE &&
+        info.metallic < rt::IC_DIFFUSE_THRESHOLD;
 }
 
 /// 发射 shadow ray，判断是否命中任何物体
@@ -548,6 +562,21 @@ void main_ray_gen()
     float3 nee_bounce1_radiance = float3(0.f); // 通道 7：第一次 bounce 的 NEE 贡献
     float3 nee_bounce2_radiance = float3(0.f); // 通道 8：第二次 bounce 的 NEE 贡献
 
+    // 调试通道 9：首次命中位置的 IC 查询
+    float3 first_hit_position = float3(0.f);
+    float3 first_hit_normal = float3(0.f);
+    bool first_hit_recorded = false;
+
+    // ========== Irradiance Cache 局部状态 ==========
+    uint ic_diffuse_bounce_count = 0;   // Diffuse 弹射计数
+    bool ic_pending_update = false;     // 是否有待处理的 IC 更新操作
+    bool ic_pending_insert = false;     // 是否有待处理的 IC 插入操作
+    uint ic_entry_index = 0xFFFFFFFF;   // 待更新的 IC entry 索引
+    float3 ic_position = float3(0.f);   // IC 记录点的世界位置
+    float3 ic_normal = float3(0.f);     // IC 记录点的法线
+    float3 ic_throughput = float3(1.f); // 到达 IC 记录点时的 throughput
+    float3 ic_radiance = float3(0.f);   // 到达 IC 记录点时已累积的 radiance
+
     for (uint depth = 0; depth < max_depth; ++depth)
     {
         TraceRay(
@@ -593,6 +622,16 @@ void main_ray_gen()
                 hdri_radiance += contrib; // 调试通道 6
             }
             break;
+        }
+
+        // ================================================================
+        // 记录首次命中位置（用于调试通道 9）
+        // ================================================================
+        if (!first_hit_recorded)
+        {
+            first_hit_position = payload.info.position;
+            first_hit_normal = payload.info.normal;
+            first_hit_recorded = true;
         }
 
         // ================================================================
@@ -659,6 +698,56 @@ void main_ray_gen()
         }
 
         // ================================================================
+        // Irradiance Cache 查询（NEE 之后，BRDF 采样之前）
+        // 条件：diffuse 弹射 >= 2、当前为 diffuse 表面、无待处理 IC 操作
+        // ================================================================
+        if (ic_diffuse_bounce_count >= rt::IC_MIN_DIFFUSE_BOUNCES &&
+            is_diffuse_surface(payload.info) &&
+            !ic_pending_update &&
+            !ic_pending_insert)
+        {
+            float3 ic_query_irradiance;
+            float ic_weight;
+            uint ic_max_weight_entry_index;
+            float ic_max_weight;
+
+            bool ic_found = push_const.irradiance_cache.lookup(
+                payload.info.position,
+                payload.info.normal,
+                ic_query_irradiance,
+                ic_weight,
+                ic_max_weight_entry_index,
+                ic_max_weight
+            );
+
+            if (ic_found && ic_max_weight >= rt::IC_LOOKUP_THRESHOLD)
+            {
+                // IC 查询成功且权重足够高：直接使用 IC 结果并终止光路
+                radiance += throughput * ic_query_irradiance;
+                break;
+            }
+            else if (ic_found && ic_max_weight < rt::IC_UPDATE_THRESHOLD)
+            {
+                // IC 查询成功但权重较低：标记待更新，继续追踪以获取更好的估计
+                ic_pending_update = true;
+                ic_entry_index = ic_max_weight_entry_index;
+                ic_position = payload.info.position;
+                ic_normal = payload.info.normal;
+                ic_throughput = throughput;
+                ic_radiance = radiance;
+            }
+            else if (!ic_found && push_const.spp_idx == 0)
+            {
+                // IC 查询失败：仅在 spp_idx == 0 时标记待插入，限制插入频率
+                ic_pending_insert = true;
+                ic_position = payload.info.position;
+                ic_normal = payload.info.normal;
+                ic_throughput = throughput;
+                ic_radiance = radiance;
+            }
+        }
+
+        // ================================================================
         // 处理材质，计算下一条光线（BRDF 采样）
         // ================================================================
         float3 next_origin, next_dir, mat_throughput, emission;
@@ -685,9 +774,11 @@ void main_ray_gen()
         if (payload.info.material_type == MaterialType::DIFFUSE)
         {
             has_diffuse = true;
+            // 递增 diffuse 弹射计数（用于 IC 查询条件）
+            ic_diffuse_bounce_count++;
         }
 
-        // 俄罗斯轮盘赌
+        if (depth >= 3)
         {
             float p = max(throughput.x, max(throughput.y, throughput.z));
             p = clamp(p, 0.05f, 0.95f);
@@ -701,6 +792,44 @@ void main_ray_gen()
         // 设置下一条光线
         ray.Origin = next_origin;
         ray.Direction = next_dir;
+    }
+
+    // ================================================================
+    // Irradiance Cache 更新/插入（路径追踪结束后）
+    // 使用最终 radiance 和记录点的 throughput 估算 irradiance
+    // ================================================================
+    if (ic_pending_update || ic_pending_insert)
+    {
+        // 计算 throughput 分量最大值，用于除零保护
+        float max_ic_throughput = max(ic_throughput.r, max(ic_throughput.g, ic_throughput.b));
+
+        // 仅当 throughput 足够大时才进行 IC 操作
+        if (max_ic_throughput >= rt::IC_THROUGHPUT_MIN)
+        {
+            // 估算从 IC 记录点开始的 irradiance
+            // irradiance = (final_radiance - radiance_at_ic) / throughput_at_ic
+            float3 delta_radiance = radiance - ic_radiance;
+            float3 safe_throughput = max(ic_throughput, float3(rt::IC_THROUGHPUT_MIN));
+            float3 estimated_irradiance = delta_radiance / safe_throughput;
+
+            // 确保 irradiance 非负（数值误差可能导致负值）
+            estimated_irradiance = max(estimated_irradiance, float3(0.f));
+
+            if (ic_pending_update)
+            {
+                // 更新现有 IC entry
+                push_const.irradiance_cache.update(ic_entry_index, estimated_irradiance);
+            }
+            else if (ic_pending_insert && push_const.spp_idx == 0)
+            {
+                // 插入新 IC entry（仅 spp_idx == 0 时执行，限制插入频率）
+                push_const.irradiance_cache.insert(
+                    ic_position,
+                    ic_normal,
+                    estimated_irradiance
+                );
+            }
+        }
     }
 
     // 根据调试通道选择输出
@@ -724,6 +853,39 @@ void main_ray_gen()
     else if (push_const.channel == 8)
     {
         output_radiance = nee_bounce2_radiance; // 第二次 bounce 的 NEE 贡献
+    }
+    else if (push_const.channel == 9)
+    {
+        // 通道 9：使用首次命中位置查询 IC
+        if (first_hit_recorded)
+        {
+            float3 ic_query_irradiance;
+            float ic_weight;
+            uint ic_max_weight_entry_index;
+            float ic_max_weight;
+
+            bool ic_found = push_const.irradiance_cache.lookup(
+                first_hit_position,
+                first_hit_normal,
+                ic_query_irradiance,
+                ic_weight,
+                ic_max_weight_entry_index,
+                ic_max_weight
+            );
+
+            if (ic_found)
+            {
+                output_radiance = ic_query_irradiance;
+            }
+            else
+            {
+                output_radiance = float3(0.f); // IC 查询失败，输出黑色
+            }
+        }
+        else
+        {
+            output_radiance = float3(0.f); // 无首次命中，输出黑色
+        }
     }
 
     // 累积帧混合
