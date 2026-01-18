@@ -509,7 +509,7 @@ impl RealtimeRtPass {
             channel: render_context.pipeline_settings.channel,
             ic_table: self.hash_table.device_address(),
             ic_entry_pool: self.entry_pool.device_address(),
-            _padding_: 0,
+            ic_enabled: render_context.pipeline_settings.ic_enabled as u32,
         };
         for spp_idx in 0..spp {
             push_constant.spp_idx = spp_idx;

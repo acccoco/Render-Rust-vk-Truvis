@@ -83,12 +83,24 @@ impl Default for DenoiseSettings {
 }
 
 /// 管线级配置
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 pub struct PipelineSettings {
     /// 0 表示 RT，1 表示 normal
     pub channel: u32,
     /// 降噪设置
     pub denoise: DenoiseSettings,
+    /// 是否启用 Irradiance Cache
+    pub ic_enabled: bool,
+}
+
+impl Default for PipelineSettings {
+    fn default() -> Self {
+        Self {
+            channel: 0,
+            denoise: DenoiseSettings::default(),
+            ic_enabled: true, // 默认启用 IC
+        }
+    }
 }
 
 /// 呈现配置

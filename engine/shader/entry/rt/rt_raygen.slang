@@ -719,9 +719,10 @@ void main_ray_gen()
 
         // ================================================================
         // Irradiance Cache 查询（NEE 之后，BRDF 采样之前）
-        // 条件：bounces、当前为 diffuse 表面、无待处理 IC 操作
+        // 条件：bounces、当前为 diffuse 表面、无待处理 IC 操作、IC 已启用
         // ================================================================
         if (
+            push_const.ic_enabled != 0 &&
             ic_diffuse_bounce_count >= rt::IC_MIN_DIFFUSE_BOUNCES &&
             ic::is_diffuse_surface(payload.info.roughness, payload.info.metallic) &&
             !(ic_pending_update || ic_pending_insert || has_ic_query)
@@ -838,7 +839,7 @@ void main_ray_gen()
     // Irradiance Cache 更新/插入（路径追踪结束后）
     // 使用最终 radiance 和记录点的 throughput 估算 irradiance
     // ================================================================
-    if (ic_pending_update || ic_pending_insert)
+    if (push_const.ic_enabled != 0 && (ic_pending_update || ic_pending_insert))
     {
         // 计算 throughput 分量最大值，用于除零保护
         float max_ic_throughput = max(ic_throughput.r, max(ic_throughput.g, ic_throughput.b));

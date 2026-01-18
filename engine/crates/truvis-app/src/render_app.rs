@@ -189,6 +189,10 @@ impl RenderApp {
                     });
 
                     ui.separator();
+                    ui.text("Irradiance Cache");
+                    ui.checkbox("Enable IC", &mut pipeline_settings.ic_enabled);
+
+                    ui.separator();
                     ui.text("Denoise Settings");
 
                     // 降噪开关

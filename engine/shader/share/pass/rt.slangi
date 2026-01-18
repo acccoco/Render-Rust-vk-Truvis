@@ -40,6 +40,6 @@ struct PushConstants
     uint spp;
     uint spp_idx;
     uint channel;
-    uint _padding_;
+    uint ic_enabled; // 0=禁用, 1=启用 Irradiance Cache
 };
 };
