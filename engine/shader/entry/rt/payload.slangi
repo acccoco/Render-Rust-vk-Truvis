@@ -115,6 +115,6 @@ const static float IC_DIFFUSE_ROUGHNESS_THRESHOLD = 0.7f;
 const static float IC_THROUGHPUT_MIN = 0.001f;
 
 /// IC 查询启用的最小 diffuse 弹射次数
-const static uint IC_MIN_DIFFUSE_BOUNCES = 2;
+const static uint IC_MIN_DIFFUSE_BOUNCES = 1;
 
 }

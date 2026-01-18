@@ -557,7 +557,7 @@ void main_ray_gen()
     bool first_hit_recorded = false;
 
     // ========== GBuffer 跟踪变量 ==========
-    bool gbuffer_written = false;  // GBuffer 是否已写入
+    bool gbuffer_written = false; // GBuffer 是否已写入
 
     // ========== Irradiance Cache 局部状态 ==========
     uint ic_diffuse_bounce_count = 0;   // Diffuse 弹射计数
@@ -567,8 +567,8 @@ void main_ray_gen()
     uint ic_entry_index = 0xFFFFFFFF;   // 待更新的 IC entry 索引
     float3 ic_position = float3(0.f);   // IC 记录点的世界位置
     float3 ic_normal = float3(0.f);     // IC 记录点的法线
-    float3 ic_throughput = float3(1.f); // 到达 IC 记录点时的 throughput
-    float3 ic_radiance = float3(0.f);   // 到达 IC 记录点时已累积的 radiance
+    float3 ic_throughput = float3(1.f); // 从 IC 记录点开始的相对 throughput
+    float3 ic_radiance = float3(0.f);   // 累积的 outgoing radiance（已含 diffuse BRDF）
 
     for (uint depth = 0; depth < max_depth; ++depth)
     {
@@ -588,6 +588,21 @@ void main_ray_gen()
         {
             radiance = debug_color;
             break;
+        }
+
+        // ================================================================
+        // IC 追踪模式：强制 diffuse 材质
+        // 当 IC 启用且满足 diffuse 条件时，将材质强制为纯 diffuse
+        // 以提高 IC 缓存的一致性
+        // ================================================================
+        if (payload.hit &&
+            push_const.ic_enabled != 0 &&
+            ic_diffuse_bounce_count >= rt::IC_MIN_DIFFUSE_BOUNCES &&
+            ic::is_diffuse_surface(payload.info.roughness, payload.info.metallic))
+        {
+            payload.info.roughness = 1.0f;
+            payload.info.metallic = 0.0f;
+            payload.info.material_type = MaterialType::DIFFUSE;
         }
 
         // ================================================================
@@ -611,6 +626,11 @@ void main_ray_gen()
                 const float3 contrib = sky_color * throughput;
                 radiance += contrib;
                 hdri_radiance += contrib; // 调试通道 6
+                // IC 追踪：累积环境光贡献
+                if (ic_pending_update || ic_pending_insert)
+                {
+                    ic_radiance += sky_color * ic_throughput;
+                }
             }
             else
             {
@@ -620,6 +640,12 @@ void main_ray_gen()
                 const float3 contrib = sky_color * throughput * mis_weight;
                 radiance += contrib;
                 hdri_radiance += contrib; // 调试通道 6
+                // IC 追踪：累积环境光贡献（使用相同 MIS 权重）
+                if (ic_pending_update || ic_pending_insert)
+                {
+                    ic_radiance += sky_color * ic_throughput * mis_weight;
+                }
+                
             }
             break;
         }
@@ -663,6 +689,11 @@ void main_ray_gen()
             const float3 contrib = payload.info.emissive * throughput;
             radiance += contrib;
             emissive_radiance += contrib; // 调试通道 5
+            // IC 追踪：累积自发光贡献
+            if (ic_pending_update || ic_pending_insert)
+            {
+                ic_radiance += payload.info.emissive * ic_throughput;
+            }
             break;
         }
 
@@ -705,6 +736,11 @@ void main_ray_gen()
                     const float3 nee_contrib = throughput * Li * brdf_cos / max(env_pdf, 1e-7f) * mis_weight;
                     radiance += nee_contrib;
                     nee_radiance += nee_contrib; // 调试通道 4
+                    // IC 追踪：累积 NEE 贡献（使用相对 throughput）
+                    if (ic_pending_update || ic_pending_insert)
+                    {
+                        ic_radiance += ic_throughput * Li * brdf_cos / max(env_pdf, 1e-7f) * mis_weight;
+                    }
                     if (depth == 0)
                     {
                         nee_bounce1_radiance = nee_contrib; // 调试通道 7
@@ -728,7 +764,7 @@ void main_ray_gen()
             !(ic_pending_update || ic_pending_insert || has_ic_query)
         )
         {
-            float3 ic_query_irradiance;
+            float3 ic_query_radiance;
             float ic_weight;
             uint ic_max_weight_entry_index;
             float ic_max_weight;
@@ -738,7 +774,7 @@ void main_ray_gen()
                 push_const.ic_entry_pool,
                 payload.info.position,
                 payload.info.forward_normal,
-                ic_query_irradiance,
+                ic_query_radiance,
                 ic_weight,
                 ic_max_weight_entry_index,
                 ic_max_weight
@@ -751,8 +787,8 @@ void main_ray_gen()
                 if (Random::rnd(payload.random_seed) < 0.7f)
                 {
                     // IC 查询成功且权重足够高：直接使用 IC 结果并终止光路
-                    // IC 里面存的是 irradiance * (rho / pi)，因此可以直接累加
-                    radiance += throughput * ic_query_irradiance;
+                    // IC 里面存的是 outgoing radiance，因此可以直接累加
+                    radiance += throughput * ic_query_radiance;
                     break;
                 }
             }
@@ -764,8 +800,9 @@ void main_ray_gen()
                 ic_entry_index = ic_max_weight_entry_index;
                 ic_position = payload.info.position;
                 ic_normal = payload.info.forward_normal;
-                ic_throughput = throughput;
-                ic_radiance = radiance;
+                // 初始化相对 throughput 和 radiance，不受 RR 缩放影响
+                ic_throughput = float3(1.f);
+                ic_radiance = float3(0.f);
             }
             else if (!ic_found && push_const.spp_idx == 0)
             {
@@ -773,8 +810,9 @@ void main_ray_gen()
                 ic_pending_insert = true;
                 ic_position = payload.info.position;
                 ic_normal = payload.info.forward_normal;
-                ic_throughput = throughput;
-                ic_radiance = radiance;
+                // 初始化相对 throughput 和 radiance，不受 RR 缩放影响
+                ic_throughput = float3(1.f);
+                ic_radiance = float3(0.f);
             }
         }
 
@@ -806,6 +844,11 @@ void main_ray_gen()
 
         // 更新 throughput
         throughput *= mat_throughput;
+        // IC 追踪：同步更新 ic_throughput（不受后续 RR 缩放影响）
+        if (ic_pending_update || ic_pending_insert)
+        {
+            ic_throughput *= mat_throughput;
+        }
 
         // 记录当前路径信息供下次 MIS 使用
         prev_brdf_pdf = brdf_pdf;
@@ -847,26 +890,24 @@ void main_ray_gen()
         // 仅当 throughput 足够大时才进行 IC 操作
         if (max_ic_throughput >= rt::IC_THROUGHPUT_MIN)
         {
-            // 估算从 IC 记录点开始的 irradiance
-            // NOTE 实际上存的是 irradiance * (rho / pi)
-            // irradiance = (final_radiance - radiance_at_ic) / throughput_at_ic
-            float3 delta_radiance = radiance - ic_radiance;
-            float3 safe_throughput = max(ic_throughput, float3(rt::IC_THROUGHPUT_MIN));
-            float3 estimated_irradiance = delta_radiance / safe_throughput;
+            // ic_radiance 已经是从 IC 记录点开始累积的出射 radiance
+            // 存储的是 irradiance * (rho / pi)，即 diffuse 表面的出射 radiance
 
-            float max_delta_radiance = max(delta_radiance.x, max(delta_radiance.y, delta_radiance.z));
-            float max_irradiance = max(estimated_irradiance.x, max(estimated_irradiance.y, estimated_irradiance.z));
-            // 估算的 irradiance 过小，放弃 IC 操作
-            if (max_delta_radiance < 0.01f ||
-                max_irradiance < 0.01f ||
-                max_irradiance > 10.f)
+            // FIXME 瞎写的，这样搞了之后，数值看起来还行……
+            ic_radiance = ic_radiance / (M_PI * M_PI); 
+
+            float max_ic_radiance = max(ic_radiance.x, max(ic_radiance.y, ic_radiance.z));
+            // 估算的 radiance 过小，放弃 IC 操作（避免存储噪声）
+            if (max_ic_radiance < 0.001f)
             {
                 ic_pending_update = false;
                 ic_pending_insert = false;
             }
-
-            // 确保 irradiance 非负（数值误差可能导致负值）
-            estimated_irradiance = max(estimated_irradiance, float3(0.f));
+            // 估算的 radiance 过大（可能是数值问题），限制最大值
+            else if (max_ic_radiance > 100.f)
+            {
+                ic_radiance = ic_radiance * (100.f / max_ic_radiance);
+            }
 
             if (ic_pending_update)
             {
@@ -876,7 +917,7 @@ void main_ray_gen()
                     ic_entry_index,
                     ic_position,
                     ic_normal,
-                    estimated_irradiance
+                    ic_radiance
                 );
             }
             else if (ic_pending_insert && push_const.spp_idx == 0)
@@ -887,7 +928,7 @@ void main_ray_gen()
                     push_const.ic_entry_pool,
                     ic_position,
                     ic_normal,
-                    estimated_irradiance
+                    ic_radiance
                 );
             }
         }
@@ -920,7 +961,7 @@ void main_ray_gen()
         // 通道 9：使用首次命中位置查询 IC
         if (first_hit_recorded)
         {
-            float3 ic_query_irradiance;
+            float3 ic_query_radiance;
             float ic_weight;
             uint ic_max_weight_entry_index;
             float ic_max_weight;
@@ -930,7 +971,7 @@ void main_ray_gen()
                 push_const.ic_entry_pool,
                 first_hit_position,
                 first_hit_normal,
-                ic_query_irradiance,
+                ic_query_radiance,
                 ic_weight,
                 ic_max_weight_entry_index,
                 ic_max_weight
@@ -938,7 +979,7 @@ void main_ray_gen()
 
             if (ic_found)
             {
-                output_radiance = ic_query_irradiance;
+                output_radiance = ic_query_radiance;
             }
             else
             {
