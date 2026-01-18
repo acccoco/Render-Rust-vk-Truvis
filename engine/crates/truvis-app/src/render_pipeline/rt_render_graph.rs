@@ -1,6 +1,7 @@
 use ash::vk;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_graph::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
+use truvis_render_graph::resources::fif_buffer::FifBuffers;
 
 use crate::render_pipeline::accum_pass::{AccumPass, AccumRgPass};
 use crate::render_pipeline::blit_pass::{BlitPass, BlitRgPass};
@@ -151,6 +152,37 @@ impl RtPipeline {
             None,
         );
 
+        // ========== GBuffer 导入 ==========
+        let (gbuffer_a_image_handle, gbuffer_a_view_handle) = fif_buffers.gbuffer_a_handle(frame_label);
+        let gbuffer_a = rg_builder.import_image(
+            "gbuffer-a",
+            gbuffer_a_image_handle,
+            Some(gbuffer_a_view_handle),
+            FifBuffers::gbuffer_a_format(),
+            RgImageState::UNDEFINED_TOP,
+            None,
+        );
+
+        let (gbuffer_b_image_handle, gbuffer_b_view_handle) = fif_buffers.gbuffer_b_handle(frame_label);
+        let gbuffer_b = rg_builder.import_image(
+            "gbuffer-b",
+            gbuffer_b_image_handle,
+            Some(gbuffer_b_view_handle),
+            FifBuffers::gbuffer_b_format(),
+            RgImageState::UNDEFINED_TOP,
+            None,
+        );
+
+        let (gbuffer_c_image_handle, gbuffer_c_view_handle) = fif_buffers.gbuffer_c_handle(frame_label);
+        let gbuffer_c = rg_builder.import_image(
+            "gbuffer-c",
+            gbuffer_c_image_handle,
+            Some(gbuffer_c_view_handle),
+            FifBuffers::gbuffer_c_format(),
+            RgImageState::UNDEFINED_TOP,
+            None,
+        );
+
         // 累积图像（跨帧持久）
         let accum_image = rg_builder.import_image(
             "accum-image",
@@ -184,6 +216,9 @@ impl RtPipeline {
                     render_context,
                     single_frame_image,
                     single_frame_extent: render_context.frame_settings.frame_extent,
+                    gbuffer_a,
+                    gbuffer_b,
+                    gbuffer_c,
                 },
             )
             .add_pass(

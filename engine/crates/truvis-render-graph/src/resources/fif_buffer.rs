@@ -42,6 +42,18 @@ pub struct FifBuffers {
     render_target_format: vk::Format,
     #[allow(dead_code)]
     render_target_extent: vk::Extent2D,
+
+    // ========== GBuffer ==========
+    /// GBufferA: normal.xyz + roughness (R16G16B16A16_SFLOAT)
+    gbuffer_a_images: [GfxImageHandle; FrameCounter::fif_count()],
+    gbuffer_a_views: [GfxImageViewHandle; FrameCounter::fif_count()],
+    /// GBufferB: world_position.xyz + linear_depth (R16G16B16A16_SFLOAT)
+    gbuffer_b_images: [GfxImageHandle; FrameCounter::fif_count()],
+    gbuffer_b_views: [GfxImageViewHandle; FrameCounter::fif_count()],
+    /// GBufferC: albedo.rgb + metallic (R8G8B8A8_UNORM)
+    gbuffer_c_images: [GfxImageHandle; FrameCounter::fif_count()],
+    gbuffer_c_views: [GfxImageViewHandle; FrameCounter::fif_count()],
+    gbuffer_extent: vk::Extent2D,
 }
 // new & init
 impl FifBuffers {
@@ -80,6 +92,30 @@ impl FifBuffers {
             frame_counter,
         );
 
+        // 创建 GBuffer 图像
+        let gbuffer_extent = frame_settigns.frame_extent;
+        let (gbuffer_a_images, gbuffer_a_views) = Self::create_gbuffer_images(
+            gfx_resource_manager,
+            vk::Format::R16G16B16A16_SFLOAT,
+            gbuffer_extent,
+            frame_counter,
+            "gbuffer-a",
+        );
+        let (gbuffer_b_images, gbuffer_b_views) = Self::create_gbuffer_images(
+            gfx_resource_manager,
+            vk::Format::R16G16B16A16_SFLOAT,
+            gbuffer_extent,
+            frame_counter,
+            "gbuffer-b",
+        );
+        let (gbuffer_c_images, gbuffer_c_views) = Self::create_gbuffer_images(
+            gfx_resource_manager,
+            vk::Format::R8G8B8A8_UNORM,
+            gbuffer_extent,
+            frame_counter,
+            "gbuffer-c",
+        );
+
         let fif_buffers = Self {
             single_frame_rt_images,
             single_frame_rt_views,
@@ -100,6 +136,14 @@ impl FifBuffers {
             off_screen_target_view_handles: render_target_image_view_handles,
             render_target_format,
             render_target_extent,
+
+            gbuffer_a_images,
+            gbuffer_a_views,
+            gbuffer_b_images,
+            gbuffer_b_views,
+            gbuffer_c_images,
+            gbuffer_c_views,
+            gbuffer_extent,
         };
         fif_buffers.register_bindless(bindless_manager);
         fif_buffers
@@ -126,6 +170,16 @@ impl FifBuffers {
             bindless_manager.register_uav(*render_target);
             bindless_manager.register_srv(*render_target);
         }
+        // 注册 GBuffer
+        for gbuffer_view in &self.gbuffer_a_views {
+            bindless_manager.register_uav(*gbuffer_view);
+        }
+        for gbuffer_view in &self.gbuffer_b_views {
+            bindless_manager.register_uav(*gbuffer_view);
+        }
+        for gbuffer_view in &self.gbuffer_c_views {
+            bindless_manager.register_uav(*gbuffer_view);
+        }
     }
 
     fn unregister_bindless(&self, bindless_manager: &mut BindlessManager) {
@@ -136,6 +190,16 @@ impl FifBuffers {
         for render_target in &self.off_screen_target_view_handles {
             bindless_manager.unregister_uav(*render_target);
             bindless_manager.unregister_srv(*render_target);
+        }
+        // 取消注册 GBuffer
+        for gbuffer_view in &self.gbuffer_a_views {
+            bindless_manager.unregister_uav(*gbuffer_view);
+        }
+        for gbuffer_view in &self.gbuffer_b_views {
+            bindless_manager.unregister_uav(*gbuffer_view);
+        }
+        for gbuffer_view in &self.gbuffer_c_views {
+            bindless_manager.unregister_uav(*gbuffer_view);
         }
     }
 
@@ -332,6 +396,69 @@ impl FifBuffers {
 
         (image_handles, image_view_handles)
     }
+
+    /// 创建 per-frame 的 GBuffer 图像
+    /// - GBufferA (R16G16B16A16_SFLOAT): normal.xyz + roughness
+    /// - GBufferB (R16G16B16A16_SFLOAT): world_position.xyz + linear_depth
+    /// - GBufferC (R8G8B8A8_UNORM): albedo.rgb + metallic
+    fn create_gbuffer_images(
+        gfx_resource_manager: &mut GfxResourceManager,
+        format: vk::Format,
+        extent: vk::Extent2D,
+        frame_counter: &FrameCounter,
+        name_prefix: &str,
+    ) -> ([GfxImageHandle; FrameCounter::fif_count()], [GfxImageViewHandle; FrameCounter::fif_count()]) {
+        let create_one_image = |frame_label: FrameLabel| {
+            let name = format!("{}-{}-{}", name_prefix, frame_label, frame_counter.frame_id());
+
+            let image_create_info = GfxImageCreateInfo::new_image_2d_info(
+                extent,
+                format,
+                vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED,
+            );
+
+            GfxImage::new(
+                &image_create_info,
+                &vk_mem::AllocationCreateInfo {
+                    usage: vk_mem::MemoryUsage::AutoPreferDevice,
+                    ..Default::default()
+                },
+                &name,
+            )
+        };
+        let images = FrameCounter::frame_labes().map(create_one_image);
+
+        // 将 layout 设置为 general（用于 storage image）
+        Gfx::get().one_time_exec(
+            |cmd| {
+                let image_barriers = images
+                    .iter()
+                    .map(|image| {
+                        GfxImageBarrier::default()
+                            .image(image.handle())
+                            .src_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())
+                            .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
+                            .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL)
+                            .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    })
+                    .collect_vec();
+
+                cmd.image_memory_barrier(vk::DependencyFlags::empty(), &image_barriers);
+            },
+            &format!("transfer-{}-layout", name_prefix),
+        );
+
+        let image_handles = images.map(|image| gfx_resource_manager.register_image(image));
+        let image_view_handles = FrameCounter::frame_labes().map(|frame_label| {
+            gfx_resource_manager.get_or_create_image_view(
+                image_handles[*frame_label],
+                GfxImageViewDesc::new_2d(format, vk::ImageAspectFlags::COLOR),
+                format!("{}-{}-{}", name_prefix, frame_label, frame_counter.frame_id()),
+            )
+        });
+
+        (image_handles, image_view_handles)
+    }
 }
 // destroy
 impl FifBuffers {
@@ -350,6 +477,17 @@ impl FifBuffers {
             gfx_resource_manager.destroy_image_immediate(render_target_image);
         }
 
+        // 销毁 GBuffer 图像
+        for gbuffer_image in std::mem::take(&mut self.gbuffer_a_images) {
+            gfx_resource_manager.destroy_image_immediate(gbuffer_image);
+        }
+        for gbuffer_image in std::mem::take(&mut self.gbuffer_b_images) {
+            gfx_resource_manager.destroy_image_immediate(gbuffer_image);
+        }
+        for gbuffer_image in std::mem::take(&mut self.gbuffer_c_images) {
+            gfx_resource_manager.destroy_image_immediate(gbuffer_image);
+        }
+
         // image view 无需销毁，只需要销毁 image 即可
         gfx_resource_manager.destroy_image_immediate(self.depth_image);
         gfx_resource_manager.destroy_image_immediate(self.accum_image);
@@ -359,12 +497,18 @@ impl FifBuffers {
         self.accum_image_view = GfxImageViewHandle::default();
         self.depth_image = GfxImageHandle::default();
         self.accum_image = GfxImageHandle::default();
+        self.gbuffer_a_views = Default::default();
+        self.gbuffer_b_views = Default::default();
+        self.gbuffer_c_views = Default::default();
     }
 }
 impl Drop for FifBuffers {
     fn drop(&mut self) {
         debug_assert!(self.single_frame_rt_images.iter().all(|img| img.is_null()));
         debug_assert!(self.off_screen_target_image_handles.iter().all(|target| target.is_null()));
+        debug_assert!(self.gbuffer_a_images.iter().all(|img| img.is_null()));
+        debug_assert!(self.gbuffer_b_images.iter().all(|img| img.is_null()));
+        debug_assert!(self.gbuffer_c_images.iter().all(|img| img.is_null()));
         debug_assert!(self.depth_image.is_null());
         debug_assert!(self.depth_image_view.is_null());
         debug_assert!(self.accum_image.is_null());
@@ -453,5 +597,49 @@ impl FifBuffers {
     #[inline]
     pub fn render_target_format(&self) -> vk::Format {
         self.render_target_format
+    }
+
+    // ========== GBuffer Getters ==========
+
+    /// 获取 GBufferA (normal.xyz + roughness) 的 handle
+    #[inline]
+    pub fn gbuffer_a_handle(&self, frame_label: FrameLabel) -> (GfxImageHandle, GfxImageViewHandle) {
+        (self.gbuffer_a_images[*frame_label], self.gbuffer_a_views[*frame_label])
+    }
+
+    /// 获取 GBufferB (world_position.xyz + linear_depth) 的 handle
+    #[inline]
+    pub fn gbuffer_b_handle(&self, frame_label: FrameLabel) -> (GfxImageHandle, GfxImageViewHandle) {
+        (self.gbuffer_b_images[*frame_label], self.gbuffer_b_views[*frame_label])
+    }
+
+    /// 获取 GBufferC (albedo.rgb + metallic) 的 handle
+    #[inline]
+    pub fn gbuffer_c_handle(&self, frame_label: FrameLabel) -> (GfxImageHandle, GfxImageViewHandle) {
+        (self.gbuffer_c_images[*frame_label], self.gbuffer_c_views[*frame_label])
+    }
+
+    /// 获取 GBuffer 的尺寸
+    #[inline]
+    pub fn gbuffer_extent(&self) -> vk::Extent2D {
+        self.gbuffer_extent
+    }
+
+    /// GBufferA 格式: R16G16B16A16_SFLOAT
+    #[inline]
+    pub const fn gbuffer_a_format() -> vk::Format {
+        vk::Format::R16G16B16A16_SFLOAT
+    }
+
+    /// GBufferB 格式: R16G16B16A16_SFLOAT
+    #[inline]
+    pub const fn gbuffer_b_format() -> vk::Format {
+        vk::Format::R16G16B16A16_SFLOAT
+    }
+
+    /// GBufferC 格式: R8G8B8A8_UNORM
+    #[inline]
+    pub const fn gbuffer_c_format() -> vk::Format {
+        vk::Format::R8G8B8A8_UNORM
     }
 }

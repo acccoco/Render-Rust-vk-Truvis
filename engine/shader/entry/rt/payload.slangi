@@ -40,6 +40,8 @@ struct HitInfo
     float3 origin_normal;
     /// 纹理坐标
     float2 uv;
+    /// 光线 t 值（线性深度）
+    float hit_t;
 
     // ========== 材质参数 ==========
     /// 基础颜色（漫反射颜色）

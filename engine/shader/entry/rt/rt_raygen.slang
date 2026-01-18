@@ -11,6 +11,7 @@
 
 #include "lib/bindless_op.slangi"
 #include "lib/env_map.slangi"
+#include "lib/gbuffer.slangi"
 #include "lib/mis.slangi"
 #include "lib/pbr.slangi"
 #include "lib/sample/random.slangi"
@@ -555,6 +556,9 @@ void main_ray_gen()
     float3 first_hit_normal = float3(0.f);
     bool first_hit_recorded = false;
 
+    // ========== GBuffer 跟踪变量 ==========
+    bool gbuffer_written = false;  // GBuffer 是否已写入
+
     // ========== Irradiance Cache 局部状态 ==========
     uint ic_diffuse_bounce_count = 0;   // Diffuse 弹射计数
     bool ic_pending_update = false;     // 是否有待处理的 IC 更新操作
@@ -594,6 +598,13 @@ void main_ray_gen()
             // sky_color 已在 miss shader 中采样并存储于 payload.info.emissive
             const float3 sky_color = payload.info.emissive;
 
+            // GBuffer: miss 情况写入默认值
+            if (!gbuffer_written)
+            {
+                gbuffer::write_gbuffer_miss(thread_id);
+                gbuffer_written = true;
+            }
+
             if (prev_is_delta || depth == 0)
             {
                 // Delta 路径或首次弹射：直接累加，不使用 MIS
@@ -621,6 +632,26 @@ void main_ray_gen()
             first_hit_position = payload.info.position;
             first_hit_normal = payload.info.forward_normal;
             first_hit_recorded = true;
+        }
+
+        // ================================================================
+        // GBuffer 输出（仅首次命中时写入）
+        // ================================================================
+        if (!gbuffer_written)
+        {
+            // 线性深度使用光线 t 值（从 hit shader 传递）
+            const float linear_depth = payload.info.hit_t;
+
+            gbuffer::GBufferData gbuffer_data = gbuffer::make_gbuffer_data(
+                payload.info.position,
+                payload.info.forward_normal,
+                linear_depth,
+                payload.info.base_color,
+                payload.info.metallic,
+                payload.info.roughness
+            );
+            gbuffer::write_gbuffer_hit(thread_id, gbuffer_data);
+            gbuffer_written = true;
         }
 
         // ================================================================

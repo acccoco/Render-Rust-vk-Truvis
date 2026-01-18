@@ -1,3 +1,5 @@
+#pragma once
+
 #include "share/__common.slangi"
 #include "share/irradiance_cache_data.slangi"
 
@@ -14,6 +16,19 @@ RaytracingAccelerationStructure rt_tlas;
 /// 单帧 RT 输出（每帧写入，用于后续累积）
 [[vk::binding(1, RT_SET_NUM)]]
 RWTexture2D<float4> rt_single_frame_output;
+
+// ========== GBuffer Outputs ==========
+/// GBufferA: normal.xyz + roughness (R16G16B16A16_SFLOAT)
+[[vk::binding(2, RT_SET_NUM)]]
+RWTexture2D<float4> gbuffer_a;
+
+/// GBufferB: world_position.xyz + linear_depth (R16G16B16A16_SFLOAT)
+[[vk::binding(3, RT_SET_NUM)]]
+RWTexture2D<float4> gbuffer_b;
+
+/// GBufferC: albedo.rgb + metallic (R8G8B8A8_UNORM)
+[[vk::binding(4, RT_SET_NUM)]]
+RWTexture2D<float4> gbuffer_c;
 
 #endif
 

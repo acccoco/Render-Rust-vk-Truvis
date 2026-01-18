@@ -256,6 +256,17 @@ pub struct RealtimeRtPassData {
     pub single_frame_output: GfxImageHandle,
     pub single_frame_output_view: GfxImageViewHandle,
     pub single_frame_extent: vk::Extent2D,
+
+    // ========== GBuffer ==========
+    /// GBufferA: normal.xyz + roughness
+    pub gbuffer_a: GfxImageHandle,
+    pub gbuffer_a_view: GfxImageViewHandle,
+    /// GBufferB: world_position.xyz + linear_depth
+    pub gbuffer_b: GfxImageHandle,
+    pub gbuffer_b_view: GfxImageViewHandle,
+    /// GBufferC: albedo.rgb + metallic
+    pub gbuffer_c: GfxImageHandle,
+    pub gbuffer_c_view: GfxImageViewHandle,
 }
 
 #[derive(DescriptorBinding)]
@@ -272,6 +283,28 @@ struct RealtimeRtDescriptorBinding {
     #[stage = "RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR"]
     #[count = 1]
     _rt_single_frame_output: (),
+
+    // ========== GBuffer ==========
+    /// GBufferA: normal.xyz + roughness
+    #[binding = 2]
+    #[descriptor_type = "STORAGE_IMAGE"]
+    #[stage = "RAYGEN_KHR"]
+    #[count = 1]
+    _gbuffer_a: (),
+
+    /// GBufferB: world_position.xyz + linear_depth
+    #[binding = 3]
+    #[descriptor_type = "STORAGE_IMAGE"]
+    #[stage = "RAYGEN_KHR"]
+    #[count = 1]
+    _gbuffer_b: (),
+
+    /// GBufferC: albedo.rgb + metallic
+    #[binding = 4]
+    #[descriptor_type = "STORAGE_IMAGE"]
+    #[stage = "RAYGEN_KHR"]
+    #[count = 1]
+    _gbuffer_c: (),
 }
 
 pub struct RealtimeRtPass {
@@ -399,6 +432,14 @@ impl RealtimeRtPass {
         let rt_image_view =
             render_context.gfx_resource_manager.get_image_view(pass_data.single_frame_output_view).unwrap().handle();
 
+        // 获取 GBuffer image views
+        let gbuffer_a_view =
+            render_context.gfx_resource_manager.get_image_view(pass_data.gbuffer_a_view).unwrap().handle();
+        let gbuffer_b_view =
+            render_context.gfx_resource_manager.get_image_view(pass_data.gbuffer_b_view).unwrap().handle();
+        let gbuffer_c_view =
+            render_context.gfx_resource_manager.get_image_view(pass_data.gbuffer_c_view).unwrap().handle();
+
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::RAY_TRACING_KHR, self.pipeline.pipeline);
@@ -422,6 +463,34 @@ impl RealtimeRtPass {
                             .image_view(rt_image_view),
                     ],
                 ),
+                // GBuffer bindings
+                RealtimeRtDescriptorBinding::gbuffer_a().write_image(
+                    vk::DescriptorSet::null(),
+                    0,
+                    vec![
+                        vk::DescriptorImageInfo::default()
+                            .image_layout(vk::ImageLayout::GENERAL)
+                            .image_view(gbuffer_a_view),
+                    ],
+                ),
+                RealtimeRtDescriptorBinding::gbuffer_b().write_image(
+                    vk::DescriptorSet::null(),
+                    0,
+                    vec![
+                        vk::DescriptorImageInfo::default()
+                            .image_layout(vk::ImageLayout::GENERAL)
+                            .image_view(gbuffer_b_view),
+                    ],
+                ),
+                RealtimeRtDescriptorBinding::gbuffer_c().write_image(
+                    vk::DescriptorSet::null(),
+                    0,
+                    vec![
+                        vk::DescriptorImageInfo::default()
+                            .image_layout(vk::ImageLayout::GENERAL)
+                            .image_view(gbuffer_c_view),
+                    ],
+                ),
             ],
         );
 
@@ -432,6 +501,7 @@ impl RealtimeRtPass {
             &render_context.global_descriptor_sets.global_sets(frame_label),
             None,
         );
+        // FIXME 这个变量废除了，现在只有 spp 1
         let spp = 1;
         let mut push_constant = truvisl::rt::PushConstants {
             spp,
@@ -540,17 +610,35 @@ pub struct RealtimeRtRgPass<'a> {
     /// 单帧 RT 输出图像（只写）
     pub single_frame_image: RgImageHandle,
     pub single_frame_extent: vk::Extent2D,
+
+    // ========== GBuffer ==========
+    pub gbuffer_a: RgImageHandle,
+    pub gbuffer_b: RgImageHandle,
+    pub gbuffer_c: RgImageHandle,
 }
 impl RgPass for RealtimeRtRgPass<'_> {
     fn setup(&mut self, builder: &mut RgPassBuilder) {
-        // RT pass 只写入单帧输出
+        // RT pass 写入单帧输出和 GBuffer
         builder.write_image(self.single_frame_image, RgImageState::STORAGE_WRITE_RAY_TRACING);
+        builder.write_image(self.gbuffer_a, RgImageState::STORAGE_WRITE_RAY_TRACING);
+        builder.write_image(self.gbuffer_b, RgImageState::STORAGE_WRITE_RAY_TRACING);
+        builder.write_image(self.gbuffer_c, RgImageState::STORAGE_WRITE_RAY_TRACING);
     }
 
     fn execute(&self, ctx: &RgPassContext<'_>) {
         let (single_frame_image, single_frame_view) = ctx
             .get_image_and_view_handle(self.single_frame_image)
             .expect("RealtimeRtRgPass: single_frame_image not found");
+
+        let (gbuffer_a, gbuffer_a_view) = ctx
+            .get_image_and_view_handle(self.gbuffer_a)
+            .expect("RealtimeRtRgPass: gbuffer_a not found");
+        let (gbuffer_b, gbuffer_b_view) = ctx
+            .get_image_and_view_handle(self.gbuffer_b)
+            .expect("RealtimeRtRgPass: gbuffer_b not found");
+        let (gbuffer_c, gbuffer_c_view) = ctx
+            .get_image_and_view_handle(self.gbuffer_c)
+            .expect("RealtimeRtRgPass: gbuffer_c not found");
 
         self.rt_pass.ray_trace(
             self.render_context,
@@ -559,6 +647,12 @@ impl RgPass for RealtimeRtRgPass<'_> {
                 single_frame_output: single_frame_image,
                 single_frame_output_view: single_frame_view,
                 single_frame_extent: self.single_frame_extent,
+                gbuffer_a,
+                gbuffer_a_view,
+                gbuffer_b,
+                gbuffer_b_view,
+                gbuffer_c,
+                gbuffer_c_view,
             },
         );
     }

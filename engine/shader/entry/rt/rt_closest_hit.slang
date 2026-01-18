@@ -76,6 +76,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
     payload.info.forward_normal = world_normal;
     payload.info.origin_normal = origin_world_normal;
     payload.info.uv = interp_uv;
+    payload.info.hit_t = RayTCurrent();  // 线性深度
 
     // 材质参数
     payload.info.base_color = base_color;
