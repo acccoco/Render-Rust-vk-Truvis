@@ -16,6 +16,13 @@ use truvis_render_interface::pipeline_settings::{FrameLabel, FrameSettings};
 // TODO FifBuffers 放到 app 里面去，由 App 进行管理
 /// 所有帧会用到的 buffers
 pub struct FifBuffers {
+    /// RT 单帧输出结果，每帧一个
+    single_frame_rt_images: [GfxImageHandle; FrameCounter::fif_count()],
+    single_frame_rt_views: [GfxImageViewHandle; FrameCounter::fif_count()],
+    single_frame_format: vk::Format,
+    #[allow(dead_code)]
+    single_frame_extent: vk::Extent2D,
+
     /// RT 计算的累积结果
     pub accum_image: GfxImageHandle,
     pub accum_image_view: GfxImageViewHandle,
@@ -24,13 +31,16 @@ pub struct FifBuffers {
 
     pub depth_image: GfxImageHandle,
     pub depth_image_view: GfxImageViewHandle,
+    #[allow(dead_code)]
     depth_format: vk::Format,
+    #[allow(dead_code)]
     depth_extent: vk::Extent2D,
 
     /// 离屏渲染的结果，数量和 fif 相同
     pub off_screen_target_image_handles: [GfxImageHandle; FrameCounter::fif_count()],
     pub off_screen_target_view_handles: [GfxImageViewHandle; FrameCounter::fif_count()],
     render_target_format: vk::Format,
+    #[allow(dead_code)]
     render_target_extent: vk::Extent2D,
 }
 // new & init
@@ -41,6 +51,16 @@ impl FifBuffers {
         gfx_resource_manager: &mut GfxResourceManager,
         frame_counter: &FrameCounter,
     ) -> Self {
+        // 创建 per-frame 的单帧 RT 输出图像
+        let single_frame_format = frame_settigns.color_format;
+        let single_frame_extent = frame_settigns.frame_extent;
+        let (single_frame_rt_images, single_frame_rt_views) = Self::create_single_frame_rt_images(
+            gfx_resource_manager,
+            single_frame_format,
+            single_frame_extent,
+            frame_counter,
+        );
+
         let accum_format = frame_settigns.color_format;
         let accum_extent = frame_settigns.frame_extent;
         let (color_image, color_image_view) =
@@ -61,6 +81,11 @@ impl FifBuffers {
         );
 
         let fif_buffers = Self {
+            single_frame_rt_images,
+            single_frame_rt_views,
+            single_frame_format,
+            single_frame_extent,
+
             accum_image: color_image,
             accum_image_view: color_image_view,
             accum_format,
@@ -93,6 +118,9 @@ impl FifBuffers {
     }
 
     fn register_bindless(&self, bindless_manager: &mut BindlessManager) {
+        for single_frame in &self.single_frame_rt_views {
+            bindless_manager.register_uav(*single_frame);
+        }
         bindless_manager.register_uav(self.accum_image_view);
         for render_target in &self.off_screen_target_view_handles {
             bindless_manager.register_uav(*render_target);
@@ -101,11 +129,73 @@ impl FifBuffers {
     }
 
     fn unregister_bindless(&self, bindless_manager: &mut BindlessManager) {
+        for single_frame in &self.single_frame_rt_views {
+            bindless_manager.unregister_uav(*single_frame);
+        }
         bindless_manager.unregister_uav(self.accum_image_view);
         for render_target in &self.off_screen_target_view_handles {
             bindless_manager.unregister_uav(*render_target);
             bindless_manager.unregister_srv(*render_target);
         }
+    }
+
+    /// 创建 per-frame 的单帧 RT 输出图像
+    fn create_single_frame_rt_images(
+        gfx_resource_manager: &mut GfxResourceManager,
+        format: vk::Format,
+        extent: vk::Extent2D,
+        frame_counter: &FrameCounter,
+    ) -> ([GfxImageHandle; FrameCounter::fif_count()], [GfxImageViewHandle; FrameCounter::fif_count()]) {
+        let create_one_image = |frame_label: FrameLabel| {
+            let name = format!("single-frame-rt-{}-{}", frame_label, frame_counter.frame_id());
+
+            let image_create_info = GfxImageCreateInfo::new_image_2d_info(
+                extent,
+                format,
+                vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::SAMPLED,
+            );
+
+            GfxImage::new(
+                &image_create_info,
+                &vk_mem::AllocationCreateInfo {
+                    usage: vk_mem::MemoryUsage::AutoPreferDevice,
+                    ..Default::default()
+                },
+                &name,
+            )
+        };
+        let images = FrameCounter::frame_labes().map(create_one_image);
+
+        // 将 layout 设置为 general
+        Gfx::get().one_time_exec(
+            |cmd| {
+                let image_barriers = images
+                    .iter()
+                    .map(|image| {
+                        GfxImageBarrier::default()
+                            .image(image.handle())
+                            .src_mask(vk::PipelineStageFlags2::TOP_OF_PIPE, vk::AccessFlags2::empty())
+                            .dst_mask(vk::PipelineStageFlags2::BOTTOM_OF_PIPE, vk::AccessFlags2::empty())
+                            .layout_transfer(vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL)
+                            .image_aspect_flag(vk::ImageAspectFlags::COLOR)
+                    })
+                    .collect_vec();
+
+                cmd.image_memory_barrier(vk::DependencyFlags::empty(), &image_barriers);
+            },
+            "transfer-single-frame-rt-image-layout",
+        );
+
+        let image_handles = images.map(|image| gfx_resource_manager.register_image(image));
+        let image_view_handles = FrameCounter::frame_labes().map(|frame_label| {
+            gfx_resource_manager.get_or_create_image_view(
+                image_handles[*frame_label],
+                GfxImageViewDesc::new_2d(format, vk::ImageAspectFlags::COLOR),
+                format!("single-frame-rt-{}-{}", frame_label, frame_counter.frame_id()),
+            )
+        });
+
+        (image_handles, image_view_handles)
     }
 
     /// 创建 RayTracing 需要的 image
@@ -253,6 +343,9 @@ impl FifBuffers {
         self.unregister_bindless(bindless_manager);
 
         // 只需销毁 image，view 会跟随销毁
+        for single_frame_image in std::mem::take(&mut self.single_frame_rt_images) {
+            gfx_resource_manager.destroy_image_immediate(single_frame_image);
+        }
         for render_target_image in std::mem::take(&mut self.off_screen_target_image_handles) {
             gfx_resource_manager.destroy_image_immediate(render_target_image);
         }
@@ -261,6 +354,7 @@ impl FifBuffers {
         gfx_resource_manager.destroy_image_immediate(self.depth_image);
         gfx_resource_manager.destroy_image_immediate(self.accum_image);
 
+        self.single_frame_rt_views = Default::default();
         self.depth_image_view = GfxImageViewHandle::default();
         self.accum_image_view = GfxImageViewHandle::default();
         self.depth_image = GfxImageHandle::default();
@@ -269,6 +363,7 @@ impl FifBuffers {
 }
 impl Drop for FifBuffers {
     fn drop(&mut self) {
+        debug_assert!(self.single_frame_rt_images.iter().all(|img| img.is_null()));
         debug_assert!(self.off_screen_target_image_handles.iter().all(|target| target.is_null()));
         debug_assert!(self.depth_image.is_null());
         debug_assert!(self.depth_image_view.is_null());
@@ -278,6 +373,21 @@ impl Drop for FifBuffers {
 }
 // getter
 impl FifBuffers {
+    /// 获取当前帧的单帧 RT 输出图像句柄
+    #[inline]
+    pub fn single_frame_rt_handle(&self, frame_label: FrameLabel) -> (GfxImageHandle, GfxImageViewHandle) {
+        (
+            self.single_frame_rt_images[*frame_label],
+            self.single_frame_rt_views[*frame_label],
+        )
+    }
+
+    /// 获取单帧 RT 输出图像的格式
+    #[inline]
+    pub fn single_frame_rt_format(&self) -> vk::Format {
+        self.single_frame_format
+    }
+
     #[inline]
     pub fn depth_image_view_handle(&self) -> GfxImageViewHandle {
         self.depth_image_view
@@ -291,22 +401,51 @@ impl FifBuffers {
         )
     }
 
+    /// 获取累积图像句柄
     #[inline]
+    pub fn accum_image_handle(&self) -> GfxImageHandle {
+        self.accum_image
+    }
+
+    /// 获取累积图像视图句柄
+    #[inline]
+    pub fn accum_image_view_handle(&self) -> GfxImageViewHandle {
+        self.accum_image_view
+    }
+
+    /// 获取累积图像格式
+    #[inline]
+    pub fn accum_image_format(&self) -> vk::Format {
+        self.accum_format
+    }
+
+    /// 获取累积图像尺寸
+    #[inline]
+    pub fn accum_image_extent(&self) -> vk::Extent2D {
+        self.accum_extent
+    }
+
+    // 保留旧的 color_* 方法作为别名以保持兼容性
+    #[inline]
+    #[deprecated(note = "use accum_image_handle() instead")]
     pub fn color_image_handle(&self) -> GfxImageHandle {
         self.accum_image
     }
 
     #[inline]
+    #[deprecated(note = "use accum_image_view_handle() instead")]
     pub fn color_image_view_handle(&self) -> GfxImageViewHandle {
         self.accum_image_view
     }
 
     #[inline]
+    #[deprecated(note = "use accum_image_format() instead")]
     pub fn color_image_format(&self) -> vk::Format {
         self.accum_format
     }
 
     #[inline]
+    #[deprecated(note = "use accum_image_extent() instead")]
     pub fn color_image_extent(&self) -> vk::Extent2D {
         self.accum_extent
     }

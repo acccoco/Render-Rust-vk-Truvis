@@ -919,16 +919,7 @@ void main_ray_gen()
         }
     }
 
-    // 累积帧混合
-    if (accum_samples > 0 && push_const.channel == 0)
-    {
-        float a = 1.f / float(accum_samples + 1);
-        const float3 old_color = rt::rt_color.Load(thread_id).xyz;
-        rt::rt_color.Store(thread_id, float4(lerp(old_color, output_radiance, a), 1.f));
-    }
-    else
-    {
-        rt::rt_color.Store(thread_id, float4(output_radiance, 1.f));
-    }
+    // 输出单帧结果（累积逻辑移至单独的 accum pass）
+    rt::rt_single_frame_output.Store(thread_id, float4(output_radiance, 1.f));
 }
 

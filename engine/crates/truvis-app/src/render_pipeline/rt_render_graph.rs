@@ -2,6 +2,7 @@ use ash::vk;
 use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_graph::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
 
+use crate::render_pipeline::accum_pass::{AccumPass, AccumRgPass};
 use crate::render_pipeline::blit_pass::{BlitPass, BlitRgPass};
 use crate::render_pipeline::realtime_rt_pass::{RealtimeRtPass, RealtimeRtRgPass};
 use crate::render_pipeline::resolve_pass::{ResolvePass, ResolveRgPass};
@@ -19,6 +20,8 @@ use truvis_renderer::present::render_present::RenderPresent;
 pub struct RtPipeline {
     /// 光追 pass
     realtime_rt_pass: RealtimeRtPass,
+    /// 累积 pass
+    accum_pass: AccumPass,
     /// Blit pass
     blit_pass: BlitPass,
     /// SDR pass
@@ -39,6 +42,7 @@ impl RtPipeline {
         cmd_allocator: &mut CmdAllocator,
     ) -> Self {
         let realtime_rt_pass = RealtimeRtPass::new(global_descriptor_sets);
+        let accum_pass = AccumPass::new(global_descriptor_sets);
         let blit_pass = BlitPass::new(global_descriptor_sets);
         let sdr_pass = SdrPass::new(global_descriptor_sets);
         let resolve_pass = ResolvePass::new(global_descriptor_sets, swapchain.image_infos().image_format);
@@ -51,6 +55,7 @@ impl RtPipeline {
 
         Self {
             realtime_rt_pass,
+            accum_pass,
             blit_pass,
             sdr_pass,
             resolve_pass,
@@ -135,12 +140,24 @@ impl RtPipeline {
         let fif_buffers = &render_context.fif_buffers;
 
         // 导入外部资源
+        // 单帧 RT 输出（per-frame image）
+        let (single_frame_image_handle, single_frame_view_handle) = fif_buffers.single_frame_rt_handle(frame_label);
+        let single_frame_image = rg_builder.import_image(
+            "single-frame-image",
+            single_frame_image_handle,
+            Some(single_frame_view_handle),
+            fif_buffers.single_frame_rt_format(),
+            RgImageState::UNDEFINED_TOP,
+            None,
+        );
+
+        // 累积图像（跨帧持久）
         let accum_image = rg_builder.import_image(
             "accum-image",
-            fif_buffers.color_image_handle(),
-            Some(fif_buffers.color_image_view_handle()),
-            fif_buffers.color_image_format(),
-            RgImageState::STORAGE_READ_WRITE_RAY_TRACING,
+            fif_buffers.accum_image_handle(),
+            Some(fif_buffers.accum_image_view_handle()),
+            fif_buffers.accum_image_format(),
+            RgImageState::STORAGE_READ_WRITE_COMPUTE,
             None,
         );
 
@@ -158,14 +175,25 @@ impl RtPipeline {
         rg_builder.export_image(render_target, RgImageState::SHADER_READ_FRAGMENT, None);
 
         // 添加 pass
+        // 流程: ray-tracing → accum → blit → hdr-to-sdr
         rg_builder
             .add_pass(
                 "ray-tracing",
                 RealtimeRtRgPass {
                     rt_pass: &self.realtime_rt_pass,
                     render_context,
+                    single_frame_image,
+                    single_frame_extent: render_context.frame_settings.frame_extent,
+                },
+            )
+            .add_pass(
+                "accum",
+                AccumRgPass {
+                    accum_pass: &self.accum_pass,
+                    render_context,
+                    single_frame_image,
                     accum_image,
-                    accum_image_extent: render_context.frame_settings.frame_extent,
+                    image_extent: render_context.frame_settings.frame_extent,
                 },
             )
             .add_pass(

@@ -11,8 +11,9 @@ namespace rt
 [[vk::binding(0, RT_SET_NUM)]]
 RaytracingAccelerationStructure rt_tlas;
 
+/// 单帧 RT 输出（每帧写入，用于后续累积）
 [[vk::binding(1, RT_SET_NUM)]]
-RWTexture2D<float4> rt_color;
+RWTexture2D<float4> rt_single_frame_output;
 
 #endif
 

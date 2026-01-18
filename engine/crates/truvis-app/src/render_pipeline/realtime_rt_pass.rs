@@ -252,9 +252,10 @@ impl Drop for SBTRegions {
 
 /// 传入 pass 的数据
 pub struct RealtimeRtPassData {
-    pub accum_image: GfxImageHandle,
-    pub accum_image_view: GfxImageViewHandle,
-    pub accum_image_extent: vk::Extent2D,
+    /// 单帧 RT 输出图像
+    pub single_frame_output: GfxImageHandle,
+    pub single_frame_output_view: GfxImageViewHandle,
+    pub single_frame_extent: vk::Extent2D,
 }
 
 #[derive(DescriptorBinding)]
@@ -265,11 +266,12 @@ struct RealtimeRtDescriptorBinding {
     #[count = 1]
     _tlas: (),
 
+    /// 单帧 RT 输出
     #[binding = 1]
     #[descriptor_type = "STORAGE_IMAGE"]
     #[stage = "RAYGEN_KHR | CLOSEST_HIT_KHR | ANY_HIT_KHR | CALLABLE_KHR | MISS_KHR"]
     #[count = 1]
-    _rt_color: (),
+    _rt_single_frame_output: (),
 }
 
 pub struct RealtimeRtPass {
@@ -392,10 +394,10 @@ impl RealtimeRtPass {
     pub fn ray_trace(&self, render_context: &RenderContext, cmd: &GfxCommandBuffer, pass_data: RealtimeRtPassData) {
         let frame_label = render_context.frame_counter.frame_label();
 
-        let _rt_handle = render_context.bindless_manager.get_shader_uav_handle(pass_data.accum_image_view);
-        let rt_image = render_context.gfx_resource_manager.get_image(pass_data.accum_image).unwrap().handle();
+        let _rt_handle = render_context.bindless_manager.get_shader_uav_handle(pass_data.single_frame_output_view);
+        let rt_image = render_context.gfx_resource_manager.get_image(pass_data.single_frame_output).unwrap().handle();
         let rt_image_view =
-            render_context.gfx_resource_manager.get_image_view(pass_data.accum_image_view).unwrap().handle();
+            render_context.gfx_resource_manager.get_image_view(pass_data.single_frame_output_view).unwrap().handle();
 
         cmd.begin_label("Ray trace", glam::vec4(0.0, 1.0, 0.0, 1.0));
 
@@ -411,7 +413,7 @@ impl RealtimeRtPass {
                     0,
                     vec![render_context.gpu_scene.tlas(frame_label).unwrap().handle()],
                 ),
-                RealtimeRtDescriptorBinding::rt_color().write_image(
+                RealtimeRtDescriptorBinding::rt_single_frame_output().write_image(
                     vk::DescriptorSet::null(),
                     0,
                     vec![
@@ -504,8 +506,8 @@ impl RealtimeRtPass {
                 &self._sbt.sbt_region_hit,
                 &self._sbt.sbt_region_callable,
                 [
-                    pass_data.accum_image_extent.width,
-                    pass_data.accum_image_extent.height,
+                    pass_data.single_frame_extent.width,
+                    pass_data.single_frame_extent.height,
                     1,
                 ],
             );
@@ -535,25 +537,28 @@ pub struct RealtimeRtRgPass<'a> {
     // TODO 暂时使用这个肮脏的实现
     pub render_context: &'a RenderContext,
 
-    pub accum_image: RgImageHandle,
-    pub accum_image_extent: vk::Extent2D,
+    /// 单帧 RT 输出图像（只写）
+    pub single_frame_image: RgImageHandle,
+    pub single_frame_extent: vk::Extent2D,
 }
 impl RgPass for RealtimeRtRgPass<'_> {
     fn setup(&mut self, builder: &mut RgPassBuilder) {
-        builder.read_write_image(self.accum_image, RgImageState::STORAGE_READ_WRITE_RAY_TRACING);
+        // RT pass 只写入单帧输出
+        builder.write_image(self.single_frame_image, RgImageState::STORAGE_WRITE_RAY_TRACING);
     }
 
     fn execute(&self, ctx: &RgPassContext<'_>) {
-        let (accum_image, accum_image_view) =
-            ctx.get_image_and_view_handle(self.accum_image).expect("RealtimeRtRgPass: accum_image_view not found");
+        let (single_frame_image, single_frame_view) = ctx
+            .get_image_and_view_handle(self.single_frame_image)
+            .expect("RealtimeRtRgPass: single_frame_image not found");
 
         self.rt_pass.ray_trace(
             self.render_context,
             ctx.cmd,
             RealtimeRtPassData {
-                accum_image,
-                accum_image_view,
-                accum_image_extent: self.accum_image_extent,
+                single_frame_output: single_frame_image,
+                single_frame_output_view: single_frame_view,
+                single_frame_extent: self.single_frame_extent,
             },
         );
     }
