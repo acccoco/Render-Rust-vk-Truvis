@@ -170,7 +170,7 @@ impl RenderApp {
             // 可交互的控制面板窗口
             ui.window("Controls")
                 .position([10.0, 200.0], imgui::Condition::FirstUseEver)
-                .size([250.0, 100.0], imgui::Condition::FirstUseEver)
+                .size([250.0, 200.0], imgui::Condition::FirstUseEver)
                 .build(|| {
                     let pipeline_settings = &mut self.renderer.render_context.pipeline_settings;
                     ui.slider("channel", 0, 9, &mut pipeline_settings.channel);
@@ -187,6 +187,20 @@ impl RenderApp {
                         9 => "Irradiance Cache",
                         _ => "Unknown",
                     });
+
+                    ui.separator();
+                    ui.text("Denoise Settings");
+
+                    // 降噪开关
+                    let denoise = &mut pipeline_settings.denoise;
+                    ui.checkbox("Enable Denoise", &mut denoise.enabled);
+
+                    // 降噪参数（仅在启用时可编辑）
+                    let _disabled = ui.begin_disabled(!denoise.enabled);
+                    ui.slider("Sigma Color", 0.01, 1.0, &mut denoise.sigma_color);
+                    ui.slider("Sigma Depth", 0.01, 2.0, &mut denoise.sigma_depth);
+                    ui.slider("Sigma Normal", 0.01, 2.0, &mut denoise.sigma_normal);
+                    ui.slider("Kernel Radius", 1, 5, &mut denoise.kernel_radius);
                 });
 
             self.outer_app.as_mut().unwrap().draw_ui(ui);

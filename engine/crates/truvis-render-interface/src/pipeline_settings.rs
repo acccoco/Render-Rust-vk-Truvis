@@ -29,11 +29,66 @@ pub struct FrameSettings {
     pub frame_extent: vk::Extent2D,
 }
 
+/// 降噪设置
+#[derive(Copy, Clone)]
+pub struct DenoiseSettings {
+    /// 是否启用降噪
+    pub enabled: bool,
+    /// 颜色差异的 sigma 参数（控制颜色相似度权重）
+    pub sigma_color: f32,
+    /// 深度差异的 sigma 参数（控制深度相似度权重）
+    pub sigma_depth: f32,
+    /// 法线差异的 sigma 参数（控制法线相似度权重）
+    pub sigma_normal: f32,
+    /// 滤波核半径（1-5）
+    pub kernel_radius: i32,
+
+    // ========== 增强联合双边滤波参数 ==========
+    /// Albedo 差异的 sigma 参数（控制材质相似度权重）
+    pub sigma_albedo: f32,
+    /// 世界空间位置差异的 sigma 参数（归一化到 scene_scale）
+    pub sigma_position: f32,
+    /// 场景尺度（用于归一化世界空间距离，如 Cornell Box 约 400）
+    pub scene_scale: f32,
+
+    // ========== 粗糙度自适应参数 ==========
+    /// 是否启用粗糙度自适应滤波
+    pub roughness_adaptive_enabled: bool,
+    /// 粗糙度对滤波半径的影响因子（roughness=1 时半径放大倍数）
+    pub roughness_radius_scale: f32,
+    /// 粗糙度对 sigma_normal 的影响因子（roughness=1 时 sigma 放大倍数）
+    pub roughness_sigma_scale: f32,
+}
+
+impl Default for DenoiseSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            sigma_color: 0.1,
+            sigma_depth: 1.0,  // 提高默认值适应大场景
+            sigma_normal: 0.5,
+            kernel_radius: 3,  // 提高默认值提升降噪效果
+
+            // 增强联合双边滤波参数
+            sigma_albedo: 0.1,
+            sigma_position: 0.1,
+            scene_scale: 400.0,  // Cornell Box 尺度
+
+            // 粗糙度自适应参数
+            roughness_adaptive_enabled: true,
+            roughness_radius_scale: 2.0,
+            roughness_sigma_scale: 1.5,
+        }
+    }
+}
+
 /// 管线级配置
 #[derive(Copy, Clone, Default)]
 pub struct PipelineSettings {
     /// 0 表示 RT，1 表示 normal
     pub channel: u32,
+    /// 降噪设置
+    pub denoise: DenoiseSettings,
 }
 
 /// 呈现配置

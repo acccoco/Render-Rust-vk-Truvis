@@ -3,8 +3,8 @@ use truvis_render_graph::render_context::RenderContext;
 use truvis_render_graph::render_graph::{RenderGraphBuilder, RgImageState, RgSemaphoreInfo};
 use truvis_render_graph::resources::fif_buffer::FifBuffers;
 
-use crate::render_pipeline::accum_pass::{AccumPass, AccumRgPass};
 use crate::render_pipeline::blit_pass::{BlitPass, BlitRgPass};
+use crate::render_pipeline::denoise_accum_pass::{DenoiseAccumPass, DenoiseAccumRgPass};
 use crate::render_pipeline::realtime_rt_pass::{RealtimeRtPass, RealtimeRtRgPass};
 use crate::render_pipeline::resolve_pass::{ResolvePass, ResolveRgPass};
 use crate::render_pipeline::sdr_pass::{SdrPass, SdrRgPass};
@@ -21,8 +21,8 @@ use truvis_renderer::present::render_present::RenderPresent;
 pub struct RtPipeline {
     /// 光追 pass
     realtime_rt_pass: RealtimeRtPass,
-    /// 累积 pass
-    accum_pass: AccumPass,
+    /// 降噪累积 pass（双边滤波降噪 + 时域累积）
+    denoise_accum_pass: DenoiseAccumPass,
     /// Blit pass
     blit_pass: BlitPass,
     /// SDR pass
@@ -43,7 +43,7 @@ impl RtPipeline {
         cmd_allocator: &mut CmdAllocator,
     ) -> Self {
         let realtime_rt_pass = RealtimeRtPass::new(global_descriptor_sets);
-        let accum_pass = AccumPass::new(global_descriptor_sets);
+        let denoise_accum_pass = DenoiseAccumPass::new(global_descriptor_sets);
         let blit_pass = BlitPass::new(global_descriptor_sets);
         let sdr_pass = SdrPass::new(global_descriptor_sets);
         let resolve_pass = ResolvePass::new(global_descriptor_sets, swapchain.image_infos().image_format);
@@ -56,7 +56,7 @@ impl RtPipeline {
 
         Self {
             realtime_rt_pass,
-            accum_pass,
+            denoise_accum_pass,
             blit_pass,
             sdr_pass,
             resolve_pass,
@@ -207,7 +207,7 @@ impl RtPipeline {
         rg_builder.export_image(render_target, RgImageState::SHADER_READ_FRAGMENT, None);
 
         // 添加 pass
-        // 流程: ray-tracing → accum → blit → hdr-to-sdr
+        // 流程: ray-tracing → denoise-accum → blit → hdr-to-sdr
         rg_builder
             .add_pass(
                 "ray-tracing",
@@ -222,12 +222,15 @@ impl RtPipeline {
                 },
             )
             .add_pass(
-                "accum",
-                AccumRgPass {
-                    accum_pass: &self.accum_pass,
+                "denoise-accum",
+                DenoiseAccumRgPass {
+                    denoise_accum_pass: &self.denoise_accum_pass,
                     render_context,
                     single_frame_image,
                     accum_image,
+                    gbuffer_a,
+                    gbuffer_b,
+                    gbuffer_c,
                     image_extent: render_context.frame_settings.frame_extent,
                 },
             )

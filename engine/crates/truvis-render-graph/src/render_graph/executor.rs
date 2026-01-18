@@ -567,11 +567,11 @@ impl CompiledGraph<'_> {
     /// - 每个 Pass 的 image/buffer 读写信息（包含资源名称）
     /// - 每个 Pass 的 barrier 详细信息（layout 转换、目标资源名称）
     pub fn print_execution_plan(&self) {
-        log::info!("╔══════════════════════════════════════════════════════════════════╗");
-        log::info!("║              RenderGraph Execution Plan                          ║");
-        log::info!("╠══════════════════════════════════════════════════════════════════╣");
+        log::info!("====================================================================");
+        log::info!("|              RenderGraph Execution Plan                          |");
+        log::info!("|==================================================================|");
         log::info!(
-            "║ Total Passes: {}  |  Execution Order: [{}]",
+            "| Total Passes: {}  |  Execution Order: [{}]",
             self.passes.len(),
             self.execution_order.iter().map(|i| self.passes[*i].name.as_str()).collect::<Vec<_>>().join(" → ")
         );

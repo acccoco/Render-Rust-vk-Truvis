@@ -2,6 +2,7 @@
 
 #include "share/pass/accum.slangi"
 #include "share/pass/blit.slangi"
+#include "share/pass/denoise_accum.slangi"
 #include "share/pass/imgui.slangi"
 #include "share/pass/raster.slangi"
 #include "share/pass/resolve.slangi"
