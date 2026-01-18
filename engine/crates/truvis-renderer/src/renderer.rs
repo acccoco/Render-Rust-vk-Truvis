@@ -5,6 +5,7 @@ use ash::vk;
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use std::ffi::CStr;
 use truvis_asset::asset_hub::AssetHub;
+use truvis_gfx::basic::bytes::BytesConvert;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::commands::semaphore::GfxSemaphore;
 use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
@@ -366,7 +367,7 @@ impl Renderer {
             }
         };
         let crt_frame_data_buffer = &self.render_context.per_frame_data_buffers[*frame_label];
-        cmd.cmd_update_buffer(crt_frame_data_buffer.vk_buffer(), 0, bytemuck::bytes_of(&per_frame_data));
+        cmd.cmd_update_buffer(crt_frame_data_buffer.vk_buffer(), 0, BytesConvert::bytes_of(&per_frame_data));
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
             &[GfxBufferBarrier::default()

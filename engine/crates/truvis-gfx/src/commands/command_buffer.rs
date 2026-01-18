@@ -122,6 +122,15 @@ impl GfxCommandBuffer {
         unsafe { Gfx::get().gfx_device().cmd_update_buffer(self.vk_handle, buffer, offset, data) }
     }
 
+    /// 视为 transfer op
+    ///
+    /// 需要进行同步
+    pub fn cmd_fill_buffer(&self, dst_buffer: vk::Buffer, dst_offset: vk::DeviceSize, size: vk::DeviceSize, data: u32) {
+        unsafe {
+            Gfx::get().gfx_device().cmd_fill_buffer(self.vk_handle, dst_buffer, dst_offset, size, data);
+        }
+    }
+
     /// - command type: state
     /// - 支持的 queue: graphics, compute
     #[inline]

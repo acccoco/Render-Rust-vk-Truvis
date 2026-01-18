@@ -32,8 +32,8 @@ impl bindgen::callbacks::ParseCallbacks for ModifyAdder {
             vec![
                 // "Clone".into(), //
                 // "Copy".into(),  //
-                "bytemuck::Pod".into(),      //
-                "bytemuck::Zeroable".into(), //
+                // "bytemuck::Pod".into(),      //
+                // "bytemuck::Zeroable".into(), //
             ]
         } else {
             vec![]
@@ -52,6 +52,7 @@ fn gen_rust_binding() {
         .raw_line("#![allow(clippy::all)]")
         .raw_line("#![allow(warnings)]")
         .enable_cxx_namespaces()
+        // .ignore_functions()
         // 添加自定义回调
         .parse_callbacks(Box::new(ModifyAdder))
         // 同时保留 cargo 回调

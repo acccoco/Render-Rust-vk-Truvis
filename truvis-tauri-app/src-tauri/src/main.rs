@@ -5,7 +5,9 @@ mod child_window;
 mod render_thread;
 mod tauri_event_adapter;
 
-use crate::child_window::{calculate_vulkan_region, calculate_vulkan_region_with_margins, ChildWindow, set_mouse_event_callback};
+use crate::child_window::{
+    ChildWindow, calculate_vulkan_region, calculate_vulkan_region_with_margins, set_mouse_event_callback,
+};
 use crate::render_thread::RenderThread;
 use crate::tauri_event_adapter::TauriEventAdapter;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};

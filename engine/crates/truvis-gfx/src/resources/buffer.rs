@@ -232,4 +232,14 @@ impl GfxBuffer {
             &cmd_name,
         );
     }
+
+    /// 清空 buffer 内容为 0
+    pub fn clear(&mut self) {
+        Gfx::get().one_time_exec(
+            |cmd| {
+                cmd.cmd_fill_buffer(self.vk_buffer(), 0, vk::WHOLE_SIZE, 0);
+            },
+            "clear-buffer",
+        );
+    }
 }

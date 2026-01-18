@@ -173,7 +173,7 @@ impl RenderApp {
                 .size([250.0, 100.0], imgui::Condition::FirstUseEver)
                 .build(|| {
                     let pipeline_settings = &mut self.renderer.render_context.pipeline_settings;
-                    ui.slider("channel", 0, 8, &mut pipeline_settings.channel);
+                    ui.slider("channel", 0, 9, &mut pipeline_settings.channel);
                     ui.text(match pipeline_settings.channel {
                         0 => "final",
                         1 => "normal",
@@ -184,6 +184,7 @@ impl RenderApp {
                         6 => "from BDRF HDRi",
                         7 => "NEE bounce 0",
                         8 => "NEE bounce 1",
+                        9 => "Irradiance Cache",
                         _ => "Unknown",
                     });
                 });

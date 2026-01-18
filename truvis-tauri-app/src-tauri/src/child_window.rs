@@ -16,11 +16,10 @@ use windows::Win32::Graphics::Gdi::HBRUSH;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, CreateWindowExW, DefWindowProcW, GetClientRect, RegisterClassExW,
-    SetWindowPos, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, HWND_TOP, SWP_SHOWWINDOW, WINDOW_EX_STYLE,
-    WM_DESTROY, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE,
-    WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_KEYDOWN, WM_KEYUP,
-    WNDCLASSEXW, WS_CHILD, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_VISIBLE,
+    BringWindowToTop, CS_HREDRAW, CS_OWNDC, CS_VREDRAW, CreateWindowExW, DefWindowProcW, GetClientRect, HWND_TOP,
+    RegisterClassExW, SWP_SHOWWINDOW, SetWindowPos, WINDOW_EX_STYLE, WM_DESTROY, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
+    WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WNDCLASSEXW,
+    WS_CHILD, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_VISIBLE,
 };
 #[cfg(windows)]
 use windows::core::PCWSTR;
@@ -149,7 +148,7 @@ impl ChildWindow {
             // 将子窗口置于 z-order 顶部（在 WebView2 之上）
             SetWindowPos(hwnd, HWND_TOP, x, y, width, height, SWP_SHOWWINDOW)
                 .map_err(|e| format!("Failed to set window z-order: {}", e))?;
-            
+
             // 额外调用 BringWindowToTop 确保在最前面
             let _ = BringWindowToTop(hwnd);
 
@@ -172,7 +171,7 @@ impl ChildWindow {
             // 使用 HWND_TOP 确保子窗口在 WebView2 之上
             SetWindowPos(self.hwnd.hwnd(), HWND_TOP, x, y, width, height, SWP_SHOWWINDOW)
                 .map_err(|e| format!("Failed to set window position: {}", e))?;
-            
+
             // 额外调用 BringWindowToTop 确保在最前面
             let _ = BringWindowToTop(self.hwnd.hwnd());
             Ok(())
@@ -206,21 +205,16 @@ fn create_raw_window_handle(hwnd: HWND, hinstance: HINSTANCE) -> RawWindowHandle
 
 /// 子窗口消息处理函数
 #[cfg(windows)]
-unsafe extern "system" fn child_window_proc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
+unsafe extern "system" fn child_window_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     use truvis_app::platform::input_event::{ElementState, KeyCode, MouseButton};
-    
+
     // 从 lparam 提取鼠标坐标
     let get_mouse_pos = || {
         let x = (lparam.0 & 0xFFFF) as i16 as f64;
         let y = ((lparam.0 >> 16) & 0xFFFF) as i16 as f64;
         (x, y)
     };
-    
+
     // 发送事件到回调
     let send_event = |event: InputEvent| {
         if let Ok(callback) = MOUSE_EVENT_CALLBACK.lock() {
@@ -229,7 +223,7 @@ unsafe extern "system" fn child_window_proc(
             }
         }
     };
-    
+
     match msg {
         WM_DESTROY => {
             // 子窗口被销毁
@@ -237,48 +231,50 @@ unsafe extern "system" fn child_window_proc(
         }
         WM_MOUSEMOVE => {
             let (x, y) = get_mouse_pos();
-            send_event(InputEvent::MouseMoved { physical_position: [x, y] });
+            send_event(InputEvent::MouseMoved {
+                physical_position: [x, y],
+            });
             LRESULT(0)
         }
         WM_LBUTTONDOWN => {
-            send_event(InputEvent::MouseButtonInput { 
-                button: MouseButton::Left, 
-                state: ElementState::Pressed 
+            send_event(InputEvent::MouseButtonInput {
+                button: MouseButton::Left,
+                state: ElementState::Pressed,
             });
             LRESULT(0)
         }
         WM_LBUTTONUP => {
-            send_event(InputEvent::MouseButtonInput { 
-                button: MouseButton::Left, 
-                state: ElementState::Released 
+            send_event(InputEvent::MouseButtonInput {
+                button: MouseButton::Left,
+                state: ElementState::Released,
             });
             LRESULT(0)
         }
         WM_RBUTTONDOWN => {
-            send_event(InputEvent::MouseButtonInput { 
-                button: MouseButton::Right, 
-                state: ElementState::Pressed 
+            send_event(InputEvent::MouseButtonInput {
+                button: MouseButton::Right,
+                state: ElementState::Pressed,
             });
             LRESULT(0)
         }
         WM_RBUTTONUP => {
-            send_event(InputEvent::MouseButtonInput { 
-                button: MouseButton::Right, 
-                state: ElementState::Released 
+            send_event(InputEvent::MouseButtonInput {
+                button: MouseButton::Right,
+                state: ElementState::Released,
             });
             LRESULT(0)
         }
         WM_MBUTTONDOWN => {
-            send_event(InputEvent::MouseButtonInput { 
-                button: MouseButton::Middle, 
-                state: ElementState::Pressed 
+            send_event(InputEvent::MouseButtonInput {
+                button: MouseButton::Middle,
+                state: ElementState::Pressed,
             });
             LRESULT(0)
         }
         WM_MBUTTONUP => {
-            send_event(InputEvent::MouseButtonInput { 
-                button: MouseButton::Middle, 
-                state: ElementState::Released 
+            send_event(InputEvent::MouseButtonInput {
+                button: MouseButton::Middle,
+                state: ElementState::Released,
             });
             LRESULT(0)
         }
@@ -290,17 +286,17 @@ unsafe extern "system" fn child_window_proc(
         }
         WM_KEYDOWN => {
             let key_code = wparam_to_keycode(wparam.0 as u32);
-            send_event(InputEvent::KeyboardInput { 
-                key_code, 
-                state: ElementState::Pressed 
+            send_event(InputEvent::KeyboardInput {
+                key_code,
+                state: ElementState::Pressed,
             });
             LRESULT(0)
         }
         WM_KEYUP => {
             let key_code = wparam_to_keycode(wparam.0 as u32);
-            send_event(InputEvent::KeyboardInput { 
-                key_code, 
-                state: ElementState::Released 
+            send_event(InputEvent::KeyboardInput {
+                key_code,
+                state: ElementState::Released,
             });
             LRESULT(0)
         }
@@ -353,11 +349,7 @@ pub fn calculate_vulkan_region_with_margins(
 
 /// 旧版兼容：计算子窗口布局（Vulkan 渲染区域占据右侧部分）
 #[cfg(windows)]
-pub fn calculate_vulkan_region(
-    parent_width: i32,
-    parent_height: i32,
-    sidebar_width: i32,
-) -> (i32, i32, i32, i32) {
+pub fn calculate_vulkan_region(parent_width: i32, parent_height: i32, sidebar_width: i32) -> (i32, i32, i32, i32) {
     calculate_vulkan_region_with_margins(parent_width, parent_height, 0, sidebar_width, 0, 0)
 }
 
@@ -407,10 +399,6 @@ pub fn calculate_vulkan_region_with_margins(
 }
 
 #[cfg(not(windows))]
-pub fn calculate_vulkan_region(
-    parent_width: i32,
-    parent_height: i32,
-    sidebar_width: i32,
-) -> (i32, i32, i32, i32) {
+pub fn calculate_vulkan_region(parent_width: i32, parent_height: i32, sidebar_width: i32) -> (i32, i32, i32, i32) {
     calculate_vulkan_region_with_margins(parent_width, parent_height, 0, sidebar_width, 0, 0)
 }

@@ -15,7 +15,7 @@ void sky_miss(inout HitPayload payload)
 
     // 填充天空信息作为"虚拟命中"
     payload.info.position = float3(0.f);
-    payload.info.normal = -WorldRayDirection();
+    payload.info.forward_normal = -WorldRayDirection();
     payload.info.origin_normal = -WorldRayDirection();
     payload.info.uv = uv;
 

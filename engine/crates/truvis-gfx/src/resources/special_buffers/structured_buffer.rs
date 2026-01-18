@@ -8,14 +8,14 @@ use ash::vk;
 use crate::{foundation::debug_messenger::DebugType, impl_derive_buffer, resources::buffer::GfxBuffer};
 
 /// buffer 内存放的是结构体或者结构体的数组
-pub struct GfxStructuredBuffer<T: bytemuck::Pod> {
+pub struct GfxStructuredBuffer<T: Sized> {
     inner: GfxBuffer,
     /// 结构体的数量
     ele_num: usize,
     _phantom: PhantomData<T>,
 }
-impl_derive_buffer!(GfxStructuredBuffer<T: bytemuck::Pod>, GfxBuffer, inner);
-impl<T: bytemuck::Pod> GfxStructuredBuffer<T> {
+impl_derive_buffer!(GfxStructuredBuffer<T>, GfxBuffer, inner);
+impl<T> GfxStructuredBuffer<T> {
     #[inline]
     pub fn new_ssbo(len: usize, debug_name: impl AsRef<str>) -> Self {
         Self::new(

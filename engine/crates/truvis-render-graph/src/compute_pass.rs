@@ -2,17 +2,18 @@ use std::ffi::CStr;
 
 use crate::render_context::RenderContext;
 use ash::vk;
+use truvis_gfx::basic::bytes::BytesConvert;
 use truvis_gfx::{commands::command_buffer::GfxCommandBuffer, gfx::Gfx, pipelines::shader::GfxShaderModule};
 use truvis_render_interface::global_descriptor_sets::GlobalDescriptorSets;
 
 /// 泛型参数 P 表示 compute shader 的参数，以 push constant 的形式传入 shader
-pub struct ComputePass<P: bytemuck::Pod> {
+pub struct ComputePass<P: Sized> {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
 
     _phantom: std::marker::PhantomData<P>,
 }
-impl<P: bytemuck::Pod> ComputePass<P> {
+impl<P: Sized> ComputePass<P> {
     pub fn new(global_descriptor_sets: &GlobalDescriptorSets, entry_point: &CStr, shader_path: &str) -> Self {
         let shader_module = GfxShaderModule::new(std::path::Path::new(shader_path));
         let stage_info = vk::PipelineShaderStageCreateInfo::default()
@@ -56,7 +57,7 @@ impl<P: bytemuck::Pod> ComputePass<P> {
         let frame_label = render_context.frame_counter.frame_label();
         cmd.cmd_bind_pipeline(vk::PipelineBindPoint::COMPUTE, self.pipeline);
 
-        cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::COMPUTE, 0, bytemuck::bytes_of(params));
+        cmd.cmd_push_constants(self.pipeline_layout, vk::ShaderStageFlags::COMPUTE, 0, BytesConvert::bytes_of(params));
         cmd.bind_descriptor_sets(
             vk::PipelineBindPoint::COMPUTE,
             self.pipeline_layout,
@@ -73,7 +74,7 @@ impl<P: bytemuck::Pod> ComputePass<P> {
         // drop
     }
 }
-impl<P: bytemuck::Pod> Drop for ComputePass<P> {
+impl<P: Sized> Drop for ComputePass<P> {
     fn drop(&mut self) {
         let gfx_device = Gfx::get().gfx_device();
         unsafe {

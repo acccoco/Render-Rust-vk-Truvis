@@ -1,5 +1,5 @@
 #include "share/__common.slangi"
-#include "lib/irradiance_cache.slangi"
+#include "share/irradiance_cache_data.slangi"
 
 namespace rt
 {
@@ -16,32 +16,14 @@ RWTexture2D<float4> rt_color;
 
 #endif
 
-// ============================================================================
-// Irradiance Cache 阈值常量
-// ============================================================================
-
-/// Diffuse 判定阈值：metallic < 此值视为 diffuse 表面
-const static float IC_DIFFUSE_THRESHOLD = 0.3f;
-
-/// IC 查询成功阈值：max_weight >= 此值时直接使用 IC 结果并终止光路
-const static float IC_LOOKUP_THRESHOLD = 0.5f;
-
-/// IC 更新阈值：查询成功但 max_weight < 此值时触发更新
-const static float IC_UPDATE_THRESHOLD = 0.8f;
-
-/// IC throughput 最小值：防止除零
-const static float IC_THROUGHPUT_MIN = 0.001f;
-
-/// IC 查询启用的最小 diffuse 弹射次数
-const static uint IC_MIN_DIFFUSE_BOUNCES = 2;
-
 struct PushConstants
 {
+    PTR(ic::Table, ic_table);
+    PTR(ic::EntryPool, ic_entry_pool);
+
     uint spp;
     uint spp_idx;
     uint channel;
-
-    /// Irradiance Cache 实例（通过 GPU 指针访问）
-    ic::IrradianceCache irradiance_cache;
+    uint _padding_;
 };
 };

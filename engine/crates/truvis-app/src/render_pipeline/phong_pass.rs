@@ -1,6 +1,7 @@
 use ash::vk;
 use std::{mem::offset_of, rc::Rc};
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_gfx::basic::bytes::BytesConvert;
 use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::resources::vertex_layout::soa_3d::VertexLayoutSoA3D;
 use truvis_gfx::{
@@ -81,7 +82,7 @@ impl PhongPass {
             self.pipeline.layout(),
             vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
             0,
-            bytemuck::bytes_of(push_constant),
+            BytesConvert::bytes_of(push_constant),
         );
 
         let render_descriptor_sets = &render_context.global_descriptor_sets;

@@ -172,7 +172,7 @@ impl GfxDevice {
             // ash::khr::spirv_1_4::NAME,
             // ash::khr::shader_float_controls::NAME,
             ash::khr::ray_tracing_pipeline::NAME, // 主要的 ext
-            ash::khr::ray_query::NAME,             // RayQuery 支持
+            ash::khr::ray_query::NAME,            // RayQuery 支持
             ash::khr::deferred_host_operations::NAME,
         ]);
 

@@ -4,6 +4,7 @@ use ash::vk;
 use itertools::Itertools;
 
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_gfx::basic::bytes::BytesConvert;
 use truvis_gfx::commands::command_buffer::GfxCommandBuffer;
 use truvis_gfx::pipelines::graphics_pipeline::{GfxGraphicsPipeline, GfxGraphicsPipelineCreateInfo, GfxPipelineLayout};
 use truvis_gfx::pipelines::rendering_info::GfxRenderingInfo;
@@ -186,7 +187,7 @@ impl ResolvePass {
             self.pipeline_layout.handle(),
             vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
             0,
-            bytemuck::bytes_of(&push_constant),
+            BytesConvert::bytes_of(&push_constant),
         );
 
         // 绘制 6 个顶点（两个三角形组成的矩形）

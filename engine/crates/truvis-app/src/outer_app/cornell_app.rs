@@ -40,14 +40,9 @@ impl CornellApp {
             _pos_padding: Default::default(),
             _color_padding: Default::default(),
         });
-        // scene_manager.load_scene(
-        //     &renderer.render_context,
-        //     std::path::Path::new("assets/fbx/sponza/Sponza.fbx"),
-        //     &glam::Mat4::from_translation(glam::vec3(10.0, 10.0, 10.0)),
-        // );
         log::info!("Loading scene...");
         AssimpSceneLoader::load_scene(
-            TruvisPath::assets_path_str("fbx/cornell-box/coord.fbx").as_ref(),
+            TruvisPath::assets_path_str("fbx/cornell-box.fbx").as_ref(),
             &mut renderer.render_context.scene_manager,
             &mut renderer.render_context.asset_hub,
         );

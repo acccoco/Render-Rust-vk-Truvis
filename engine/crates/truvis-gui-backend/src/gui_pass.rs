@@ -6,6 +6,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_gfx::basic::bytes::BytesConvert;
 use truvis_gfx::resources::layout::GfxVertexLayout;
 use truvis_gfx::{
     commands::command_buffer::GfxCommandBuffer,
@@ -157,7 +158,7 @@ impl GuiPass {
             self.pipeline_layout.handle(),
             vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
             0,
-            bytemuck::bytes_of(&push_constant),
+            BytesConvert::bytes_of(&push_constant),
         );
 
         cmd.cmd_bind_index_buffer(&gui_mesh.index_buffer, 0);
@@ -216,7 +217,7 @@ impl GuiPass {
                                 self.pipeline_layout.handle(),
                                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                                 0,
-                                bytemuck::bytes_of(&push_constant),
+                                BytesConvert::bytes_of(&push_constant),
                             );
                             last_texture_id = Some(texture_id);
                         }

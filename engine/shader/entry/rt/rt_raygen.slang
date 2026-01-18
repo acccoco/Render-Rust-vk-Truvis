@@ -15,6 +15,7 @@
 #include "lib/pbr.slangi"
 #include "lib/sample/random.slangi"
 #include "lib/sample/sample.slangi"
+#include "lib/irradiance_cache.slangi"
 
 // 开启后，虽然 active threads 的 coherence 指标从 50% 上升到了 70%
 // SER 主要用于提升后续新的 shader invocation 的一致性
@@ -79,12 +80,12 @@ void sample_diffuse(
     // throughput = BRDF * cos(theta) / pdf = diffuse_color
     const float3 local_dir = Sample::get_cos_hemisphere_sample(random_seed);
     float3 tangent, bitangent;
-    Sample::create_local_coord(info.normal, tangent, bitangent);
-    out_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * info.normal);
+    Sample::create_local_coord(info.forward_normal, tangent, bitangent);
+    out_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * info.forward_normal);
 
     const float3 diffuse_color = (1.f - info.metallic) * info.base_color;
     out_throughput = diffuse_color;
-    out_pdf = DiffuseBrdf::pdf(info.normal, out_dir);
+    out_pdf = DiffuseBrdf::pdf(info.forward_normal, out_dir);
 }
 
 /// 镜面反射采样（GGX）
@@ -108,8 +109,8 @@ void sample_specular(
     const float real_roughness = info.roughness * info.roughness;
 
     // 根据 NDF 采样半程向量 H
-    float3 h = SpecularBrdf::ggx_sample(random_seed, real_roughness, info.normal);
-    SpecularBrdf specular_brdf = SpecularBrdf(f0, real_roughness, info.normal, view_dir, h);
+    float3 h = SpecularBrdf::ggx_sample(random_seed, real_roughness, info.forward_normal);
+    SpecularBrdf specular_brdf = SpecularBrdf(f0, real_roughness, info.forward_normal, view_dir, h);
 
     out_throughput = specular_brdf.brdf_with_pdf() * specular_brdf.get_ndotl();
     out_dir = specular_brdf.light;
@@ -128,11 +129,11 @@ void sample_perfect_reflection(
     out float3 out_throughput
 )
 {
-    out_dir = reflect(ray_dir, info.normal);
+    out_dir = reflect(ray_dir, info.forward_normal);
     // 完美镜面反射的 throughput 基于菲涅尔
     const float reflectance = 0.8f;
     const float3 f0 = lerp(0.16 * reflectance * reflectance, info.base_color, info.metallic);
-    const float cos_theta = saturate(dot(-ray_dir, info.normal));
+    const float cos_theta = saturate(dot(-ray_dir, info.forward_normal));
     const float fresnel = pow(1.f - cos_theta, 5.f);
     out_throughput = f0 + (1.f - f0) * fresnel;
 }
@@ -153,7 +154,7 @@ bool sample_refraction(
     // 根据光线与原始法线的夹角判断是进入还是离开介质
     const float eta = dot(ray_dir, info.origin_normal) > 0.f ? info.ior : 1.f / info.ior;
 
-    out_dir = refract(ray_dir, info.normal, eta);
+    out_dir = refract(ray_dir, info.forward_normal, eta);
     if (length(out_dir) < 1e-6f)
     {
         out_dir = float3(0.f);
@@ -276,8 +277,8 @@ void handle_diffuse(
         // Diffuse 采样：cos-weighted hemisphere
         const float3 local_dir = Sample::get_cos_hemisphere_sample(payload.random_seed);
         float3 tangent, bitangent;
-        Sample::create_local_coord(info.normal, tangent, bitangent);
-        out_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * info.normal);
+        Sample::create_local_coord(info.forward_normal, tangent, bitangent);
+        out_dir = normalize(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * info.forward_normal);
     }
     else
     {
@@ -285,12 +286,12 @@ void handle_diffuse(
         const float reflectance = 0.8f;
         const float3 f0 = lerp(0.16 * reflectance * reflectance, info.base_color, info.metallic);
         const float real_roughness = info.roughness * info.roughness;
-        float3 h = SpecularBrdf::ggx_sample(payload.random_seed, real_roughness, info.normal);
+        float3 h = SpecularBrdf::ggx_sample(payload.random_seed, real_roughness, info.forward_normal);
         out_dir = reflect(-view_dir, h);
     }
 
     // 检查采样方向是否有效（在表面上方）
-    const float ndotl = dot(info.normal, out_dir);
+    const float ndotl = dot(info.forward_normal, out_dir);
     if (ndotl <= 0.f)
     {
         out_throughput = float3(0.f);
@@ -387,14 +388,14 @@ float eval_brdf_pdf(const HitInfo info, const float3 view_dir, const float3 ligh
     const float prob_diffuse = info.roughness;
 
     // 漫反射 PDF
-    const float diffuse_pdf = DiffuseBrdf::pdf(info.normal, light_dir);
+    const float diffuse_pdf = DiffuseBrdf::pdf(info.forward_normal, light_dir);
 
     // 镜面反射 PDF
     const float3 h = normalize(view_dir + light_dir);
     const float reflectance = 0.8f;
     const float3 f0 = lerp(0.16 * reflectance * reflectance, info.base_color, info.metallic);
     const float real_roughness = info.roughness * info.roughness;
-    SpecularBrdf specular_brdf = SpecularBrdf(f0, real_roughness, info.normal, view_dir, h);
+    SpecularBrdf specular_brdf = SpecularBrdf(f0, real_roughness, info.forward_normal, view_dir, h);
     const float specular_pdf = specular_brdf.ggx_pdf();
 
     // 混合 PDF
@@ -408,7 +409,7 @@ float eval_brdf_pdf(const HitInfo info, const float3 view_dir, const float3 ligh
 /// @return BRDF * cos(theta)
 float3 eval_brdf(const HitInfo info, const float3 view_dir, const float3 light_dir)
 {
-    const float ndotl = max(dot(info.normal, light_dir), 0.f);
+    const float ndotl = max(dot(info.forward_normal, light_dir), 0.f);
     if (ndotl <= 0.f)
     {
         return float3(0.f);
@@ -423,7 +424,7 @@ float3 eval_brdf(const HitInfo info, const float3 view_dir, const float3 light_d
     const float reflectance = 0.8f;
     const float3 f0 = lerp(0.16 * reflectance * reflectance, info.base_color, info.metallic);
     const float real_roughness = info.roughness * info.roughness;
-    SpecularBrdf specular_brdf = SpecularBrdf(f0, real_roughness, info.normal, view_dir, h);
+    SpecularBrdf specular_brdf = SpecularBrdf(f0, real_roughness, info.forward_normal, view_dir, h);
     const float3 specular = specular_brdf.brdf();
 
     return (diffuse + specular) * ndotl;
@@ -455,7 +456,7 @@ bool handle_debug_channel(const HitInfo info, uint channel, out float3 out_color
     // 通道 1：法线可视化
     if (channel == 1)
     {
-        out_color = info.normal * 0.5f + 0.5f;
+        out_color = info.forward_normal * 0.5f + 0.5f;
         return true;
     }
 
@@ -483,19 +484,6 @@ uint compute_coherence_hint(const HitInfo info)
 float luminance(float3 color)
 {
     return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
-}
-
-// ============================================================================
-// Irradiance Cache 辅助函数
-// ============================================================================
-
-/// 判断当前表面是否满足 diffuse 条件（用于 IC 查询）
-/// @param info 命中信息
-/// @return true 表示满足 diffuse 条件
-bool is_diffuse_surface(const HitInfo info)
-{
-    return info.material_type == MaterialType::DIFFUSE &&
-        info.metallic < rt::IC_DIFFUSE_THRESHOLD;
 }
 
 /// 发射 shadow ray，判断是否命中任何物体
@@ -571,6 +559,7 @@ void main_ray_gen()
     uint ic_diffuse_bounce_count = 0;   // Diffuse 弹射计数
     bool ic_pending_update = false;     // 是否有待处理的 IC 更新操作
     bool ic_pending_insert = false;     // 是否有待处理的 IC 插入操作
+    bool has_ic_query = false;          // 是否已进行 IC 查询
     uint ic_entry_index = 0xFFFFFFFF;   // 待更新的 IC entry 索引
     float3 ic_position = float3(0.f);   // IC 记录点的世界位置
     float3 ic_normal = float3(0.f);     // IC 记录点的法线
@@ -630,7 +619,7 @@ void main_ray_gen()
         if (!first_hit_recorded)
         {
             first_hit_position = payload.info.position;
-            first_hit_normal = payload.info.normal;
+            first_hit_normal = payload.info.forward_normal;
             first_hit_recorded = true;
         }
 
@@ -657,12 +646,12 @@ void main_ray_gen()
             sample_env_map_uniform(payload.random_seed, light_dir, env_pdf);
 
             // 检查光源方向是否在表面上方
-            const float ndotl = dot(payload.info.normal, light_dir);
+            const float ndotl = dot(payload.info.forward_normal, light_dir);
             if (ndotl > 0.f)
             {
                 // 构造阴影光线
                 RayDesc shadow_ray_desc;
-                shadow_ray_desc.Origin = payload.info.position + 0.001f * payload.info.normal;
+                shadow_ray_desc.Origin = payload.info.position + 0.001f * light_dir;
                 shadow_ray_desc.Direction = light_dir;
                 shadow_ray_desc.TMin = 0.001f;
                 shadow_ray_desc.TMax = 10000.0f;
@@ -699,40 +688,50 @@ void main_ray_gen()
 
         // ================================================================
         // Irradiance Cache 查询（NEE 之后，BRDF 采样之前）
-        // 条件：diffuse 弹射 >= 2、当前为 diffuse 表面、无待处理 IC 操作
+        // 条件：bounces、当前为 diffuse 表面、无待处理 IC 操作
         // ================================================================
-        if (ic_diffuse_bounce_count >= rt::IC_MIN_DIFFUSE_BOUNCES &&
-            is_diffuse_surface(payload.info) &&
-            !ic_pending_update &&
-            !ic_pending_insert)
+        if (
+            ic_diffuse_bounce_count >= rt::IC_MIN_DIFFUSE_BOUNCES &&
+            ic::is_diffuse_surface(payload.info.roughness, payload.info.metallic) &&
+            !(ic_pending_update || ic_pending_insert || has_ic_query)
+        )
         {
             float3 ic_query_irradiance;
             float ic_weight;
             uint ic_max_weight_entry_index;
             float ic_max_weight;
 
-            bool ic_found = push_const.irradiance_cache.lookup(
+            bool ic_found = ic::fn::lookup(
+                push_const.ic_table,
+                push_const.ic_entry_pool,
                 payload.info.position,
-                payload.info.normal,
+                payload.info.forward_normal,
                 ic_query_irradiance,
                 ic_weight,
                 ic_max_weight_entry_index,
                 ic_max_weight
             );
+            has_ic_query = true;
 
-            if (ic_found && ic_max_weight >= rt::IC_LOOKUP_THRESHOLD)
+            if (ic_found && ic_max_weight > ic::IC_LOOKUP_THRESHOLD)
             {
-                // IC 查询成功且权重足够高：直接使用 IC 结果并终止光路
-                radiance += throughput * ic_query_irradiance;
-                break;
+                // 概率性使用 IC 结果
+                if (Random::rnd(payload.random_seed) < 0.7f)
+                {
+                    // IC 查询成功且权重足够高：直接使用 IC 结果并终止光路
+                    // IC 里面存的是 irradiance * (rho / pi)，因此可以直接累加
+                    radiance += throughput * ic_query_irradiance;
+                    break;
+                }
             }
-            else if (ic_found && ic_max_weight < rt::IC_UPDATE_THRESHOLD)
+
+            if (ic_found && ic_max_weight > ic::IC_UPDATE_THRESHOLD)
             {
                 // IC 查询成功但权重较低：标记待更新，继续追踪以获取更好的估计
                 ic_pending_update = true;
                 ic_entry_index = ic_max_weight_entry_index;
                 ic_position = payload.info.position;
-                ic_normal = payload.info.normal;
+                ic_normal = payload.info.forward_normal;
                 ic_throughput = throughput;
                 ic_radiance = radiance;
             }
@@ -741,7 +740,7 @@ void main_ray_gen()
                 // IC 查询失败：仅在 spp_idx == 0 时标记待插入，限制插入频率
                 ic_pending_insert = true;
                 ic_position = payload.info.position;
-                ic_normal = payload.info.normal;
+                ic_normal = payload.info.forward_normal;
                 ic_throughput = throughput;
                 ic_radiance = radiance;
             }
@@ -753,7 +752,17 @@ void main_ray_gen()
         float3 next_origin, next_dir, mat_throughput, emission;
         bool done;
         float brdf_pdf;
-        process_material(payload, payload.info, ray.Direction, next_origin, next_dir, mat_throughput, emission, done, brdf_pdf);
+        process_material(
+            payload,
+            payload.info,
+            ray.Direction,
+            next_origin,
+            next_dir,
+            mat_throughput,
+            emission,
+            done,
+            brdf_pdf
+        );
 
         // 累积自发光（如 SKY 材质类型）
         radiance += emission * throughput;
@@ -771,7 +780,7 @@ void main_ray_gen()
         prev_is_delta = payload.info.is_delta_path();
 
         // 检测是否遇到了 diffuse（在 BRDF 采样之后）
-        if (payload.info.material_type == MaterialType::DIFFUSE)
+        if (ic::is_diffuse_surface(payload.info.roughness, payload.info.metallic))
         {
             has_diffuse = true;
             // 递增 diffuse 弹射计数（用于 IC 查询条件）
@@ -807,10 +816,22 @@ void main_ray_gen()
         if (max_ic_throughput >= rt::IC_THROUGHPUT_MIN)
         {
             // 估算从 IC 记录点开始的 irradiance
+            // NOTE 实际上存的是 irradiance * (rho / pi)
             // irradiance = (final_radiance - radiance_at_ic) / throughput_at_ic
             float3 delta_radiance = radiance - ic_radiance;
             float3 safe_throughput = max(ic_throughput, float3(rt::IC_THROUGHPUT_MIN));
             float3 estimated_irradiance = delta_radiance / safe_throughput;
+
+            float max_delta_radiance = max(delta_radiance.x, max(delta_radiance.y, delta_radiance.z));
+            float max_irradiance = max(estimated_irradiance.x, max(estimated_irradiance.y, estimated_irradiance.z));
+            // 估算的 irradiance 过小，放弃 IC 操作
+            if (max_delta_radiance < 0.01f ||
+                max_irradiance < 0.01f ||
+                max_irradiance > 10.f)
+            {
+                ic_pending_update = false;
+                ic_pending_insert = false;
+            }
 
             // 确保 irradiance 非负（数值误差可能导致负值）
             estimated_irradiance = max(estimated_irradiance, float3(0.f));
@@ -818,12 +839,20 @@ void main_ray_gen()
             if (ic_pending_update)
             {
                 // 更新现有 IC entry
-                push_const.irradiance_cache.update(ic_entry_index, estimated_irradiance);
+                ic::fn::update(
+                    push_const.ic_entry_pool,
+                    ic_entry_index,
+                    ic_position,
+                    ic_normal,
+                    estimated_irradiance
+                );
             }
             else if (ic_pending_insert && push_const.spp_idx == 0)
             {
                 // 插入新 IC entry（仅 spp_idx == 0 时执行，限制插入频率）
-                push_const.irradiance_cache.insert(
+                ic::fn::insert(
+                    push_const.ic_table,
+                    push_const.ic_entry_pool,
                     ic_position,
                     ic_normal,
                     estimated_irradiance
@@ -864,7 +893,9 @@ void main_ray_gen()
             uint ic_max_weight_entry_index;
             float ic_max_weight;
 
-            bool ic_found = push_const.irradiance_cache.lookup(
+            bool ic_found = ic::fn::lookup(
+                push_const.ic_table,
+                push_const.ic_entry_pool,
                 first_hit_position,
                 first_hit_normal,
                 ic_query_irradiance,

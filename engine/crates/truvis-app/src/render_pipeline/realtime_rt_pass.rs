@@ -2,7 +2,10 @@ use ash::vk;
 use itertools::Itertools;
 use truvis_crate_tools::resource::TruvisPath;
 use truvis_descriptor_layout_macro::DescriptorBinding;
+use truvis_gfx::basic::bytes::BytesConvert;
+use truvis_gfx::commands::barrier::GfxBufferBarrier;
 use truvis_gfx::descriptors::descriptor::GfxDescriptorSetLayout;
+use truvis_gfx::resources::special_buffers::structured_buffer::GfxStructuredBuffer;
 use truvis_gfx::utilities::descriptor_cursor::GfxDescriptorCursor;
 use truvis_gfx::{
     commands::{barrier::GfxImageBarrier, command_buffer::GfxCommandBuffer},
@@ -273,6 +276,9 @@ pub struct RealtimeRtPass {
     pipeline: GfxRtPipeline,
     _sbt: SBTRegions,
     _rt_descriptor_set_layout: GfxDescriptorSetLayout<RealtimeRtDescriptorBinding>,
+
+    hash_table: GfxStructuredBuffer<truvisl::ic::Table>,
+    entry_pool: GfxStructuredBuffer<truvisl::ic::EntryPool>,
 }
 impl RealtimeRtPass {
     pub fn new(render_descriptor_sets: &GlobalDescriptorSets) -> Self {
@@ -355,10 +361,32 @@ impl RealtimeRtPass {
         };
         let sbt = SBTRegions::create_sbt(&rt_pipeline);
 
+        let mut hash_table = GfxStructuredBuffer::<truvisl::ic::Table>::new(
+            "ic-hash-table",
+            1,
+            vk::BufferUsageFlags::STORAGE_BUFFER
+                | vk::BufferUsageFlags::TRANSFER_DST
+                | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+            false,
+        );
+        hash_table.clear();
+        let mut entry_pool = GfxStructuredBuffer::<truvisl::ic::EntryPool>::new(
+            "ic-entry-pool",
+            1,
+            vk::BufferUsageFlags::STORAGE_BUFFER
+                | vk::BufferUsageFlags::TRANSFER_DST
+                | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+            false,
+        );
+        entry_pool.clear();
+
         Self {
             pipeline: rt_pipeline,
             _sbt: sbt,
             _rt_descriptor_set_layout: rt_descriptor_set_layout,
+
+            hash_table,
+            entry_pool,
         }
     }
     pub fn ray_trace(&self, render_context: &RenderContext, cmd: &GfxCommandBuffer, pass_data: RealtimeRtPassData) {
@@ -402,16 +430,19 @@ impl RealtimeRtPass {
             &render_context.global_descriptor_sets.global_sets(frame_label),
             None,
         );
-        let spp = 4;
+        let spp = 1;
         let mut push_constant = truvisl::rt::PushConstants {
             spp,
             spp_idx: 0,
             channel: render_context.pipeline_settings.channel,
-            _padding_1: 0,
+            ic_table: self.hash_table.device_address(),
+            ic_entry_pool: self.entry_pool.device_address(),
+            _padding_: 0,
         };
         for spp_idx in 0..spp {
             push_constant.spp_idx = spp_idx;
 
+            // 在 spp 之间，需要插入一个 image barrier，确保上一次的写入被下一次读取到
             if spp_idx != 0 {
                 cmd.image_memory_barrier(
                     vk::DependencyFlags::empty(),
@@ -429,6 +460,33 @@ impl RealtimeRtPass {
                 );
             }
 
+            // 在每次 spp 之前，都需要确保 hash table 的读写可以被下一次的 spp 读取到
+            cmd.buffer_memory_barrier(
+                vk::DependencyFlags::empty(),
+                &[
+                    GfxBufferBarrier::new()
+                        .buffer(self.hash_table.vk_buffer(), 0, vk::WHOLE_SIZE)
+                        .src_mask(
+                            vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+                            vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
+                        )
+                        .dst_mask(
+                            vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+                            vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
+                        ),
+                    GfxBufferBarrier::new()
+                        .buffer(self.entry_pool.vk_buffer(), 0, vk::WHOLE_SIZE)
+                        .src_mask(
+                            vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+                            vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
+                        )
+                        .dst_mask(
+                            vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+                            vk::AccessFlags2::SHADER_READ | vk::AccessFlags2::SHADER_WRITE,
+                        ),
+                ],
+            );
+
             cmd.cmd_push_constants(
                 self.pipeline.pipeline_layout,
                 vk::ShaderStageFlags::RAYGEN_KHR
@@ -437,7 +495,7 @@ impl RealtimeRtPass {
                     | vk::ShaderStageFlags::CALLABLE_KHR
                     | vk::ShaderStageFlags::CLOSEST_HIT_KHR,
                 0,
-                bytemuck::bytes_of(&push_constant),
+                BytesConvert::bytes_of(&push_constant),
             );
 
             cmd.trace_rays(

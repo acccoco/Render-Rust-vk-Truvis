@@ -73,7 +73,7 @@ void main_closest_hit(inout HitPayload payload, in BuiltInTriangleIntersectionAt
 
     // 几何信息
     payload.info.position = world_pos;
-    payload.info.normal = world_normal;
+    payload.info.forward_normal = world_normal;
     payload.info.origin_normal = origin_world_normal;
     payload.info.uv = interp_uv;
 

@@ -9,6 +9,7 @@ use ash::vk;
 use itertools::Itertools;
 use std::path::PathBuf;
 use truvis_crate_tools::resource::TruvisPath;
+use truvis_gfx::basic::bytes::BytesConvert;
 use truvis_gfx::{
     commands::{
         barrier::{GfxBarrierMask, GfxBufferBarrier},
@@ -252,7 +253,7 @@ impl GpuScene {
             uv_checker_sampler_type: truvisl::ESamplerType_LinearClamp,
         };
 
-        cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.vk_buffer(), 0, bytemuck::bytes_of(&gpu_scene_data));
+        cmd.cmd_update_buffer(crt_gpu_buffers.scene_buffer.vk_buffer(), 0, BytesConvert::bytes_of(&gpu_scene_data));
         cmd.buffer_memory_barrier(
             vk::DependencyFlags::empty(),
             &[GfxBufferBarrier::default().mask(barrier_mask).buffer(
