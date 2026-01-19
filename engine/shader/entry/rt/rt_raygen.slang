@@ -645,7 +645,6 @@ void main_ray_gen()
                 {
                     ic_radiance += sky_color * ic_throughput * mis_weight;
                 }
-                
             }
             break;
         }
@@ -794,6 +793,7 @@ void main_ray_gen()
             }
 
             if (ic_found && ic_max_weight > ic::IC_UPDATE_THRESHOLD)
+            // if (ic_found && ic_max_weight > 0.f)
             {
                 // IC 查询成功但权重较低：标记待更新，继续追踪以获取更好的估计
                 ic_pending_update = true;
@@ -871,6 +871,7 @@ void main_ray_gen()
                 break;
             }
             throughput /= p;
+            ic_throughput /= p;
         }
 
         // 设置下一条光线
@@ -881,34 +882,16 @@ void main_ray_gen()
     // ================================================================
     // Irradiance Cache 更新/插入（路径追踪结束后）
     // 使用最终 radiance 和记录点的 throughput 估算 irradiance
+    // 没有命中的路径也需要更新，因为这是 RR + MC 估计下的结果
     // ================================================================
     if (push_const.ic_enabled != 0 && (ic_pending_update || ic_pending_insert))
     {
-        // 计算 throughput 分量最大值，用于除零保护
         float max_ic_throughput = max(ic_throughput.r, max(ic_throughput.g, ic_throughput.b));
+        float max_ic_radiance = max(ic_radiance.x, max(ic_radiance.y, ic_radiance.z));
 
         // 仅当 throughput 足够大时才进行 IC 操作
-        if (max_ic_throughput >= rt::IC_THROUGHPUT_MIN)
+        // if (max_ic_throughput >= rt::IC_THROUGHPUT_MIN)
         {
-            // ic_radiance 已经是从 IC 记录点开始累积的出射 radiance
-            // 存储的是 irradiance * (rho / pi)，即 diffuse 表面的出射 radiance
-
-            // FIXME 瞎写的，这样搞了之后，数值看起来还行……
-            ic_radiance = ic_radiance / (M_PI * M_PI); 
-
-            float max_ic_radiance = max(ic_radiance.x, max(ic_radiance.y, ic_radiance.z));
-            // 估算的 radiance 过小，放弃 IC 操作（避免存储噪声）
-            if (max_ic_radiance < 0.001f)
-            {
-                ic_pending_update = false;
-                ic_pending_insert = false;
-            }
-            // 估算的 radiance 过大（可能是数值问题），限制最大值
-            else if (max_ic_radiance > 100.f)
-            {
-                ic_radiance = ic_radiance * (100.f / max_ic_radiance);
-            }
-
             if (ic_pending_update)
             {
                 // 更新现有 IC entry

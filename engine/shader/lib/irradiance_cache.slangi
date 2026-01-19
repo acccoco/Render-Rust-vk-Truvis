@@ -11,19 +11,19 @@ namespace ic
 // ============================================================================
 
 /// 每个 cell 的大小（世界单位）
-const static float CELL_SIZE = 16.0f;
+const static float CELL_SIZE = 24.0f;
 
 /// 有效采样数阈值，超过此值后更新权重固定
 const static uint VALID_SAMPLE_COUNT = 64;
 
 /// 最小权重阈值，低于此值认为查找失败
-const static float MIN_WEIGHT_THRESHOLD = 0.001f;
+const static float MIN_WEIGHT_THRESHOLD = 0.0001f;
 
 /// 法线相似度阈值（cos 值），约 25° 夹角
 const static float NORMAL_THRESHOLD = 0.9f;
 
-/// 默认 entry 半径
-const static float DEFAULT_RADIUS = CELL_SIZE * 1.6f;
+/// 默认 entry 有效半径
+const static float DEFAULT_RADIUS = CELL_SIZE * 1.3f;
 
 /// weight = Radius / (100 * Dist + Radius)
 /// Dist = (1 - weight) / (100 * weigt) * Radius
@@ -231,7 +231,7 @@ bool lookup(
                 }
             }
         }
-    } 
+    }
 
     // 检查是否找到有效缓存
     if (total_weight > MIN_WEIGHT_THRESHOLD &&
@@ -272,13 +272,16 @@ static void update(
         return;
     }
 
+    float valid_weight = 1.f;
+    valid_weight *= saturate(dot(normal, entry_pool->normals[entry_idx].xyz));
+
     // 获取当前采样数
     uint current_count = entry_pool->sample_counts[entry_idx];
 
     // 计算更新权重：使用简单的指数移动平均
     // 采样数越多，新样本的权重越小
     uint effective_count = min(current_count + 1, VALID_SAMPLE_COUNT);
-    float update_weight = 1.0f / float(effective_count);
+    float update_weight = 1.0f / float(effective_count) * valid_weight;
 
     // 增量平均更新
     float3 old_radiance = entry_pool->radiances[entry_idx].xyz;
@@ -331,14 +334,21 @@ static bool insert(
     int3 cell_coord = world_to_cell(position);
     uint bucket_idx = get_bucket_index(cell_coord);
 
-    // 原子分配 bucket 内的 slot
+        // 直接丢弃超出最大 entry 数的情况
     uint slot;
     InterlockedAdd(hash_table->buckets[bucket_idx].entry_count, 1u, slot);
+    if (slot >= MAX_ENTRY_IN_BUCKET)
+    {
+        // 回滚 entry_count 和 bucket entry_count
+        InterlockedAdd(entry_pool->entry_count, -1);
+        InterlockedAdd(hash_table->buckets[bucket_idx].entry_count, -1);
+        return false;
+    }
 
     // 使用环形缓冲区策略：当 bucket 满时替换旧的 entry
     // slot % MAX_ENTRY_IN_BUCKET 确保索引在有效范围内
     uint actual_slot = slot % MAX_ENTRY_IN_BUCKET;
-    
+
     // 使用原子交换确保写入对其他线程可见
     // 注意：这里仍存在短暂的竞态窗口，但原子操作保证了写入的原子性
     uint old_entry_idx;

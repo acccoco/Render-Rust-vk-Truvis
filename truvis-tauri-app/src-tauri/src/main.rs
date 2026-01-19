@@ -156,7 +156,7 @@ fn init_vulkan_child_window(main_window: &WebviewWindow) -> Result<(), Box<dyn s
     println!("Created Vulkan child window at ({}, {}) with size {}x{}", x, y, width, height);
 
     // 在独立线程中启动渲染器
-    let render_thread = RenderThread::spawn(raw_display_handle, || Box::new(CornellApp::default()));
+    let render_thread = RenderThread::spawn(raw_display_handle, || Box::new(SponzaApp::default()));
 
     // 发送窗口初始化消息（使用子窗口的句柄）
     render_thread.init_window(raw_display_handle, child_raw_handle, scale_factor, [width as u32, height as u32]);

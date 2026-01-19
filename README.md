@@ -16,6 +16,7 @@
 - **剖切**：支持剖切体和填充面渲染效果
 - **RenderGraph**：基于渲染图的资源和依赖管理
 - **SER 优化**：使用 Shader Execution Reordering 提升光线追踪性能
+- **Irradiance Cache** 缓存 diffuse 表面的 outgoing radiance
 
 ![Result](./docs/imgs/Result.PNG)
 ![rt-sponza](./docs/imgs/rt-sponza.png)
@@ -80,6 +81,12 @@ cargo run --bin shader-toy
 ```
 
 ## 🌟 特性
+
+### Irrdiance Cache
+
+使用 HashGrid 存储场景中 diffuse 表面的 Irradiance 信息，在第二次命中 diffuse 表面时，查询缓存以加速全局光照计算，提升渲染性能。
+
+![IrradianceCache](./docs/imgs/IrradianceCache.png)
 
 ### 剖切体和填充面
 
